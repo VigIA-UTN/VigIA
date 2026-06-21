@@ -7,4 +7,11 @@ assignees: ''
 
 ---
 
+## Descripción
+...
 
+## Criterios de Aceptación
+- [ ] ...
+
+## Comentarios
+...
