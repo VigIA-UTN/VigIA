@@ -1,6 +1,6 @@
 ---
 name: Documentación
-about: Template para Tickets de Documentación sin Diagrama
+about: Template para Tickets de Documentación
 title: ''
 labels: ''
 assignees: ''
