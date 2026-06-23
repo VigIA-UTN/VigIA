@@ -1,0 +1,27 @@
+# Java / Maven
+backend-core/target/
+*.class
+
+# Python
+**/venv/
+**/__pycache__/
+**/*.pyc
+
+# Node / React
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Docker / OS
+infra/postgres-init/*.bak
+.DS_Store
+Thumbs.db
+
+# Github
+
+.github/ISSUE_TEMPLATE/

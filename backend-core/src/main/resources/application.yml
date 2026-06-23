@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: vigia-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/vigia
+    username: vigia_user
+    password: vigia_dev_password
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8080
+
+# URLs internas de los microservicios ML (red privada / VPC en producción,
+# localhost durante el desarrollo)
+vigia:
+  ml:
+    celo-url: http://localhost:8001
+    salud-url: http://localhost:8002
+    geo-url: http://localhost:8003
