@@ -9,7 +9,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Coordenada de referencia provisoria; reemplazar por la ubicación real del campo.
 const CENTRO_CAMPO: [number, number] = [-34.6037, -58.3816];
 
 function App() {

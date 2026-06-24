@@ -17,7 +17,12 @@ frontend/.env.local
 *.iml
 .vscode/
 
-# Docker / OS
+# Docker / OS / Env
 infra/postgres-init/*.bak
 .DS_Store
 Thumbs.db
+
+# Environments
+.env
+.env.*
+!.env.example

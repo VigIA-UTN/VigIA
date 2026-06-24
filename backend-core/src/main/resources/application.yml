@@ -2,7 +2,7 @@ spring:
   application:
     name: vigia-backend
   datasource:
-    url: jdbc:postgresql://localhost:5432/vigia
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/vigia
     username: vigia_user
     password: vigia_dev_password
   jpa:
@@ -19,6 +19,6 @@ server:
 # localhost durante el desarrollo)
 vigia:
   ml:
-    celo-url: http://localhost:8001
-    salud-url: http://localhost:8002
-    geo-url: http://localhost:8003
+    celo-url: ${ML_CELO_URL:http://localhost:8001}
+    salud-url: ${ML_SALUD_URL:http://localhost:8002}
+    geo-url: ${ML_GEO_URL:http://localhost:8003}

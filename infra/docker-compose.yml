@@ -15,23 +15,48 @@ services:
       - vigia_pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d
 
+  backend-core:
+    build: ../backend-core
+    container_name: vigia-backend-core
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=db
+      - ML_CELO_URL=http://ml-celo:8001
+      - ML_SALUD_URL=http://ml-salud:8002
+      - ML_GEO_URL=http://ml-geo:8003
+    depends_on:
+      - db
+      - ml-celo
+      - ml-salud
+      - ml-geo
+
   ml-celo:
     build: ../ml-celo
     container_name: vigia-ml-celo
     ports:
       - "8001:8001"
+    volumes:
+      - ../ml-celo/app:/app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
 
   ml-salud:
     build: ../ml-salud
     container_name: vigia-ml-salud
     ports:
       - "8002:8002"
+    volumes:
+      - ../ml-salud/app:/app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"]
 
   ml-geo:
     build: ../ml-geo
     container_name: vigia-ml-geo
     ports:
       - "8003:8003"
+    volumes:
+      - ../ml-geo/app:/app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"]
 
 volumes:
   vigia_pgdata:
