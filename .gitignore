@@ -21,7 +21,3 @@ frontend/.env.local
 infra/postgres-init/*.bak
 .DS_Store
 Thumbs.db
-
-# Github
-
-.github/ISSUE_TEMPLATE/
