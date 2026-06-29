@@ -1,16 +1,14 @@
-version: "3.9"
-
 services:
   db:
     image: timescale/timescaledb:latest-pg16
     container_name: vigia-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: vigia
-      POSTGRES_USER: vigia_user
-      POSTGRES_PASSWORD: vigia_dev_password
+      POSTGRES_DB: ${POSTGRES_DB:-vigia}
+      POSTGRES_USER: ${POSTGRES_USER:-vigia_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vigia_dev_password}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - vigia_pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d
@@ -19,9 +17,12 @@ services:
     build: ../backend-core
     container_name: vigia-backend-core
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     environment:
       - DB_HOST=db
+      - DB_NAME=${POSTGRES_DB:-vigia}
+      - DB_USER=${POSTGRES_USER:-vigia_user}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-vigia_dev_password}
       - ML_CELO_URL=http://ml-celo:8001
       - ML_SALUD_URL=http://ml-salud:8002
       - ML_GEO_URL=http://ml-geo:8003
@@ -35,28 +36,28 @@ services:
     build: ../ml-celo
     container_name: vigia-ml-celo
     ports:
-      - "8001:8001"
+      - "${ML_CELO_PORT:-8001}:8001"
     volumes:
       - ../ml-celo/app:/app/app
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload" ]
 
   ml-salud:
     build: ../ml-salud
     container_name: vigia-ml-salud
     ports:
-      - "8002:8002"
+      - "${ML_SALUD_PORT:-8002}:8002"
     volumes:
       - ../ml-salud/app:/app/app
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"]
+    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload" ]
 
   ml-geo:
     build: ../ml-geo
     container_name: vigia-ml-geo
     ports:
-      - "8003:8003"
+      - "${ML_GEO_PORT:-8003}:8003"
     volumes:
       - ../ml-geo/app:/app/app
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"]
+    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload" ]
 
 volumes:
   vigia_pgdata:
