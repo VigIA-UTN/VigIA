@@ -1,5 +1,5 @@
 # Java / Maven
-backend-core/target/
+backend/target/
 *.class
 
 # Python

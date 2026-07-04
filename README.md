@@ -16,8 +16,8 @@ Siempre que vayas a trabajar en el backend, necesitás la base de datos encendid
 
 ### 2. Levantar el Backend (Spring Boot)
 Para aprovechar el autocompletado y el live-reload de tu entorno:
-- **Opción A (Recomendada):** Abrí la carpeta `/backend-core` en tu IDE (IntelliJ, VSCode, etc.) y dale 'Run' a la clase principal.
-- **Opción B (Terminal):** Abrí una terminal en `/backend-core` y ejecutá:
+- **Opción A (Recomendada):** Abrí la carpeta `/backend` en tu IDE (IntelliJ, VSCode, etc.) y dale 'Run' a la clase principal.
+- **Opción B (Terminal):** Abrí una terminal en `/backend` y ejecutá:
    ```bash
    mvn spring-boot:run
    ```
