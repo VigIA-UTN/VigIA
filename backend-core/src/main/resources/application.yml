@@ -7,7 +7,7 @@ spring:
     password: ${DB_PASSWORD:vigia_dev_password}
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
