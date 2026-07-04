@@ -1,6 +1,6 @@
 spring:
   application:
-    name: vigia-backend
+    name: backend
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:5432/${DB_NAME:vigia}
     username: ${DB_USER:vigia_user}
