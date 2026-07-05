@@ -29,8 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * "Configurar Spring Security con JWT".
  *
  * Criterios de aceptación:
- *   ✅ Tokens generados correctamente al autenticar.
- *   ✅ Tokens validados en endpoints protegidos.
+ * ✅ Tokens generados correctamente al autenticar.
+ * ✅ Tokens validados en endpoints protegidos.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -49,7 +49,7 @@ class AuthControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private static final String EMAIL    = "productor@vigia.dev";
+    private static final String EMAIL = "productor@vigia.dev";
     private static final String PASSWORD = "secret123";
 
     @BeforeEach
@@ -71,12 +71,13 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("Login exitoso → responde 200 con token, email y rol")
+    @SuppressWarnings("null")
     void login_success_returnsTokenAndUserInfo() throws Exception {
         Map<String, String> body = Map.of("email", EMAIL, "password", PASSWORD);
 
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(body)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andExpect(jsonPath("$.email").value(EMAIL))
@@ -85,23 +86,25 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("Credenciales incorrectas → responde 401")
+    @SuppressWarnings("null")
     void login_wrongPassword_returns401() throws Exception {
         Map<String, String> body = Map.of("email", EMAIL, "password", "wrong!");
 
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(body)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     @DisplayName("Email inexistente → responde 401")
+    @SuppressWarnings("null")
     void login_unknownEmail_returns401() throws Exception {
         Map<String, String> body = Map.of("email", "nadie@vigia.dev", "password", PASSWORD);
 
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(body)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -116,12 +119,13 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("Endpoint protegido con token válido → acepta la request (no 401/403)")
+    @SuppressWarnings("null")
     void protectedEndpoint_withValidToken_isAccepted() throws Exception {
         // 1. Hacemos login para obtener el token
         Map<String, String> loginBody = Map.of("email", EMAIL, "password", PASSWORD);
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginBody)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginBody)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -131,13 +135,12 @@ class AuthControllerTest {
         assertThat(token).isNotBlank();
 
         // 2. Usamos el token en un endpoint protegido — Spring debería reconocerlo
-        // (404 es OK: el endpoint no existe, pero demuestra que el filtro JWT lo dejó pasar)
+        // (404 es OK: el endpoint no existe, pero demuestra que el filtro JWT lo dejó
+        // pasar)
         mockMvc.perform(get("/api/test-protegido")
-                        .header("Authorization", "Bearer " + token))
-                .andExpect(result ->
-                        assertThat(result.getResponse().getStatus())
-                                .as("El JWT fue aceptado — no debería ser 401 ni 403")
-                                .isNotIn(401, 403)
-                );
+                .header("Authorization", "Bearer " + token))
+                .andExpect(result -> assertThat(result.getResponse().getStatus())
+                        .as("El JWT fue aceptado — no debería ser 401 ni 403")
+                        .isNotIn(401, 403));
     }
 }

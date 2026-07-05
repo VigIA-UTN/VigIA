@@ -28,10 +28,12 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
+    @SuppressWarnings("null")
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
 
+    @SuppressWarnings("null")
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
@@ -53,6 +55,7 @@ public class JwtUtil {
         return extractExpiration(token).before(new Date());
     }
 
+    @SuppressWarnings("null")
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         String role = userDetails.getAuthorities().stream()

@@ -17,38 +17,39 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.http.HttpStatus;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthenticationManager authenticationManager;
-    private final CustomUserDetailsService userDetailsService;
-    private final JwtUtil jwtUtil;
+        private final AuthenticationManager authenticationManager;
+        private final CustomUserDetailsService userDetailsService;
+        private final JwtUtil jwtUtil;
 
-    @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        @PostMapping("/login")
+        @SuppressWarnings("null")
+        public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
+                authenticationManager.authenticate(
+                                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-        final String jwt = jwtUtil.generateToken(userDetails);
+                final UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
+                final String jwt = jwtUtil.generateToken(userDetails);
 
-        String role = userDetails.getAuthorities().stream()
-                .findFirst()
-                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
-                .map(r -> r.replaceFirst("^ROLE_", ""))
-                .orElse("");
+                String role = userDetails.getAuthorities().stream()
+                                .findFirst()
+                                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                                .map(r -> r.replaceFirst("^ROLE_", ""))
+                                .orElse("");
 
-        return ResponseEntity.ok(AuthResponse.builder()
-                .token(jwt)
-                .email(userDetails.getUsername())
-                .rol(role)
-                .build());
-    }
+                return ResponseEntity.ok(AuthResponse.builder()
+                                .token(jwt)
+                                .email(userDetails.getUsername())
+                                .rol(role)
+                                .build());
+        }
 
-    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
-    public ResponseEntity<String> handleAuthenticationException(
-            org.springframework.security.core.AuthenticationException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Email o contraseña incorrectos");
-    }
+        @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+        public ResponseEntity<String> handleAuthenticationException(
+                        org.springframework.security.core.AuthenticationException e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Email o contraseña incorrectos");
+        }
 }

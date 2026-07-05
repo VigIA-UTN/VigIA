@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.List;
 
-
 @Slf4j
 @Component
 @Profile("dev")
@@ -24,6 +23,7 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
 
     @Override
+    @SuppressWarnings("null")
     public void run(String... args) {
         if (usuarioRepository.count() > 0) {
             log.info("[DataInitializer] La base ya tiene datos — saltando seed.");
@@ -31,12 +31,11 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         List<Usuario> usuarios = List.of(
-                buildUsuario("Admin",       "VigIA",     "admin@vigia.dev",        "admin123",      Rol.ADMINISTRADOR),
-                buildUsuario("Juan",        "Productor", "productor@vigia.dev",    "productor123",  Rol.PRODUCTOR),
-                buildUsuario("Carlos",      "Campero",   "campero@vigia.dev",      "campero123",    Rol.CAMPERO),
-                buildUsuario("Laura",       "Vet",       "veterinario@vigia.dev",  "vet123",        Rol.VETERINARIO),
-                buildUsuario("Nuevo",       "Usuario",   "pendiente@vigia.dev",    "pendiente123",  Rol.PENDIENTE)
-        );
+                buildUsuario("Admin", "VigIA", "admin@vigia.dev", "admin123", Rol.ADMINISTRADOR),
+                buildUsuario("Juan", "Productor", "productor@vigia.dev", "productor123", Rol.PRODUCTOR),
+                buildUsuario("Carlos", "Campero", "campero@vigia.dev", "campero123", Rol.CAMPERO),
+                buildUsuario("Laura", "Vet", "veterinario@vigia.dev", "vet123", Rol.VETERINARIO),
+                buildUsuario("Nuevo", "Usuario", "pendiente@vigia.dev", "pendiente123", Rol.PENDIENTE));
 
         usuarioRepository.saveAll(usuarios);
         log.info("[DataInitializer] ✅ Seed completado — {} usuarios creados.", usuarios.size());
