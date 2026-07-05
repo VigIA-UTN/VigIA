@@ -4,5 +4,6 @@ public enum Rol {
     ADMINISTRADOR,
     PRODUCTOR,
     CAMPERO,
-    VETERINARIO
+    VETERINARIO,
+    PENDIENTE  // Usuario registrado que aún no tiene acceso al producto
 }

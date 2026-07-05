@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   application:
     name: backend
   datasource:
@@ -22,3 +24,6 @@ vigia:
     celo-url: ${ML_CELO_URL:http://localhost:8001}
     salud-url: ${ML_SALUD_URL:http://localhost:8002}
     geo-url: ${ML_GEO_URL:http://localhost:8003}
+
+cors:
+  allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
