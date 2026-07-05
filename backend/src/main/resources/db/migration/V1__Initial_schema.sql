@@ -3,7 +3,7 @@ CREATE TABLE usuarios (
     nombre VARCHAR(255),
     apellido VARCHAR(255),
     email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255),
+    password_hash VARCHAR(255),
     rol VARCHAR(50),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_alta DATE,
