@@ -75,7 +75,7 @@ class AuthControllerTest {
     void login_success_returnsTokenAndUserInfo() throws Exception {
         Map<String, String> body = Map.of("email", EMAIL, "password", PASSWORD);
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
@@ -90,7 +90,7 @@ class AuthControllerTest {
     void login_wrongPassword_returns401() throws Exception {
         Map<String, String> body = Map.of("email", EMAIL, "password", "wrong!");
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized());
@@ -102,7 +102,7 @@ class AuthControllerTest {
     void login_unknownEmail_returns401() throws Exception {
         Map<String, String> body = Map.of("email", "nadie@vigia.dev", "password", PASSWORD);
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized());
@@ -123,7 +123,7 @@ class AuthControllerTest {
     void protectedEndpoint_withValidToken_isAccepted() throws Exception {
         // 1. Hacemos login para obtener el token
         Map<String, String> loginBody = Map.of("email", EMAIL, "password", PASSWORD);
-        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+        MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginBody)))
                 .andExpect(status().isOk())
