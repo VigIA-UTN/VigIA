@@ -2,6 +2,7 @@ package dev.vigia.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AuthRequest;
+import dev.vigia.backend.dto.InvitacionEmpleadoRequest;
 import dev.vigia.backend.dto.InvitacionProductorRequest;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
@@ -23,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -101,11 +103,14 @@ class InvitacionControllerTest {
         est.setLongitud(-58.0);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
+        est.setUsuarios(new ArrayList<>());
+        est.getUsuarios().add(productor);
         est = establecimientoRepository.save(est);
         establecimientoId = est.getId();
         
         // Mock email service
         doNothing().when(emailService).enviarInvitacionProductor(anyString(), anyString(), anyString());
+        doNothing().when(emailService).enviarInvitacionEmpleado(anyString(), anyString(), anyString(), anyString());
     }
 
     @SuppressWarnings("null")
@@ -186,5 +191,69 @@ class InvitacionControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/invitaciones/empleado - Productor crea invitacion exitosamente")
+    @SuppressWarnings("null")
+    void crearInvitacionEmpleado_asProductor_success() throws Exception {
+        InvitacionEmpleadoRequest request = new InvitacionEmpleadoRequest();
+        request.setEmail("nuevo_empleado@test.com");
+        request.setEstablecimientoId(establecimientoId);
+        request.setRol(Rol.VETERINARIO);
+
+        mockMvc.perform(post("/api/v1/invitaciones/empleado")
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.emailDestino").value("nuevo_empleado@test.com"))
+                .andExpect(jsonPath("$.rol").value(Rol.VETERINARIO.name()))
+                .andExpect(jsonPath("$.estado").value("PENDIENTE"))
+                .andExpect(jsonPath("$.token").isNotEmpty());
+
+        assertThat(invitacionRepository.findAll()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/invitaciones/empleado - Falla si productor no pertenece al establecimiento")
+    @SuppressWarnings("null")
+    void crearInvitacionEmpleado_wrongEstablecimiento() throws Exception {
+        // Crear un establecimiento donde el productor no está
+        Establecimiento est2 = new Establecimiento();
+        est2.setNombre("Establecimiento Otro");
+        est2.setLatitud(-34.0);
+        est2.setLongitud(-58.0);
+        est2.setActivo(true);
+        est2 = establecimientoRepository.save(est2);
+
+        InvitacionEmpleadoRequest request = new InvitacionEmpleadoRequest();
+        request.setEmail("nuevo_empleado@test.com");
+        request.setEstablecimientoId(est2.getId());
+        request.setRol(Rol.VETERINARIO);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mockMvc.perform(post("/api/v1/invitaciones/empleado")
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))))
+                .hasCauseInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("El productor no pertenece a este establecimiento");
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/invitaciones/empleado - Falla si rol es invalido para empleado")
+    @SuppressWarnings("null")
+    void crearInvitacionEmpleado_invalidRole() throws Exception {
+        InvitacionEmpleadoRequest request = new InvitacionEmpleadoRequest();
+        request.setEmail("nuevo_empleado@test.com");
+        request.setEstablecimientoId(establecimientoId);
+        request.setRol(Rol.ADMINISTRADOR);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mockMvc.perform(post("/api/v1/invitaciones/empleado")
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))))
+                .hasCauseInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("El rol especificado no es válido");
     }
 }

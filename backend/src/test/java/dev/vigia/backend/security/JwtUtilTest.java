@@ -1,5 +1,6 @@
 package dev.vigia.backend.security;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -102,7 +103,7 @@ class JwtUtilTest {
         // Modificamos el payload para simular un token manipulado
         String tampered = token.substring(0, token.length() - 4) + "XXXX";
 
-        org.junit.jupiter.api.Assertions.assertThrows(
+        Assertions.assertThrows(
                 Exception.class,
                 () -> jwtUtil.extractUsername(tampered));
     }

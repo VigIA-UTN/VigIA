@@ -1,9 +1,11 @@
 package dev.vigia.backend.repository;
 
+import dev.vigia.backend.model.EstadoInvitacion;
 import dev.vigia.backend.model.Invitacion;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -12,6 +14,6 @@ public interface InvitacionRepository extends JpaRepository<Invitacion, Long> {
 
     boolean existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
             String emailDestino,
-            dev.vigia.backend.model.EstadoInvitacion estadoInvitacion,
-            java.time.LocalDateTime now);
+            EstadoInvitacion estadoInvitacion,
+            LocalDateTime now);
 }

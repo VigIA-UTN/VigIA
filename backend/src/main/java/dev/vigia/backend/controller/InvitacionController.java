@@ -1,5 +1,6 @@
 package dev.vigia.backend.controller;
 
+import dev.vigia.backend.dto.InvitacionEmpleadoRequest;
 import dev.vigia.backend.dto.InvitacionProductorRequest;
 import dev.vigia.backend.dto.InvitacionResponse;
 import dev.vigia.backend.service.InvitacionService;
@@ -26,6 +27,18 @@ public class InvitacionController {
         
         String emailAdmin = authentication.getName();
         InvitacionResponse response = invitacionService.generarInvitacionProductor(request, emailAdmin);
+        
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/empleado")
+    @PreAuthorize("hasRole('PRODUCTOR')")
+    public ResponseEntity<InvitacionResponse> generarInvitacionEmpleado(
+            @Valid @RequestBody InvitacionEmpleadoRequest request,
+            Authentication authentication) {
+        
+        String emailProductor = authentication.getName();
+        InvitacionResponse response = invitacionService.generarInvitacionEmpleado(request, emailProductor);
         
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

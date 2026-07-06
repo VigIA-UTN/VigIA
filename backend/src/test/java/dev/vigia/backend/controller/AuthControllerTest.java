@@ -7,6 +7,8 @@ import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
+import dev.vigia.backend.service.AuthService;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +52,7 @@ class AuthControllerTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private dev.vigia.backend.service.AuthService authService;
+    private AuthService authService;
 
     private static final String EMAIL = "productor@vigia.dev";
     private static final String PASSWORD = "secret123";
