@@ -48,7 +48,7 @@ Cuando termines de trabajar, así es como bajás todo para liberar recursos en t
 
 ---
 
-### 🚀 Extras: Microservicios de Machine Learning
+### Extras: Microservicios de Machine Learning
 Si necesitás que el backend se comunique con los módulos de Python, podés levantar todo el ecosistema de dependencias rápidamente. Desde la carpeta `/infra` ejecutá:
 ```bash
 docker-compose up -d db ml-celo ml-salud ml-geo

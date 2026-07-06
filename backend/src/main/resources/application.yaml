@@ -35,4 +35,4 @@ vigia:
     geo-url: ${ML_GEO_URL:http://localhost:8003}
 
 cors:
-  allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+  allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
