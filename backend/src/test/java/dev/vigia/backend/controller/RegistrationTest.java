@@ -2,6 +2,7 @@ package dev.vigia.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.RegisterRequest;
+import dev.vigia.backend.dto.ValidateCodeRequest;
 import dev.vigia.backend.model.*;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
@@ -166,6 +167,44 @@ class RegistrationTest {
         request.setToken("TOKEN123");
 
         mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Validar código exitoso devuelve datos sin marcar como usado")
+    @SuppressWarnings("null")
+    void validateCode_success() throws Exception {
+        ValidateCodeRequest request = new ValidateCodeRequest();
+        request.setToken("TOKEN123");
+        request.setEmail("nuevo@vigia.dev");
+
+        mockMvc.perform(post("/api/v1/auth/validate-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("nuevo@vigia.dev"))
+                .andExpect(jsonPath("$.rol").value("VETERINARIO"))
+                .andExpect(jsonPath("$.establecimiento").value("Establecimiento Base"));
+
+        // El estado debe seguir siendo PENDIENTE
+        Invitacion inv = invitacionRepository.findByToken("TOKEN123").orElseThrow();
+        assertThat(inv.getEstadoInvitacion()).isEqualTo(EstadoInvitacion.PENDIENTE);
+    }
+
+    @Test
+    @DisplayName("Validar código falla si el email no coincide para Productor")
+    @SuppressWarnings("null")
+    void validateCode_failsEmailMismatch() throws Exception {
+        validInvitacion.setTipoInvitacion(TipoInvitacion.PRODUCTOR);
+        invitacionRepository.save(validInvitacion);
+
+        ValidateCodeRequest request = new ValidateCodeRequest();
+        request.setToken("TOKEN123");
+        request.setEmail("distinto@vigia.dev");
+
+        mockMvc.perform(post("/api/v1/auth/validate-code")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());

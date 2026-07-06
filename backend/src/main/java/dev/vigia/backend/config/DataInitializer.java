@@ -26,7 +26,7 @@ public class DataInitializer implements CommandLineRunner {
     @SuppressWarnings("null")
     public void run(String... args) {
         if (usuarioRepository.count() > 0) {
-            log.info("[DataInitializer] La base ya tiene datos — saltando seed.");
+            log.info("[DataInitializer] La base ya tiene datos - saltando seed.");
             return;
         }
 

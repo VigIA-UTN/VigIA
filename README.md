@@ -6,20 +6,21 @@ https://drive.google.com/drive/folders/1OaNcqx1iyuzeKOyNrNP1Tt-S7YMCXce3
 
 ## Paso a Paso para Levantar el Entorno
 
-### 1. Levantar la Base de Datos
-Siempre que vayas a trabajar en el backend, necesitás la base de datos encendida:
+### 1. Levantar Infraestructura (Base de Datos y Mail)
+Siempre que vayas a trabajar en el backend, necesitás la base de datos y el servidor de correos local encendidos:
 1. Abrí una terminal en la carpeta `/infra`.
 2. Ejecutá el siguiente comando (el `-d` es para que corra en segundo plano):
    ```bash
-   docker-compose up -d db
+   docker-compose up -d db mail
    ```
+*(La base de datos corre en el puerto 5432 y puedes ver los emails enviados en `http://localhost:8025`).*
 
 ### 2. Levantar el Backend (Spring Boot)
 Para aprovechar el autocompletado y el live-reload de tu entorno:
 - **Opción A (Recomendada):** Abrí la carpeta `/backend` en tu IDE (IntelliJ, VSCode, etc.) y dale 'Run' a la clase principal.
 - **Opción B (Terminal):** Abrí una terminal en `/backend` y ejecutá:
    ```bash
-   mvn spring-boot:run
+   mvn clean test spring-boot:run
    ```
 *(Tu backend estará disponible en `http://localhost:8080`).*
 

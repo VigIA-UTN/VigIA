@@ -9,4 +9,9 @@ import java.util.Optional;
 @Repository
 public interface InvitacionRepository extends JpaRepository<Invitacion, Long> {
     Optional<Invitacion> findByToken(String token);
+
+    boolean existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
+            String emailDestino,
+            dev.vigia.backend.model.EstadoInvitacion estadoInvitacion,
+            java.time.LocalDateTime now);
 }

@@ -13,12 +13,21 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USER:user}
+    password: ${MAIL_PASSWORD:pass}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 server:
   port: 8080
 
-# URLs internas de los microservicios ML (red privada / VPC en producción,
-# localhost durante el desarrollo)
 vigia:
   ml:
     celo-url: ${ML_CELO_URL:http://localhost:8001}

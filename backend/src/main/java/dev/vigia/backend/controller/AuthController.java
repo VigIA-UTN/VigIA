@@ -3,6 +3,7 @@ package dev.vigia.backend.controller;
 import dev.vigia.backend.dto.AuthRequest;
 import dev.vigia.backend.dto.AuthResponse;
 import dev.vigia.backend.dto.RegisterRequest;
+import dev.vigia.backend.dto.ValidateCodeRequest;
 import dev.vigia.backend.security.CustomUserDetailsService;
 import dev.vigia.backend.security.JwtUtil;
 import dev.vigia.backend.service.AuthService;
@@ -33,6 +34,15 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
             return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/validate-code")
+    public ResponseEntity<?> validateCode(@RequestBody ValidateCodeRequest request) {
+        try {
+            return ResponseEntity.ok(authService.validateCode(request));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

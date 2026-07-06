@@ -2,6 +2,8 @@ package dev.vigia.backend.service;
 
 import dev.vigia.backend.dto.AuthResponse;
 import dev.vigia.backend.dto.RegisterRequest;
+import dev.vigia.backend.dto.ValidateCodeRequest;
+import dev.vigia.backend.dto.ValidateCodeResponse;
 import dev.vigia.backend.model.EstadoInvitacion;
 import dev.vigia.backend.model.Invitacion;
 import dev.vigia.backend.model.TipoInvitacion;
@@ -30,36 +32,22 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
 
-    // Caché en memoria para evitar guardar en BD intentos fallidos (MVP)
     private final ConcurrentHashMap<String, Integer> failedLoginAttemptsCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LocalDateTime> lockoutCache = new ConcurrentHashMap<>();
 
+    public ValidateCodeResponse validateCode(ValidateCodeRequest request) {
+        Invitacion invitacion = validateAndGetInvitacion(request.getToken(), request.getEmail());
+        
+        return ValidateCodeResponse.builder()
+                .email(invitacion.getEmailDestino())
+                .rol(invitacion.getRol() != null ? invitacion.getRol().name() : null)
+                .establecimiento(invitacion.getEstablecimiento() != null ? invitacion.getEstablecimiento().getNombre() : null)
+                .build();
+    }
+
     public AuthResponse register(RegisterRequest request) {
-        Invitacion invitacion = invitacionRepository.findByToken(request.getToken())
-                .orElseThrow(() -> new IllegalArgumentException("El código de invitación es inválido."));
-
-        if (invitacion.getEstadoInvitacion() != EstadoInvitacion.PENDIENTE) {
-            throw new IllegalArgumentException("La invitación ya ha sido utilizada o cancelada.");
-        }
-
-        if (invitacion.getFechaExpiracion() != null && invitacion.getFechaExpiracion().isBefore(LocalDateTime.now())) {
-            invitacion.setEstadoInvitacion(EstadoInvitacion.EXPIRADA);
-            invitacionRepository.save(invitacion);
-            throw new IllegalArgumentException("El código de invitación ha expirado.");
-        }
-
-        String emailToUse;
-        if (TipoInvitacion.PRODUCTOR.equals(invitacion.getTipoInvitacion())) {
-            if (request.getEmail() == null || request.getEmail().isBlank()) {
-                throw new IllegalArgumentException("El email es requerido para el registro con código.");
-            }
-            if (!invitacion.getEmailDestino().equalsIgnoreCase(request.getEmail())) {
-                throw new IllegalArgumentException("El email no coincide con el de la invitación.");
-            }
-            emailToUse = request.getEmail();
-        } else {
-            emailToUse = invitacion.getEmailDestino();
-        }
+        Invitacion invitacion = validateAndGetInvitacion(request.getToken(), request.getEmail());
+        String emailToUse = invitacion.getEmailDestino();
 
         validatePassword(request.getPassword());
 
@@ -97,6 +85,31 @@ public class AuthService {
                 .email(savedUser.getEmail())
                 .rol(roleStr)
                 .build();
+    }
+
+    private Invitacion validateAndGetInvitacion(String token, String providedEmail) {
+        Invitacion invitacion = invitacionRepository.findByToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("El código de invitación es inválido."));
+
+        if (invitacion.getEstadoInvitacion() != EstadoInvitacion.PENDIENTE) {
+            throw new IllegalArgumentException("La invitación ya ha sido utilizada o cancelada.");
+        }
+
+        if (invitacion.getFechaExpiracion() != null && invitacion.getFechaExpiracion().isBefore(LocalDateTime.now())) {
+            invitacion.setEstadoInvitacion(EstadoInvitacion.EXPIRADA);
+            invitacionRepository.save(invitacion);
+            throw new IllegalArgumentException("El código de invitación ha expirado.");
+        }
+
+        if (TipoInvitacion.PRODUCTOR.equals(invitacion.getTipoInvitacion())) {
+            if (providedEmail == null || providedEmail.isBlank()) {
+                throw new IllegalArgumentException("El email es requerido para el registro con código.");
+            }
+            if (!invitacion.getEmailDestino().equalsIgnoreCase(providedEmail)) {
+                throw new IllegalArgumentException("El email no coincide con el de la invitación.");
+            }
+        }
+        return invitacion;
     }
 
     private void validatePassword(String password) {

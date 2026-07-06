@@ -12,6 +12,9 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
+  mail:
+    host: localhost
+    port: 1025
 
 cors:
   allowed-origins: http://localhost:3000
