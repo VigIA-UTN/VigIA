@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AuthRequest;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +38,12 @@ class AuthControllerTest {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private EstablecimientoRepository establecimientoRepository;
+
+    @Autowired
+    private InvitacionRepository invitacionRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -49,6 +57,8 @@ class AuthControllerTest {
 
     @BeforeEach
     void setUp() {
+        invitacionRepository.deleteAll();
+        establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
         authService.clearCacheForTests();
 

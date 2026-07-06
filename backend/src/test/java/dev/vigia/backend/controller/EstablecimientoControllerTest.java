@@ -7,6 +7,7 @@ import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,6 +42,9 @@ class EstablecimientoControllerTest {
     private EstablecimientoRepository establecimientoRepository;
 
     @Autowired
+    private InvitacionRepository invitacionRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -56,6 +60,7 @@ class EstablecimientoControllerTest {
     @BeforeEach
     @SuppressWarnings("null")
     void setUp() throws Exception {
+        invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
         authService.clearCacheForTests();
