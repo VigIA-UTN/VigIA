@@ -45,7 +45,7 @@ public class EstablecimientoController {
         return ResponseEntity.ok(establecimientoService.updateEstablecimiento(id, request));
     }
 
-    @PutMapping("/{id}/desactivar")
+    @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<EstablecimientoResponse> desactivarEstablecimiento(@PathVariable Long id) {
         return ResponseEntity.ok(establecimientoService.desactivarEstablecimiento(id));
