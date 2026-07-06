@@ -10,10 +10,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.2",
+    "axios": "^1.18.1",
+    "bootstrap": "^5.3.8",
     "leaflet": "^1.9.4",
     "react": "^19.2.7",
+    "react-bootstrap": "^2.10.10",
     "react-dom": "^19.2.7",
-    "react-leaflet": "^5.0.0"
+    "react-hook-form": "^7.81.0",
+    "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.18.1",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
