@@ -60,13 +60,15 @@ body,
 }
 
 .login-left-tagline-box {
-  background: rgba(255, 255, 255, 0.20);
+  background: rgba(255, 255, 255, 0.50);
   backdrop-filter: blur(2px);
   border-radius: 16px;
   padding: 32px 40px;
   text-align: left;
   color: #263238;
   font-family: 'Outfit', sans-serif;
+  user-select: none;
+  cursor: default;
 }
 
 .login-left-tagline-box p:first-child {
@@ -127,6 +129,8 @@ body,
   text-align: center;
   letter-spacing: 0.01em;
   line-height: 1.15;
+  user-select: none;
+  cursor: default;
 }
 
 /* ── Formulario ── */
@@ -150,6 +154,8 @@ body,
   font-weight: 500;
   margin-bottom: 6px;
   letter-spacing: 0.02em;
+  user-select: none;
+  cursor: default;
 }
 
 /* ── Input base ── */
@@ -224,7 +230,8 @@ body,
 
 /* ── Error general (401 / 423) ── */
 .login-alert {
-  width: 100%;
+  width: 392px;
+  max-width: 100%;
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 0.85rem;
@@ -233,6 +240,8 @@ body,
   align-items: center;
   gap: 8px;
   animation: shakeX 0.4s ease;
+  user-select: none;
+  cursor: default;
 }
 
 .login-alert.alert-error {
@@ -292,6 +301,8 @@ body,
   align-items: center;
   justify-content: center;
   gap: 8px;
+  user-select: none;
+  cursor: pointer;
 }
 
 .login-btn:hover:not(:disabled) {

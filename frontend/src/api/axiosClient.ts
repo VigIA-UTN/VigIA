@@ -8,6 +8,7 @@ const axiosClient = axios.create({
   },
 });
 
+// Interceptor de REQUEST: adjunta el JWT a cada llamada autenticada
 axiosClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
   if (token) {
@@ -15,5 +16,22 @@ axiosClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Interceptor de RESPONSE: si el servidor responde 401, cierra la sesión
+axiosClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      // Evita logout en la propia llamada de login
+      const isLoginEndpoint = error.config?.url?.includes('/auth/login');
+      if (!isLoginEndpoint) {
+        useAuthStore.getState().logout();
+        // Redirige al login usando location para no depender de React Router aquí
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default axiosClient;
