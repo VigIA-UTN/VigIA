@@ -3,8 +3,10 @@ package dev.vigia.backend.service.impl;
 import dev.vigia.backend.service.UsuarioService;
 
 import dev.vigia.backend.dto.UsuarioResponse;
+import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import java.util.stream.Collectors;
 public class UsuarioServiceImpl implements UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final EstablecimientoRepository establecimientoRepository;
 
     public List<UsuarioResponse> getProductores() {
         return usuarioRepository.findByRolAndActivoTrue(Rol.PRODUCTOR).stream()
@@ -33,6 +36,42 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
         usuario.setActivo(false);
         usuarioRepository.save(usuario);
+    }
+
+    public List<UsuarioResponse> getEmpleados(String emailProductor) {
+        Usuario productor = usuarioRepository.findByEmail(emailProductor)
+                .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
+
+        Establecimiento establecimiento = establecimientoRepository.findByUsuariosId(productor.getId())
+                .orElseThrow(() -> new IllegalArgumentException("El productor no tiene un establecimiento asignado"));
+
+        return establecimiento.getUsuarios().stream()
+                .filter(u -> u.getRol() != Rol.PRODUCTOR && u.isActivo())
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @SuppressWarnings("null")
+    public void desactivarEmpleado(String emailProductor, Long empleadoId) {
+        Usuario productor = usuarioRepository.findByEmail(emailProductor)
+                .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
+
+        Establecimiento establecimiento = establecimientoRepository.findByUsuariosId(productor.getId())
+                .orElseThrow(() -> new IllegalArgumentException("El productor no tiene un establecimiento asignado"));
+
+        Usuario empleado = usuarioRepository.findById(empleadoId)
+                .orElseThrow(() -> new IllegalArgumentException("Empleado no encontrado"));
+
+        if (!establecimiento.getUsuarios().contains(empleado)) {
+            throw new IllegalArgumentException("El empleado no pertenece al establecimiento del productor");
+        }
+
+        if (empleado.getRol() == Rol.PRODUCTOR) {
+            throw new IllegalArgumentException("No se puede desactivar a un productor");
+        }
+
+        empleado.setActivo(false);
+        usuarioRepository.save(empleado);
     }
 
     private UsuarioResponse mapToResponse(Usuario usuario) {

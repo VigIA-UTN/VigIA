@@ -1,5 +1,6 @@
 package dev.vigia.backend.service;
 
+import dev.vigia.backend.dto.InvitacionEmpleadoRequest;
 import dev.vigia.backend.dto.InvitacionProductorRequest;
 import dev.vigia.backend.dto.InvitacionResponse;
 import dev.vigia.backend.model.*;
@@ -18,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,24 +48,38 @@ class InvitacionServiceTest {
         private InvitacionServiceImpl invitacionService;
 
         private InvitacionProductorRequest request;
+        private InvitacionEmpleadoRequest empleadoRequest;
         private Usuario adminUser;
+        private Usuario productorUser;
         private Establecimiento establecimiento;
         private final String adminEmail = "admin@test.com";
+        private final String productorEmail = "productor@test.com";
 
         @BeforeEach
         void setUp() {
                 request = new InvitacionProductorRequest();
-                request.setEmail("productor@test.com");
+                request.setEmail("productor_nuevo@test.com");
                 request.setEstablecimientoId(1L);
+
+                empleadoRequest = new InvitacionEmpleadoRequest();
+                empleadoRequest.setEmail("empleado@test.com");
+                empleadoRequest.setEstablecimientoId(1L);
+                empleadoRequest.setRol(Rol.CAMPERO);
 
                 adminUser = new Usuario();
                 adminUser.setId(10L);
                 adminUser.setEmail(adminEmail);
                 adminUser.setRol(Rol.ADMINISTRADOR);
 
+                productorUser = new Usuario();
+                productorUser.setId(11L);
+                productorUser.setEmail(productorEmail);
+                productorUser.setRol(Rol.PRODUCTOR);
+
                 establecimiento = new Establecimiento();
                 establecimiento.setId(1L);
                 establecimiento.setNombre("Estancia La Paz");
+                establecimiento.setUsuarios(new java.util.ArrayList<>(java.util.List.of(productorUser)));
         }
 
         @Test
@@ -161,5 +177,90 @@ class InvitacionServiceTest {
                                 .hasMessageContaining("Establecimiento no encontrado");
 
                 verify(invitacionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Debe generar invitación empleado con éxito")
+        @SuppressWarnings("null")
+        void generarInvitacionEmpleado_Success() {
+                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                eq(empleadoRequest.getEmail()), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
+                                .thenReturn(false);
+
+                when(usuarioRepository.findByEmail(productorEmail)).thenReturn(Optional.of(productorUser));
+                when(establecimientoRepository.findById(empleadoRequest.getEstablecimientoId()))
+                                .thenReturn(Optional.of(establecimiento));
+
+                Invitacion savedInvitacion = new Invitacion();
+                savedInvitacion.setId(101L);
+                savedInvitacion.setEmailDestino(empleadoRequest.getEmail());
+                savedInvitacion.setRol(Rol.CAMPERO);
+                savedInvitacion.setEstadoInvitacion(EstadoInvitacion.PENDIENTE);
+                savedInvitacion.setToken("mock-token-456");
+                savedInvitacion.setFechaCreacion(LocalDateTime.now());
+                savedInvitacion.setFechaExpiracion(LocalDateTime.now().plusDays(7));
+
+                when(invitacionRepository.save(any(Invitacion.class))).thenReturn(savedInvitacion);
+
+                InvitacionResponse response = invitacionService.generarInvitacionEmpleado(empleadoRequest, productorEmail);
+
+                assertThat(response).isNotNull();
+                assertThat(response.getId()).isEqualTo(101L);
+                assertThat(response.getEmailDestino()).isEqualTo(empleadoRequest.getEmail());
+                assertThat(response.getEstado()).isEqualTo(EstadoInvitacion.PENDIENTE.name());
+                assertThat(response.getRol()).isEqualTo(Rol.CAMPERO.name());
+
+                ArgumentCaptor<Invitacion> invitacionCaptor = ArgumentCaptor.forClass(Invitacion.class);
+                verify(invitacionRepository).save(invitacionCaptor.capture());
+                Invitacion captured = invitacionCaptor.getValue();
+
+                assertThat(captured.getEmailDestino()).isEqualTo(empleadoRequest.getEmail());
+                assertThat(captured.getRol()).isEqualTo(Rol.CAMPERO);
+                assertThat(captured.getTipoInvitacion()).isEqualTo(TipoInvitacion.EMPLEADO);
+                assertThat(captured.getCreador()).isEqualTo(productorUser);
+                assertThat(captured.getEstablecimiento()).isEqualTo(establecimiento);
+
+                verify(emailService).enviarInvitacionEmpleado(
+                                eq(empleadoRequest.getEmail()),
+                                eq(captured.getToken()),
+                                eq(establecimiento.getNombre()),
+                                eq(Rol.CAMPERO.name()));
+        }
+
+        @Test
+        @DisplayName("Debe lanzar excepción si el productor no pertenece al establecimiento")
+        @SuppressWarnings("null")
+        void generarInvitacionEmpleado_ThrowsWhenProductorNoPertenece() {
+                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                anyString(), any(), any())).thenReturn(false);
+                when(usuarioRepository.findByEmail(productorEmail)).thenReturn(Optional.of(productorUser));
+
+                Establecimiento otroEstablecimiento = new Establecimiento();
+                otroEstablecimiento.setId(1L);
+                otroEstablecimiento.setUsuarios(new ArrayList<>());
+                
+                when(establecimientoRepository.findById(empleadoRequest.getEstablecimientoId()))
+                                .thenReturn(Optional.of(otroEstablecimiento));
+
+                assertThatThrownBy(() -> invitacionService.generarInvitacionEmpleado(empleadoRequest, productorEmail))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("El productor no pertenece a este establecimiento");
+        }
+
+        @Test
+        @DisplayName("Debe lanzar excepción si el rol del empleado es inválido")
+        @SuppressWarnings("null")
+        void generarInvitacionEmpleado_ThrowsWhenRolInvalido() {
+                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                anyString(), any(), any())).thenReturn(false);
+                when(usuarioRepository.findByEmail(productorEmail)).thenReturn(Optional.of(productorUser));
+                when(establecimientoRepository.findById(empleadoRequest.getEstablecimientoId()))
+                                .thenReturn(Optional.of(establecimiento));
+
+                empleadoRequest.setRol(Rol.ADMINISTRADOR);
+
+                assertThatThrownBy(() -> invitacionService.generarInvitacionEmpleado(empleadoRequest, productorEmail))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("El rol especificado no es válido para un empleado");
         }
 }

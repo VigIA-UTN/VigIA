@@ -2,6 +2,7 @@ package dev.vigia.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AuthRequest;
+import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -22,6 +23,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,14 +59,12 @@ class UsuarioControllerTest {
     private Long productorId;
 
     @BeforeEach
-    @SuppressWarnings("null")
     void setUp() throws Exception {
         invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
         authService.clearCacheForTests();
 
-        // 1. Admin
         Usuario admin = new Usuario();
         admin.setEmail("admin@vigia.dev");
         admin.setPasswordHash(passwordEncoder.encode("admin123"));
@@ -70,7 +73,6 @@ class UsuarioControllerTest {
         admin.setActivo(true);
         usuarioRepository.save(admin);
 
-        // 2. Productor Activo
         Usuario productor = new Usuario();
         productor.setEmail("productor@vigia.dev");
         productor.setPasswordHash(passwordEncoder.encode("prod123"));
@@ -80,7 +82,6 @@ class UsuarioControllerTest {
         productor = usuarioRepository.save(productor);
         productorId = productor.getId();
 
-        // 3. Productor Inactivo (no deberia listarse)
         Usuario productorInactivo = new Usuario();
         productorInactivo.setEmail("inactivo@vigia.dev");
         productorInactivo.setPasswordHash(passwordEncoder.encode("prod123"));
@@ -142,5 +143,106 @@ class UsuarioControllerTest {
         mockMvc.perform(delete("/api/v1/usuarios/productores/" + productorId)
                 .header("Authorization", "Bearer " + productorToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/usuarios/empleados - Productor ve lista de sus empleados activos")
+    @SuppressWarnings("null")
+    void getEmpleados_asProductor_success() throws Exception {
+        Usuario empleado = new Usuario();
+        empleado.setEmail("empleado@vigia.dev");
+        empleado.setPasswordHash(passwordEncoder.encode("emp123"));
+        empleado.setNombre("Empleado 1");
+        empleado.setRol(Rol.CAMPERO);
+        empleado.setActivo(true);
+        empleado = usuarioRepository.save(empleado);
+
+        Establecimiento est = new Establecimiento();
+        est.setNombre("Estancia Test");
+        est.setLatitud(-34.0);
+        est.setLongitud(-58.0);
+        est.setActivo(true);
+        est.setFechaAlta(LocalDate.now());
+        est.setUsuarios(new ArrayList<>(List.of(usuarioRepository.findById(productorId).orElseThrow(), empleado)));
+        establecimientoRepository.save(est);
+
+        mockMvc.perform(get("/api/v1/usuarios/empleados")
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].nombre").value("Empleado 1"))
+                .andExpect(jsonPath("$[0].activo").value(true));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/usuarios/empleados - Admin recibe 403 Forbidden")
+    void getEmpleados_asAdmin_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/usuarios/empleados")
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/usuarios/empleados/{id} - Productor desactiva empleado de su establecimiento")
+    @SuppressWarnings("null")
+    void desactivarEmpleado_asProductor_success() throws Exception {
+        Usuario empleado = new Usuario();
+        empleado.setEmail("empleado2@vigia.dev");
+        empleado.setPasswordHash(passwordEncoder.encode("emp123"));
+        empleado.setNombre("Empleado 2");
+        empleado.setRol(Rol.CAMPERO);
+        empleado.setActivo(true);
+        empleado = usuarioRepository.save(empleado);
+
+        Establecimiento est = new Establecimiento();
+        est.setNombre("Estancia Test 2");
+        est.setLatitud(-34.0);
+        est.setLongitud(-58.0);
+        est.setActivo(true);
+        est.setFechaAlta(LocalDate.now());
+        est.setUsuarios(new ArrayList<>(List.of(usuarioRepository.findById(productorId).orElseThrow(), empleado)));
+        establecimientoRepository.save(est);
+
+        mockMvc.perform(delete("/api/v1/usuarios/empleados/" + empleado.getId())
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk());
+
+        Usuario user = usuarioRepository.findById(empleado.getId()).orElseThrow();
+        assertThat(user.isActivo()).isFalse();
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/usuarios/empleados/{id} - Falla si empleado no pertenece al establecimiento")
+    @SuppressWarnings("null")
+    void desactivarEmpleado_wrongEstablecimiento_badRequest() throws Exception {
+        Usuario empleado = new Usuario();
+        empleado.setEmail("empleado3@vigia.dev");
+        empleado.setPasswordHash(passwordEncoder.encode("emp123"));
+        empleado.setNombre("Empleado 3");
+        empleado.setRol(Rol.CAMPERO);
+        empleado.setActivo(true);
+        empleado = usuarioRepository.save(empleado);
+
+        Establecimiento est = new Establecimiento();
+        est.setNombre("Estancia Test 3");
+        est.setLatitud(-34.0);
+        est.setLongitud(-58.0);
+        est.setActivo(true);
+        est.setFechaAlta(LocalDate.now());
+        est.setUsuarios(new ArrayList<>(List.of(empleado)));
+        establecimientoRepository.save(est);
+        
+        Establecimiento estProd = new Establecimiento();
+        estProd.setNombre("Estancia Prod");
+        estProd.setLatitud(-34.0);
+        estProd.setLongitud(-58.0);
+        estProd.setActivo(true);
+        estProd.setFechaAlta(LocalDate.now());
+        estProd.setUsuarios(new ArrayList<>(List.of(usuarioRepository.findById(productorId).orElseThrow())));
+        establecimientoRepository.save(estProd);
+
+        mockMvc.perform(delete("/api/v1/usuarios/empleados/" + empleado.getId())
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isBadRequest());
     }
 }
