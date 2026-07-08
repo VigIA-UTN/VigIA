@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useInactivityTimer } from '../hooks/useInactivityTimer';
+import NavScroll from './Navbar';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,5 +17,5 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return <><NavScroll /> {children}</>;
 }
