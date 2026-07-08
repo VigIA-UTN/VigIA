@@ -32,21 +32,20 @@ export default function EstablecimientosPage() {
   });
 
   useEffect(() => {
+    const fetchEstablecimientos = async () => {
+      try {
+        const data = await getEstablecimientos();
+        setEstablecimientos(data);
+      } catch (err) {
+        const axiosError = err as { response?: { data?: { message?: string } } };
+        setError(axiosError.response?.data?.message || 'Error al cargar establecimientos');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchEstablecimientos();
   }, []);
-
-  const fetchEstablecimientos = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getEstablecimientos();
-      setEstablecimientos(data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al cargar establecimientos');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -55,8 +54,9 @@ export default function EstablecimientosPage() {
       const nuevo = await createEstablecimiento(data);
       setEstablecimientos([...establecimientos, nuevo]);
       handleCloseModal();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al crear establecimiento');
+    } catch (err) {
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      setError(axiosError.response?.data?.message || 'Error al crear establecimiento');
     } finally {
       setSubmitting(false);
     }
@@ -67,8 +67,9 @@ export default function EstablecimientosPage() {
     try {
       const actualizado = await desactivarEstablecimiento(id);
       setEstablecimientos(establecimientos.map(e => e.id === id ? actualizado : e));
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Error al desactivar establecimiento');
+    } catch (err) {
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      alert(axiosError.response?.data?.message || 'Error al desactivar establecimiento');
     }
   };
 
