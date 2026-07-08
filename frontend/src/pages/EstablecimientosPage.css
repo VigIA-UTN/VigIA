@@ -1,0 +1,96 @@
+.establecimientos-container {
+  padding: 2rem;
+  min-height: calc(100vh - 120px);
+  background-color: #f5f6fa; /* Assuming a light background like in typical dashboards, wireframe shows gray/light background */
+}
+
+.establecimientos-title {
+  color: #1E3A5F;
+  font-weight: bold;
+}
+
+.establecimiento-card {
+  background-color: #1E3A5F;
+  color: white;
+  border-radius: 10px;
+  padding: 1.5rem;
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.establecimiento-card h4 {
+  margin-bottom: 0.5rem;
+}
+
+.establecimiento-card .location {
+  color: #a0aec0;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.status-indicator {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+}
+
+.status-active {
+  background-color: #4CAF50;
+}
+
+.status-inactive {
+  background-color: #F44336;
+}
+
+.btn-vigia-primary {
+  background-color: #8CC63F !important;
+  border: none !important;
+  color: white !important;
+  font-weight: bold !important;
+  border-radius: 5px !important;
+  padding: 0.5rem 1.5rem !important;
+}
+
+.btn-vigia-primary:hover {
+  background-color: #7ab332 !important;
+}
+
+.btn-vigia-danger {
+  background-color: #F44336 !important;
+  border: none !important;
+  color: white !important;
+  font-weight: bold !important;
+  border-radius: 5px !important;
+  padding: 0.5rem 1.5rem !important;
+}
+
+.btn-vigia-danger:hover {
+  background-color: #d32f2f !important;
+}
+
+.btn-vigia-secondary {
+  background-color: #1E3A5F !important;
+  border: none !important;
+  color: white !important;
+  font-weight: bold !important;
+  border-radius: 5px !important;
+  padding: 0.5rem 1.5rem !important;
+}
+
+.btn-vigia-secondary:hover {
+  background-color: #152b47 !important;
+}
+
+.card-actions {
+  margin-top: auto;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
