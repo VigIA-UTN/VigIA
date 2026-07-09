@@ -86,13 +86,14 @@ class InvitacionServiceTest {
         @DisplayName("Debe generar invitación con éxito")
         @SuppressWarnings("null")
         void generarInvitacionProductor_Success() {
-                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
-                                eq(request.getEmail()), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
-                                .thenReturn(false);
-
                 when(usuarioRepository.findByEmail(adminEmail)).thenReturn(Optional.of(adminUser));
                 when(establecimientoRepository.findById(request.getEstablecimientoId()))
                                 .thenReturn(Optional.of(establecimiento));
+                // El email del nuevo productor no existe como usuario → flujo de invitación
+                when(usuarioRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
+                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                eq(request.getEmail()), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
+                                .thenReturn(false);
 
                 Invitacion savedInvitacion = new Invitacion();
                 savedInvitacion.setId(100L);
@@ -135,6 +136,10 @@ class InvitacionServiceTest {
         @DisplayName("Debe lanzar excepción si ya existe invitación vigente")
         @SuppressWarnings("null")
         void generarInvitacionProductor_ThrowsWhenExistsVigente() {
+                when(usuarioRepository.findByEmail(adminEmail)).thenReturn(Optional.of(adminUser));
+                when(establecimientoRepository.findById(request.getEstablecimientoId()))
+                                .thenReturn(Optional.of(establecimiento));
+                when(usuarioRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
                 when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
                                 eq(request.getEmail()), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
                                 .thenReturn(true);
@@ -151,8 +156,6 @@ class InvitacionServiceTest {
         @DisplayName("Debe lanzar excepción si no encuentra administrador")
         @SuppressWarnings("null")
         void generarInvitacionProductor_ThrowsWhenAdminNotFound() {
-                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
-                                anyString(), any(), any())).thenReturn(false);
                 when(usuarioRepository.findByEmail(adminEmail)).thenReturn(Optional.empty());
 
                 assertThatThrownBy(() -> invitacionService.generarInvitacionProductor(request, adminEmail))
@@ -166,9 +169,6 @@ class InvitacionServiceTest {
         @DisplayName("Debe lanzar excepción si no encuentra establecimiento")
         @SuppressWarnings("null")
         void generarInvitacionProductor_ThrowsWhenEstablecimientoNotFound() {
-
-                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
-                                anyString(), any(), any())).thenReturn(false);
                 when(usuarioRepository.findByEmail(adminEmail)).thenReturn(Optional.of(adminUser));
                 when(establecimientoRepository.findById(request.getEstablecimientoId())).thenReturn(Optional.empty());
 
@@ -183,13 +183,14 @@ class InvitacionServiceTest {
         @DisplayName("Debe generar invitación empleado con éxito")
         @SuppressWarnings("null")
         void generarInvitacionEmpleado_Success() {
-                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
-                                eq(empleadoRequest.getEmail()), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
-                                .thenReturn(false);
-
                 when(usuarioRepository.findByEmail(productorEmail)).thenReturn(Optional.of(productorUser));
                 when(establecimientoRepository.findById(empleadoRequest.getEstablecimientoId()))
                                 .thenReturn(Optional.of(establecimiento));
+                // El email del nuevo empleado no existe como usuario → flujo de invitación
+                when(usuarioRepository.findByEmail(empleadoRequest.getEmail())).thenReturn(Optional.empty());
+                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                eq(empleadoRequest.getEmail()), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
+                                .thenReturn(false);
 
                 Invitacion savedInvitacion = new Invitacion();
                 savedInvitacion.setId(101L);
@@ -231,14 +232,12 @@ class InvitacionServiceTest {
         @DisplayName("Debe lanzar excepción si el productor no pertenece al establecimiento")
         @SuppressWarnings("null")
         void generarInvitacionEmpleado_ThrowsWhenProductorNoPertenece() {
-                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
-                                anyString(), any(), any())).thenReturn(false);
                 when(usuarioRepository.findByEmail(productorEmail)).thenReturn(Optional.of(productorUser));
 
                 Establecimiento otroEstablecimiento = new Establecimiento();
                 otroEstablecimiento.setId(1L);
                 otroEstablecimiento.setUsuarios(new ArrayList<>());
-                
+
                 when(establecimientoRepository.findById(empleadoRequest.getEstablecimientoId()))
                                 .thenReturn(Optional.of(otroEstablecimiento));
 
@@ -251,8 +250,6 @@ class InvitacionServiceTest {
         @DisplayName("Debe lanzar excepción si el rol del empleado es inválido")
         @SuppressWarnings("null")
         void generarInvitacionEmpleado_ThrowsWhenRolInvalido() {
-                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
-                                anyString(), any(), any())).thenReturn(false);
                 when(usuarioRepository.findByEmail(productorEmail)).thenReturn(Optional.of(productorUser));
                 when(establecimientoRepository.findById(empleadoRequest.getEstablecimientoId()))
                                 .thenReturn(Optional.of(establecimiento));

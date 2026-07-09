@@ -38,10 +38,6 @@ export default function InvitacionesPage() {
     resolver: zodResolver(schema),
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -58,6 +54,10 @@ export default function InvitacionesPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const onSubmit = async (data: FormData) => {
     try {
