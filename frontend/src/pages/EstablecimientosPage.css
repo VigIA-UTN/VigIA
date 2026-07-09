@@ -1,7 +1,7 @@
 .establecimientos-container {
   padding: 2rem;
   min-height: calc(100vh - 120px);
-  background-color: #f5f6fa; /* Assuming a light background like in typical dashboards, wireframe shows gray/light background */
+  background-color: #f5f6fa;
 }
 
 .establecimientos-title {
@@ -39,6 +39,21 @@
   position: absolute;
   top: 1.5rem;
   right: 1.5rem;
+}
+
+.edit-icon {
+  position: absolute;
+  top: 1.3rem;
+  right: 3rem;
+  cursor: pointer;
+  font-size: 15px;
+  color: #a0aec0;
+  transition: color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.edit-icon:hover {
+  color: #8CC63F;
+  transform: scale(1.15);
 }
 
 .status-active {
@@ -93,4 +108,9 @@
   display: flex;
   gap: 0.5rem;
   justify-content: center;
+}
+
+.establishment-map {
+  height: 400px;
+  width: 100%;
 }

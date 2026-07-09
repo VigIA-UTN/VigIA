@@ -29,3 +29,8 @@ export async function desactivarEstablecimiento(id: number): Promise<Establecimi
   const response = await axiosClient.delete<EstablecimientoResponse>(`/establecimientos/${id}`);
   return response.data;
 }
+
+export async function updateEstablecimiento(id: number, data: EstablecimientoRequest): Promise<EstablecimientoResponse> {
+  const response = await axiosClient.put<EstablecimientoResponse>(`/establecimientos/${id}`, data);
+  return response.data;
+}
