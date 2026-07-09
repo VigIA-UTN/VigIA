@@ -62,6 +62,14 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         return mapToResponse(establecimientoRepository.save(est));
     }
 
+    @SuppressWarnings("null")
+    public EstablecimientoResponse activarEstablecimiento(Long id) {
+        Establecimiento est = establecimientoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+        est.setActivo(true);
+        return mapToResponse(establecimientoRepository.save(est));
+    }
+
     private EstablecimientoResponse mapToResponse(Establecimiento est) {
         return EstablecimientoResponse.builder()
                 .id(est.getId())

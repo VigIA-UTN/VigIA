@@ -11,4 +11,5 @@ public interface EstablecimientoService {
     EstablecimientoResponse getEstablecimientoById(Long id);
     EstablecimientoResponse updateEstablecimiento(Long id, EstablecimientoRequest request);
     EstablecimientoResponse desactivarEstablecimiento(Long id);
+    EstablecimientoResponse activarEstablecimiento(Long id);
 }

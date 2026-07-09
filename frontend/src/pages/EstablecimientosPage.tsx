@@ -7,7 +7,8 @@ import {
   getEstablecimientos,
   createEstablecimiento,
   desactivarEstablecimiento,
-  updateEstablecimiento
+  updateEstablecimiento,
+  activarEstablecimiento
 } from '../api/establecimientosApi';
 import type { EstablecimientoResponse } from '../api/establecimientosApi';
 import './EstablecimientosPage.css';
@@ -101,6 +102,16 @@ export default function EstablecimientosPage() {
     }
   };
 
+  const handleActivar = async (id: number) => {
+    try {
+      const actualizado = await activarEstablecimiento(id);
+      setEstablecimientos(establecimientos.map(e => e.id === id ? actualizado : e));
+    } catch (err) {
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      alert(axiosError.response?.data?.message || 'Error al activar el establecimiento');
+    }
+  };
+
   const handleCloseModal = () => {
     setShowModal(false);
     reset();
@@ -161,9 +172,13 @@ export default function EstablecimientosPage() {
                     }}>
                       Ver detalle
                     </Button>
-                    {est.activo && (
+                    {est.activo ? (
                       <Button variant="light" className="btn-vigia-danger w-100" onClick={() => handleDesactivar(est.id)}>
                         Desactivar
+                      </Button>
+                    ) : (
+                      <Button variant="light" className="btn-vigia-danger w-100" onClick={() => handleActivar(est.id)}>
+                        Activar
                       </Button>
                     )}
                   </div>

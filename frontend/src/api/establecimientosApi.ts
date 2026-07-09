@@ -30,6 +30,11 @@ export async function desactivarEstablecimiento(id: number): Promise<Establecimi
   return response.data;
 }
 
+export async function activarEstablecimiento(id: number): Promise<EstablecimientoResponse> {
+  const response = await axiosClient.put<EstablecimientoResponse>(`/establecimientos/activar/${id}`);
+  return response.data;
+}
+
 export async function updateEstablecimiento(id: number, data: EstablecimientoRequest): Promise<EstablecimientoResponse> {
   const response = await axiosClient.put<EstablecimientoResponse>(`/establecimientos/${id}`, data);
   return response.data;
