@@ -4,7 +4,7 @@ import MapPage from './pages/MapPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import EstablecimientosPage from './pages/EstablecimientosPage';
 import InvitacionesPage from './pages/InvitacionesPage';
-import RegisterPage from './pages/Registerpage';
+import RegisterPage from './pages/RegisterPage';
 
 function App() {
   return (
