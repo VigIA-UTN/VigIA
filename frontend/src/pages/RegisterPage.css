@@ -1,0 +1,373 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+/* ── Reset & base ── */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    width: 100%;
+    font-family: 'Outfit', sans-serif;
+}
+
+/* ── Layout ── */
+.register-wrapper {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+/* ── Left panel: imagen ── */
+.register-left {
+    flex: 0 0 50%;
+    width: 50%;
+    position: relative;
+    overflow: hidden;
+}
+
+.register-left img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
+.register-left-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top,
+            rgba(0, 0, 0, 0.4) 0%,
+            rgba(0, 0, 0, 0.1) 60%,
+            rgba(0, 0, 0, 0.05) 100%);
+}
+
+.register-left-tagline {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+}
+
+.register-left-tagline-box {
+    background: rgba(255, 255, 255, 0.50);
+    backdrop-filter: blur(2px);
+    border-radius: 16px;
+    padding: 32px 40px;
+    text-align: left;
+    color: #263238;
+    font-family: 'Outfit', sans-serif;
+    user-select: none;
+    cursor: default;
+}
+
+.register-left-tagline-box p:first-child {
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 1.2;
+    text-shadow: 0 2px 10px rgba(255, 255, 255, 0.15);
+}
+
+.register-left-tagline-box p:last-child {
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-shadow: 0 2px 10px rgba(255, 255, 255, 0.15);
+}
+
+/* ── Right panel: formulario ── */
+.register-right {
+    flex: 0 0 50%;
+    width: 50%;
+    background-color: #1E3A5F;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    animation: fadeInRight 0.5s ease both;
+    overflow-y: auto;
+}
+
+.register-content-container {
+    width: 100%;
+    max-width: 392px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: auto 0;
+}
+
+@keyframes fadeInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* ── Logo ── */
+.register-logo {
+    width: 320px;
+    max-width: 88%;
+    height: auto;
+    margin-bottom: 20px;
+}
+
+/* ── Título ── */
+.register-title {
+    color: #fff;
+    font-size: 48px;
+    font-weight: 500;
+    margin-bottom: 28px;
+    text-align: center;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+}
+
+/* ── Formulario ── */
+.register-form {
+    width: 392px;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.register-field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+}
+
+.register-field label {
+    color: #c8d9ed;
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+    user-select: none;
+    cursor: default;
+}
+
+/* ── Input base ── */
+.register-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.register-input {
+    width: 392px;
+    max-width: 100%;
+    height: 40px;
+    padding: 0 44px 0 16px;
+    border-radius: 8px;
+    border: 1.5px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.97);
+    color: #1B344D;
+    font-family: 'Outfit', sans-serif;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.register-input::placeholder {
+    color: #9aabb8;
+}
+
+.register-input:focus {
+    border-color: #94C11E;
+    box-shadow: 0 0 0 3px rgba(148, 193, 30, 0.2);
+}
+
+.register-input.input-error {
+    border-color: #e53e3e;
+    box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.15);
+}
+
+/* ── Ícono dentro del input (email check, password toggle) ── */
+.input-icon {
+    position: absolute;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    color: #9aabb8;
+}
+
+.toggle-password {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    color: #9aabb8;
+    transition: color 0.2s;
+}
+
+.toggle-password:hover {
+    color: #1B344D;
+}
+
+/* ── Mensaje de error inline ── */
+.register-error-msg {
+    color: #fc8181;
+    font-size: 0.78rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ── Error general (401 / 423) ── */
+.register-alert {
+    width: 392px;
+    max-width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: shakeX 0.4s ease;
+    user-select: none;
+    cursor: default;
+}
+
+.register-alert.alert-error {
+    background: rgba(229, 62, 62, 0.15);
+    border: 1px solid rgba(229, 62, 62, 0.4);
+    color: #fc8181;
+}
+
+.register-alert.alert-locked {
+    background: rgba(237, 137, 54, 0.15);
+    border: 1px solid rgba(237, 137, 54, 0.4);
+    color: #f6ad55;
+}
+
+@keyframes shakeX {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    20% {
+        transform: translateX(-6px);
+    }
+
+    40% {
+        transform: translateX(6px);
+    }
+
+    60% {
+        transform: translateX(-4px);
+    }
+
+    80% {
+        transform: translateX(4px);
+    }
+}
+
+/* ── Botón principal ── */
+.register-btn {
+    width: 392px;
+    max-width: 100%;
+    height: 48px;
+    padding: 0;
+    margin-top: 8px;
+    background-color: #94C11E;
+    color: #1B344D;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: background-color 0.2s, transform 0.15s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    user-select: none;
+    cursor: pointer;
+}
+
+.register-btn:hover:not(:disabled) {
+    background-color: #a8d420;
+    box-shadow: 0 4px 16px rgba(148, 193, 30, 0.35);
+    transform: translateY(-1px);
+}
+
+.register-btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.register-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* ── Spinner ── */
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2.5px solid rgba(27, 52, 77, 0.3);
+    border-top-color: #1B344D;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Responsive: en pantallas pequeñas ocultar el panel izquierdo ── */
+@media (max-width: 680px) {
+    .register-left {
+        display: none;
+    }
+
+    .register-right {
+        flex: 0 0 100%;
+        width: 100%;
+    }
+}
+
+
+/* ── Link para loggearse ── */
+.register-link-container {
+    margin-top: 16px;
+}
+
+.register-link {
+    color: #9aabb8;
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.register-link:hover {
+    color: #94C11E;
+}

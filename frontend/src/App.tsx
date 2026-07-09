@@ -4,12 +4,14 @@ import MapPage from './pages/MapPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import EstablecimientosPage from './pages/EstablecimientosPage';
 import InvitacionesPage from './pages/InvitacionesPage';
+import RegisterPage from './pages/Registerpage';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route
           path="/"
           element={

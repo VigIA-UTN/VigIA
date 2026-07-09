@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { loginRequest } from '../api/authApi';
 import { useAuthStore } from '../store/authStore';
@@ -188,6 +188,9 @@ export default function LoginPage() {
               'Iniciar Sesión'
             )}
           </button>
+          <div className="login-link-container">
+            <Link to="/register" className='login-link'>¿Contas con una de invitación? Registrate aquí</Link>
+          </div>
         </form>
       </div>
     </div>
