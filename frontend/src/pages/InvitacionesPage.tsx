@@ -38,25 +38,24 @@ export default function InvitacionesPage() {
     resolver: zodResolver(schema),
   });
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [inv, est] = await Promise.all([
-        getInvitacionesProductor(),
-        getEstablecimientos(),
-      ]);
-      setInvitaciones(inv);
-      setEstablecimientos(est);
-    } catch (err) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      setError(axiosError.response?.data?.message || 'Error al cargar datos');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [inv, est] = await Promise.all([
+          getInvitacionesProductor(),
+          getEstablecimientos(),
+        ]);
+        setInvitaciones(inv);
+        setEstablecimientos(est);
+      } catch (err) {
+        const axiosError = err as { response?: { data?: { message?: string } } };
+        setError(axiosError.response?.data?.message || 'Error al cargar datos');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
   const onSubmit = async (data: FormData) => {
@@ -65,11 +64,13 @@ export default function InvitacionesPage() {
       setError(null);
       const nueva = await crearInvitacionProductor(data);
       if (nueva.estado === 'USADA') {
-        setSuccessMsg(`El usuario ya estaba registrado y fue asociado al establecimiento. Se le envió un email de notificación.`);
+        setSuccessMsg('El usuario ya estaba registrado y fue asociado al establecimiento. Se le envió un email de notificación.');
       } else {
         setSuccessMsg(`Invitación enviada correctamente a ${nueva.emailDestino}.`);
       }
-      await fetchData();
+      // Recargar la lista de invitaciones
+      const invActualizadas = await getInvitacionesProductor();
+      setInvitaciones(invActualizadas);
       handleCloseModal();
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
