@@ -64,4 +64,44 @@ public class EmailServiceImpl implements EmailService {
             log.error("Error al enviar email de invitación a {}: {}", to, e.getMessage());
         }
     }
+
+    @Override
+    public void enviarNuevoEstablecimientoProductor(String to, String establecimientoNombre) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom("no-reply@vigia.dev");
+            message.setTo(to);
+            message.setSubject("Nuevo establecimiento asignado en VigIA");
+            message.setText("Hola,\n\n"
+                    + "Te informamos que hemos dado de alta el establecimiento \""
+                    + establecimientoNombre + "\" en tu cuenta de VigIA.\n\n"
+                    + "Ya podés acceder a él desde la plataforma con tu usuario habitual.\n\n"
+                    + "Saludos,\nEl equipo de VigIA.");
+
+            emailSender.send(message);
+            log.info("Email de nuevo establecimiento enviado a {}", to);
+        } catch (Exception e) {
+            log.error("Error al enviar email de nuevo establecimiento a {}: {}", to, e.getMessage());
+        }
+    }
+
+    @Override
+    public void enviarNuevoEstablecimientoEmpleado(String to, String establecimientoNombre, String rol) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom("no-reply@vigia.dev");
+            message.setTo(to);
+            message.setSubject("Nuevo establecimiento asignado en VigIA");
+            message.setText("Hola,\n\n"
+                    + "Te informamos que hemos dado de alta en el establecimiento \""
+                    + establecimientoNombre + "\" con el rol de " + rol + " en tu cuenta de VigIA.\n\n"
+                    + "Ya podés acceder a él desde la plataforma con tu usuario habitual.\n\n"
+                    + "Saludos,\nEl equipo de VigIA.");
+
+            emailSender.send(message);
+            log.info("Email de nuevo establecimiento (empleado) enviado a {}", to);
+        } catch (Exception e) {
+            log.error("Error al enviar email de nuevo establecimiento (empleado) a {}: {}", to, e.getMessage());
+        }
+    }
 }

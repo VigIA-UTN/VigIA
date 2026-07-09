@@ -2,7 +2,21 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  cursor: default;
+  user-select: none;
 }
+
+a, button, [role="button"], label,
+input, textarea, select,
+[type="checkbox"], [type="radio"] {
+  cursor: auto;
+  user-select: auto;
+}
+
+a { cursor: pointer; }
+button, [role="button"] { cursor: pointer; }
+input, textarea { cursor: text; user-select: text; }
+select { cursor: pointer; }
 
 html,
 body,
@@ -11,6 +25,19 @@ body,
   padding: 0;
   height: 100%;
   width: 100%;
+  cursor: default;
+}
+
+/* Fuerza cursor default en contenedores de Bootstrap que heredan cursor de texto */
+.navbar,
+.navbar *:not(a):not(button):not(input):not(select):not(textarea) {
+  cursor: default !important;
+  user-select: none !important;
+}
+
+.nav-link,
+.navbar-brand {
+  cursor: pointer !important;
 }
 
 .brand-trapezoid {

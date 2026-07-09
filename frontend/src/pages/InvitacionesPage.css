@@ -1,0 +1,249 @@
+.invitaciones-container {
+  padding: 2rem;
+  min-height: calc(100vh - 120px);
+  background-color: #f5f6fa;
+}
+
+.invitaciones-title {
+  color: #1E3A5F;
+  font-weight: bold;
+}
+
+/* Tabla */
+.invitaciones-table-wrapper {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.invitaciones-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.invitaciones-table thead tr {
+  border-bottom: 2px solid #e8ecf0;
+}
+
+.invitaciones-table thead th {
+  padding: 1rem 1.5rem;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  user-select: none;
+  cursor: default;
+}
+
+.invitaciones-table tbody tr {
+  border-bottom: 1px solid #f0f2f5;
+  transition: background-color 0.15s ease;
+}
+
+.invitaciones-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.invitaciones-table tbody tr:hover {
+  background-color: #f8f9fc;
+}
+
+.invitaciones-table tbody td {
+  padding: 1rem 1.5rem;
+  vertical-align: middle;
+  color: #374151;
+  font-size: 0.95rem;
+  user-select: none;
+  cursor: default;
+}
+
+/* Avatar + nombre */
+.productor-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.productor-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #1E3A5F;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+/* Email */
+.email-link {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.email-link:hover {
+  text-decoration: underline;
+}
+
+/* Establecimiento */
+.establecimiento-tag {
+  font-family: monospace;
+  font-size: 0.88rem;
+  color: #4b5563;
+}
+
+/* Badges de estado */
+.estado-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.35em 0.75em;
+  border-radius: 999px;
+}
+
+.badge-pendiente {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+  border: 1px solid #fde68a;
+}
+
+.badge-usada {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-expirada {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+  border: 1px solid #fecaca;
+}
+
+/* Botones */
+.btn-vigia-primary {
+  background-color: #8CC63F !important;
+  border: none !important;
+  color: #1B344D !important;
+  font-weight: bold !important;
+  border-radius: 5px !important;
+  padding: 0.5rem 1.5rem !important;
+}
+
+.btn-vigia-primary:hover {
+  background-color: #7ab332 !important;
+  color: #1B344D !important;
+}
+
+/* Modal oscuro */
+.modal-productor .modal-content {
+  background-color: #1B344D;
+  border-radius: 16px;
+  border: none;
+  color: white;
+  padding: 0.5rem;
+}
+
+.modal-productor .modal-header {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.modal-productor .modal-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: white;
+  width: 100%;
+  text-align: center;
+}
+
+.modal-productor .btn-close {
+  filter: invert(1);
+}
+
+.modal-productor .modal-body {
+  padding: 1.5rem 2rem;
+}
+
+.modal-productor .modal-footer {
+  border-top: none;
+  padding: 0 2rem 1.5rem;
+}
+
+.modal-productor .form-label {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+
+.modal-productor .form-control,
+.modal-productor .form-select {
+  background-color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  color: #1B344D;
+}
+
+.modal-productor .form-control:focus,
+.modal-productor .form-select:focus {
+  box-shadow: 0 0 0 3px rgba(140, 198, 63, 0.4);
+  border: none;
+  outline: none;
+}
+
+.email-input-wrapper {
+  position: relative;
+}
+
+.email-clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1B344D;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.email-clear-btn:hover {
+  background: #152b47;
+}
+
+.btn-generar {
+  background-color: #8CC63F;
+  border: none;
+  border-radius: 8px;
+  color: #1B344D;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.75rem;
+  width: 100%;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-generar:hover {
+  background-color: #7ab332;
+}
+
+.btn-generar:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

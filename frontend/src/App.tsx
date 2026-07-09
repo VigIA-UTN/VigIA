@@ -3,6 +3,7 @@ import LoginPage from './pages/LoginPage';
 import MapPage from './pages/MapPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import EstablecimientosPage from './pages/EstablecimientosPage';
+import InvitacionesPage from './pages/InvitacionesPage';
 
 function App() {
   return (
@@ -22,6 +23,14 @@ function App() {
           element={
             <ProtectedRoute>
               <EstablecimientosPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/invitaciones"
+          element={
+            <ProtectedRoute>
+              <InvitacionesPage />
             </ProtectedRoute>
           }
         />

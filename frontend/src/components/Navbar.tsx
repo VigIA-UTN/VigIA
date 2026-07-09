@@ -41,6 +41,7 @@ function NavScroll() {
                     >
                         <Nav.Link as={Link} to="/animales" className="mx-2">Animales</Nav.Link>
                         <Nav.Link as={Link} to="/establecimientos" className="mx-2">Establecimientos</Nav.Link>
+                        <Nav.Link as={Link} to="/invitaciones" className="mx-2">Productores</Nav.Link>
                     </Nav>
                 </Navbar.Collapse>
             </Container>
