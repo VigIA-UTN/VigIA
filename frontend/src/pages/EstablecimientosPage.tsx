@@ -80,7 +80,8 @@ export default function EstablecimientosPage() {
     try {
       setSubmittingUpdate(true);
       setError(null);
-      const actualizado = await updateEstablecimiento(establecimientoEdit?.id, data);
+      if (!establecimientoEdit) return;
+      const actualizado = await updateEstablecimiento(establecimientoEdit.id, data);
       setEstablecimientos(establecimientos.map(e => e.id === actualizado.id ? actualizado : e));
       setShowUpdateModal(false);
     } catch (err) {
