@@ -20,7 +20,7 @@ export default function ProtectedRoute({ roles, children }: ProtectedRouteProps)
 
   const rol = useAuthStore((s) => s.rol);
 
-  if (roles && !roles.includes(rol)) {
+  if (roles && !roles.includes(rol || "")) {
     return <Navigate to="/" replace />;
   }
 
