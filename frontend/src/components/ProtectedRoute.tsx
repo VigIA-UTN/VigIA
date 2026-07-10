@@ -10,6 +10,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ roles, children }: ProtectedRouteProps) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const rol = useAuthStore((s) => s.rol);
 
   // El timer solo corre cuando el usuario está autenticado y en una ruta privada
   useInactivityTimer();
@@ -17,8 +18,6 @@ export default function ProtectedRoute({ roles, children }: ProtectedRouteProps)
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-
-  const rol = useAuthStore((s) => s.rol);
 
   if (roles && !roles.includes(rol || "")) {
     return <Navigate to="/" replace />;
