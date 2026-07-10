@@ -37,8 +37,16 @@
   height: 15px;
   border-radius: 50%;
   position: absolute;
+  top: 3.5rem;
+  right: 1.5rem;
+}
+
+.card-id {
+  position: absolute;
   top: 1.5rem;
   right: 1.5rem;
+  color: #a0aec0;
+  font-size: 1rem;
 }
 
 .edit-icon {

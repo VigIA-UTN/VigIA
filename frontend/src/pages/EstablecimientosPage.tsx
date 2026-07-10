@@ -26,6 +26,7 @@ export default function EstablecimientosPage() {
   const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -129,11 +130,20 @@ export default function EstablecimientosPage() {
   return (
     <div className="establecimientos-container">
       <Container>
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2 className="establecimientos-title">Establecimientos</h2>
-          <Button className="btn-vigia-primary" onClick={handleShowModal}>
-            + Nuevo
-          </Button>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+          <h2 className="establecimientos-title mb-0">Establecimientos</h2>
+          <div className="d-flex gap-3">
+            <Form.Control
+              type="text"
+              placeholder="Buscar por nombre o #id..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ maxWidth: '300px' }}
+            />
+            <Button className="btn-vigia-primary text-nowrap" onClick={handleShowModal}>
+              + Nuevo
+            </Button>
+          </div>
         </div>
 
         {error && <Alert variant="danger">{error}</Alert>}
@@ -142,57 +152,65 @@ export default function EstablecimientosPage() {
           <div className="text-center mt-5">
             <Spinner animation="border" variant="primary" />
           </div>
-        ) : (
-          <Row className="g-4">
-            {establecimientos.map((est) => (
-              <Col key={est.id} xs={12} md={6} lg={4}>
-                <div className="establecimiento-card">
-                  <div className={`status-indicator ${est.activo ? 'status-active' : 'status-inactive'}`} title={est.activo ? 'Activo' : 'Inactivo'} />
-                  <h4>{est.nombre}</h4>
-                  <i
-                    className="bi bi-pencil-square edit-icon"
-                    onClick={() => {
-                      setEstablecimientoEdit(est);
-                      resetUpdate({
-                        nombre: est.nombre,
-                        latitud: est.latitud,
-                        longitud: est.longitud,
-                      });
-                      setShowUpdateModal(true);
-                    }}
-                  ></i>
-                  <div className="location">
-                    <i className="bi bi-geo-alt-fill me-2"></i>
-                    Lat: {est.latitud}, Lon: {est.longitud}
-                  </div>
+        ) : (() => {
+          const filtered = establecimientos.filter(est => {
+            if (searchTerm === '') return true;
+            const searchLower = searchTerm.toLowerCase();
+            return est.nombre.toLowerCase().includes(searchLower) || `#${est.id}`.includes(searchLower);
+          });
+          return (
+            <Row className="g-4">
+              {filtered.map((est) => (
+                <Col key={est.id} xs={12} md={6} lg={4}>
+                  <div className="establecimiento-card">
+                    <div className={`status-indicator ${est.activo ? 'status-active' : 'status-inactive'}`} title={est.activo ? 'Activo' : 'Inactivo'} />
+                    <div className="card-id">#{est.id}</div>
+                    <h4>{est.nombre}</h4>
+                    <i
+                      className="bi bi-pencil-square edit-icon"
+                      onClick={() => {
+                        setEstablecimientoEdit(est);
+                        resetUpdate({
+                          nombre: est.nombre,
+                          latitud: est.latitud,
+                          longitud: est.longitud,
+                        });
+                        setShowUpdateModal(true);
+                      }}
+                    ></i>
+                    <div className="location">
+                      <i className="bi bi-geo-alt-fill me-2"></i>
+                      Lat: {est.latitud}, Lon: {est.longitud}
+                    </div>
 
-                  <div className="card-actions">
-                    <Button variant="light" className="btn-vigia-primary w-100" onClick={() => {
-                      setShowDetailModal(true);
-                      setEstablecimientoDetail(est);
-                    }}>
-                      Ver detalle
-                    </Button>
-                    {est.activo ? (
-                      <Button variant="light" className="btn-vigia-danger w-100" onClick={() => handleDesactivar(est.id)}>
-                        Desactivar
+                    <div className="card-actions">
+                      <Button variant="light" className="btn-vigia-primary w-100" onClick={() => {
+                        setShowDetailModal(true);
+                        setEstablecimientoDetail(est);
+                      }}>
+                        Ver detalle
                       </Button>
-                    ) : (
-                      <Button variant="light" className="btn-vigia-danger w-100" onClick={() => handleActivar(est.id)}>
-                        Activar
-                      </Button>
-                    )}
+                      {est.activo ? (
+                        <Button variant="light" className="btn-vigia-danger w-100" onClick={() => handleDesactivar(est.id)}>
+                          Desactivar
+                        </Button>
+                      ) : (
+                        <Button variant="light" className="btn-vigia-danger w-100" onClick={() => handleActivar(est.id)}>
+                          Activar
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Col>
-            ))}
-            {establecimientos.length === 0 && !loading && (
-              <Col>
-                <p className="text-muted">No hay establecimientos registrados.</p>
-              </Col>
-            )}
-          </Row>
-        )}
+                </Col>
+              ))}
+              {filtered.length === 0 && (
+                <Col>
+                  <p className="text-muted">No se encontraron establecimientos.</p>
+                </Col>
+              )}
+            </Row>
+          );
+        })()}
       </Container>
 
       {/* Modal Alta */}

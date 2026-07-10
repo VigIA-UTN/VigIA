@@ -34,6 +34,10 @@ export default function InvitacionesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const [emailFilter, setEmailFilter] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState('');
+  const [establecimientoFilter, setEstablecimientoFilter] = useState('');
+
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
@@ -108,6 +112,37 @@ export default function InvitacionesPage() {
           </Alert>
         )}
 
+        {/* Filtros */}
+        <div className="d-flex flex-column flex-md-row mb-4 gap-3">
+          <Form.Control
+            type="text"
+            placeholder="Buscar por email..."
+            value={emailFilter}
+            onChange={(e) => setEmailFilter(e.target.value)}
+            style={{ flex: 1, maxWidth: '300px' }}
+          />
+          <Form.Select 
+            value={estadoFilter} 
+            onChange={(e) => setEstadoFilter(e.target.value)}
+            style={{ flex: 1, maxWidth: '200px' }}
+          >
+            <option value="">Todos los estados</option>
+            <option value="PENDIENTE">PENDIENTE</option>
+            <option value="USADA">USADA</option>
+            <option value="EXPIRADA">EXPIRADA</option>
+          </Form.Select>
+          <Form.Select 
+            value={establecimientoFilter} 
+            onChange={(e) => setEstablecimientoFilter(e.target.value)}
+            style={{ flex: 1, maxWidth: '250px' }}
+          >
+            <option value="">Todos los establecimientos</option>
+            {establecimientos.map(e => (
+              <option key={e.id} value={e.nombre}>{e.nombre}</option>
+            ))}
+          </Form.Select>
+        </div>
+
         {/* Tabla */}
         {loading ? (
           <div className="text-center mt-5">
@@ -125,14 +160,25 @@ export default function InvitacionesPage() {
                 </tr>
               </thead>
               <tbody>
-                {invitaciones.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="text-center text-muted py-4">
-                      No hay invitaciones registradas.
-                    </td>
-                  </tr>
-                ) : (
-                  invitaciones.map((inv, idx) => {
+                {(() => {
+                  const filteredInvitaciones = invitaciones.filter(inv => {
+                      const matchesEmail = emailFilter === '' || inv.emailDestino.toLowerCase().includes(emailFilter.toLowerCase());
+                      const matchesEstado = estadoFilter === '' || inv.estado === estadoFilter;
+                      const matchesEstablecimiento = establecimientoFilter === '' || (inv.establecimiento && inv.establecimiento === establecimientoFilter);
+                      return matchesEmail && matchesEstado && matchesEstablecimiento;
+                  });
+
+                  if (filteredInvitaciones.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={4} className="text-center text-muted py-4">
+                          No se encontraron invitaciones que coincidan con la búsqueda.
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filteredInvitaciones.map((inv, idx) => {
                     const estadoConf = ESTADO_CONFIG[inv.estado] ?? { label: inv.estado, className: '' };
                     return (
                       <tr key={inv.id ?? idx}>
@@ -163,8 +209,8 @@ export default function InvitacionesPage() {
                         </td>
                       </tr>
                     );
-                  })
-                )}
+                  });
+                })()}
               </tbody>
             </table>
           </div>
