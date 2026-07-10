@@ -80,7 +80,7 @@ public class InvitacionServiceImpl implements InvitacionService {
         invitacion.setEstablecimiento(establecimiento);
         invitacion.setToken(token);
         invitacion.setFechaCreacion(LocalDateTime.now());
-        invitacion.setFechaExpiracion(LocalDateTime.now().plusDays(7));
+        invitacion.setFechaExpiracion(LocalDateTime.now().plusSeconds(30));
 
         Invitacion saved = invitacionRepository.save(invitacion);
 
@@ -164,7 +164,7 @@ public class InvitacionServiceImpl implements InvitacionService {
         invitacion.setEstablecimiento(establecimiento);
         invitacion.setToken(token);
         invitacion.setFechaCreacion(LocalDateTime.now());
-        invitacion.setFechaExpiracion(LocalDateTime.now().plusDays(7));
+        invitacion.setFechaExpiracion(LocalDateTime.now().plusSeconds(30));
 
         Invitacion saved = invitacionRepository.save(invitacion);
 

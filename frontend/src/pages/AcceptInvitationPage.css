@@ -213,19 +213,30 @@
 }
 
 .back-btn {
-  background-color: transparent;
-  border: 1px solid #94C11E;
-  color: #94C11E;
+  background-color: #94C11E;
+  border: none;
+  color: #263238;
   border-radius: 12px;
-  padding: 10px 20px;
-  font-weight: 600;
+  padding: 14px 20px;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s, transform 0.15s, box-shadow 0.2s;
   margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .back-btn:hover {
-  background-color: rgba(148, 193, 30, 0.1);
+  background-color: #a8d420;
+  box-shadow: 0 4px 16px rgba(148, 193, 30, 0.35);
+  transform: translateY(-1px);
+}
+
+.back-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 /* Spinner */

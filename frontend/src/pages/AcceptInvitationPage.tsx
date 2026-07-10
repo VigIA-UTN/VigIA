@@ -92,7 +92,9 @@ export default function AcceptInvitationPage() {
 
   if (isLoading) {
     return (
-      <div className="accept-invitation-container" style={{ backgroundImage: `url(${loginImage})` }}>
+      <div className="accept-invitation-container">
+        <div className="background-image" style={{ backgroundImage: `url(${loginImage})` }}></div>
+        <div className="background-overlay"></div>
         <div className="accept-invitation-card loading-card">
           <div className="spinner" />
           <p>Validando invitación...</p>
@@ -103,7 +105,9 @@ export default function AcceptInvitationPage() {
 
   if (error || !invitationData) {
     return (
-      <div className="accept-invitation-container" style={{ backgroundImage: `url(${loginImage})` }}>
+      <div className="accept-invitation-container">
+        <div className="background-image" style={{ backgroundImage: `url(${loginImage})` }}></div>
+        <div className="background-overlay"></div>
         <div className="accept-invitation-card error-card">
           <img src={logoImg} alt="VigIA Logo" className="logo" />
           <h2>Algo salió mal</h2>
