@@ -96,6 +96,8 @@ class EstablecimientoControllerTest {
         est.setLongitud(-58.0);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
+        est.setUsuarios(new java.util.ArrayList<>());
+        est.getUsuarios().add(productor);
         est = establecimientoRepository.save(est);
         establecimientoId = est.getId();
     }
@@ -171,10 +173,12 @@ class EstablecimientoControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/establecimientos - Usuario no-Admin recibe 403 Forbidden")
-    void getAllEstablecimientos_asProductor_forbidden() throws Exception {
+    @DisplayName("GET /api/v1/establecimientos - Productor lista solo sus establecimientos")
+    void getAllEstablecimientos_asProductor_success() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos")
                 .header("Authorization", "Bearer " + userToken))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].nombre").value("Establecimiento Test"));
     }
 }

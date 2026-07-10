@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,9 +29,13 @@ public class EstablecimientoController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<List<EstablecimientoResponse>> getAllEstablecimientos() {
-        return ResponseEntity.ok(establecimientoService.getAllEstablecimientos());
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<List<EstablecimientoResponse>> getAllEstablecimientos(Authentication authentication) {
+        if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"))) {
+            return ResponseEntity.ok(establecimientoService.getAllEstablecimientos());
+        } else {
+            return ResponseEntity.ok(establecimientoService.getEstablecimientosByUsuario(authentication.getName()));
+        }
     }
 
     @GetMapping("/{id}")

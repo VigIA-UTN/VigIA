@@ -8,6 +8,7 @@ import java.util.List;
 public interface EstablecimientoService {
     EstablecimientoResponse createEstablecimiento(EstablecimientoRequest request);
     List<EstablecimientoResponse> getAllEstablecimientos();
+    List<EstablecimientoResponse> getEstablecimientosByUsuario(String email);
     EstablecimientoResponse getEstablecimientoById(Long id);
     EstablecimientoResponse updateEstablecimiento(Long id, EstablecimientoRequest request);
     EstablecimientoResponse desactivarEstablecimiento(Long id);

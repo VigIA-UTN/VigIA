@@ -37,6 +37,12 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 .collect(Collectors.toList());
     }
 
+    public List<EstablecimientoResponse> getEstablecimientosByUsuario(String email) {
+        return establecimientoRepository.findByUsuariosEmail(email).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     @SuppressWarnings("null")
     public EstablecimientoResponse getEstablecimientoById(Long id) {
         return establecimientoRepository.findById(id)
