@@ -1,0 +1,57 @@
+.empleados-container {
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.empleados-title {
+    color: #1E3A5F;
+    font-weight: 600;
+    margin-bottom: 30px;
+    font-size: 2rem;
+}
+
+.empleados-table-wrapper {
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.empleados-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.empleados-table th {
+    border-bottom: 1px solid #333;
+    padding: 16px 12px;
+    color: #333;
+    font-weight: 600;
+    text-align: center;
+}
+
+.empleados-table td {
+    padding: 16px 12px;
+    vertical-align: middle;
+    text-align: center;
+    color: #555;
+}
+
+.empleados-table tr {
+    border-bottom: 0px;
+}
+
+.estado-badge {
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: inline-block;
+    min-width: 80px;
+}
+
+.badge-activo {
+    color: #1E3A5F;
+}
+
+.badge-inactivo {
+    color: #888;
+}

@@ -8,6 +8,7 @@ import InvitacionesEmpleadosPage from './pages/InvitacionesEmpleadosPage';
 import RegisterPage from './pages/RegisterPage';
 import UsuariosAdminPage from './pages/UsuariosAdminPage';
 import { useAuthStore } from './store/authStore';
+import EmpleadosPage from './pages/EmpleadosPage';
 
 function InvitacionesRouter() {
   const rol = useAuthStore(state => state.rol);
@@ -51,6 +52,14 @@ function App() {
           element={
             <ProtectedRoute>
               <UsuariosAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/empleados"
+          element={
+            <ProtectedRoute>
+              <EmpleadosPage />
             </ProtectedRoute>
           }
         />

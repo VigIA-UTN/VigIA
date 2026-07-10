@@ -11,4 +11,5 @@ public interface UsuarioService {
     void desactivarEmpleado(String emailProductor, Long empleadoId);
     List<UsuarioResponse> getAllUsuariosNoAdmins();
     void toggleUsuarioEstado(Long id);
+    void toggleEstadoEmpleado(String emailProductor, Long empleadoId);
 }
