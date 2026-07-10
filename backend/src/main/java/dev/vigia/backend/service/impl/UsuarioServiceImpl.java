@@ -74,6 +74,24 @@ public class UsuarioServiceImpl implements UsuarioService {
         usuarioRepository.save(empleado);
     }
 
+    public List<UsuarioResponse> getAllUsuariosNoAdmins() {
+        return usuarioRepository.findAll().stream()
+                .filter(u -> u.getRol() != Rol.ADMINISTRADOR)
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @SuppressWarnings("null")
+    public void toggleUsuarioEstado(Long id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+        if (usuario.getRol() == Rol.ADMINISTRADOR) {
+            throw new IllegalArgumentException("No se puede modificar el estado de un administrador");
+        }
+        usuario.setActivo(!usuario.isActivo());
+        usuarioRepository.save(usuario);
+    }
+
     private UsuarioResponse mapToResponse(Usuario usuario) {
         return UsuarioResponse.builder()
                 .id(usuario.getId())

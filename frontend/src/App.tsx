@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import EstablecimientosPage from './pages/EstablecimientosPage';
 import InvitacionesPage from './pages/InvitacionesPage';
 import RegisterPage from './pages/RegisterPage';
+import UsuariosAdminPage from './pages/UsuariosAdminPage';
 
 function App() {
   return (
@@ -33,6 +34,14 @@ function App() {
           element={
             <ProtectedRoute>
               <InvitacionesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/usuarios"
+          element={
+            <ProtectedRoute>
+              <UsuariosAdminPage />
             </ProtectedRoute>
           }
         />

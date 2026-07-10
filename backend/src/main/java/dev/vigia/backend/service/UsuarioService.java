@@ -9,4 +9,6 @@ public interface UsuarioService {
     void desactivarProductor(Long id);
     List<UsuarioResponse> getEmpleados(String emailProductor);
     void desactivarEmpleado(String emailProductor, Long empleadoId);
+    List<UsuarioResponse> getAllUsuariosNoAdmins();
+    void toggleUsuarioEstado(Long id);
 }

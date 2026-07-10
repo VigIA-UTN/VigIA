@@ -50,4 +50,21 @@ public class UsuarioController {
             return ResponseEntity.badRequest().build();
         }
     }
+
+    @GetMapping("")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<List<UsuarioResponse>> getAllUsuarios() {
+        return ResponseEntity.ok(usuarioService.getAllUsuariosNoAdmins());
+    }
+
+    @PatchMapping("/{id}/estado")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<Void> toggleUsuarioEstado(@PathVariable Long id) {
+        try {
+            usuarioService.toggleUsuarioEstado(id);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }
