@@ -6,6 +6,7 @@ import EstablecimientosPage from './pages/EstablecimientosPage';
 import InvitacionesPage from './pages/InvitacionesPage';
 import InvitacionesEmpleadosPage from './pages/InvitacionesEmpleadosPage';
 import RegisterPage from './pages/RegisterPage';
+import AcceptInvitationPage from './pages/AcceptInvitationPage';
 import UsuariosAdminPage from './pages/UsuariosAdminPage';
 import { useAuthStore } from './store/authStore';
 
@@ -22,6 +23,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/aceptar-invitacion" element={<AcceptInvitationPage />} />
         <Route
           path="/"
           element={

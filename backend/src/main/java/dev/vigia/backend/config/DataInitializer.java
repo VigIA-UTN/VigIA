@@ -1,7 +1,10 @@
 package dev.vigia.backend.config;
 
+import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.ArrayList;
 
 @Slf4j
 @Component
@@ -20,25 +24,42 @@ import java.util.List;
 public class DataInitializer implements CommandLineRunner {
 
     private final UsuarioRepository usuarioRepository;
+    private final EstablecimientoRepository establecimientoRepository;
+    private final InvitacionRepository invitacionRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     @SuppressWarnings("null")
     public void run(String... args) {
-        if (usuarioRepository.count() > 0) {
-            log.info("[DataInitializer] La base ya tiene datos - saltando seed.");
-            return;
-        }
+        log.info("[DataInitializer] Limpiando la base de datos para entorno de desarrollo...");
+        invitacionRepository.deleteAll();
+        establecimientoRepository.deleteAll();
+        usuarioRepository.deleteAll();
 
-        List<Usuario> usuarios = List.of(
-                buildUsuario("Admin", "VigIA", "admin@vigia.dev", "admin123", Rol.ADMINISTRADOR),
-                buildUsuario("Juan", "Productor", "productor@vigia.dev", "productor123", Rol.PRODUCTOR),
-                buildUsuario("Carlos", "Campero", "campero@vigia.dev", "campero123", Rol.CAMPERO),
-                buildUsuario("Laura", "Vet", "veterinario@vigia.dev", "vet123", Rol.VETERINARIO),
-                buildUsuario("Nuevo", "Usuario", "pendiente@vigia.dev", "pendiente123", Rol.PENDIENTE));
+        Usuario admin = buildUsuario("Admin", "VigIA", "admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+        Usuario productor = buildUsuario("Juan", "Productor", "productor@vigia.dev", "productor123", Rol.PRODUCTOR);
+        Usuario campero = buildUsuario("Carlos", "Campero", "campero@vigia.dev", "campero123", Rol.CAMPERO);
+        Usuario vet = buildUsuario("Laura", "Vet", "veterinario@vigia.dev", "vet123", Rol.VETERINARIO);
+        Usuario pendiente = buildUsuario("Nuevo", "Usuario", "pendiente@vigia.dev", "pendiente123", Rol.PENDIENTE);
 
+        List<Usuario> usuarios = List.of(admin, productor, campero, vet, pendiente);
         usuarioRepository.saveAll(usuarios);
+
+        Establecimiento est = new Establecimiento();
+        est.setNombre("Establecimiento de Prueba");
+        est.setLatitud(-34.6037);
+        est.setLongitud(-58.3816);
+        est.setActivo(true);
+        est.setFechaAlta(LocalDate.now());
+        
+        // Es necesario crear una lista mutable
+        List<Usuario> usuariosEst = new ArrayList<>();
+        usuariosEst.add(productor);
+        est.setUsuarios(usuariosEst);
+        establecimientoRepository.save(est);
+
         log.info("[DataInitializer] ✅ Seed completado — {} usuarios creados.", usuarios.size());
+        log.info("[DataInitializer] ✅ Establecimiento 'Establecimiento de Prueba' creado y asignado al Productor.");
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
         log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");

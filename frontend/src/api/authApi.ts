@@ -20,3 +20,14 @@ export async function registerRequest(nombre: string, apellido: string, email: s
   const response = await axiosClient.post<AuthResponse>('/auth/register', { nombre, apellido, email, password, token });
   return response.data;
 }
+
+export interface ValidateCodeResponse {
+  email: string;
+  rol: string;
+  establecimiento: string;
+}
+
+export async function validateCodeRequest(token: string, email?: string): Promise<ValidateCodeResponse> {
+  const response = await axiosClient.post<ValidateCodeResponse>('/auth/validate-code', { token, email });
+  return response.data;
+}

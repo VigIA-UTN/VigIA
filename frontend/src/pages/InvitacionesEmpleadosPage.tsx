@@ -13,7 +13,7 @@ import type { EstablecimientoResponse } from '../api/establecimientosApi';
 import './InvitacionesPage.css';
 
 const schema = z.object({
-  email: z.email('Debe ser un email válido'),
+  email: z.string().email('Debe ser un email válido'),
   establecimientoId: z.number({ message: 'Seleccione un establecimiento' }).min(1, 'Seleccione un establecimiento'),
   rol: z.enum(['VETERINARIO', 'CAMPERO'], { message: 'Debe ser un rol válido' })
 });
@@ -263,7 +263,7 @@ export default function InvitacionesEmpleadosPage() {
               </div>
             </Form.Group>
 
-            {establecimientos.length > 1 && (
+            {establecimientos.length > 1 ? (
               <Form.Group className="mb-3">
                 <Form.Label>Establecimiento</Form.Label>
                 <Form.Select
@@ -280,6 +280,16 @@ export default function InvitacionesEmpleadosPage() {
                   {errors.establecimientoId?.message}
                 </Form.Control.Feedback>
               </Form.Group>
+            ) : (
+              establecimientos.length === 1 && (
+                <input type="hidden" {...register('establecimientoId', { valueAsNumber: true })} value={establecimientos[0].id} />
+              )
+            )}
+
+            {establecimientos.length === 0 && (
+              <Alert variant="warning" className="mb-3">
+                No tenés ningún establecimiento activo. No podés generar invitaciones.
+              </Alert>
             )}
 
             <Form.Group className="mb-4">
@@ -299,7 +309,7 @@ export default function InvitacionesEmpleadosPage() {
             </Form.Group>
           </Modal.Body>
           <Modal.Footer>
-            <button type="submit" className="btn-generar" disabled={submitting}>
+            <button type="submit" className="btn-generar" disabled={submitting || establecimientos.length === 0}>
               {submitting ? <Spinner size="sm" animation="border" /> : 'Generar Invitación'}
             </button>
           </Modal.Footer>
