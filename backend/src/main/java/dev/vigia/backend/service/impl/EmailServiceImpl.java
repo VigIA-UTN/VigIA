@@ -54,7 +54,7 @@ public class EmailServiceImpl implements EmailService {
                     + "Has sido invitado para unirte a VigIA como " + rol + " en el establecimiento: "
                     + establecimientoNombre + ".\n\n"
                     + "Por favor, haz clic en el siguiente enlace para registrarte:\n"
-                    + frontendUrl + "/register?token=" + token + "\n\n"
+                    + frontendUrl + "/aceptar-invitacion?token=" + token + "\n\n"
                     + "Este enlace es válido por 7 días.\n\n"
                     + "Saludos,\nEl equipo de VigIA.");
 
