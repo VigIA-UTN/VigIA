@@ -20,4 +20,6 @@ public interface InvitacionRepository extends JpaRepository<Invitacion, Long> {
             LocalDateTime now);
 
     List<Invitacion> findByTipoInvitacionOrderByFechaCreacionDesc(TipoInvitacion tipoInvitacion);
+
+    List<Invitacion> findByCreador_EmailAndTipoInvitacionOrderByFechaCreacionDesc(String creadorEmail, TipoInvitacion tipoInvitacion);
 }

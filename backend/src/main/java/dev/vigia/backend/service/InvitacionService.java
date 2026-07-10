@@ -12,4 +12,6 @@ public interface InvitacionService {
     InvitacionResponse generarInvitacionEmpleado(InvitacionEmpleadoRequest request, String emailProductor);
 
     List<InvitacionResponse> listarInvitacionesProductor();
+
+    List<InvitacionResponse> listarInvitacionesEmpleado(String emailProductor);
 }

@@ -205,4 +205,28 @@ public class InvitacionServiceImpl implements InvitacionService {
                 })
                 .toList();
     }
+
+    public List<InvitacionResponse> listarInvitacionesEmpleado(String emailProductor) {
+        return invitacionRepository
+                .findByCreador_EmailAndTipoInvitacionOrderByFechaCreacionDesc(emailProductor, TipoInvitacion.EMPLEADO)
+                .stream()
+                .map(inv -> {
+                    Usuario usuario = usuarioRepository.findByEmail(inv.getEmailDestino()).orElse(null);
+                    String nombreCompleto = usuario != null
+                            ? usuario.getNombre() + " " + usuario.getApellido()
+                            : null;
+                    return InvitacionResponse.builder()
+                            .id(inv.getId())
+                            .nombreCompleto(nombreCompleto)
+                            .emailDestino(inv.getEmailDestino())
+                            .rol(inv.getRol().name())
+                            .establecimiento(inv.getEstablecimiento() != null ? inv.getEstablecimiento().getNombre() : null)
+                            .token(inv.getToken())
+                            .fechaCreacion(inv.getFechaCreacion())
+                            .fechaExpiracion(inv.getFechaExpiracion())
+                            .estado(inv.getEstadoInvitacion().name())
+                            .build();
+                })
+                .toList();
+    }
 }

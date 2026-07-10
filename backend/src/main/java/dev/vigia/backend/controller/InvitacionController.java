@@ -49,4 +49,10 @@ public class InvitacionController {
     public ResponseEntity<List<InvitacionResponse>> listarInvitacionesProductor() {
         return ResponseEntity.ok(invitacionService.listarInvitacionesProductor());
     }
+
+    @GetMapping("/empleado")
+    @PreAuthorize("hasRole('PRODUCTOR')")
+    public ResponseEntity<List<InvitacionResponse>> listarInvitacionesEmpleado(Authentication authentication) {
+        return ResponseEntity.ok(invitacionService.listarInvitacionesEmpleado(authentication.getName()));
+    }
 }

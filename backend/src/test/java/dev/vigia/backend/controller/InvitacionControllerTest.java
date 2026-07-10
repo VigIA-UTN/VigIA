@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -255,5 +256,49 @@ class InvitacionControllerTest {
                 .content(objectMapper.writeValueAsString(request))))
                 .hasCauseInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("El rol especificado no es válido");
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/invitaciones/productor - Admin lista invitaciones exitosamente")
+    @SuppressWarnings("null")
+    void listarInvitacionesProductor_asAdmin_success() throws Exception {
+        dev.vigia.backend.model.Invitacion inv = new dev.vigia.backend.model.Invitacion();
+        inv.setEmailDestino("nuevo_productor2@test.com");
+        inv.setRol(Rol.PRODUCTOR);
+        inv.setTipoInvitacion(dev.vigia.backend.model.TipoInvitacion.PRODUCTOR);
+        inv.setEstadoInvitacion(dev.vigia.backend.model.EstadoInvitacion.PENDIENTE);
+        inv.setToken("token-admin-123");
+        inv.setFechaCreacion(java.time.LocalDateTime.now());
+        inv.setCreador(usuarioRepository.findByEmail("admin@vigia.dev").get());
+        invitacionRepository.save(inv);
+
+        mockMvc.perform(get("/api/v1/invitaciones/productor")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].emailDestino").value("nuevo_productor2@test.com"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/invitaciones/empleado - Productor lista invitaciones a empleados exitosamente")
+    @SuppressWarnings("null")
+    void listarInvitacionesEmpleado_asProductor_success() throws Exception {
+        dev.vigia.backend.model.Invitacion inv = new dev.vigia.backend.model.Invitacion();
+        inv.setEmailDestino("emp@test.com");
+        inv.setRol(Rol.VETERINARIO);
+        inv.setTipoInvitacion(dev.vigia.backend.model.TipoInvitacion.EMPLEADO);
+        inv.setEstadoInvitacion(dev.vigia.backend.model.EstadoInvitacion.PENDIENTE);
+        inv.setToken("token-emp-123");
+        inv.setFechaCreacion(java.time.LocalDateTime.now());
+        inv.setCreador(usuarioRepository.findByEmail("productor@vigia.dev").get());
+        invitacionRepository.save(inv);
+
+        mockMvc.perform(get("/api/v1/invitaciones/empleado")
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].emailDestino").value("emp@test.com"));
     }
 }
