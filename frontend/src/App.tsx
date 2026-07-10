@@ -34,7 +34,7 @@ function App() {
         <Route
           path="/establecimientos"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={['ADMINISTRADOR', 'PRODUCTOR']}>
               <EstablecimientosPage />
             </ProtectedRoute>
           }
@@ -42,7 +42,7 @@ function App() {
         <Route
           path="/invitaciones"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={['ADMINISTRADOR', 'PRODUCTOR']}>
               <InvitacionesRouter />
             </ProtectedRoute>
           }
@@ -50,7 +50,7 @@ function App() {
         <Route
           path="/usuarios"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={['ADMINISTRADOR']}>
               <UsuariosAdminPage />
             </ProtectedRoute>
           }
@@ -58,7 +58,7 @@ function App() {
         <Route
           path="/empleados"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={['PRODUCTOR']}>
               <EmpleadosPage />
             </ProtectedRoute>
           }
