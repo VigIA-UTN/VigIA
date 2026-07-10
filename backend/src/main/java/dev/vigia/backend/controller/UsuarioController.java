@@ -51,6 +51,17 @@ public class UsuarioController {
         }
     }
 
+    @PatchMapping("/empleados/{id}/estado")
+    @PreAuthorize("hasRole('PRODUCTOR')")
+    public ResponseEntity<Void> toggleEmpleadoEstado(@PathVariable Long id, Principal principal) {
+        try {
+            usuarioService.toggleEstadoEmpleado(principal.getName(),id);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @GetMapping("")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<List<UsuarioResponse>> getAllUsuarios() {

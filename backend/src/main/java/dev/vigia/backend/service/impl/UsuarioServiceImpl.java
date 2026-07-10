@@ -92,6 +92,29 @@ public class UsuarioServiceImpl implements UsuarioService {
         usuarioRepository.save(usuario);
     }
 
+    @SuppressWarnings("null")
+    public void toggleEstadoEmpleado(String emailProductor, Long empleadoId) {
+        Usuario productor = usuarioRepository.findByEmail(emailProductor)
+                .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
+
+        Establecimiento establecimiento = establecimientoRepository.findByUsuariosId(productor.getId())
+                .orElseThrow(() -> new IllegalArgumentException("El productor no tiene un establecimiento asignado"));
+
+        Usuario empleado = usuarioRepository.findById(empleadoId)
+                .orElseThrow(() -> new IllegalArgumentException("Empleado no encontrado"));
+
+        if (!establecimiento.getUsuarios().contains(empleado)) {
+            throw new IllegalArgumentException("El empleado no pertenece al establecimiento del productor");
+        }
+
+        if (empleado.getRol() == Rol.PRODUCTOR) {
+            throw new IllegalArgumentException("No se puede desactivar a un productor");
+        }
+
+        empleado.setActivo(!empleado.isActivo());
+        usuarioRepository.save(empleado);
+    }
+
     private UsuarioResponse mapToResponse(Usuario usuario) {
         return UsuarioResponse.builder()
                 .id(usuario.getId())

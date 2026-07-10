@@ -17,6 +17,8 @@ export async function loginRequest(email: string, password: string): Promise<Aut
 }
 
 export async function registerRequest(nombre: string, apellido: string, email: string, password: string, token: string): Promise<AuthResponse> {
-  const response = await axiosClient.post<AuthResponse>('/auth/register', { nombre, apellido, email, password, token });
+  const response = await axiosClient.post<AuthResponse>('/auth/register', {
+    nombre: nombre, apellido: apellido, email: email, password: password, token: token
+  });
   return response.data;
 }
