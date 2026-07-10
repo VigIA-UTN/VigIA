@@ -4,8 +4,17 @@ import MapPage from './pages/MapPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import EstablecimientosPage from './pages/EstablecimientosPage';
 import InvitacionesPage from './pages/InvitacionesPage';
+import InvitacionesEmpleadosPage from './pages/InvitacionesEmpleadosPage';
 import RegisterPage from './pages/RegisterPage';
 import UsuariosAdminPage from './pages/UsuariosAdminPage';
+import { useAuthStore } from './store/authStore';
+
+function InvitacionesRouter() {
+  const rol = useAuthStore(state => state.rol);
+  if (rol === 'ADMINISTRADOR') return <InvitacionesPage />;
+  if (rol === 'PRODUCTOR') return <InvitacionesEmpleadosPage />;
+  return <Navigate to="/" replace />;
+}
 
 function App() {
   return (
@@ -33,7 +42,7 @@ function App() {
           path="/invitaciones"
           element={
             <ProtectedRoute>
-              <InvitacionesPage />
+              <InvitacionesRouter />
             </ProtectedRoute>
           }
         />
