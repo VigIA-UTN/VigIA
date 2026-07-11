@@ -17,6 +17,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -51,6 +53,9 @@ class UsuarioControllerTest {
 
     @Autowired
     private dev.vigia.backend.repository.InvitacionRepository invitacionRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private dev.vigia.backend.service.AuthService authService;
@@ -212,9 +217,16 @@ class UsuarioControllerTest {
                 .header("Authorization", "Bearer " + productorToken))
                 .andExpect(status().isOk());
 
-        Establecimiento updatedEst = establecimientoRepository.findById(est.getId()).orElseThrow();
+        final Long estId = est.getId();
         final Long empId = empleado.getId();
-        assertThat(updatedEst.getEmpleados().stream().anyMatch(v -> v.getUsuario().getId().equals(empId) && v.isActivo())).isFalse();
+
+        // Verificar en BD que el vínculo fue desactivado (requiere sesión abierta para la colección lazy)
+        Boolean isStillActive = new TransactionTemplate(transactionManager).execute(status -> {
+            Establecimiento updatedEst = establecimientoRepository.findById(estId).orElseThrow();
+            return updatedEst.getEmpleados().stream()
+                    .anyMatch(v -> v.getUsuario().getId().equals(empId) && v.isActivo());
+        });
+        assertThat(isStillActive).isFalse();
         
         Usuario user = usuarioRepository.findById(empleado.getId()).orElseThrow();
         assertThat(user.isActivo()).isTrue();
