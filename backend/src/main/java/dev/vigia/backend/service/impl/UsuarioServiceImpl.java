@@ -6,12 +6,15 @@ import dev.vigia.backend.dto.UsuarioResponse;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,36 +45,55 @@ public class UsuarioServiceImpl implements UsuarioService {
         Usuario productor = usuarioRepository.findByEmail(emailProductor)
                 .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
 
-        Establecimiento establecimiento = establecimientoRepository.findByUsuariosId(productor.getId())
-                .orElseThrow(() -> new IllegalArgumentException("El productor no tiene un establecimiento asignado"));
+        List<Establecimiento> establecimientos = establecimientoRepository.findActiveEstablecimientoByUsuarioId(productor.getId());
 
-        return establecimiento.getUsuarios().stream()
-                .filter(u -> u.getRol() != Rol.PRODUCTOR && u.isActivo())
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        List<UsuarioResponse> responses = new java.util.ArrayList<>();
+        for (Establecimiento est : establecimientos) {
+            List<UsuarioResponse> emps = est.getEmpleados().stream()
+                    .filter(Empleado::isActivo)
+                    .map(Empleado::getUsuario)
+                    .filter(u -> u.getRol() != Rol.PRODUCTOR && u.isActivo())
+                    .map(u -> {
+                        UsuarioResponse resp = mapToResponse(u);
+                        resp.setEstablecimiento(est.getNombre());
+                        resp.setEstablecimientoId(est.getId());
+                        return resp;
+                    })
+                    .collect(Collectors.toList());
+            responses.addAll(emps);
+        }
+        return responses;
     }
 
     @SuppressWarnings("null")
-    public void desactivarEmpleado(String emailProductor, Long empleadoId) {
+    public void removerEmpleado(String emailProductor, Long empleadoId, Long establecimientoId) {
         Usuario productor = usuarioRepository.findByEmail(emailProductor)
                 .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
 
-        Establecimiento establecimiento = establecimientoRepository.findByUsuariosId(productor.getId())
-                .orElseThrow(() -> new IllegalArgumentException("El productor no tiene un establecimiento asignado"));
+        Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                .filter(e -> e.isActivo() && e.getEmpleados().stream().anyMatch(v -> v.getUsuario().equals(productor) && v.isActivo()))
+                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado o el productor no pertenece al mismo"));
 
         Usuario empleado = usuarioRepository.findById(empleadoId)
                 .orElseThrow(() -> new IllegalArgumentException("Empleado no encontrado"));
 
-        if (!establecimiento.getUsuarios().contains(empleado)) {
-            throw new IllegalArgumentException("El empleado no pertenece al establecimiento del productor");
+        Optional<Empleado> vinculoOpt = establecimiento.getEmpleados().stream()
+                .filter(v -> v.getUsuario().equals(empleado) && v.isActivo())
+                .findFirst();
+
+        if (vinculoOpt.isEmpty()) {
+            throw new IllegalArgumentException("El empleado no pertenece al establecimiento del productor o ya está desvinculado");
         }
 
         if (empleado.getRol() == Rol.PRODUCTOR) {
-            throw new IllegalArgumentException("No se puede desactivar a un productor");
+            throw new IllegalArgumentException("No se puede remover a un productor");
         }
 
-        empleado.setActivo(false);
-        usuarioRepository.save(empleado);
+        Empleado vinculo = vinculoOpt.get();
+        vinculo.setActivo(false);
+        vinculo.setFechaDesvinculacion(LocalDateTime.now());
+        
+        establecimientoRepository.save(establecimiento);
     }
 
     public List<UsuarioResponse> getAllUsuariosNoAdmins() {
@@ -90,29 +112,6 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
         usuario.setActivo(!usuario.isActivo());
         usuarioRepository.save(usuario);
-    }
-
-    @SuppressWarnings("null")
-    public void toggleEstadoEmpleado(String emailProductor, Long empleadoId) {
-        Usuario productor = usuarioRepository.findByEmail(emailProductor)
-                .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
-
-        Establecimiento establecimiento = establecimientoRepository.findByUsuariosId(productor.getId())
-                .orElseThrow(() -> new IllegalArgumentException("El productor no tiene un establecimiento asignado"));
-
-        Usuario empleado = usuarioRepository.findById(empleadoId)
-                .orElseThrow(() -> new IllegalArgumentException("Empleado no encontrado"));
-
-        if (!establecimiento.getUsuarios().contains(empleado)) {
-            throw new IllegalArgumentException("El empleado no pertenece al establecimiento del productor");
-        }
-
-        if (empleado.getRol() == Rol.PRODUCTOR) {
-            throw new IllegalArgumentException("No se puede desactivar a un productor");
-        }
-
-        empleado.setActivo(!empleado.isActivo());
-        usuarioRepository.save(empleado);
     }
 
     private UsuarioResponse mapToResponse(Usuario usuario) {

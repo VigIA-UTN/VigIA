@@ -8,8 +8,7 @@ public interface UsuarioService {
     List<UsuarioResponse> getProductores();
     void desactivarProductor(Long id);
     List<UsuarioResponse> getEmpleados(String emailProductor);
-    void desactivarEmpleado(String emailProductor, Long empleadoId);
+    void removerEmpleado(String emailProductor, Long empleadoId, Long establecimientoId);
     List<UsuarioResponse> getAllUsuariosNoAdmins();
     void toggleUsuarioEstado(Long id);
-    void toggleEstadoEmpleado(String emailProductor, Long empleadoId);
 }

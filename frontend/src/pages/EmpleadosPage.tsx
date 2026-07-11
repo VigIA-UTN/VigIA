@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Container, Spinner, Alert, Button, Form } from 'react-bootstrap';
-import { getEmpleados, toggleEstadoEmpleado } from '../api/usuariosApi';
+import { getEmpleados, removerEmpleado } from '../api/usuariosApi';
 import type { UsuarioResponse } from '../api/usuariosApi';
 import './EmpleadosPage.css';
 
@@ -31,14 +31,18 @@ export default function EmpleadosPage() {
         fetchUsuarios();
     }, []);
 
-    const handleToggleEstado = async (id: number) => {
+    const handleRemoverEmpleado = async (id: number, establecimientoId: number) => {
+        if (!window.confirm('¿Estás seguro de que querés quitar a este empleado del establecimiento?')) {
+            return;
+        }
+
         try {
             setTogglingId(id);
-            await toggleEstadoEmpleado(id);
-            setEmpleados(prev => prev.map(e => e.id === id ? { ...e, activo: !e.activo } : e));
+            await removerEmpleado(id, establecimientoId);
+            setEmpleados(prev => prev.filter(e => !(e.id === id && e.establecimientoId === establecimientoId)));
         } catch (err) {
             const axiosError = err as { response?: { data?: { message?: string } } };
-            alert(axiosError.response?.data?.message || 'Error al cambiar el estado del empleado');
+            alert(axiosError.response?.data?.message || 'Error al remover el empleado');
         } finally {
             setTogglingId(null);
         }
@@ -47,7 +51,8 @@ export default function EmpleadosPage() {
     const filteredEmpleados = empleados.filter(e => {
         const matchesSearch = searchTerm === '' ||
             `${e.nombre} ${e.apellido}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            e.email.toLowerCase().includes(searchTerm.toLowerCase());
+            e.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (e.establecimiento && e.establecimiento.toLowerCase().includes(searchTerm.toLowerCase()));
 
         const matchesRole = roleFilter === '' || e.rol === roleFilter;
 
@@ -62,7 +67,7 @@ export default function EmpleadosPage() {
                 <div className="d-flex flex-column flex-md-row justify-content-between mb-4 gap-3">
                     <Form.Control
                         type="text"
-                        placeholder="Buscar por nombre o email..."
+                        placeholder="Buscar por nombre, email o establecimiento..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         style={{ maxWidth: '400px' }}
@@ -93,7 +98,7 @@ export default function EmpleadosPage() {
                                     <th>Nombre Completo</th>
                                     <th>Email</th>
                                     <th>Rol</th>
-                                    <th>Estado</th>
+                                    <th>Establecimiento</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -106,7 +111,7 @@ export default function EmpleadosPage() {
                                     </tr>
                                 ) : (
                                     filteredEmpleados.map((u) => (
-                                        <tr key={u.id}>
+                                        <tr key={`${u.id}-${u.establecimientoId}`}>
                                             <td className="fw-medium text-dark">{u.nombre} {u.apellido}</td>
                                             <td>
                                                 <a href={`mailto:${u.email}`} className="text-decoration-none text-muted">
@@ -114,23 +119,19 @@ export default function EmpleadosPage() {
                                                 </a>
                                             </td>
                                             <td>{u.rol}</td>
-                                            <td>
-                                                <span className={`estado-badge ${u.activo ? 'badge-activo' : 'badge-inactivo'}`}>
-                                                    {u.activo ? 'ACTIVO' : 'INACTIVO'}
-                                                </span>
-                                            </td>
+                                            <td>{u.establecimiento}</td>
                                             <td>
                                                 <Button
-                                                    variant={u.activo ? 'outline-danger' : 'outline-success'}
+                                                    variant="outline-danger"
                                                     size="sm"
                                                     className="border-0 fw-semibold"
-                                                    onClick={() => handleToggleEstado(u.id)}
+                                                    onClick={() => u.establecimientoId && handleRemoverEmpleado(u.id, u.establecimientoId)}
                                                     disabled={togglingId === u.id}
                                                 >
                                                     {togglingId === u.id ? (
                                                         <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
                                                     ) : (
-                                                        u.activo ? 'Desactivar' : 'Activar'
+                                                        'Quitar'
                                                     )}
                                                 </Button>
                                             </td>

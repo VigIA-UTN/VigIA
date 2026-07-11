@@ -19,19 +19,19 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      token: sessionStorage.getItem(TOKEN_KEY),
+      token: (() => { try { return sessionStorage.getItem(TOKEN_KEY); } catch (e) { return null; } })(),
       email: null,
       rol: null,
-      isAuthenticated: !!sessionStorage.getItem(TOKEN_KEY),
+      isAuthenticated: (() => { try { return !!sessionStorage.getItem(TOKEN_KEY); } catch (e) { return false; } })(),
       lastActivity: Date.now(),
 
       login: (token, email, rol) => {
-        sessionStorage.setItem(TOKEN_KEY, token);
+        try { sessionStorage.setItem(TOKEN_KEY, token); } catch (e) {}
         set({ token, email, rol, isAuthenticated: true, lastActivity: Date.now() });
       },
 
       logout: () => {
-        sessionStorage.removeItem(TOKEN_KEY);
+        try { sessionStorage.removeItem(TOKEN_KEY); } catch (e) {}
         set({
           token: null,
           email: null,
@@ -52,11 +52,11 @@ export const useAuthStore = create<AuthState>()(
         lastActivity: state.lastActivity,
       }),
       // Al rehidratar, reconstruir isAuthenticated y token desde sessionStorage
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          const token = sessionStorage.getItem(TOKEN_KEY);
-          state.token = token;
-          state.isAuthenticated = !!token;
+      onRehydrateStorage: () => (state, error) => {
+        if (!error) {
+          let token = null;
+          try { token = sessionStorage.getItem(TOKEN_KEY); } catch (e) {}
+          useAuthStore.setState({ token, isAuthenticated: !!token });
         }
       },
     }

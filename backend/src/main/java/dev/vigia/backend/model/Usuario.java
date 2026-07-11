@@ -1,5 +1,7 @@
 package dev.vigia.backend.model;
 
+import dev.vigia.backend.util.BooleanToSmallintConverter;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,6 +31,7 @@ public class Usuario {
     @Enumerated(EnumType.STRING)
     private Rol rol;
 
+    @Convert(converter = BooleanToSmallintConverter.class)
     private boolean activo = true;
 
     private LocalDate fechaAlta;

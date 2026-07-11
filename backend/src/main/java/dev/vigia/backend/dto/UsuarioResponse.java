@@ -17,4 +17,6 @@ public class UsuarioResponse {
     private String email;
     private Rol rol;
     private boolean activo;
+    private String establecimiento;
+    private Long establecimientoId;
 }

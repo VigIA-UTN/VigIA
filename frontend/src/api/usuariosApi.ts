@@ -7,6 +7,8 @@ export interface UsuarioResponse {
   email: string;
   rol: string;
   activo: boolean;
+  establecimiento?: string;
+  establecimientoId?: number;
 }
 
 export async function getTodosUsuarios(): Promise<UsuarioResponse[]> {
@@ -23,7 +25,6 @@ export async function getEmpleados(): Promise<UsuarioResponse[]> {
   return response.data;
 }
 
-export async function toggleEstadoEmpleado(id: number): Promise<void> {
-  const response = await axiosClient.patch(`/usuarios/empleados/${id}/estado`);
-  return response.data;
+export async function removerEmpleado(id: number, establecimientoId: number): Promise<void> {
+  await axiosClient.delete(`/usuarios/empleados/${establecimientoId}/${id}`);
 }

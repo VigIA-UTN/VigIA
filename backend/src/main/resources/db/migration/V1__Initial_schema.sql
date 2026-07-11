@@ -5,7 +5,7 @@ CREATE TABLE usuarios (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255),
     rol VARCHAR(50),
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    activo SMALLINT NOT NULL DEFAULT 1,
     fecha_alta DATE,
     proveedor_auth VARCHAR(255)
 );
@@ -15,14 +15,17 @@ CREATE TABLE establecimientos (
     nombre VARCHAR(255),
     latitud DOUBLE PRECISION,
     longitud DOUBLE PRECISION,
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    activo SMALLINT NOT NULL DEFAULT 1,
     fecha_alta DATE
 );
 
-CREATE TABLE establecimiento_usuario (
+CREATE TABLE empleado (
+    id BIGSERIAL PRIMARY KEY,
     establecimiento_id BIGINT REFERENCES establecimientos(id),
     usuario_id BIGINT REFERENCES usuarios(id),
-    PRIMARY KEY (establecimiento_id, usuario_id)
+    activo SMALLINT NOT NULL DEFAULT 1,
+    fecha_vinculacion TIMESTAMP NOT NULL,
+    fecha_desvinculacion TIMESTAMP
 );
 
 CREATE TABLE invitaciones (

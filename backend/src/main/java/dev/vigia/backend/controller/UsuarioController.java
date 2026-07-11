@@ -40,22 +40,11 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.getEmpleados(principal.getName()));
     }
 
-    @DeleteMapping("/empleados/{id}")
+    @DeleteMapping("/empleados/{establecimientoId}/{id}")
     @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<Void> desactivarEmpleado(@PathVariable Long id, Principal principal) {
+    public ResponseEntity<Void> desactivarEmpleado(@PathVariable Long establecimientoId, @PathVariable Long id, Principal principal) {
         try {
-            usuarioService.desactivarEmpleado(principal.getName(), id);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
-    }
-
-    @PatchMapping("/empleados/{id}/estado")
-    @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<Void> toggleEmpleadoEstado(@PathVariable Long id, Principal principal) {
-        try {
-            usuarioService.toggleEstadoEmpleado(principal.getName(),id);
+            usuarioService.removerEmpleado(principal.getName(), id, establecimientoId);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();

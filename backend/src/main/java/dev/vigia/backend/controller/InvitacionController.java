@@ -55,4 +55,27 @@ public class InvitacionController {
     public ResponseEntity<List<InvitacionResponse>> listarInvitacionesEmpleado(Authentication authentication) {
         return ResponseEntity.ok(invitacionService.listarInvitacionesEmpleado(authentication.getName()));
     }
+
+    @GetMapping("/mis-invitaciones")
+    public ResponseEntity<List<InvitacionResponse>> listarMisInvitaciones(Authentication authentication) {
+        return ResponseEntity.ok(invitacionService.listarMisInvitaciones(authentication.getName()));
+    }
+
+    @PostMapping("/{id}/aceptar")
+    public ResponseEntity<Void> aceptarInvitacion(@PathVariable Long id, Authentication authentication) {
+        invitacionService.aceptarInvitacion(id, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/token/{token}/aceptar")
+    public ResponseEntity<Void> aceptarInvitacionPorToken(@PathVariable String token, Authentication authentication) {
+        invitacionService.aceptarInvitacionPorToken(token, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/rechazar")
+    public ResponseEntity<Void> rechazarInvitacion(@PathVariable Long id, Authentication authentication) {
+        invitacionService.rechazarInvitacion(id, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
 }

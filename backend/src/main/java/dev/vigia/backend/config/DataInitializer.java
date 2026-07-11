@@ -3,6 +3,7 @@ package dev.vigia.backend.config;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -52,10 +53,8 @@ public class DataInitializer implements CommandLineRunner {
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
         
-        // Es necesario crear una lista mutable
-        List<Usuario> usuariosEst = new ArrayList<>();
-        usuariosEst.add(productor);
-        est.setUsuarios(usuariosEst);
+        Empleado vinculo = new Empleado(est, productor);
+        est.getEmpleados().add(vinculo);
         establecimientoRepository.save(est);
 
         log.info("[DataInitializer] ✅ Seed completado — {} usuarios creados.", usuarios.size());

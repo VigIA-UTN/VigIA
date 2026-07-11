@@ -7,6 +7,7 @@ import dev.vigia.backend.dto.InvitacionProductorRequest;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -104,8 +105,9 @@ class InvitacionControllerTest {
         est.setLongitud(-58.0);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-        est.setUsuarios(new ArrayList<>());
-        est.getUsuarios().add(productor);
+        est.setEmpleados(new ArrayList<>());
+        Empleado vinculoProd = new Empleado(est, productor);
+        est.getEmpleados().add(vinculoProd);
         est = establecimientoRepository.save(est);
         establecimientoId = est.getId();
         

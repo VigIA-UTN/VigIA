@@ -1,6 +1,7 @@
 package dev.vigia.backend.repository;
 
 import dev.vigia.backend.model.EstadoInvitacion;
+import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Invitacion;
 import dev.vigia.backend.model.TipoInvitacion;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,12 +15,15 @@ import java.util.Optional;
 public interface InvitacionRepository extends JpaRepository<Invitacion, Long> {
     Optional<Invitacion> findByToken(String token);
 
-    boolean existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
+    boolean existsByEmailDestinoAndEstablecimientoAndEstadoInvitacionAndFechaExpiracionAfter(
             String emailDestino,
+            Establecimiento establecimiento,
             EstadoInvitacion estadoInvitacion,
             LocalDateTime now);
 
     List<Invitacion> findByTipoInvitacionOrderByFechaCreacionDesc(TipoInvitacion tipoInvitacion);
 
     List<Invitacion> findByCreador_EmailAndTipoInvitacionOrderByFechaCreacionDesc(String creadorEmail, TipoInvitacion tipoInvitacion);
+
+    List<Invitacion> findByEmailDestinoAndEstadoInvitacionOrderByFechaCreacionDesc(String emailDestino, EstadoInvitacion estadoInvitacion);
 }

@@ -14,7 +14,12 @@ const schema = z.object({
     nombre: z.string().min(1, 'El nombre es requerido'),
     apellido: z.string().min(1, 'El apellido es requerido'),
     email: z.string().email('Ingresá un email válido').min(1, 'El email es requerido'),
-    password: z.string().min(1, 'La contraseña es requerida'),
+    password: z.string()
+      .min(8, 'Debe tener al menos 8 caracteres')
+      .max(32, 'No puede tener más de 32 caracteres')
+      .regex(/[A-Z]/, 'Debe contener al menos una mayúscula')
+      .regex(/[a-z]/, 'Debe contener al menos una minúscula')
+      .regex(/[0-9\W_]/, 'Debe contener al menos un número o símbolo'),
     token: z.string().min(1, 'El código de invitación es requerido'),
 });
 

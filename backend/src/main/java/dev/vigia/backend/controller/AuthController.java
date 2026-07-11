@@ -10,6 +10,7 @@ import dev.vigia.backend.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
@@ -76,6 +77,8 @@ public class AuthController {
                     .email(userDetails.getUsername())
                     .rol(role)
                     .build());
+        } catch (DisabledException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("La cuenta no está activa.");
         } catch (AuthenticationException e) {
             authService.handleFailedLogin(request.getEmail());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Email o contraseña incorrectos");

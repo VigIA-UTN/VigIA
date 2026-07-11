@@ -74,11 +74,7 @@ export default function InvitacionesEmpleadosPage() {
       setSubmitting(true);
       setError(null);
       const nueva = await crearInvitacionEmpleado(data);
-      if (nueva.estado === 'USADA') {
-        setSuccessMsg('El empleado ya estaba registrado y fue asociado al establecimiento. Se le envió un email de notificación.');
-      } else {
-        setSuccessMsg(`Invitación enviada correctamente a ${nueva.emailDestino}.`);
-      }
+      setSuccessMsg(`Invitación enviada correctamente a ${nueva.emailDestino}.`);
       const invActualizadas = await getInvitacionesEmpleado();
       setInvitaciones(invActualizadas);
       handleCloseModal();

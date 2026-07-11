@@ -6,6 +6,7 @@ import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -23,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -96,8 +98,9 @@ class EstablecimientoControllerTest {
         est.setLongitud(-58.0);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-        est.setUsuarios(new java.util.ArrayList<>());
-        est.getUsuarios().add(productor);
+        est.setEmpleados(new ArrayList<>());
+        Empleado vinculoProd = new Empleado(est, productor);
+        est.getEmpleados().add(vinculoProd);
         est = establecimientoRepository.save(est);
         establecimientoId = est.getId();
     }

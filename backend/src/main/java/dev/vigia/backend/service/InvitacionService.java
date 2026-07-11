@@ -14,4 +14,12 @@ public interface InvitacionService {
     List<InvitacionResponse> listarInvitacionesProductor();
 
     List<InvitacionResponse> listarInvitacionesEmpleado(String emailProductor);
+
+    List<InvitacionResponse> listarMisInvitaciones(String email);
+
+    void aceptarInvitacion(Long id, String email);
+
+    void aceptarInvitacionPorToken(String token, String email);
+
+    void rechazarInvitacion(Long id, String email);
 }

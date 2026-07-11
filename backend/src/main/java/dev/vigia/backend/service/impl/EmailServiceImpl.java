@@ -86,22 +86,22 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void enviarNuevoEstablecimientoEmpleado(String to, String establecimientoNombre, String rol) {
+    public void enviarInvitacionPendienteUsuarioExistente(String to, String establecimientoNombre, String rol) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom("no-reply@vigia.dev");
             message.setTo(to);
-            message.setSubject("Nuevo establecimiento asignado en VigIA");
+            message.setSubject("Nueva invitación pendiente en VigIA");
             message.setText("Hola,\n\n"
-                    + "Te informamos que hemos dado de alta en el establecimiento \""
-                    + establecimientoNombre + "\" con el rol de " + rol + " en tu cuenta de VigIA.\n\n"
-                    + "Ya podés acceder a él desde la plataforma con tu usuario habitual.\n\n"
+                    + "Te han enviado una invitación para unirte como " + rol + " en el establecimiento: "
+                    + establecimientoNombre + ".\n\n"
+                    + "Por favor iniciá sesión en tu cuenta de VigIA para aceptarla o rechazarla desde la sección 'Mis Invitaciones'.\n\n"
                     + "Saludos,\nEl equipo de VigIA.");
 
             emailSender.send(message);
-            log.info("Email de nuevo establecimiento (empleado) enviado a {}", to);
+            log.info("Email de invitación pendiente enviado a usuario existente {}", to);
         } catch (Exception e) {
-            log.error("Error al enviar email de nuevo establecimiento (empleado) a {}: {}", to, e.getMessage());
+            log.error("Error al enviar email de invitación pendiente a {}: {}", to, e.getMessage());
         }
     }
 }

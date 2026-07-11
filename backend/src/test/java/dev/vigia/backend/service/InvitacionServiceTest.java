@@ -79,7 +79,8 @@ class InvitacionServiceTest {
                 establecimiento = new Establecimiento();
                 establecimiento.setId(1L);
                 establecimiento.setNombre("Estancia La Paz");
-                establecimiento.setUsuarios(new java.util.ArrayList<>(java.util.List.of(productorUser)));
+                Empleado vinculo = new Empleado(establecimiento, productorUser);
+                establecimiento.getEmpleados().add(vinculo);
         }
 
         @Test
@@ -91,8 +92,8 @@ class InvitacionServiceTest {
                                 .thenReturn(Optional.of(establecimiento));
                 // El email del nuevo productor no existe como usuario → flujo de invitación
                 when(usuarioRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
-                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
-                                eq(request.getEmail()), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
+                when(invitacionRepository.existsByEmailDestinoAndEstablecimientoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                eq(request.getEmail()), eq(establecimiento), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
                                 .thenReturn(false);
 
                 Invitacion savedInvitacion = new Invitacion();
@@ -140,8 +141,8 @@ class InvitacionServiceTest {
                 when(establecimientoRepository.findById(request.getEstablecimientoId()))
                                 .thenReturn(Optional.of(establecimiento));
                 when(usuarioRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
-                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
-                                eq(request.getEmail()), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
+                when(invitacionRepository.existsByEmailDestinoAndEstablecimientoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                eq(request.getEmail()), eq(establecimiento), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
                                 .thenReturn(true);
 
                 assertThatThrownBy(() -> invitacionService.generarInvitacionProductor(request, adminEmail))
@@ -188,8 +189,8 @@ class InvitacionServiceTest {
                                 .thenReturn(Optional.of(establecimiento));
                 // El email del nuevo empleado no existe como usuario → flujo de invitación
                 when(usuarioRepository.findByEmail(empleadoRequest.getEmail())).thenReturn(Optional.empty());
-                when(invitacionRepository.existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
-                                eq(empleadoRequest.getEmail()), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
+                when(invitacionRepository.existsByEmailDestinoAndEstablecimientoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                eq(empleadoRequest.getEmail()), eq(establecimiento), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
                                 .thenReturn(false);
 
                 Invitacion savedInvitacion = new Invitacion();
@@ -236,7 +237,7 @@ class InvitacionServiceTest {
 
                 Establecimiento otroEstablecimiento = new Establecimiento();
                 otroEstablecimiento.setId(1L);
-                otroEstablecimiento.setUsuarios(new ArrayList<>());
+                otroEstablecimiento.setEmpleados(new ArrayList<>());
 
                 when(establecimientoRepository.findById(empleadoRequest.getEstablecimientoId()))
                                 .thenReturn(Optional.of(otroEstablecimiento));
@@ -259,5 +260,75 @@ class InvitacionServiceTest {
                 assertThatThrownBy(() -> invitacionService.generarInvitacionEmpleado(empleadoRequest, productorEmail))
                                 .isInstanceOf(IllegalArgumentException.class)
                                 .hasMessageContaining("El rol especificado no es válido para un empleado");
+        }
+        @Test
+        @DisplayName("Debe generar invitación empleado para usuario existente enviando correo pendiente")
+        @SuppressWarnings("null")
+        void generarInvitacionEmpleado_ConUsuarioExistente() {
+                when(usuarioRepository.findByEmail(productorEmail)).thenReturn(Optional.of(productorUser));
+                when(establecimientoRepository.findById(empleadoRequest.getEstablecimientoId()))
+                                .thenReturn(Optional.of(establecimiento));
+                
+                Usuario empleadoExistente = new Usuario();
+                empleadoExistente.setId(99L);
+                empleadoExistente.setEmail(empleadoRequest.getEmail());
+                empleadoExistente.setRol(Rol.CAMPERO);
+                
+                when(usuarioRepository.findByEmail(empleadoRequest.getEmail())).thenReturn(Optional.of(empleadoExistente));
+                when(invitacionRepository.existsByEmailDestinoAndEstablecimientoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                eq(empleadoRequest.getEmail()), eq(establecimiento), eq(EstadoInvitacion.PENDIENTE), any(LocalDateTime.class)))
+                                .thenReturn(false);
+
+                Invitacion savedInvitacion = new Invitacion();
+                savedInvitacion.setId(102L);
+                savedInvitacion.setEmailDestino(empleadoRequest.getEmail());
+                savedInvitacion.setRol(Rol.CAMPERO);
+                savedInvitacion.setEstadoInvitacion(EstadoInvitacion.PENDIENTE);
+                savedInvitacion.setToken("mock-token-789");
+                savedInvitacion.setFechaCreacion(LocalDateTime.now());
+                savedInvitacion.setFechaExpiracion(LocalDateTime.now().plusDays(7));
+
+                when(invitacionRepository.save(any(Invitacion.class))).thenReturn(savedInvitacion);
+
+                InvitacionResponse response = invitacionService.generarInvitacionEmpleado(empleadoRequest, productorEmail);
+
+                assertThat(response).isNotNull();
+                assertThat(response.getId()).isEqualTo(102L);
+                assertThat(response.getEstado()).isEqualTo(EstadoInvitacion.PENDIENTE.name());
+
+                verify(emailService).enviarInvitacionPendienteUsuarioExistente(
+                                eq(empleadoRequest.getEmail()),
+                                eq(establecimiento.getNombre()),
+                                eq(Rol.CAMPERO.name()));
+                verify(emailService, never()).enviarInvitacionEmpleado(anyString(), anyString(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("Debe asociar directamente a productor existente sin crear invitación pendiente")
+        @SuppressWarnings("null")
+        void generarInvitacionProductor_ConUsuarioExistente() {
+                when(usuarioRepository.findByEmail(adminEmail)).thenReturn(Optional.of(adminUser));
+                when(establecimientoRepository.findById(request.getEstablecimientoId()))
+                                .thenReturn(Optional.of(establecimiento));
+                
+                Usuario productorExistente = new Usuario();
+                productorExistente.setId(88L);
+                productorExistente.setEmail(request.getEmail());
+                productorExistente.setRol(Rol.PRODUCTOR);
+                
+                when(usuarioRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(productorExistente));
+
+                InvitacionResponse response = invitacionService.generarInvitacionProductor(request, adminEmail);
+
+                assertThat(response).isNotNull();
+                assertThat(response.getEstado()).isEqualTo(EstadoInvitacion.USADA.name());
+                assertThat(establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(productorExistente))).isTrue();
+
+                verify(invitacionRepository, never()).save(any());
+                verify(establecimientoRepository).save(establecimiento);
+                verify(emailService).enviarNuevoEstablecimientoProductor(
+                                eq(request.getEmail()),
+                                eq(establecimiento.getNombre()));
         }
 }

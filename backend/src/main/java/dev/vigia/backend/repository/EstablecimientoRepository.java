@@ -2,6 +2,8 @@ package dev.vigia.backend.repository;
 
 import dev.vigia.backend.model.Establecimiento;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -9,7 +11,9 @@ import java.util.Optional;
 
 @Repository
 public interface EstablecimientoRepository extends JpaRepository<Establecimiento, Long> {
-    Optional<Establecimiento> findByUsuariosId(Long id);
+    @Query("SELECT e FROM Establecimiento e JOIN e.empleados v WHERE v.usuario.id = :usuarioId AND v.activo = true")
+    List<Establecimiento> findActiveEstablecimientoByUsuarioId(@Param("usuarioId") Long usuarioId);
 
-    List<Establecimiento> findByUsuariosEmail(String email);
+    @Query("SELECT e FROM Establecimiento e JOIN e.empleados v WHERE v.usuario.email = :email AND v.activo = true")
+    List<Establecimiento> findActiveEstablecimientoByUsuarioEmail(@Param("email") String email);
 }

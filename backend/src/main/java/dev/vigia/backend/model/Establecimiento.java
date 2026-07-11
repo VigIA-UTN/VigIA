@@ -1,11 +1,14 @@
 package dev.vigia.backend.model;
 
+import dev.vigia.backend.util.BooleanToSmallintConverter;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -23,14 +26,10 @@ public class Establecimiento {
     private Double latitud;
     private Double longitud;
 
-    @ManyToMany
-    @JoinTable(
-        name = "establecimiento_usuario",
-        joinColumns = @JoinColumn(name = "establecimiento_id"),
-        inverseJoinColumns = @JoinColumn(name = "usuario_id")
-    )
-    private List<Usuario> usuarios;
+    @OneToMany(mappedBy = "establecimiento", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Empleado> empleados = new ArrayList<>();
 
+    @Convert(converter = BooleanToSmallintConverter.class)
     private boolean activo = true;
 
     private LocalDate fechaAlta;

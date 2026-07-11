@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -38,16 +39,20 @@ public class InvitacionServiceImpl implements InvitacionService {
                 Establecimiento establecimiento = establecimientoRepository.findById(request.getEstablecimientoId())
                                 .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
 
-                // Si el usuario ya existe, asociarlo directamente al establecimiento
                 var usuarioExistente = usuarioRepository.findByEmail(request.getEmail());
                 if (usuarioExistente.isPresent()) {
                         Usuario productor = usuarioExistente.get();
 
-                        if (establecimiento.getUsuarios().contains(productor)) {
-                                throw new IllegalArgumentException("El productor ya pertenece a este establecimiento.");
-                        }
+                        Optional<Empleado> vinculoActivoOpt = establecimiento.getEmpleados().stream()
+                                .filter(v -> v.getUsuario().equals(productor) && v.isActivo())
+                                .findFirst();
 
-                        establecimiento.getUsuarios().add(productor);
+                        if (vinculoActivoOpt.isPresent()) {
+                                throw new IllegalArgumentException("El productor ya pertenece a este establecimiento y está activo.");
+                        } else {
+                                Empleado nuevoVinculo = new Empleado(establecimiento, productor);
+                                establecimiento.getEmpleados().add(nuevoVinculo);
+                        }
                         establecimientoRepository.save(establecimiento);
 
                         emailService.enviarNuevoEstablecimientoProductor(productor.getEmail(),
@@ -60,10 +65,10 @@ public class InvitacionServiceImpl implements InvitacionService {
                                         .build();
                 }
 
-                // El usuario no existe: generar invitación de registro
                 boolean existsVigente = invitacionRepository
-                                .existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                .existsByEmailDestinoAndEstablecimientoAndEstadoInvitacionAndFechaExpiracionAfter(
                                                 request.getEmail(),
+                                                establecimiento,
                                                 EstadoInvitacion.PENDIENTE,
                                                 LocalDateTime.now());
 
@@ -114,8 +119,11 @@ public class InvitacionServiceImpl implements InvitacionService {
                 Establecimiento establecimiento = establecimientoRepository.findById(request.getEstablecimientoId())
                                 .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
 
-                if (!establecimiento.getUsuarios().contains(productorUser)) {
-                        throw new IllegalArgumentException("El productor no pertenece a este establecimiento.");
+                boolean productorActivoEnEstablecimiento = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
+
+                if (!productorActivoEnEstablecimiento) {
+                        throw new IllegalArgumentException("El productor no pertenece a este establecimiento o no está activo.");
                 }
 
                 if (request.getRol() == Rol.ADMINISTRADOR || request.getRol() == Rol.PRODUCTOR
@@ -123,33 +131,23 @@ public class InvitacionServiceImpl implements InvitacionService {
                         throw new IllegalArgumentException("El rol especificado no es válido para un empleado.");
                 }
 
-                // Si el usuario ya existe, asociarlo directamente al establecimiento
                 var usuarioExistente = usuarioRepository.findByEmail(request.getEmail());
                 if (usuarioExistente.isPresent()) {
                         Usuario empleado = usuarioExistente.get();
 
-                        if (establecimiento.getUsuarios().contains(empleado)) {
-                                throw new IllegalArgumentException("El empleado ya pertenece a este establecimiento.");
+                        Optional<Empleado> vinculoActivoOpt = establecimiento.getEmpleados().stream()
+                                .filter(v -> v.getUsuario().equals(empleado) && v.isActivo())
+                                .findFirst();
+
+                        if (vinculoActivoOpt.isPresent()) {
+                                throw new IllegalArgumentException("El empleado ya pertenece a este establecimiento y está activo.");
                         }
-
-                        establecimiento.getUsuarios().add(empleado);
-                        establecimientoRepository.save(establecimiento);
-
-                        emailService.enviarNuevoEstablecimientoEmpleado(empleado.getEmail(),
-                                        establecimiento.getNombre(),
-                                        request.getRol().name());
-
-                        return InvitacionResponse.builder()
-                                        .emailDestino(empleado.getEmail())
-                                        .rol(empleado.getRol().name())
-                                        .estado(EstadoInvitacion.USADA.name())
-                                        .build();
                 }
 
-                // El usuario no existe: generar invitación de registro
                 boolean existsVigente = invitacionRepository
-                                .existsByEmailDestinoAndEstadoInvitacionAndFechaExpiracionAfter(
+                                .existsByEmailDestinoAndEstablecimientoAndEstadoInvitacionAndFechaExpiracionAfter(
                                                 request.getEmail(),
+                                                establecimiento,
                                                 EstadoInvitacion.PENDIENTE,
                                                 LocalDateTime.now());
 
@@ -173,8 +171,13 @@ public class InvitacionServiceImpl implements InvitacionService {
 
                 Invitacion saved = invitacionRepository.save(invitacion);
 
-                emailService.enviarInvitacionEmpleado(saved.getEmailDestino(), token, establecimiento.getNombre(),
-                                saved.getRol().name());
+                if (usuarioExistente.isEmpty()) {
+                        emailService.enviarInvitacionEmpleado(saved.getEmailDestino(), token, establecimiento.getNombre(),
+                                        saved.getRol().name());
+                } else {
+                        emailService.enviarInvitacionPendienteUsuarioExistente(saved.getEmailDestino(), establecimiento.getNombre(),
+                                        saved.getRol().name());
+                }
 
                 return InvitacionResponse.builder()
                                 .id(saved.getId())
@@ -240,5 +243,84 @@ public class InvitacionServiceImpl implements InvitacionService {
                                                         .build();
                                 })
                                 .toList();
+        }
+
+        public List<InvitacionResponse> listarMisInvitaciones(String email) {
+                return invitacionRepository
+                                .findByEmailDestinoAndEstadoInvitacionOrderByFechaCreacionDesc(email, EstadoInvitacion.PENDIENTE)
+                                .stream()
+                                .map(inv -> {
+                                        Usuario creador = inv.getCreador();
+                                        String nombreCompleto = creador != null
+                                                        ? creador.getNombre() + " " + creador.getApellido()
+                                                        : null;
+                                        return InvitacionResponse.builder()
+                                                        .id(inv.getId())
+                                                        .nombreCompleto(nombreCompleto)
+                                                        .emailDestino(inv.getEmailDestino())
+                                                        .rol(inv.getRol().name())
+                                                        .establecimiento(inv.getEstablecimiento() != null
+                                                                        ? inv.getEstablecimiento().getNombre()
+                                                                        : null)
+                                                        .token(inv.getToken())
+                                                        .fechaCreacion(inv.getFechaCreacion())
+                                                        .fechaExpiracion(inv.getFechaExpiracion())
+                                                        .estado(inv.getEstadoInvitacion().name())
+                                                        .build();
+                                })
+                                .toList();
+        }
+
+        @Transactional
+        public void aceptarInvitacion(Long id, String email) {
+                Invitacion invitacion = invitacionRepository.findById(id)
+                                .orElseThrow(() -> new IllegalArgumentException("Invitación no encontrada"));
+
+                if (!invitacion.getEmailDestino().equals(email)) {
+                        throw new IllegalArgumentException("La invitación no te pertenece");
+                }
+                if (invitacion.getEstadoInvitacion() != EstadoInvitacion.PENDIENTE) {
+                        throw new IllegalArgumentException("La invitación ya no está pendiente");
+                }
+
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+                
+                if (usuario.getRol() == Rol.PENDIENTE) {
+                        usuario.setRol(invitacion.getRol());
+                        usuarioRepository.save(usuario);
+                }
+
+                Establecimiento establecimiento = invitacion.getEstablecimiento();
+
+                Empleado nuevoVinculo = new Empleado(establecimiento, usuario);
+                establecimiento.getEmpleados().add(nuevoVinculo);
+                establecimientoRepository.save(establecimiento);
+
+                invitacion.setEstadoInvitacion(EstadoInvitacion.USADA);
+                invitacionRepository.save(invitacion);
+        }
+
+        @Transactional
+        public void aceptarInvitacionPorToken(String token, String email) {
+                Invitacion invitacion = invitacionRepository.findByToken(token)
+                                .orElseThrow(() -> new IllegalArgumentException("Invitación no encontrada"));
+                aceptarInvitacion(invitacion.getId(), email);
+        }
+
+        @Transactional
+        public void rechazarInvitacion(Long id, String email) {
+                Invitacion invitacion = invitacionRepository.findById(id)
+                                .orElseThrow(() -> new IllegalArgumentException("Invitación no encontrada"));
+
+                if (!invitacion.getEmailDestino().equals(email)) {
+                        throw new IllegalArgumentException("La invitación no te pertenece");
+                }
+                if (invitacion.getEstadoInvitacion() != EstadoInvitacion.PENDIENTE) {
+                        throw new IllegalArgumentException("La invitación ya no está pendiente");
+                }
+
+                invitacion.setEstadoInvitacion(EstadoInvitacion.RECHAZADA);
+                invitacionRepository.save(invitacion);
         }
 }

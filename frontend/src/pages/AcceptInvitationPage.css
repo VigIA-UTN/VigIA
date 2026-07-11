@@ -264,3 +264,22 @@
     transform: rotate(360deg);
   }
 }
+
+.login-hint {
+  font-size: 0.9rem;
+  color: #c8d9ed;
+  text-align: center;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.login-hint a {
+  color: #94C11E;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.2s ease;
+}
+
+.login-hint a:hover {
+  color: #a8d420;
+}

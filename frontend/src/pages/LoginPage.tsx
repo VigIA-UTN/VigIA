@@ -47,6 +47,8 @@ export default function LoginPage() {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 423) {
           setIsLocked(true);
+        } else if (error.response?.status === 403) {
+          setServerError('La cuenta no está activa. Contactá al administrador.');
         } else if (error.response?.status === 401) {
           setServerError('Credenciales incorrectas. Verificá tu email y contraseña.');
         } else {

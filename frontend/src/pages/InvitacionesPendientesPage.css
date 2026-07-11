@@ -1,0 +1,83 @@
+.invitaciones-pendientes-container {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.invitaciones-pendientes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.invitaciones-pendientes-header h2 {
+  font-weight: 600;
+  color: #1E3A5F;
+  margin: 0;
+}
+
+.invitacion-card {
+  background-color: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e0e0e0;
+}
+
+.invitacion-info h4 {
+  margin: 0 0 8px 0;
+  color: #1E3A5F;
+  font-weight: 600;
+}
+
+.invitacion-info p {
+  margin: 0 0 4px 0;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.invitacion-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-aceptar {
+  background-color: #94C11E;
+  color: #1E3A5F;
+  border: none;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 10px 20px;
+  transition: all 0.2s;
+}
+
+.btn-aceptar:hover {
+  background-color: #a8d420;
+}
+
+.btn-rechazar {
+  background-color: transparent;
+  color: #e74c3c;
+  border: 1px solid #e74c3c;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 10px 20px;
+  transition: all 0.2s;
+}
+
+.btn-rechazar:hover {
+  background-color: rgba(231, 76, 60, 0.1);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  color: #666;
+}

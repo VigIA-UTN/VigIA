@@ -10,6 +10,7 @@ import dev.vigia.backend.model.EstadoInvitacion;
 import dev.vigia.backend.model.Invitacion;
 import dev.vigia.backend.model.TipoInvitacion;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -70,7 +71,8 @@ public class AuthServiceImpl implements AuthService {
 
         if (invitacion.getEstablecimiento() != null) {
             var establecimiento = invitacion.getEstablecimiento();
-            establecimiento.getUsuarios().add(savedUser);
+            Empleado vinculo = new Empleado(establecimiento, savedUser);
+            establecimiento.getEmpleados().add(vinculo);
             establecimientoRepository.save(establecimiento);
         }
 

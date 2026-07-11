@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import EstablecimientosPage from './pages/EstablecimientosPage';
 import InvitacionesPage from './pages/InvitacionesPage';
 import InvitacionesEmpleadosPage from './pages/InvitacionesEmpleadosPage';
+import InvitacionesPendientesPage from './pages/InvitacionesPendientesPage';
 import RegisterPage from './pages/RegisterPage';
 import AcceptInvitationPage from './pages/AcceptInvitationPage';
 import UsuariosAdminPage from './pages/UsuariosAdminPage';
@@ -15,6 +16,7 @@ function InvitacionesRouter() {
   const rol = useAuthStore(state => state.rol);
   if (rol === 'ADMINISTRADOR') return <InvitacionesPage />;
   if (rol === 'PRODUCTOR') return <InvitacionesEmpleadosPage />;
+  if (rol === 'VETERINARIO' || rol === 'CAMPERO') return <InvitacionesPendientesPage />;
   return <Navigate to="/" replace />;
 }
 
@@ -44,7 +46,7 @@ function App() {
         <Route
           path="/invitaciones"
           element={
-            <ProtectedRoute roles={['ADMINISTRADOR', 'PRODUCTOR']}>
+            <ProtectedRoute roles={['ADMINISTRADOR', 'PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
               <InvitacionesRouter />
             </ProtectedRoute>
           }

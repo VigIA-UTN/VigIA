@@ -46,3 +46,21 @@ export async function crearInvitacionEmpleado(
   const response = await axiosClient.post<InvitacionResponse>('/invitaciones/empleado', data);
   return response.data;
 }
+
+export async function aceptarInvitacionPorTokenRequest(token: string): Promise<void> {
+  await axiosClient.post(`/invitaciones/token/${token}/aceptar`);
+}
+
+export async function listarMisInvitacionesRequest(): Promise<InvitacionResponse[]> {
+  const response = await axiosClient.get<InvitacionResponse[]>('/invitaciones/mis-invitaciones');
+  return response.data;
+}
+
+export async function aceptarInvitacionRequest(id: number): Promise<void> {
+  await axiosClient.post(`/invitaciones/${id}/aceptar`);
+}
+
+export async function rechazarInvitacionRequest(id: number): Promise<void> {
+  await axiosClient.post(`/invitaciones/${id}/rechazar`);
+}
+

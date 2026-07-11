@@ -5,6 +5,7 @@ import dev.vigia.backend.dto.AuthRequest;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,8 +29,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @SpringBootTest
 @AutoConfigureMockMvc
+@Transactional
 @DisplayName("UsuarioController — Tests (Listado y Baja de Productores)")
 class UsuarioControllerTest {
 
@@ -163,7 +167,9 @@ class UsuarioControllerTest {
         est.setLongitud(-58.0);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-        est.setUsuarios(new ArrayList<>(List.of(usuarioRepository.findById(productorId).orElseThrow(), empleado)));
+        Empleado vinculoProd = new Empleado(est, usuarioRepository.findById(productorId).orElseThrow());
+        Empleado vinculoEmp = new Empleado(est, empleado);
+        est.setEmpleados(new ArrayList<>(List.of(vinculoProd, vinculoEmp)));
         establecimientoRepository.save(est);
 
         mockMvc.perform(get("/api/v1/usuarios/empleados")
@@ -183,9 +189,9 @@ class UsuarioControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/v1/usuarios/empleados/{id} - Productor desactiva empleado de su establecimiento")
+    @DisplayName("DELETE /api/v1/usuarios/empleados/{id} - Productor remueve empleado de su establecimiento")
     @SuppressWarnings("null")
-    void desactivarEmpleado_asProductor_success() throws Exception {
+    void removerEmpleado_asProductor_success() throws Exception {
         Usuario empleado = new Usuario();
         empleado.setEmail("empleado2@vigia.dev");
         empleado.setPasswordHash(passwordEncoder.encode("emp123"));
@@ -200,15 +206,21 @@ class UsuarioControllerTest {
         est.setLongitud(-58.0);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-        est.setUsuarios(new ArrayList<>(List.of(usuarioRepository.findById(productorId).orElseThrow(), empleado)));
-        establecimientoRepository.save(est);
+        Empleado vinculoProd = new Empleado(est, usuarioRepository.findById(productorId).orElseThrow());
+        Empleado vinculoEmp = new Empleado(est, empleado);
+        est.setEmpleados(new ArrayList<>(List.of(vinculoProd, vinculoEmp)));
+        est = establecimientoRepository.save(est);
 
-        mockMvc.perform(delete("/api/v1/usuarios/empleados/" + empleado.getId())
+        mockMvc.perform(delete("/api/v1/usuarios/empleados/" + est.getId() + "/" + empleado.getId())
                 .header("Authorization", "Bearer " + productorToken))
                 .andExpect(status().isOk());
 
+        Establecimiento updatedEst = establecimientoRepository.findById(est.getId()).orElseThrow();
+        final Long empId = empleado.getId();
+        assertThat(updatedEst.getEmpleados().stream().anyMatch(v -> v.getUsuario().getId().equals(empId) && v.isActivo())).isFalse();
+        
         Usuario user = usuarioRepository.findById(empleado.getId()).orElseThrow();
-        assertThat(user.isActivo()).isFalse();
+        assertThat(user.isActivo()).isTrue();
     }
 
     @Test
@@ -229,7 +241,8 @@ class UsuarioControllerTest {
         est.setLongitud(-58.0);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-        est.setUsuarios(new ArrayList<>(List.of(empleado)));
+        Empleado vinculoEmp = new Empleado(est, empleado);
+        est.setEmpleados(new ArrayList<>(List.of(vinculoEmp)));
         establecimientoRepository.save(est);
         
         Establecimiento estProd = new Establecimiento();
@@ -238,10 +251,11 @@ class UsuarioControllerTest {
         estProd.setLongitud(-58.0);
         estProd.setActivo(true);
         estProd.setFechaAlta(LocalDate.now());
-        estProd.setUsuarios(new ArrayList<>(List.of(usuarioRepository.findById(productorId).orElseThrow())));
+        Empleado vinculoProd = new Empleado(estProd, usuarioRepository.findById(productorId).orElseThrow());
+        estProd.setEmpleados(new ArrayList<>(List.of(vinculoProd)));
         establecimientoRepository.save(estProd);
 
-        mockMvc.perform(delete("/api/v1/usuarios/empleados/" + empleado.getId())
+        mockMvc.perform(delete("/api/v1/usuarios/empleados/" + estProd.getId() + "/" + empleado.getId())
                 .header("Authorization", "Bearer " + productorToken))
                 .andExpect(status().isBadRequest());
     }
