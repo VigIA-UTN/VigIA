@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -47,7 +48,7 @@ public class UsuarioServiceImpl implements UsuarioService {
 
         List<Establecimiento> establecimientos = establecimientoRepository.findActiveEstablecimientoByUsuarioId(productor.getId());
 
-        List<UsuarioResponse> responses = new java.util.ArrayList<>();
+        List<UsuarioResponse> responses = new ArrayList<>();
         for (Establecimiento est : establecimientos) {
             List<UsuarioResponse> emps = est.getEmpleados().stream()
                     .filter(Empleado::isActivo)

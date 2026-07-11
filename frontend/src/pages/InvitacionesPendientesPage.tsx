@@ -17,14 +17,16 @@ export default function InvitacionesPendientesPage() {
       setLoading(true);
       const data = await listarMisInvitacionesRequest();
       setInvitaciones(data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al cargar las invitaciones.');
+    } catch (err) {
+      const errorResponse = (err as { response?: { data?: { message?: string } } }).response;
+      setError(errorResponse?.data?.message || 'Error al cargar las invitaciones.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchInvitaciones();
   }, []);
 
@@ -41,8 +43,10 @@ export default function InvitacionesPendientesPage() {
           fetchInvitaciones();
         }
       });
-    } catch (err: any) {
-      alert(err.response?.data?.message || err.response?.data || 'Error al aceptar invitación.');
+    } catch (err) {
+      const data = (err as { response?: { data?: { message?: string } | string } }).response?.data;
+      const errorMessage = typeof data === 'string' ? data : data?.message;
+      alert(errorMessage || 'Error al aceptar invitación.');
     }
   };
 
@@ -51,8 +55,9 @@ export default function InvitacionesPendientesPage() {
     try {
       await rechazarInvitacionRequest(id);
       fetchInvitaciones();
-    } catch (err: any) {
-      alert(err.response?.data || 'Error al rechazar invitación.');
+    } catch (err) {
+      const errorResponse = (err as { response?: { data?: string } }).response;
+      alert(errorResponse?.data || 'Error al rechazar invitación.');
     }
   };
 

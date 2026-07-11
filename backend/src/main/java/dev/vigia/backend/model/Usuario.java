@@ -37,9 +37,4 @@ public class Usuario {
     private LocalDate fechaAlta;
 
     private String proveedorAuth;
-
-    public boolean validarCredenciales(String pass) {
-        // Implementación dummy para el modelo
-        return false;
-    }
 }
