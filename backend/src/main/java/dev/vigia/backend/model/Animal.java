@@ -1,5 +1,6 @@
 package dev.vigia.backend.model;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import dev.vigia.backend.util.BooleanToSmallintConverter;
@@ -36,7 +37,7 @@ public class Animal {
     private String alias;
 
     @Column(name = "fecha_nacimiento")
-    private LocalDateTime fechaNacimiento;
+    private LocalDate fechaNacimiento;
 
     private String raza;
 
@@ -46,9 +47,6 @@ public class Animal {
 
     @Column(name = "fecha_alta")
     private LocalDateTime fechaAlta;
-
-    @Convert(converter = BooleanToSmallintConverter.class)
-    private boolean activo = true;
 
     public Animal(Establecimiento establecimiento, RodeoLote rodeoLote) {
         this.establecimiento = establecimiento;

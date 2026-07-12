@@ -59,5 +59,4 @@ CREATE TABLE animales (
     raza VARCHAR(255),
     estado_actual VARCHAR(50),
     fecha_alta TIMESTAMP,
-    activo SMALLINT NOT NULL DEFAULT 1
 );
