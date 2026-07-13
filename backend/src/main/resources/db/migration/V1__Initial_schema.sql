@@ -40,3 +40,23 @@ CREATE TABLE invitaciones (
     tipo_invitacion VARCHAR(50) NOT NULL,
     estado_invitacion VARCHAR(50) NOT NULL
 );
+
+CREATE TABLE rodeo_lote (
+    id BIGSERIAL PRIMARY KEY,
+    establecimiento_id BIGINT REFERENCES establecimientos(id),
+    nombre VARCHAR(255),
+    activo SMALLINT NOT NULL DEFAULT 1,
+    fecha_alta TIMESTAMP
+);
+
+CREATE TABLE animales (
+    id BIGSERIAL PRIMARY KEY,
+    establecimiento_id BIGINT REFERENCES establecimientos(id),
+    rodeo_lote_id BIGINT REFERENCES rodeo_lote(id),
+    id_caravana_oficial VARCHAR(255),
+    alias VARCHAR(255),
+    fecha_nacimiento TIMESTAMP,
+    raza VARCHAR(255),
+    estado_actual VARCHAR(50),
+    fecha_alta TIMESTAMP,
+);
