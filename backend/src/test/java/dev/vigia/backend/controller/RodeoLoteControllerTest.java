@@ -2,14 +2,14 @@ package dev.vigia.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AuthRequest;
-import dev.vigia.backend.dto.RodeoRequest;
+import dev.vigia.backend.dto.RodeoLoteRequest;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
-import dev.vigia.backend.repository.RodeoRepository;
+import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
 
@@ -35,8 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@DisplayName("RodeoController — Tests")
-class RodeoControllerTest {
+@DisplayName("RodeoLoteController — Tests")
+class RodeoLoteControllerTest {
 
         @Autowired
         private MockMvc mockMvc;
@@ -45,7 +45,12 @@ class RodeoControllerTest {
         private UsuarioRepository usuarioRepository;
 
         @Autowired
-        private RodeoRepository rodeoRepository;
+        private dev.vigia.backend.repository.EstadoReproductivoRepository estadoReproductivoRepository;
+        @Autowired
+        private dev.vigia.backend.repository.AnimalRepository animalRepository;
+
+        @Autowired
+        private RodeoLoteRepository rodeoLoteRepository;
 
         @Autowired
         private EstablecimientoRepository establecimientoRepository;
@@ -72,7 +77,9 @@ class RodeoControllerTest {
         @SuppressWarnings("null")
         void setUp() throws Exception {
                 // Orden correcto: primero tablas hijas, luego padres
-                rodeoRepository.deleteAll();
+                estadoReproductivoRepository.deleteAll();
+                animalRepository.deleteAll();
+                rodeoLoteRepository.deleteAll();
                 invitacionRepository.deleteAll();
                 establecimientoRepository.deleteAll();
                 usuarioRepository.deleteAll();
@@ -127,14 +134,14 @@ class RodeoControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeos/crear - Productor crea rodeo exitosamente")
+        @DisplayName("POST /api/v1/rodeo-lotes/crear - Productor crea rodeoLote exitosamente")
         @SuppressWarnings("null")
-        void crearRodeo_asProductor_success() throws Exception {
-                RodeoRequest request = new RodeoRequest();
+        void crearRodeoLote_asProductor_success() throws Exception {
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Verano");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeos/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -143,50 +150,50 @@ class RodeoControllerTest {
                                 .andExpect(jsonPath("$.activo").value(true))
                                 .andExpect(jsonPath("$.establecimientoId").value(establecimientoId));
 
-                // Verificar en BD que el rodeo fue persistido
-                assertThat(rodeoRepository.findByEstablecimientoId(establecimientoId)).hasSize(1);
+                // Verificar en BD que el rodeoLote fue persistido
+                assertThat(rodeoLoteRepository.findByEstablecimientoId(establecimientoId)).hasSize(1);
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeos/crear - Admin recibe 403 Forbidden")
+        @DisplayName("POST /api/v1/rodeo-lotes/crear - Admin recibe 403 Forbidden")
         @SuppressWarnings("null")
-        void crearRodeo_asAdmin_forbidden() throws Exception {
-                RodeoRequest request = new RodeoRequest();
+        void crearRodeoLote_asAdmin_forbidden() throws Exception {
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo No Permitido");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeos/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + adminToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isForbidden());
 
-                assertThat(rodeoRepository.findAll()).isEmpty();
+                assertThat(rodeoLoteRepository.findAll()).isEmpty();
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeos/crear - Sin autenticación recibe 401")
+        @DisplayName("POST /api/v1/rodeo-lotes/crear - Sin autenticación recibe 401")
         @SuppressWarnings("null")
-        void crearRodeo_sinAutenticacion_unauthorized() throws Exception {
-                RodeoRequest request = new RodeoRequest();
+        void crearRodeoLote_sinAutenticacion_unauthorized() throws Exception {
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Anonimo");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeos/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeos/crear - Establecimiento no encontrado retorna 400")
+        @DisplayName("POST /api/v1/rodeo-lotes/crear - Establecimiento no encontrado retorna 400")
         @SuppressWarnings("null")
-        void crearRodeo_establecimientoInexistente_badRequest() throws Exception {
-                RodeoRequest request = new RodeoRequest();
+        void crearRodeoLote_establecimientoInexistente_badRequest() throws Exception {
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Sin Est.");
                 request.setEstablecimientoId(9999L);
 
-                mockMvc.perform(post("/api/v1/rodeos/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -194,9 +201,9 @@ class RodeoControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeos/crear - Productor no pertenece al establecimiento retorna 400")
+        @DisplayName("POST /api/v1/rodeo-lotes/crear - Productor no pertenece al establecimiento retorna 400")
         @SuppressWarnings("null")
-        void crearRodeo_productorNoPertenece_badRequest() throws Exception {
+        void crearRodeoLote_productorNoPertenece_badRequest() throws Exception {
                 // Crear otro establecimiento sin vincular al productor
                 Establecimiento otroEst = new Establecimiento();
                 otroEst.setNombre("Otro Establecimiento");
@@ -207,11 +214,11 @@ class RodeoControllerTest {
                 otroEst.setEmpleados(new ArrayList<>());
                 otroEst = establecimientoRepository.save(otroEst);
 
-                RodeoRequest request = new RodeoRequest();
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Ajeno");
                 request.setEstablecimientoId(otroEst.getId());
 
-                mockMvc.perform(post("/api/v1/rodeos/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -219,9 +226,9 @@ class RodeoControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeos/crear - Productor inactivo en establecimiento retorna 400")
+        @DisplayName("POST /api/v1/rodeo-lotes/crear - Productor inactivo en establecimiento retorna 400")
         @SuppressWarnings("null")
-        void crearRodeo_productorInactivo_badRequest() throws Exception {
+        void crearRodeoLote_productorInactivo_badRequest() throws Exception {
                 // Crear un segundo productor inactivo en el establecimiento
                 Usuario productorInactivo = new Usuario();
                 productorInactivo.setEmail("inactivo@vigia.dev");
@@ -239,11 +246,11 @@ class RodeoControllerTest {
 
                 String tokenInactivo = getTokenFor("inactivo@vigia.dev", "inac123");
 
-                RodeoRequest request = new RodeoRequest();
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Inactivo");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeos/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + tokenInactivo)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -251,21 +258,21 @@ class RodeoControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/rodeos - Admin lista todos los rodeos")
+        @DisplayName("GET /api/v1/rodeo-lotes - Admin lista todos los rodeos")
         @SuppressWarnings("null")
-        void getAllRodeos_asAdmin_success() throws Exception {
-                // Crear un rodeo en la BD previamente
-                RodeoRequest request = new RodeoRequest();
+        void getAllRodeoLotes_asAdmin_success() throws Exception {
+                // Crear un rodeoLote en la BD previamente
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Admin View");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeos/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated());
 
-                mockMvc.perform(get("/api/v1/rodeos")
+                mockMvc.perform(get("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + adminToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.length()").value(1))
@@ -273,20 +280,20 @@ class RodeoControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/rodeos - Productor lista solo sus rodeos")
+        @DisplayName("GET /api/v1/rodeo-lotes - Productor lista solo sus rodeos")
         @SuppressWarnings("null")
-        void getAllRodeos_asProductor_success() throws Exception {
-                RodeoRequest request = new RodeoRequest();
+        void getAllRodeoLotes_asProductor_success() throws Exception {
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Propio");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeos/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isCreated());
 
-                mockMvc.perform(get("/api/v1/rodeos")
+                mockMvc.perform(get("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.length()").value(1))
@@ -294,22 +301,22 @@ class RodeoControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/rodeos - Sin autenticación recibe 403")
-        void getAllRodeos_sinAutenticacion_forbidden() throws Exception {
-                mockMvc.perform(get("/api/v1/rodeos"))
+        @DisplayName("GET /api/v1/rodeo-lotes - Sin autenticación recibe 403")
+        void getAllRodeoLotes_sinAutenticacion_forbidden() throws Exception {
+                mockMvc.perform(get("/api/v1/rodeo-lotes"))
                                 .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("GET /api/v1/rodeos/{id} - Productor obtiene rodeo por id")
+        @DisplayName("GET /api/v1/rodeo-lotes/{id} - Productor obtiene rodeoLote por id")
         @SuppressWarnings("null")
-        void getRodeoById_asProductor_success() throws Exception {
-                // Crear rodeo primero
-                RodeoRequest request = new RodeoRequest();
+        void getRodeoLoteById_asProductor_success() throws Exception {
+                // Crear rodeoLote primero
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Get By Id");
                 request.setEstablecimientoId(establecimientoId);
 
-                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeos/crear")
+                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -319,7 +326,7 @@ class RodeoControllerTest {
                 Long rodeoId = objectMapper.readTree(
                                 createResult.getResponse().getContentAsString()).get("id").asLong();
 
-                mockMvc.perform(get("/api/v1/rodeos/" + rodeoId)
+                mockMvc.perform(get("/api/v1/rodeo-lotes/" + rodeoId)
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.id").value(rodeoId))
@@ -328,31 +335,31 @@ class RodeoControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/rodeos/{id} - Rodeo inexistente retorna 400")
-        void getRodeoById_inexistente_badRequest() throws Exception {
-                mockMvc.perform(get("/api/v1/rodeos/9999")
+        @DisplayName("GET /api/v1/rodeo-lotes/{id} - RodeoLote inexistente retorna 400")
+        void getRodeoLoteById_inexistente_badRequest() throws Exception {
+                mockMvc.perform(get("/api/v1/rodeo-lotes/9999")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isBadRequest());
         }
 
         @Test
-        @DisplayName("GET /api/v1/rodeos/{id} - Admin recibe 403 Forbidden")
-        void getRodeoById_asAdmin_forbidden() throws Exception {
-                mockMvc.perform(get("/api/v1/rodeos/1")
+        @DisplayName("GET /api/v1/rodeo-lotes/{id} - Admin recibe 403 Forbidden")
+        void getRodeoLoteById_asAdmin_forbidden() throws Exception {
+                mockMvc.perform(get("/api/v1/rodeo-lotes/1")
                                 .header("Authorization", "Bearer " + adminToken))
                                 .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/rodeos/{id} - Productor desactiva su rodeo exitosamente")
+        @DisplayName("DELETE /api/v1/rodeo-lotes/{id} - Productor desactiva su rodeoLote exitosamente")
         @SuppressWarnings("null")
-        void desactivarRodeo_asProductor_success() throws Exception {
+        void desactivarRodeoLote_asProductor_success() throws Exception {
                 // Crear rodeo
-                RodeoRequest request = new RodeoRequest();
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Para Eliminar");
                 request.setEstablecimientoId(establecimientoId);
 
-                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeos/crear")
+                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -362,35 +369,35 @@ class RodeoControllerTest {
                 Long rodeoId = objectMapper.readTree(
                                 createResult.getResponse().getContentAsString()).get("id").asLong();
 
-                mockMvc.perform(delete("/api/v1/rodeos/" + rodeoId)
+                mockMvc.perform(delete("/api/v1/rodeo-lotes/" + rodeoId)
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk());
 
                 // Verificar baja lógica en BD
-                assertThat(rodeoRepository.findById(rodeoId)).isPresent();
-                assertThat(rodeoRepository.findById(rodeoId).get().isActivo()).isFalse();
+                assertThat(rodeoLoteRepository.findById(rodeoId)).isPresent();
+                assertThat(rodeoLoteRepository.findById(rodeoId).get().isActivo()).isFalse();
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/rodeos/{id} - Rodeo inexistente retorna 400")
-        void desactivarRodeo_inexistente_badRequest() throws Exception {
-                mockMvc.perform(delete("/api/v1/rodeos/9999")
+        @DisplayName("DELETE /api/v1/rodeo-lotes/{id} - RodeoLote inexistente retorna 400")
+        void desactivarRodeoLote_inexistente_badRequest() throws Exception {
+                mockMvc.perform(delete("/api/v1/rodeo-lotes/9999")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isBadRequest());
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/rodeos/{id} - Admin recibe 403 Forbidden")
-        void desactivarRodeo_asAdmin_forbidden() throws Exception {
-                mockMvc.perform(delete("/api/v1/rodeos/1")
+        @DisplayName("DELETE /api/v1/rodeo-lotes/{id} - Admin recibe 403 Forbidden")
+        void desactivarRodeoLote_asAdmin_forbidden() throws Exception {
+                mockMvc.perform(delete("/api/v1/rodeo-lotes/1")
                                 .header("Authorization", "Bearer " + adminToken))
                                 .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/rodeos/{id} - Productor no pertenece al establecimiento retorna 400")
+        @DisplayName("DELETE /api/v1/rodeo-lotes/{id} - Productor no pertenece al establecimiento retorna 400")
         @SuppressWarnings("null")
-        void desactivarRodeo_productorAjeno_badRequest() throws Exception {
+        void desactivarRodeoLote_productorAjeno_badRequest() throws Exception {
                 // Crear otro productor y vincularlo al establecimiento base
                 Usuario otroProductor = new Usuario();
                 otroProductor.setEmail("otro@vigia.dev");
@@ -400,12 +407,12 @@ class RodeoControllerTest {
                 otroProductor.setActivo(true);
                 otroProductor = usuarioRepository.save(otroProductor);
 
-                // Establecimiento propio del primer productor — crear un rodeo en él
-                RodeoRequest request = new RodeoRequest();
+                // Establecimiento propio del primer productor — crear un rodeoLote en él
+                RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Ajeno Delete");
                 request.setEstablecimientoId(establecimientoId);
 
-                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeos/crear")
+                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -430,8 +437,8 @@ class RodeoControllerTest {
 
                 String otroToken = getTokenFor("otro@vigia.dev", "otro123");
 
-                // "otro" intenta borrar el rodeo del primer productor
-                mockMvc.perform(delete("/api/v1/rodeos/" + rodeoId)
+                // "otro" intenta borrar el rodeoLote del primer productor
+                mockMvc.perform(delete("/api/v1/rodeo-lotes/" + rodeoId)
                                 .header("Authorization", "Bearer " + otroToken))
                                 .andExpect(status().isBadRequest());
         }

@@ -14,7 +14,7 @@ import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
-import dev.vigia.backend.repository.RodeoRepository;
+import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AnimalService;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ public class AnimalSerciveImpl implements AnimalService {
         private final AnimalRepository animalRepository;
         private final UsuarioRepository usuarioRepository;
         private final EstablecimientoRepository establecimientoRepository;
-        private final RodeoRepository rodeoLoteRepository;
+        private final RodeoLoteRepository rodeoLoteRepository;
 
         @Override
         @SuppressWarnings("null")
