@@ -29,7 +29,6 @@ public class AnimalSerciveImpl implements AnimalService {
         private final RodeoRepository rodeoLoteRepository;
 
         @Override
-        @SuppressWarnings("null")
         public AnimalResponse cargarAnimal(String emailProductor, AnimalRequest request) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
@@ -67,7 +66,6 @@ public class AnimalSerciveImpl implements AnimalService {
         }
 
         @Override
-        @SuppressWarnings("null")
         public void desactivarAnimal(Long animalId, String emailProductor) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
@@ -94,7 +92,6 @@ public class AnimalSerciveImpl implements AnimalService {
         }
 
         @Override
-        @SuppressWarnings("null")
         public AnimalResponse getAnimalById(Long animalId, String emailProductor) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
@@ -121,7 +118,6 @@ public class AnimalSerciveImpl implements AnimalService {
         }
 
         @Override
-        @SuppressWarnings("null")
         public List<AnimalResponse> getAnimalesByEstablecimiento(Long establecimientoId, String emailUsuario) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
@@ -142,7 +138,6 @@ public class AnimalSerciveImpl implements AnimalService {
         }
 
         @Override
-        @SuppressWarnings("null")
         public List<AnimalResponse> getAnimalesByRodeoLote(Long rodeoLoteId, String emailUsuario) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));

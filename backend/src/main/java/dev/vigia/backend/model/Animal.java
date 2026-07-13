@@ -3,6 +3,7 @@ package dev.vigia.backend.model;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import dev.vigia.backend.util.BooleanToSmallintConverter;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
