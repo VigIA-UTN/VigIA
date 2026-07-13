@@ -44,11 +44,12 @@ public class InvitacionServiceImpl implements InvitacionService {
                         Usuario productor = usuarioExistente.get();
 
                         Optional<Empleado> vinculoActivoOpt = establecimiento.getEmpleados().stream()
-                                .filter(v -> v.getUsuario().equals(productor) && v.isActivo())
-                                .findFirst();
+                                        .filter(v -> v.getUsuario().equals(productor) && v.isActivo())
+                                        .findFirst();
 
                         if (vinculoActivoOpt.isPresent()) {
-                                throw new IllegalArgumentException("El productor ya pertenece a este establecimiento y está activo.");
+                                throw new IllegalArgumentException(
+                                                "El productor ya pertenece a este establecimiento y está activo.");
                         } else {
                                 Empleado nuevoVinculo = new Empleado(establecimiento, productor);
                                 establecimiento.getEmpleados().add(nuevoVinculo);
@@ -123,7 +124,8 @@ public class InvitacionServiceImpl implements InvitacionService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException("El productor no pertenece a este establecimiento o no está activo.");
+                        throw new IllegalArgumentException(
+                                        "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
                 if (request.getRol() == Rol.ADMINISTRADOR || request.getRol() == Rol.PRODUCTOR
@@ -136,11 +138,12 @@ public class InvitacionServiceImpl implements InvitacionService {
                         Usuario empleado = usuarioExistente.get();
 
                         Optional<Empleado> vinculoActivoOpt = establecimiento.getEmpleados().stream()
-                                .filter(v -> v.getUsuario().equals(empleado) && v.isActivo())
-                                .findFirst();
+                                        .filter(v -> v.getUsuario().equals(empleado) && v.isActivo())
+                                        .findFirst();
 
                         if (vinculoActivoOpt.isPresent()) {
-                                throw new IllegalArgumentException("El empleado ya pertenece a este establecimiento y está activo.");
+                                throw new IllegalArgumentException(
+                                                "El empleado ya pertenece a este establecimiento y está activo.");
                         }
                 }
 
@@ -172,10 +175,12 @@ public class InvitacionServiceImpl implements InvitacionService {
                 Invitacion saved = invitacionRepository.save(invitacion);
 
                 if (usuarioExistente.isEmpty()) {
-                        emailService.enviarInvitacionEmpleado(saved.getEmailDestino(), token, establecimiento.getNombre(),
+                        emailService.enviarInvitacionEmpleado(saved.getEmailDestino(), token,
+                                        establecimiento.getNombre(),
                                         saved.getRol().name());
                 } else {
-                        emailService.enviarInvitacionPendienteUsuarioExistente(saved.getEmailDestino(), establecimiento.getNombre(),
+                        emailService.enviarInvitacionPendienteUsuarioExistente(saved.getEmailDestino(),
+                                        establecimiento.getNombre(),
                                         saved.getRol().name());
                 }
 
@@ -247,7 +252,8 @@ public class InvitacionServiceImpl implements InvitacionService {
 
         public List<InvitacionResponse> listarMisInvitaciones(String email) {
                 return invitacionRepository
-                                .findByEmailDestinoAndEstadoInvitacionOrderByFechaCreacionDesc(email, EstadoInvitacion.PENDIENTE)
+                                .findByEmailDestinoAndEstadoInvitacionOrderByFechaCreacionDesc(email,
+                                                EstadoInvitacion.PENDIENTE)
                                 .stream()
                                 .map(inv -> {
                                         Usuario creador = inv.getCreador();
@@ -272,6 +278,7 @@ public class InvitacionServiceImpl implements InvitacionService {
         }
 
         @Transactional
+        @SuppressWarnings("null")
         public void aceptarInvitacion(Long id, String email) {
                 Invitacion invitacion = invitacionRepository.findById(id)
                                 .orElseThrow(() -> new IllegalArgumentException("Invitación no encontrada"));
@@ -285,7 +292,7 @@ public class InvitacionServiceImpl implements InvitacionService {
 
                 Usuario usuario = usuarioRepository.findByEmail(email)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-                
+
                 if (usuario.getRol() == Rol.PENDIENTE) {
                         usuario.setRol(invitacion.getRol());
                         usuarioRepository.save(usuario);
@@ -309,6 +316,7 @@ public class InvitacionServiceImpl implements InvitacionService {
         }
 
         @Transactional
+        @SuppressWarnings("null")
         public void rechazarInvitacion(Long id, String email) {
                 Invitacion invitacion = invitacionRepository.findById(id)
                                 .orElseThrow(() -> new IllegalArgumentException("Invitación no encontrada"));

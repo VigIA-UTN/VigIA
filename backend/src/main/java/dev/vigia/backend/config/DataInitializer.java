@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.ArrayList;
 
 @Slf4j
 @Component
@@ -52,7 +51,7 @@ public class DataInitializer implements CommandLineRunner {
         est.setLongitud(-58.3816);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-        
+
         Empleado vinculo = new Empleado(est, productor);
         est.getEmpleados().add(vinculo);
         establecimientoRepository.save(est);
