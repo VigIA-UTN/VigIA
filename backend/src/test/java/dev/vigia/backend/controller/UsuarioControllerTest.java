@@ -69,6 +69,7 @@ class UsuarioControllerTest {
         invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
+        usuarioRepository.flush();
         authService.clearCacheForTests();
 
         Usuario admin = new Usuario();

@@ -77,6 +77,7 @@ class AnimalControllerTest {
         invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
+        usuarioRepository.flush();
         authService.clearCacheForTests();
 
         // Admin
@@ -203,6 +204,7 @@ class AnimalControllerTest {
 
     @Test
     @DisplayName("POST /api/v1/animales/crear - Admin recibe 403 Forbidden")
+    @SuppressWarnings("null")
     void cargarAnimal_asAdmin_forbidden() throws Exception {
         AnimalRequest req = new AnimalRequest();
         req.setAlias("Toro Prohibido");
@@ -220,6 +222,7 @@ class AnimalControllerTest {
 
     @Test
     @DisplayName("POST /api/v1/animales/crear - Sin autenticación recibe 403")
+    @SuppressWarnings("null")
     void cargarAnimal_sinAuth_forbidden() throws Exception {
         AnimalRequest req = new AnimalRequest();
         req.setAlias("Toro Anon");
@@ -234,6 +237,7 @@ class AnimalControllerTest {
 
     @Test
     @DisplayName("POST /api/v1/animales/crear - Establecimiento inexistente retorna 400")
+    @SuppressWarnings("null")
     void cargarAnimal_establecimientoInexistente_badRequest() throws Exception {
         AnimalRequest req = new AnimalRequest();
         req.setAlias("Toro");
@@ -275,6 +279,7 @@ class AnimalControllerTest {
 
     @Test
     @DisplayName("POST /api/v1/animales/crear - RodeoLote inexistente retorna 400")
+    @SuppressWarnings("null")
     void cargarAnimal_rodeoInexistente_badRequest() throws Exception {
         AnimalRequest req = new AnimalRequest();
         req.setAlias("Toro");

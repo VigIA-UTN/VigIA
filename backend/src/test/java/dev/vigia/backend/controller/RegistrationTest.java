@@ -53,6 +53,7 @@ class RegistrationTest {
         invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
+        usuarioRepository.flush();
 
         establecimiento = new Establecimiento();
         establecimiento.setNombre("Establecimiento Base");
