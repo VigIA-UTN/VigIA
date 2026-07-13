@@ -1,7 +1,6 @@
 package dev.vigia.backend.dto;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 import dev.vigia.backend.model.EstadoAnimal;
 import lombok.Builder;
@@ -18,5 +17,5 @@ public class AnimalResponse {
     private EstadoAnimal estadoActual;
     private Long rodeoLoteId;
     private Long establecimientoId;
-    private LocalDateTime fechaAlta;
+    private LocalDate fechaAlta;
 }

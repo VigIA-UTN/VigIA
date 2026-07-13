@@ -42,11 +42,13 @@ public class UsuarioServiceImpl implements UsuarioService {
         usuarioRepository.save(usuario);
     }
 
+    @SuppressWarnings("null")
     public List<UsuarioResponse> getEmpleados(String emailProductor) {
         Usuario productor = usuarioRepository.findByEmail(emailProductor)
                 .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
 
-        List<Establecimiento> establecimientos = establecimientoRepository.findActiveEstablecimientoByUsuarioId(productor.getId());
+        List<Establecimiento> establecimientos = establecimientoRepository
+                .findActiveEstablecimientoByUsuarioId(productor.getId());
 
         List<UsuarioResponse> responses = new ArrayList<>();
         for (Establecimiento est : establecimientos) {
@@ -72,8 +74,10 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
 
         Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
-                .filter(e -> e.isActivo() && e.getEmpleados().stream().anyMatch(v -> v.getUsuario().equals(productor) && v.isActivo()))
-                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado o el productor no pertenece al mismo"));
+                .filter(e -> e.isActivo()
+                        && e.getEmpleados().stream().anyMatch(v -> v.getUsuario().equals(productor) && v.isActivo()))
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Establecimiento no encontrado o el productor no pertenece al mismo"));
 
         Usuario empleado = usuarioRepository.findById(empleadoId)
                 .orElseThrow(() -> new IllegalArgumentException("Empleado no encontrado"));
@@ -83,7 +87,8 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .findFirst();
 
         if (vinculoOpt.isEmpty()) {
-            throw new IllegalArgumentException("El empleado no pertenece al establecimiento del productor o ya está desvinculado");
+            throw new IllegalArgumentException(
+                    "El empleado no pertenece al establecimiento del productor o ya está desvinculado");
         }
 
         if (empleado.getRol() == Rol.PRODUCTOR) {
@@ -93,7 +98,7 @@ public class UsuarioServiceImpl implements UsuarioService {
         Empleado vinculo = vinculoOpt.get();
         vinculo.setActivo(false);
         vinculo.setFechaDesvinculacion(LocalDateTime.now());
-        
+
         establecimientoRepository.save(establecimiento);
     }
 

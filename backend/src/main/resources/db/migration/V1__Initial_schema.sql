@@ -55,8 +55,8 @@ CREATE TABLE animales (
     rodeo_lote_id BIGINT REFERENCES rodeo_lote(id),
     id_caravana_oficial VARCHAR(255),
     alias VARCHAR(255),
-    fecha_nacimiento TIMESTAMP,
+    fecha_nacimiento DATE,
     raza VARCHAR(255),
     estado_actual VARCHAR(50),
-    fecha_alta TIMESTAMP,
+    fecha_alta DATE
 );

@@ -19,98 +19,104 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RodeoServiceImpl implements RodeoService {
 
-    private final RodeoRepository rodeoRepository;
-    private final EstablecimientoRepository establecimientoRepository;
-    private final UsuarioRepository usuarioRepository;
+        private final RodeoRepository rodeoRepository;
+        private final EstablecimientoRepository establecimientoRepository;
+        private final UsuarioRepository usuarioRepository;
 
-    @Override
-    public RodeoResponse generarRodeo(RodeoRequest request, String emailProductor) {
+        @Override
+        @SuppressWarnings("null")
+        public RodeoResponse generarRodeo(RodeoRequest request, String emailProductor) {
 
-        Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
+                Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
 
-        Establecimiento establecimiento = establecimientoRepository.findById(request.getEstablecimientoId())
-                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+                Establecimiento establecimiento = establecimientoRepository.findById(request.getEstablecimientoId())
+                                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
 
-        boolean productorActivoEnEstablecimiento = establecimiento.getEmpleados().stream()
-                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
+                boolean productorActivoEnEstablecimiento = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
-        if (!productorActivoEnEstablecimiento) {
-            throw new IllegalArgumentException("El productor no pertenece a este establecimiento o no está activo.");
+                if (!productorActivoEnEstablecimiento) {
+                        throw new IllegalArgumentException(
+                                        "El productor no pertenece a este establecimiento o no está activo.");
+                }
+
+                RodeoLote rodeo = new RodeoLote(establecimiento);
+                rodeo.setNombre(request.getNombre());
+                RodeoLote savedRodeo = rodeoRepository.save(rodeo);
+                return mapToResponse(savedRodeo);
         }
 
-        RodeoLote rodeo = new RodeoLote(establecimiento);
-        rodeo.setNombre(request.getNombre());
-        RodeoLote savedRodeo = rodeoRepository.save(rodeo);
-        return mapToResponse(savedRodeo);
-    }
-
-    private RodeoResponse mapToResponse(RodeoLote rodeo) {
-        return RodeoResponse.builder()
-                .id(rodeo.getId())
-                .nombre(rodeo.getNombre())
-                .establecimientoId(rodeo.getEstablecimiento().getId())
-                .activo(rodeo.isActivo())
-                .fechaAlta(rodeo.getFechaAlta())
-                .build();
-    }
-
-    @Override
-    public void desactivarRodeo(Long rodeoId, String emailProductor) {
-
-        Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
-
-        RodeoLote rodeo = rodeoRepository.findById(rodeoId)
-                .orElseThrow(() -> new IllegalArgumentException("Rodeo no encontrado."));
-
-        boolean productorActivoEnEstablecimiento = rodeo.getEstablecimiento().getEmpleados().stream()
-                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
-
-        if (!productorActivoEnEstablecimiento) {
-            throw new IllegalArgumentException("El productor no pertenece a este establecimiento o no está activo.");
+        private RodeoResponse mapToResponse(RodeoLote rodeo) {
+                return RodeoResponse.builder()
+                                .id(rodeo.getId())
+                                .nombre(rodeo.getNombre())
+                                .establecimientoId(rodeo.getEstablecimiento().getId())
+                                .activo(rodeo.isActivo())
+                                .fechaAlta(rodeo.getFechaAlta())
+                                .build();
         }
 
-        rodeo.setActivo(false);
-        rodeoRepository.save(rodeo);
-    }
+        @Override
+        @SuppressWarnings("null")
+        public void desactivarRodeo(Long rodeoId, String emailProductor) {
 
-    @Override
-    public RodeoResponse getRodeoById(Long id, String emailProductor) {
+                Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
 
-        Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
+                RodeoLote rodeo = rodeoRepository.findById(rodeoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Rodeo no encontrado."));
 
-        RodeoLote rodeo = rodeoRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Rodeo no encontrado."));
+                boolean productorActivoEnEstablecimiento = rodeo.getEstablecimiento().getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
-        boolean productorActivoEnEstablecimiento = rodeo.getEstablecimiento().getEmpleados().stream()
-                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
+                if (!productorActivoEnEstablecimiento) {
+                        throw new IllegalArgumentException(
+                                        "El productor no pertenece a este establecimiento o no está activo.");
+                }
 
-        if (!productorActivoEnEstablecimiento) {
-            throw new IllegalArgumentException("El productor no pertenece a este establecimiento o no está activo.");
+                rodeo.setActivo(false);
+                rodeoRepository.save(rodeo);
         }
 
-        return mapToResponse(rodeo);
-    }
+        @Override
+        @SuppressWarnings("null")
+        public RodeoResponse getRodeoById(Long id, String emailProductor) {
 
-    @Override
-    public List<RodeoResponse> getAllRodeos() {
-        List<RodeoLote> rodeos = rodeoRepository.findAll();
-        return rodeos.stream()
-                .map(this::mapToResponse)
-                .collect(java.util.stream.Collectors.toList());
-    }
+                Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
 
-    @Override
-    public List<RodeoResponse> getRodeosByUsuario(String emailProductor) {
-        Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+                RodeoLote rodeo = rodeoRepository.findById(id)
+                                .orElseThrow(() -> new IllegalArgumentException("Rodeo no encontrado."));
 
-        List<RodeoLote> rodeos = rodeoRepository.findByEstablecimiento_Empleados_Usuario(productorUser);
-        return rodeos.stream()
-                .map(this::mapToResponse)
-                .collect(java.util.stream.Collectors.toList());
-    }
+                boolean productorActivoEnEstablecimiento = rodeo.getEstablecimiento().getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
+
+                if (!productorActivoEnEstablecimiento) {
+                        throw new IllegalArgumentException(
+                                        "El productor no pertenece a este establecimiento o no está activo.");
+                }
+
+                return mapToResponse(rodeo);
+        }
+
+        @Override
+        public List<RodeoResponse> getAllRodeos() {
+                List<RodeoLote> rodeos = rodeoRepository.findAll();
+                return rodeos.stream()
+                                .map(this::mapToResponse)
+                                .collect(java.util.stream.Collectors.toList());
+        }
+
+        @Override
+        public List<RodeoResponse> getRodeosByUsuario(String emailProductor) {
+                Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                List<RodeoLote> rodeos = rodeoRepository.findByEstablecimiento_Empleados_Usuario(productorUser);
+                return rodeos.stream()
+                                .map(this::mapToResponse)
+                                .collect(java.util.stream.Collectors.toList());
+        }
 
 }

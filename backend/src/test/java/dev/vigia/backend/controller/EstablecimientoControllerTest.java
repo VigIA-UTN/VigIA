@@ -67,6 +67,7 @@ class EstablecimientoControllerTest {
         invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
+        usuarioRepository.flush();
         authService.clearCacheForTests();
 
         // 1. Setup ADMIN user

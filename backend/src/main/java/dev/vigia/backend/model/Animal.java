@@ -1,9 +1,7 @@
 package dev.vigia.backend.model;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
-import dev.vigia.backend.util.BooleanToSmallintConverter;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -46,11 +44,11 @@ public class Animal {
     private EstadoAnimal estadoActual;
 
     @Column(name = "fecha_alta")
-    private LocalDateTime fechaAlta;
+    private LocalDate fechaAlta;
 
     public Animal(Establecimiento establecimiento, RodeoLote rodeoLote) {
         this.establecimiento = establecimiento;
         this.rodeoLote = rodeoLote;
-        this.fechaAlta = LocalDateTime.now();
+        this.fechaAlta = LocalDate.now();
     }
 }
