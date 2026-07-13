@@ -7,6 +7,7 @@ import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.UsuarioRepository;
+import dev.vigia.backend.repository.RodeoLoteRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,15 @@ class UsuarioControllerTest {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+    
+    @Autowired
+    private RodeoLoteRepository rodeoLoteRepository;
+
+    @Autowired
+    private dev.vigia.backend.repository.AnimalRepository animalRepository;
+
+    @Autowired
+    private dev.vigia.backend.repository.EstadoReproductivoRepository estadoReproductivoRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -66,6 +76,9 @@ class UsuarioControllerTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        estadoReproductivoRepository.deleteAll();
+        animalRepository.deleteAll();
+        rodeoLoteRepository.deleteAll();
         invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();

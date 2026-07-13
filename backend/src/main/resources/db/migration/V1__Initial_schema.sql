@@ -60,3 +60,14 @@ CREATE TABLE animales (
     estado_actual VARCHAR(50),
     fecha_alta DATE
 );
+
+CREATE TABLE estados_reproductivos (
+    id BIGSERIAL PRIMARY KEY,
+    animal_id BIGINT REFERENCES animales(id),
+    usuario_registro_id BIGINT REFERENCES usuarios(id),
+    estado VARCHAR(50),
+    fecha_ultimo_parto DATE,
+    fecha_ultima_inseminacion DATE,
+    origen VARCHAR(50),
+    fecha_registro TIMESTAMP
+);

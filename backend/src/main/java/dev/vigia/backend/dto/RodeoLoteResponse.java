@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @Builder
-public class RodeoResponse {
+public class RodeoLoteResponse {
     private Long id;
     private String nombre;
     private boolean activo;

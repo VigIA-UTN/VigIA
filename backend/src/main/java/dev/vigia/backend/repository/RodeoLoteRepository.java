@@ -10,7 +10,7 @@ import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Usuario;
 
 @Repository
-public interface RodeoRepository extends JpaRepository<RodeoLote, Long> {
+public interface RodeoLoteRepository extends JpaRepository<RodeoLote, Long> {
 
     List<RodeoLote> findByEstablecimientoId(Long establecimientoId);
 

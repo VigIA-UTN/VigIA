@@ -47,6 +47,13 @@ class InvitacionControllerTest {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private dev.vigia.backend.repository.EstadoReproductivoRepository estadoReproductivoRepository;
+    @Autowired
+    private dev.vigia.backend.repository.AnimalRepository animalRepository;
+    @Autowired
+    private dev.vigia.backend.repository.RodeoLoteRepository rodeoLoteRepository;
+
+    @Autowired
     private EstablecimientoRepository establecimientoRepository;
 
     @Autowired
@@ -71,6 +78,9 @@ class InvitacionControllerTest {
     @BeforeEach
     @SuppressWarnings("null")
     void setUp() throws Exception {
+        estadoReproductivoRepository.deleteAll();
+        animalRepository.deleteAll();
+        rodeoLoteRepository.deleteAll();
         invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();

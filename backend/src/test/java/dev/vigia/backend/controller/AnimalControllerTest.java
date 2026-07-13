@@ -11,8 +11,9 @@ import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
-import dev.vigia.backend.repository.RodeoRepository;
+import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
 import jakarta.transaction.Transactional;
@@ -54,13 +55,15 @@ class AnimalControllerTest {
     @Autowired
     private AnimalRepository animalRepository;
     @Autowired
-    private RodeoRepository rodeoRepository;
+    private RodeoLoteRepository rodeoLoteRepository;
     @Autowired
     private InvitacionRepository invitacionRepository;
     @Autowired
     private EstablecimientoRepository establecimientoRepository;
     @Autowired
     private UsuarioRepository usuarioRepository;
+    @Autowired
+    private EstadoReproductivoRepository estadoReproductivoRepository;
 
     private Long establecimientoId;
     private Long rodeoLoteId;
@@ -72,8 +75,9 @@ class AnimalControllerTest {
     @SuppressWarnings("null")
     void setUp() throws Exception {
         // Orden correcto de borrado (hijos primero)
+        estadoReproductivoRepository.deleteAll();
         animalRepository.deleteAll();
-        rodeoRepository.deleteAll();
+        rodeoLoteRepository.deleteAll();
         invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
@@ -110,11 +114,11 @@ class AnimalControllerTest {
         est = establecimientoRepository.save(est);
         establecimientoId = est.getId();
 
-        // Rodeo Lote en el establecimiento
-        RodeoLote rodeo = new RodeoLote(est);
-        rodeo.setNombre("Rodeo Base");
-        rodeo = rodeoRepository.save(rodeo);
-        rodeoLoteId = rodeo.getId();
+        // RodeoLote Lote en el establecimiento
+        RodeoLote rodeoLote = new RodeoLote(est);
+        rodeoLote.setNombre("Rodeo Base");
+        rodeoLote = rodeoLoteRepository.save(rodeoLote);
+        rodeoLoteId = rodeoLote.getId();
 
         // Tokens
         productorToken = getTokenFor("productor@vigia.dev", "prod123");
@@ -157,7 +161,7 @@ class AnimalControllerTest {
     // =========================================================================
 
     @Test
-    @DisplayName("POST /api/v1/animales/crear - Productor carga animal con rodeo exitosamente")
+    @DisplayName("POST /api/v1/animales/crear - Productor carga animal con rodeoLote exitosamente")
     @SuppressWarnings("null")
     void cargarAnimal_conRodeo_success() throws Exception {
         AnimalRequest req = new AnimalRequest();
@@ -181,7 +185,7 @@ class AnimalControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/animales/crear - Productor carga animal sin rodeo (rodeoLoteId null)")
+    @DisplayName("POST /api/v1/animales/crear - Productor carga animal sin rodeoLote (rodeoLoteId null)")
     @SuppressWarnings("null")
     void cargarAnimal_sinRodeo_success() throws Exception {
         AnimalRequest req = new AnimalRequest();
@@ -527,8 +531,8 @@ class AnimalControllerTest {
     @DisplayName("GET /api/v1/animales/rodeoLote/{id} - Productor lista animales del rodeo")
     @SuppressWarnings("null")
     void getAnimalesByRodeoLote_asProductor_success() throws Exception {
-        crearAnimal("Animal Rodeo 1", establecimientoId, rodeoLoteId);
-        crearAnimal("Animal Rodeo 2", establecimientoId, rodeoLoteId);
+        crearAnimal("Animal RodeoLote 1", establecimientoId, rodeoLoteId);
+        crearAnimal("Animal RodeoLote 2", establecimientoId, rodeoLoteId);
 
         mockMvc.perform(get("/api/v1/animales/rodeoLote/" + rodeoLoteId)
                 .header("Authorization", "Bearer " + productorToken))
@@ -545,7 +549,7 @@ class AnimalControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/animales/rodeoLote/{id} - Productor ajeno al establecimiento del rodeo recibe 400")
+    @DisplayName("GET /api/v1/animales/rodeoLote/{id} - Productor ajeno al establecimiento del rodeoLote recibe 400")
     @SuppressWarnings("null")
     void getAnimalesByRodeoLote_productorAjeno_badRequest() throws Exception {
         Usuario otroProductor = new Usuario();
