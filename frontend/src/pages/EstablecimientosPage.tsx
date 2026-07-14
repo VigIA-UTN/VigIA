@@ -41,7 +41,7 @@ export default function EstablecimientosPage() {
 
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [establecimientoDetail, setEstablecimientoDetail] = useState<EstablecimientoResponse | null>(null);
-  
+
   const [lotesDetalle, setLotesDetalle] = useState<RodeoLoteResponse[]>([]);
   const [loadingLotes, setLoadingLotes] = useState(false);
   const [nuevoLoteNombre, setNuevoLoteNombre] = useState('');
@@ -204,7 +204,7 @@ export default function EstablecimientosPage() {
                         try {
                           const allLotes = await getRodeoLotes();
                           setLotesDetalle(allLotes.filter(l => l.establecimientoId === est.id));
-                        } catch (err) {
+                        } catch {
                           setErrorLote('Error al cargar lotes');
                         } finally {
                           setLoadingLotes(false);
@@ -387,7 +387,7 @@ export default function EstablecimientosPage() {
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h5 className="mb-0">Lotes</h5>
             </div>
-            
+
             {errorLote && <Alert variant="danger">{errorLote}</Alert>}
 
             <Form onSubmit={async (e) => {

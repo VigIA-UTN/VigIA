@@ -6,7 +6,6 @@
 .animales-title {
     color: #1E3A5F;
     font-weight: 600;
-<<<<<<< HEAD
     font-size: 2rem;
 }
 
@@ -70,12 +69,6 @@
 }
 
 /* Table */
-=======
-    margin-bottom: 30px;
-    font-size: 2rem;
-}
-
->>>>>>> listado_y_alta_animales
 .animales-table-wrapper {
     background-color: transparent;
     border-radius: 0;
@@ -89,11 +82,7 @@
 }
 
 .animales-table th {
-<<<<<<< HEAD
     border-bottom: 1px solid #bbb;
-=======
-    border-bottom: 1px solid #333;
->>>>>>> listado_y_alta_animales
     padding: 16px 12px;
     color: #333;
     font-weight: 600;
@@ -101,7 +90,6 @@
 }
 
 .animales-table td {
-<<<<<<< HEAD
     padding: 14px 12px;
     vertical-align: middle;
     text-align: center;
@@ -125,30 +113,12 @@
     display: inline-block;
     min-width: 80px;
     text-transform: uppercase;
-=======
-    padding: 16px 12px;
-    vertical-align: middle;
-    text-align: center;
-    color: #555;
-}
-
-.animales-table tr {
-    border-bottom: 0px;
-}
-
-.estado-badge {
-    font-weight: 700;
-    font-size: 0.9rem;
-    display: inline-block;
-    min-width: 80px;
->>>>>>> listado_y_alta_animales
 }
 
 .badge-activo {
     color: #1E3A5F;
 }
 
-<<<<<<< HEAD
 .badge-con-alerta {
     color: #d97706;
 }
@@ -247,9 +217,3 @@
 .btn-guardar-animal:hover {
     background-color: #7ab332 !important;
 }
-
-=======
-.badge-inactivo {
-    color: #888;
-}
->>>>>>> listado_y_alta_animales
