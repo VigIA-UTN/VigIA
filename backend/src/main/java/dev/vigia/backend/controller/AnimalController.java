@@ -31,7 +31,7 @@ public class AnimalController {
     private final AnimalService animalService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','PRODUCTOR','VETERINARIO','CAMPERO')")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> listarAnimales(Authentication authentication) {
         try {
             String email = authentication.getName();
