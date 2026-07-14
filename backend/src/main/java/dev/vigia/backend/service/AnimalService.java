@@ -14,7 +14,5 @@ public interface AnimalService {
 
     List<AnimalResponse> getAllAnimales();
 
-    List<AnimalResponse> getAnimalesByEstablecimiento(Long establecimientoId, String emailUsuario);
-
-    List<AnimalResponse> getAnimalesByRodeoLote(Long rodeoLoteId, String emailUsuario);
+    List<AnimalResponse> listarAnimales(String emailUsuario);
 }

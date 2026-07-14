@@ -28,9 +28,15 @@ public class AnimalController {
     private final AnimalService animalService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<List<AnimalResponse>> getAllAnimales(Authentication authentication) {
-        return ResponseEntity.ok(animalService.getAllAnimales());
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR','PRODUCTOR','VETERINARIO','CAMPERO')")
+    public ResponseEntity<?> listarAnimales(Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<AnimalResponse> response = animalService.listarAnimales(email);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping("/{id}")
@@ -48,7 +54,7 @@ public class AnimalController {
         }
     }
 
-    @PostMapping("/crear")
+    @PostMapping
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> cargarAnimal(
             @Valid @RequestBody AnimalRequest request,
@@ -75,35 +81,6 @@ public class AnimalController {
             return ResponseEntity.ok().body("Animal desactivado exitosamente");
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
-
-    @GetMapping("/establecimiento/{id}")
-    @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<List<AnimalResponse>> getAnimalesByEstablecimiento(
-            @PathVariable("id") Long establecimientoId,
-            Authentication authentication) {
-        try {
-            String emailProductor = authentication.getName();
-            List<AnimalResponse> response = animalService.getAnimalesByEstablecimiento(establecimientoId,
-                    emailProductor);
-            return ResponseEntity.ok().body(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(null);
-        }
-    }
-
-    @GetMapping("/rodeoLote/{id}")
-    @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<List<AnimalResponse>> getAnimalesByRodeoLote(
-            @PathVariable("id") Long rodeoLoteId,
-            Authentication authentication) {
-        try {
-            String emailProductor = authentication.getName();
-            List<AnimalResponse> response = animalService.getAnimalesByRodeoLote(rodeoLoteId, emailProductor);
-            return ResponseEntity.ok().body(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(null);
         }
     }
 }

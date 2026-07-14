@@ -1,6 +1,7 @@
 package dev.vigia.backend.service.impl;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -9,7 +10,7 @@ import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
-import dev.vigia.backend.model.RodeoLote;
+import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
@@ -56,6 +57,7 @@ public class AnimalSerciveImpl implements AnimalService {
                                                 ? rodeoLoteRepository.findById(request.getRodeoLoteId()).get()
                                                 : null);
 
+                animal.setIdCaravanaOficial(request.getIdCaravanaOficial());
                 animal.setAlias(request.getAlias());
                 animal.setFechaNacimiento(request.getFechaNacimiento());
                 animal.setRaza(request.getRaza());
@@ -120,59 +122,63 @@ public class AnimalSerciveImpl implements AnimalService {
                 return animales.stream().map(this::mapToResponse).toList();
         }
 
-        @Override
-        @SuppressWarnings("null")
-        public List<AnimalResponse> getAnimalesByEstablecimiento(Long establecimientoId, String emailUsuario) {
-                Usuario productorUser = usuarioRepository.findByEmail(emailUsuario)
-                                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
-
-                Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
-                                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
-
-                boolean esProductorOEmpleadoDelEstablecimiento = establecimiento.getEmpleados().stream()
-                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
-
-                if (!esProductorOEmpleadoDelEstablecimiento) {
-                        throw new IllegalArgumentException(
-                                        "El productor no pertenece a este establecimiento o no está activo.");
-                }
-
-                List<Animal> animales = animalRepository.findByEstablecimientoId(establecimiento.getId());
-                return animales.stream().map(this::mapToResponse).toList();
-        }
-
-        @Override
-        @SuppressWarnings("null")
-        public List<AnimalResponse> getAnimalesByRodeoLote(Long rodeoLoteId, String emailUsuario) {
-                Usuario productorUser = usuarioRepository.findByEmail(emailUsuario)
-                                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
-
-                RodeoLote rodeoLote = rodeoLoteRepository.findById(rodeoLoteId)
-                                .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
-
-                Establecimiento establecimiento = rodeoLote.getEstablecimiento();
-
-                boolean esProductorOEmpleadoDelEstablecimiento = establecimiento.getEmpleados().stream()
-                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
-
-                if (!esProductorOEmpleadoDelEstablecimiento) {
-                        throw new IllegalArgumentException(
-                                        "El productor no pertenece a este establecimiento o no está activo.");
-                }
-
-                List<Animal> animales = animalRepository.findByRodeoLoteId(rodeoLoteId);
-                return animales.stream().map(this::mapToResponse).toList();
-        }
-
         private AnimalResponse mapToResponse(Animal animal) {
+                EstadoReproductivo ultimoEstado = animal.getEstadosReproductivos().stream()
+                                .findFirst()
+                                .orElse(null);
+
                 return AnimalResponse.builder()
                                 .id(animal.getId())
+                                .idCaravanaOficial(animal.getIdCaravanaOficial())
                                 .alias(animal.getAlias())
                                 .fechaNacimiento(animal.getFechaNacimiento())
                                 .raza(animal.getRaza())
                                 .estadoActual(animal.getEstadoActual())
+                                .rodeoLoteId(animal.getRodeoLote() != null ? animal.getRodeoLote().getId() : null)
+                                .rodeoLoteNombre(animal.getRodeoLote() != null ? animal.getRodeoLote().getNombre()
+                                                : null)
+                                .establecimientoId(
+                                                animal.getEstablecimiento() != null
+                                                                ? animal.getEstablecimiento().getId()
+                                                                : null)
                                 .fechaAlta(animal.getFechaAlta())
+                                .estadoReproductivo(ultimoEstado != null ? ultimoEstado.getEstado() : null)
+                                .fechaUltimoParto(ultimoEstado != null ? ultimoEstado.getFechaUltParto() : null)
+                                .fechaUltimaInseminacion(
+                                                ultimoEstado != null ? ultimoEstado.getFechaUltInseminacion() : null)
                                 .build();
+        }
+
+        @Override
+        public List<AnimalResponse> listarAnimales(String emailUsuario) {
+
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                if (usuario.getRol().equals(Rol.ADMINISTRADOR)) {
+                        return animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO)
+                                        .stream()
+                                        .map(this::mapToResponse)
+                                        .collect(Collectors.toList());
+                }
+
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                if (establecimientos.isEmpty()) {
+                        throw new IllegalArgumentException(
+                                        "El usuario no pertenece a ningún establecimiento activo.");
+                }
+
+                List<Long> establecimientoIds = establecimientos.stream()
+                                .map(Establecimiento::getId)
+                                .collect(Collectors.toList());
+
+                return animalRepository
+                                .findByEstablecimientoIdInAndEstadoActualNot(establecimientoIds, EstadoAnimal.INACTIVO)
+                                .stream()
+                                .map(this::mapToResponse)
+                                .collect(Collectors.toList());
         }
 
 }

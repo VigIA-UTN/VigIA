@@ -3,11 +3,14 @@ package dev.vigia.backend.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AuthRequest;
+import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
+import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
+import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
@@ -16,6 +19,7 @@ import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -64,12 +68,16 @@ class AnimalControllerTest {
     private UsuarioRepository usuarioRepository;
     @Autowired
     private EstadoReproductivoRepository estadoReproductivoRepository;
+    @Autowired
+    private EntityManager entityManager;
 
     private Long establecimientoId;
     private Long rodeoLoteId;
 
     private String productorToken;
     private String adminToken;
+    private String veterinarioToken;
+    private String camperoToken;
 
     @BeforeEach
     @SuppressWarnings("null")
@@ -102,7 +110,25 @@ class AnimalControllerTest {
         productor.setActivo(true);
         productor = usuarioRepository.save(productor);
 
-        // Establecimiento con productor como empleado activo
+        // Veterinario activo
+        Usuario veterinario = new Usuario();
+        veterinario.setEmail("veterinario@vigia.dev");
+        veterinario.setPasswordHash(passwordEncoder.encode("vet123"));
+        veterinario.setNombre("Veterinario");
+        veterinario.setRol(Rol.VETERINARIO);
+        veterinario.setActivo(true);
+        veterinario = usuarioRepository.save(veterinario);
+
+        // Campero activo
+        Usuario campero = new Usuario();
+        campero.setEmail("campero@vigia.dev");
+        campero.setPasswordHash(passwordEncoder.encode("camp123"));
+        campero.setNombre("Campero");
+        campero.setRol(Rol.CAMPERO);
+        campero.setActivo(true);
+        campero = usuarioRepository.save(campero);
+
+        // Establecimiento con todos los roles operativos como empleados activos
         Establecimiento est = new Establecimiento();
         est.setNombre("Estancia Test");
         est.setLatitud(-34.0);
@@ -111,10 +137,12 @@ class AnimalControllerTest {
         est.setFechaAlta(LocalDate.now());
         est.setEmpleados(new ArrayList<>());
         est.getEmpleados().add(new Empleado(est, productor));
+        est.getEmpleados().add(new Empleado(est, veterinario));
+        est.getEmpleados().add(new Empleado(est, campero));
         est = establecimientoRepository.save(est);
         establecimientoId = est.getId();
 
-        // RodeoLote Lote en el establecimiento
+        // RodeoLote en el establecimiento
         RodeoLote rodeoLote = new RodeoLote(est);
         rodeoLote.setNombre("Rodeo Base");
         rodeoLote = rodeoLoteRepository.save(rodeoLote);
@@ -123,6 +151,8 @@ class AnimalControllerTest {
         // Tokens
         productorToken = getTokenFor("productor@vigia.dev", "prod123");
         adminToken = getTokenFor("admin@vigia.dev", "admin123");
+        veterinarioToken = getTokenFor("veterinario@vigia.dev", "vet123");
+        camperoToken = getTokenFor("campero@vigia.dev", "camp123");
     }
 
     @SuppressWarnings("null")
@@ -136,9 +166,15 @@ class AnimalControllerTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("token").asText();
     }
 
-    /** Crea un animal via API y devuelve su id. */
+    /** Crea un animal ACTIVO via API (como productor) y devuelve su id. */
     @SuppressWarnings("null")
     private Long crearAnimal(String nombre, Long estId, Long rodeoId) throws Exception {
+        return crearAnimalConToken(nombre, estId, rodeoId, productorToken);
+    }
+
+    /** Crea un animal ACTIVO via API con el token indicado y devuelve su id. */
+    @SuppressWarnings("null")
+    private Long crearAnimalConToken(String nombre, Long estId, Long rodeoId, String token) throws Exception {
         AnimalRequest req = new AnimalRequest();
         req.setAlias(nombre);
         req.setEstablecimientoId(estId);
@@ -147,8 +183,8 @@ class AnimalControllerTest {
         req.setFechaNacimiento(LocalDate.of(2022, 1, 1));
         req.setRaza("Angus");
 
-        MvcResult result = mockMvc.perform(post("/api/v1/animales/crear")
-                .header("Authorization", "Bearer " + productorToken)
+        MvcResult result = mockMvc.perform(post("/api/v1/animales")
+                .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated())
@@ -157,8 +193,9 @@ class AnimalControllerTest {
     }
 
     // =========================================================================
-    // POST /api/v1/animales/crear
+    // POST /api/v1/animales
     // =========================================================================
+
 
     @Test
     @DisplayName("POST /api/v1/animales/crear - Productor carga animal con rodeoLote exitosamente")
@@ -172,7 +209,7 @@ class AnimalControllerTest {
         req.setFechaNacimiento(LocalDate.of(2021, 5, 10));
         req.setRaza("Hereford");
 
-        mockMvc.perform(post("/api/v1/animales/crear")
+        mockMvc.perform(post("/api/v1/animales")
                 .header("Authorization", "Bearer " + productorToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
@@ -196,7 +233,7 @@ class AnimalControllerTest {
         req.setFechaNacimiento(LocalDate.of(2020, 3, 15));
         req.setRaza("Criolla");
 
-        mockMvc.perform(post("/api/v1/animales/crear")
+        mockMvc.perform(post("/api/v1/animales")
                 .header("Authorization", "Bearer " + productorToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
@@ -215,7 +252,7 @@ class AnimalControllerTest {
         req.setEstablecimientoId(establecimientoId);
         req.setEstadoActual(EstadoAnimal.ACTIVO);
 
-        mockMvc.perform(post("/api/v1/animales/crear")
+        mockMvc.perform(post("/api/v1/animales")
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
@@ -233,7 +270,7 @@ class AnimalControllerTest {
         req.setEstablecimientoId(establecimientoId);
         req.setEstadoActual(EstadoAnimal.ACTIVO);
 
-        mockMvc.perform(post("/api/v1/animales/crear")
+        mockMvc.perform(post("/api/v1/animales")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isForbidden());
@@ -248,7 +285,7 @@ class AnimalControllerTest {
         req.setEstablecimientoId(9999L);
         req.setEstadoActual(EstadoAnimal.ACTIVO);
 
-        mockMvc.perform(post("/api/v1/animales/crear")
+        mockMvc.perform(post("/api/v1/animales")
                 .header("Authorization", "Bearer " + productorToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
@@ -274,7 +311,7 @@ class AnimalControllerTest {
         req.setEstablecimientoId(otroEst.getId());
         req.setEstadoActual(EstadoAnimal.ACTIVO);
 
-        mockMvc.perform(post("/api/v1/animales/crear")
+        mockMvc.perform(post("/api/v1/animales")
                 .header("Authorization", "Bearer " + productorToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
@@ -291,7 +328,7 @@ class AnimalControllerTest {
         req.setRodeoLoteId(9999L);
         req.setEstadoActual(EstadoAnimal.ACTIVO);
 
-        mockMvc.perform(post("/api/v1/animales/crear")
+        mockMvc.perform(post("/api/v1/animales")
                 .header("Authorization", "Bearer " + productorToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
@@ -299,15 +336,73 @@ class AnimalControllerTest {
     }
 
     // =========================================================================
-    // GET /api/v1/animales
+    // GET /api/v1/animales — listarAnimales
     // =========================================================================
 
     @Test
-    @DisplayName("GET /api/v1/animales - Admin lista todos los animales")
+    @DisplayName("GET /api/v1/animales - Productor ve los animales de su establecimiento")
     @SuppressWarnings("null")
-    void getAllAnimales_asAdmin_success() throws Exception {
-        crearAnimal("Animal 1", establecimientoId, rodeoLoteId);
-        crearAnimal("Animal 2", establecimientoId, rodeoLoteId);
+    void listarAnimales_asProductor_retornaAnimalesDelEstablecimiento() throws Exception {
+        crearAnimal("Vaca 1", establecimientoId, rodeoLoteId);
+        crearAnimal("Vaca 2", establecimientoId, null);
+
+        mockMvc.perform(get("/api/v1/animales")
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/animales - Veterinario ve los animales de su establecimiento")
+    @SuppressWarnings("null")
+    void listarAnimales_asVeterinario_retornaAnimalesDelEstablecimiento() throws Exception {
+        crearAnimal("Toro Vet", establecimientoId, rodeoLoteId);
+
+        mockMvc.perform(get("/api/v1/animales")
+                .header("Authorization", "Bearer " + veterinarioToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].alias").value("Toro Vet"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/animales - Campero ve los animales de su establecimiento")
+    @SuppressWarnings("null")
+    void listarAnimales_asCampero_retornaAnimalesDelEstablecimiento() throws Exception {
+        crearAnimal("Toro Camp", establecimientoId, rodeoLoteId);
+
+        mockMvc.perform(get("/api/v1/animales")
+                .header("Authorization", "Bearer " + camperoToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/animales - Admin ve todos los animales del sistema")
+    @SuppressWarnings("null")
+    void listarAnimales_asAdmin_retornaTodosLosAnimales() throws Exception {
+        // Segundo productor con su propio establecimiento
+        Usuario otroProductor = new Usuario();
+        otroProductor.setEmail("otro@vigia.dev");
+        otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+        otroProductor.setNombre("Otro");
+        otroProductor.setRol(Rol.PRODUCTOR);
+        otroProductor.setActivo(true);
+        otroProductor = usuarioRepository.save(otroProductor);
+
+        Establecimiento otroEst = new Establecimiento();
+        otroEst.setNombre("Otro Campo");
+        otroEst.setLatitud(-35.0);
+        otroEst.setLongitud(-59.0);
+        otroEst.setActivo(true);
+        otroEst.setFechaAlta(LocalDate.now());
+        otroEst.setEmpleados(new ArrayList<>());
+        otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+        final Establecimiento savedOtroEst = establecimientoRepository.save(otroEst);
+        final String otroToken = getTokenFor("otro@vigia.dev", "otro123");
+
+        crearAnimal("Animal Est1", establecimientoId, rodeoLoteId);
+        crearAnimalConToken("Animal Est2", savedOtroEst.getId(), null, otroToken);
 
         mockMvc.perform(get("/api/v1/animales")
                 .header("Authorization", "Bearer " + adminToken))
@@ -316,16 +411,139 @@ class AnimalControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/animales - Productor recibe 403 Forbidden")
-    void getAllAnimales_asProductor_forbidden() throws Exception {
+    @DisplayName("GET /api/v1/animales - No devuelve animales INACTIVOS")
+    @SuppressWarnings("null")
+    void listarAnimales_noRetornaAnimalesInactivos() throws Exception {
+        Long animalInactivoId = crearAnimal("Animal Inactivo", establecimientoId, rodeoLoteId);
+        crearAnimal("Animal Activo", establecimientoId, rodeoLoteId);
+
+        mockMvc.perform(delete("/api/v1/animales/" + animalInactivoId)
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk());
+
         mockMvc.perform(get("/api/v1/animales")
                 .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].alias").value("Animal Activo"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/animales - Incluye animales con estado CON_ALERTA")
+    @SuppressWarnings("null")
+    void listarAnimales_incluyeAnimalesConAlerta() throws Exception {
+        Animal conAlerta = new Animal(establecimientoRepository.findById(establecimientoId).get(), null);
+        conAlerta.setAlias("Con Alerta");
+        conAlerta.setEstadoActual(EstadoAnimal.CON_ALERTA);
+        animalRepository.save(conAlerta);
+
+        crearAnimal("Normal", establecimientoId, rodeoLoteId);
+
+        mockMvc.perform(get("/api/v1/animales")
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/animales - No devuelve animales de otros establecimientos")
+    @SuppressWarnings("null")
+    void listarAnimales_noRetornaAnimalesDeOtroEstablecimiento() throws Exception {
+        crearAnimal("Mi Animal", establecimientoId, rodeoLoteId);
+
+        Usuario otroProductor = new Usuario();
+        otroProductor.setEmail("otro@vigia.dev");
+        otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+        otroProductor.setNombre("Otro");
+        otroProductor.setRol(Rol.PRODUCTOR);
+        otroProductor.setActivo(true);
+        otroProductor = usuarioRepository.save(otroProductor);
+
+        Establecimiento otroEst = new Establecimiento();
+        otroEst.setNombre("Otro Campo");
+        otroEst.setLatitud(-35.0);
+        otroEst.setLongitud(-59.0);
+        otroEst.setActivo(true);
+        otroEst.setFechaAlta(LocalDate.now());
+        otroEst.setEmpleados(new ArrayList<>());
+        otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+        final Establecimiento savedOtroEst = establecimientoRepository.save(otroEst);
+        final String otroToken = getTokenFor("otro@vigia.dev", "otro123");
+
+        crearAnimalConToken("Animal Ajeno", savedOtroEst.getId(), null, otroToken);
+
+        mockMvc.perform(get("/api/v1/animales")
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].alias").value("Mi Animal"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/animales - Retorna los campos mínimos requeridos (incluye rodeoLoteNombre)")
+    @SuppressWarnings("null")
+    void listarAnimales_retornaCamposRequeridos() throws Exception {
+        crearAnimal("Toro Campos", establecimientoId, rodeoLoteId);
+
+        mockMvc.perform(get("/api/v1/animales")
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").exists())
+                .andExpect(jsonPath("$[0].alias").value("Toro Campos"))
+                .andExpect(jsonPath("$[0].raza").value("Angus"))
+                .andExpect(jsonPath("$[0].rodeoLoteId").value(rodeoLoteId))
+                .andExpect(jsonPath("$[0].rodeoLoteNombre").value("Rodeo Base"))
+                .andExpect(jsonPath("$[0].estadoActual").value("ACTIVO"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/animales - Retorna el último estado reproductivo del animal")
+    @SuppressWarnings("null")
+    void listarAnimales_conEstadoReproductivo_retornaCamposCelo() throws Exception {
+        Long animalId = crearAnimal("Vaca Reproductiva", establecimientoId, rodeoLoteId);
+        Animal animal = animalRepository.findById(animalId).get();
+
+        // Estado reproductivo más antiguo (no debe aparecer)
+        EstadoReproductivo estadoViejo = new EstadoReproductivo();
+        estadoViejo.setAnimal(animal);
+        estadoViejo.setEstado(TipoReproductivo.GESTANTE);
+        estadoViejo.setFechaRegistro(java.time.LocalDateTime.now().minusDays(30));
+        estadoReproductivoRepository.save(estadoViejo);
+
+        // Estado reproductivo más reciente (debe aparecer en el response)
+        EstadoReproductivo estadoActual = new EstadoReproductivo();
+        estadoActual.setAnimal(animal);
+        estadoActual.setEstado(TipoReproductivo.VACIA);
+        estadoActual.setFechaUltParto(LocalDate.of(2025, 7, 1));
+        estadoActual.setFechaUltInseminacion(LocalDate.of(2026, 7, 1));
+        estadoActual.setFechaRegistro(java.time.LocalDateTime.now());
+        estadoReproductivoRepository.save(estadoActual);
+
+        // Flush y clear: vacia la caché L1 de Hibernate para que el @EntityGraph
+        // recargue la colección estadosReproductivos desde la BD
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/v1/animales")
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].estadoReproductivo").value("VACIA"))
+                .andExpect(jsonPath("$[0].fechaUltimoParto").value("2025-07-01"))
+                .andExpect(jsonPath("$[0].fechaUltimaInseminacion").value("2026-07-01"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/animales - Lista vacía cuando no hay animales activos")
+    void listarAnimales_sinAnimales_retornaListaVacia() throws Exception {
+        mockMvc.perform(get("/api/v1/animales")
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
     @DisplayName("GET /api/v1/animales - Sin autenticación recibe 403")
-    void getAllAnimales_sinAuth_forbidden() throws Exception {
+    void listarAnimales_sinAuth_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/animales"))
                 .andExpect(status().isForbidden());
     }
@@ -460,128 +678,5 @@ class AnimalControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // =========================================================================
-    // GET /api/v1/animales/establecimiento/{id}
-    // =========================================================================
 
-    @Test
-    @DisplayName("GET /api/v1/animales/establecimiento/{id} - Productor lista animales de su establecimiento")
-    @SuppressWarnings("null")
-    void getAnimalesByEstablecimiento_asProductor_success() throws Exception {
-        crearAnimal("Animal Est 1", establecimientoId, rodeoLoteId);
-        crearAnimal("Animal Est 2", establecimientoId, null);
-
-        mockMvc.perform(get("/api/v1/animales/establecimiento/" + establecimientoId)
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/animales/establecimiento/{id} - Establecimiento inexistente retorna 400")
-    void getAnimalesByEstablecimiento_inexistente_badRequest() throws Exception {
-        mockMvc.perform(get("/api/v1/animales/establecimiento/9999")
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/animales/establecimiento/{id} - Productor ajeno al establecimiento recibe 400")
-    @SuppressWarnings("null")
-    void getAnimalesByEstablecimiento_productorAjeno_badRequest() throws Exception {
-        // Crear segundo productor sin vínculo al establecimiento base
-        Usuario otroProductor = new Usuario();
-        otroProductor.setEmail("otro@vigia.dev");
-        otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
-        otroProductor.setNombre("Otro");
-        otroProductor.setRol(Rol.PRODUCTOR);
-        otroProductor.setActivo(true);
-        otroProductor = usuarioRepository.save(otroProductor);
-
-        Establecimiento otroEst = new Establecimiento();
-        otroEst.setNombre("Otro Campo");
-        otroEst.setLatitud(-36.0);
-        otroEst.setLongitud(-60.0);
-        otroEst.setActivo(true);
-        otroEst.setFechaAlta(LocalDate.now());
-        otroEst.setEmpleados(new ArrayList<>());
-        otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
-        establecimientoRepository.save(otroEst);
-
-        String otroToken = getTokenFor("otro@vigia.dev", "otro123");
-
-        mockMvc.perform(get("/api/v1/animales/establecimiento/" + establecimientoId)
-                .header("Authorization", "Bearer " + otroToken))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/animales/establecimiento/{id} - Admin recibe 403")
-    void getAnimalesByEstablecimiento_asAdmin_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/animales/establecimiento/" + establecimientoId)
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isForbidden());
-    }
-
-    // =========================================================================
-    // GET /api/v1/animales/rodeoLote/{id}
-    // =========================================================================
-
-    @Test
-    @DisplayName("GET /api/v1/animales/rodeoLote/{id} - Productor lista animales del rodeo")
-    @SuppressWarnings("null")
-    void getAnimalesByRodeoLote_asProductor_success() throws Exception {
-        crearAnimal("Animal RodeoLote 1", establecimientoId, rodeoLoteId);
-        crearAnimal("Animal RodeoLote 2", establecimientoId, rodeoLoteId);
-
-        mockMvc.perform(get("/api/v1/animales/rodeoLote/" + rodeoLoteId)
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/animales/rodeoLote/{id} - RodeoLote inexistente retorna 400")
-    void getAnimalesByRodeoLote_inexistente_badRequest() throws Exception {
-        mockMvc.perform(get("/api/v1/animales/rodeoLote/9999")
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/animales/rodeoLote/{id} - Productor ajeno al establecimiento del rodeoLote recibe 400")
-    @SuppressWarnings("null")
-    void getAnimalesByRodeoLote_productorAjeno_badRequest() throws Exception {
-        Usuario otroProductor = new Usuario();
-        otroProductor.setEmail("otro@vigia.dev");
-        otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
-        otroProductor.setNombre("Otro");
-        otroProductor.setRol(Rol.PRODUCTOR);
-        otroProductor.setActivo(true);
-        otroProductor = usuarioRepository.save(otroProductor);
-
-        Establecimiento otroEst = new Establecimiento();
-        otroEst.setNombre("Otro Campo");
-        otroEst.setLatitud(-36.0);
-        otroEst.setLongitud(-60.0);
-        otroEst.setActivo(true);
-        otroEst.setFechaAlta(LocalDate.now());
-        otroEst.setEmpleados(new ArrayList<>());
-        otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
-        establecimientoRepository.save(otroEst);
-
-        String otroToken = getTokenFor("otro@vigia.dev", "otro123");
-
-        mockMvc.perform(get("/api/v1/animales/rodeoLote/" + rodeoLoteId)
-                .header("Authorization", "Bearer " + otroToken))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/animales/rodeoLote/{id} - Admin recibe 403")
-    void getAnimalesByRodeoLote_asAdmin_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/animales/rodeoLote/" + rodeoLoteId)
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isForbidden());
-    }
 }

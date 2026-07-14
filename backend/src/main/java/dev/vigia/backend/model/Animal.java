@@ -1,6 +1,8 @@
 package dev.vigia.backend.model;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -45,6 +47,10 @@ public class Animal {
 
     @Column(name = "fecha_alta")
     private LocalDate fechaAlta;
+
+    @OneToMany(mappedBy = "animal", fetch = FetchType.LAZY)
+    @OrderBy("fechaRegistro DESC")
+    private List<EstadoReproductivo> estadosReproductivos = new ArrayList<>();
 
     public Animal(Establecimiento establecimiento, RodeoLote rodeoLote) {
         this.establecimiento = establecimiento;
