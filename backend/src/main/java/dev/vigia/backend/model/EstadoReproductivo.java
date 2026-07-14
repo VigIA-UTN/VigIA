@@ -1,5 +1,8 @@
 package dev.vigia.backend.model;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -28,14 +31,14 @@ public class EstadoReproductivo {
     private TipoReproductivo estado;
 
     @Column(name = "fecha_ultimo_parto")
-    private java.time.LocalDate fechaUltParto;
+    private LocalDate fechaUltParto;
 
     @Column(name = "fecha_ultima_inseminacion")
-    private java.time.LocalDate fechaUltInseminacion;
+    private LocalDate fechaUltInseminacion;
 
     @Enumerated(EnumType.STRING)
     private OrigenEstado origen;
 
     @Column(name = "fecha_registro")
-    private java.time.LocalDateTime fechaRegistro;
+    private LocalDateTime fechaRegistro;
 }

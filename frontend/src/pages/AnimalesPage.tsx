@@ -109,7 +109,7 @@ export default function AnimalesPage() {
                         </button>
                     </div>
                     <div className="animales-header-right">
-                        <Button className="btn-vigia-primary" onClick={() => {}}>
+                        <Button className="btn-vigia-primary" onClick={() => { }}>
                             <i className="bi bi-upload" /> Cargar CSV
                         </Button>
                         <Button className="btn-vigia-primary" onClick={openModal}>
@@ -130,47 +130,49 @@ export default function AnimalesPage() {
 
                 {error && <Alert variant="danger" className="mt-3">{error}</Alert>}
 
-                {loading ? (
-                    <div className="text-center mt-5">
-                        <Spinner animation="border" style={{ color: '#1E3A5F' }} />
-                    </div>
-                ) : (
-                    <div className="animales-table-wrapper">
-                        <table className="animales-table">
-                            <thead>
-                                <tr>
-                                    <th>Identificador</th>
-                                    <th>Nombre</th>
-                                    <th>Fecha Nacimiento</th>
-                                    <th>Raza</th>
-                                    <th>Rodeo</th>
-                                    <th>Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredAnimales.length === 0 ? (
+                {
+                    loading ? (
+                        <div className="text-center mt-5">
+                            <Spinner animation="border" style={{ color: '#1E3A5F' }} />
+                        </div>
+                    ) : (
+                        <div className="animales-table-wrapper">
+                            <table className="animales-table">
+                                <thead>
                                     <tr>
-                                        <td colSpan={6} className="text-center py-4 text-muted">
-                                            No se encontraron animales.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredAnimales.map(a => (
-                                        <tr key={a.id}>
-                                            <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
-                                            <td>{a.alias || '—'}</td>
-                                            <td>{formatFecha(a.fechaNacimiento)}</td>
-                                            <td>{a.raza || '—'}</td>
-                                            <td>{a.rodeoLoteId ? `#${String(a.rodeoLoteId).padStart(2, '0')}` : '—'}</td>
-                                            <td><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </Container>
+                                        <th>Identificador</th>
+                                        <th>Nombre</th>
+                                        <th>Fecha Nacimiento</th>
+                                        <th>Raza</th>
+                                        <th>Rodeo</th>
+                                        <th>Estado</th>
+                                    </tr >
+                                </thead >
+                                <tbody>
+                                    {filteredAnimales.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="text-center py-4 text-muted">
+                                                No se encontraron animales.
+                                            </td>
+                                        </tr >
+                                    ) : (
+                                        filteredAnimales.map(a => (
+                                            <tr key={a.id}>
+                                                <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
+                                                <td>{a.alias || '—'}</td>
+                                                <td>{formatFecha(a.fechaNacimiento)}</td>
+                                                <td>{a.raza || '—'}</td>
+                                                <td>{a.rodeoLoteId ? `#${String(a.rodeoLoteId).padStart(2, '0')}` : '—'}</td>
+                                                <td><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody >
+                            </table >
+                        </div >
+                    )
+                }
+            </Container >
 
             <Modal show={showModal} onHide={() => setShowModal(false)} centered dialogClassName="modal-nuevo-animal">
                 <Modal.Header closeButton>
@@ -216,6 +218,6 @@ export default function AnimalesPage() {
                     </Button>
                 </Modal.Footer>
             </Modal>
-        </div>
+        </div >
     );
 }

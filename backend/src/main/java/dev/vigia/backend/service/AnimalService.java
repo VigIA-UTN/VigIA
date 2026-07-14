@@ -4,6 +4,8 @@ import java.util.List;
 
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
+import dev.vigia.backend.dto.EstadoReproductivoRequest;
+import dev.vigia.backend.dto.EstadoReproductivoResponse;
 
 public interface AnimalService {
     AnimalResponse cargarAnimal(String emailProductor, AnimalRequest request);
@@ -14,7 +16,11 @@ public interface AnimalService {
 
     List<AnimalResponse> getAllAnimales();
 
-    List<AnimalResponse> getAnimalesByEstablecimiento(Long establecimientoId, String emailUsuario);
+    List<AnimalResponse> listarAnimales(String emailUsuario);
 
-    List<AnimalResponse> getAnimalesByRodeoLote(Long rodeoLoteId, String emailUsuario);
+    EstadoReproductivoResponse registrarEstadoReproductivo(Long animalId, String emailProductor,
+            EstadoReproductivoRequest request);
+
+    EstadoReproductivoResponse editarEstadoReproductivo(Long animalId, Long estadoId, String emailProductor,
+            EstadoReproductivoRequest request);
 }

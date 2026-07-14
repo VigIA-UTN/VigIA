@@ -10,12 +10,15 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
+import dev.vigia.backend.dto.EstadoReproductivoRequest;
+import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.service.AnimalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,9 +31,15 @@ public class AnimalController {
     private final AnimalService animalService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<List<AnimalResponse>> getAllAnimales(Authentication authentication) {
-        return ResponseEntity.ok(animalService.getAllAnimales());
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarAnimales(Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<AnimalResponse> response = animalService.listarAnimales(email);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping("/{id}")
@@ -48,7 +57,7 @@ public class AnimalController {
         }
     }
 
-    @PostMapping("/crear")
+    @PostMapping
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> cargarAnimal(
             @Valid @RequestBody AnimalRequest request,
@@ -78,32 +87,38 @@ public class AnimalController {
         }
     }
 
-    @GetMapping("/establecimiento/{id}")
+    @PostMapping("/{id}/estado-reproductivo")
     @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<List<AnimalResponse>> getAnimalesByEstablecimiento(
-            @PathVariable("id") Long establecimientoId,
+    public ResponseEntity<?> registrarEstadoReproductivo(
+            @PathVariable("id") Long animalId,
+            @Valid @RequestBody EstadoReproductivoRequest request,
             Authentication authentication) {
+
         try {
             String emailProductor = authentication.getName();
-            List<AnimalResponse> response = animalService.getAnimalesByEstablecimiento(establecimientoId,
-                    emailProductor);
-            return ResponseEntity.ok().body(response);
+            EstadoReproductivoResponse response = animalService.registrarEstadoReproductivo(animalId, emailProductor,
+                    request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(null);
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
-    @GetMapping("/rodeoLote/{id}")
+    @PutMapping("/{id}/estado-reproductivo/{estadoId}")
     @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<List<AnimalResponse>> getAnimalesByRodeoLote(
-            @PathVariable("id") Long rodeoLoteId,
+    public ResponseEntity<?> editarEstadoReproductivo(
+            @PathVariable("id") Long animalId,
+            @PathVariable("estadoId") Long estadoId,
+            @Valid @RequestBody dev.vigia.backend.dto.EstadoReproductivoRequest request,
             Authentication authentication) {
+
         try {
             String emailProductor = authentication.getName();
-            List<AnimalResponse> response = animalService.getAnimalesByRodeoLote(rodeoLoteId, emailProductor);
-            return ResponseEntity.ok().body(response);
+            dev.vigia.backend.dto.EstadoReproductivoResponse response = animalService.editarEstadoReproductivo(animalId,
+                    estadoId, emailProductor, request);
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(null);
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 }
