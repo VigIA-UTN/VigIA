@@ -11,8 +11,11 @@ import {
   activarEstablecimiento
 } from '../api/establecimientosApi';
 import type { EstablecimientoResponse } from '../api/establecimientosApi';
+import { getRodeoLotes, crearRodeoLote } from '../api/rodeoLotesApi';
+import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import './EstablecimientosPage.css';
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { useAuthStore } from '../store/authStore';
 
 const schema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
@@ -23,6 +26,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function EstablecimientosPage() {
+  const rol = useAuthStore(state => state.rol);
   const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +41,12 @@ export default function EstablecimientosPage() {
 
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [establecimientoDetail, setEstablecimientoDetail] = useState<EstablecimientoResponse | null>(null);
+  
+  const [lotesDetalle, setLotesDetalle] = useState<RodeoLoteResponse[]>([]);
+  const [loadingLotes, setLoadingLotes] = useState(false);
+  const [nuevoLoteNombre, setNuevoLoteNombre] = useState('');
+  const [creandoLote, setCreandoLote] = useState(false);
+  const [errorLote, setErrorLote] = useState<string | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -140,9 +150,11 @@ export default function EstablecimientosPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ maxWidth: '300px' }}
             />
-            <Button className="btn-vigia-primary text-nowrap" onClick={handleShowModal}>
-              + Nuevo
-            </Button>
+            {rol === 'ADMINISTRADOR' && (
+              <Button className="btn-vigia-primary text-nowrap" onClick={handleShowModal}>
+                + Nuevo
+              </Button>
+            )}
           </div>
         </div>
 
@@ -184,9 +196,19 @@ export default function EstablecimientosPage() {
                     </div>
 
                     <div className="card-actions">
-                      <Button variant="light" className="btn-vigia-primary w-100" onClick={() => {
-                        setShowDetailModal(true);
+                      <Button variant="light" className="btn-vigia-primary w-100" onClick={async () => {
                         setEstablecimientoDetail(est);
+                        setShowDetailModal(true);
+                        setLoadingLotes(true);
+                        setErrorLote(null);
+                        try {
+                          const allLotes = await getRodeoLotes();
+                          setLotesDetalle(allLotes.filter(l => l.establecimientoId === est.id));
+                        } catch (err) {
+                          setErrorLote('Error al cargar lotes');
+                        } finally {
+                          setLoadingLotes(false);
+                        }
                       }}>
                         Ver detalle
                       </Button>
@@ -335,21 +357,22 @@ export default function EstablecimientosPage() {
 
       {/* Modal Detalle */}
       {establecimientoDetail && (
-        <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} centered>
+        <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} centered size="lg">
           <Modal.Header closeButton style={{ backgroundColor: '#1E3A5F', color: 'white' }}>
             <Modal.Title>Detalle establecimiento</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <p>Nombre: {establecimientoDetail.nombre}</p>
+            <p><strong>Nombre:</strong> {establecimientoDetail.nombre}</p>
             <div className="location pb-2">
               <i className="bi bi-geo-alt-fill me-2"></i>
-              Lat: {establecimientoDetail.latitud}, Lon: {establecimientoDetail.longitud}
+              <strong>Ubicación:</strong> Lat: {establecimientoDetail.latitud}, Lon: {establecimientoDetail.longitud}
             </div>
             <MapContainer
               center={[establecimientoDetail.latitud, establecimientoDetail.longitud]}
               zoom={14}
               scrollWheelZoom={false}
               className="establishment-map"
+              style={{ height: '300px', marginBottom: '20px' }}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -359,6 +382,63 @@ export default function EstablecimientosPage() {
                 <Popup>Establecimiento: {establecimientoDetail.nombre}</Popup>
               </Marker>
             </MapContainer>
+
+            <hr />
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0">Lotes</h5>
+            </div>
+            
+            {errorLote && <Alert variant="danger">{errorLote}</Alert>}
+
+            <Form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!nuevoLoteNombre.trim()) return;
+              try {
+                setCreandoLote(true);
+                setErrorLote(null);
+                const nuevo = await crearRodeoLote(nuevoLoteNombre, establecimientoDetail.id);
+                setLotesDetalle([...lotesDetalle, nuevo]);
+                setNuevoLoteNombre('');
+              } catch (err) {
+                const axiosError = err as { response?: { data?: string } };
+                setErrorLote(axiosError.response?.data || 'Error al crear lote');
+              } finally {
+                setCreandoLote(false);
+              }
+            }} className="mb-3 d-flex gap-2">
+              <Form.Control
+                type="text"
+                placeholder="Nombre del nuevo lote"
+                value={nuevoLoteNombre}
+                onChange={e => setNuevoLoteNombre(e.target.value)}
+                disabled={creandoLote}
+              />
+              <Button type="submit" className="btn-vigia-primary text-nowrap" disabled={creandoLote || !nuevoLoteNombre.trim()}>
+                {creandoLote ? <Spinner size="sm" animation="border" /> : '+ Nuevo Lote'}
+              </Button>
+            </Form>
+
+            {loadingLotes ? (
+              <div className="text-center py-3"><Spinner animation="border" variant="primary" /></div>
+            ) : lotesDetalle.length === 0 ? (
+              <p className="text-muted text-center py-2">No hay lotes en este establecimiento.</p>
+            ) : (
+              <ul className="list-group">
+                {lotesDetalle.map(lote => (
+                  <li key={lote.id} className="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                      <span className="fw-semibold">{lote.nombre}</span>
+                      {lote.activo ? (
+                        <span className="badge bg-success ms-2">Activo</span>
+                      ) : (
+                        <span className="badge bg-secondary ms-2">Inactivo</span>
+                      )}
+                    </div>
+                    <span className="text-muted small">Alta: {new Date(lote.fechaAlta).toLocaleDateString()}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Modal.Body>
         </Modal>
       )}

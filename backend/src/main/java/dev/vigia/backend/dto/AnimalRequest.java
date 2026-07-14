@@ -7,6 +7,7 @@ import lombok.Data;
 
 @Data
 public class AnimalRequest {
+    private String idCaravanaOficial;
     private String alias;
     private LocalDate fechaNacimiento;
     private String sexo;

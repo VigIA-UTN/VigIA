@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class AnimalSerciveImpl implements AnimalService {
+public class AnimalServiceImpl implements AnimalService {
 
         private final AnimalRepository animalRepository;
         private final UsuarioRepository usuarioRepository;
@@ -56,6 +56,7 @@ public class AnimalSerciveImpl implements AnimalService {
                                                 ? rodeoLoteRepository.findById(request.getRodeoLoteId()).get()
                                                 : null);
 
+                animal.setIdCaravanaOficial(request.getIdCaravanaOficial());
                 animal.setAlias(request.getAlias());
                 animal.setFechaNacimiento(request.getFechaNacimiento());
                 animal.setRaza(request.getRaza());
@@ -167,10 +168,13 @@ public class AnimalSerciveImpl implements AnimalService {
         private AnimalResponse mapToResponse(Animal animal) {
                 return AnimalResponse.builder()
                                 .id(animal.getId())
+                                .idCaravanaOficial(animal.getIdCaravanaOficial())
                                 .alias(animal.getAlias())
                                 .fechaNacimiento(animal.getFechaNacimiento())
                                 .raza(animal.getRaza())
                                 .estadoActual(animal.getEstadoActual())
+                                .rodeoLoteId(animal.getRodeoLote() != null ? animal.getRodeoLote().getId() : null)
+                                .establecimientoId(animal.getEstablecimiento() != null ? animal.getEstablecimiento().getId() : null)
                                 .fechaAlta(animal.getFechaAlta())
                                 .build();
         }

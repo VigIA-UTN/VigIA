@@ -11,6 +11,7 @@ import AcceptInvitationPage from './pages/AcceptInvitationPage';
 import UsuariosAdminPage from './pages/UsuariosAdminPage';
 import { useAuthStore } from './store/authStore';
 import EmpleadosPage from './pages/EmpleadosPage';
+import AnimalesPage from './pages/AnimalesPage';
 
 function InvitacionesRouter() {
   const rol = useAuthStore(state => state.rol);
@@ -64,6 +65,14 @@ function App() {
           element={
             <ProtectedRoute roles={['PRODUCTOR']}>
               <EmpleadosPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/animales"
+          element={
+            <ProtectedRoute roles={['PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
+              <AnimalesPage />
             </ProtectedRoute>
           }
         />

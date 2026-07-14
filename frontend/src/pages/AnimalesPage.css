@@ -1,0 +1,220 @@
+.animales-container {
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.animales-title {
+    color: #1E3A5F;
+    font-weight: 600;
+    font-size: 2rem;
+}
+
+/* Header row */
+.animales-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.animales-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.animales-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Divider below header */
+.animales-divider {
+    border: none;
+    border-top: 1.5px solid #ccc;
+    margin: 0 0 0 0;
+}
+
+/* Filter toggle buttons */
+.btn-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1.5px solid #ccc;
+    border-radius: 20px;
+    background: transparent;
+    color: #333;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 5px 14px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.btn-filter:hover {
+    border-color: #1E3A5F;
+    background: #f0f4fa;
+    color: #1E3A5F;
+}
+
+.btn-filter.active {
+    border-color: #1E3A5F;
+    background: #e8eef7;
+    color: #1E3A5F;
+}
+
+.btn-filter svg {
+    flex-shrink: 0;
+}
+
+/* Table */
+.animales-table-wrapper {
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.animales-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.animales-table th {
+    border-bottom: 1px solid #bbb;
+    padding: 16px 12px;
+    color: #333;
+    font-weight: 600;
+    text-align: center;
+}
+
+.animales-table td {
+    padding: 14px 12px;
+    vertical-align: middle;
+    text-align: center;
+    color: #555;
+    font-size: 0.9rem;
+}
+
+/* Vertical separators only between td cells */
+.animales-table td:not(:last-child) {
+    border-right: 1px solid #e0e0e0;
+}
+
+.animales-table tbody tr:hover {
+    background-color: #f5f8ff;
+}
+
+/* Estado badge */
+.estado-badge {
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: inline-block;
+    min-width: 80px;
+    text-transform: uppercase;
+}
+
+.badge-activo {
+    color: #1E3A5F;
+}
+
+.badge-con-alerta {
+    color: #d97706;
+}
+
+.badge-inactivo {
+    color: #888;
+}
+
+/* Empty state */
+.animales-empty {
+    text-align: center;
+    color: #999;
+    padding: 48px 0;
+    font-size: 0.95rem;
+}
+
+/* ── Modal "Nuevo Animal" ── dark navy style ──────────────────────────── */
+.modal-nuevo-animal .modal-content {
+    background-color: #1E3A5F;
+    border: 2px solid #4DD0E1;
+    border-radius: 16px;
+    color: white;
+}
+
+.modal-nuevo-animal .modal-title {
+    color: white;
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    width: 100%;
+}
+
+.modal-nuevo-animal .modal-header {
+    border-bottom: none;
+    padding-bottom: 0;
+    justify-content: center;
+}
+
+.modal-nuevo-animal .btn-close {
+    filter: invert(1);
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+}
+
+.modal-nuevo-animal .modal-body {
+    padding: 16px 28px 8px;
+}
+
+.modal-nuevo-animal .modal-footer {
+    border-top: none;
+    padding: 8px 28px 24px;
+    justify-content: center;
+}
+
+.modal-nuevo-animal .form-label {
+    color: #cde;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.modal-nuevo-animal .form-control,
+.modal-nuevo-animal .form-select {
+    background-color: white;
+    color: #1E3A5F;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+}
+
+.modal-nuevo-animal .form-control:focus,
+.modal-nuevo-animal .form-select:focus {
+    border: 2px solid #4DD0E1;
+    box-shadow: none;
+    outline: none;
+}
+
+.modal-nuevo-animal .form-control::placeholder {
+    color: #aaa;
+}
+
+.btn-guardar-animal {
+    background-color: #8CC63F !important;
+    border: none !important;
+    border-radius: 10px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    width: 100%;
+    padding: 12px !important;
+    transition: background 0.2s !important;
+}
+
+.btn-guardar-animal:hover {
+    background-color: #7ab332 !important;
+}
+

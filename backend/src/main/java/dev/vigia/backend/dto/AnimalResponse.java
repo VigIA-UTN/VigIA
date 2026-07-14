@@ -10,6 +10,7 @@ import lombok.Data;
 @Builder
 public class AnimalResponse {
     private Long id;
+    private String idCaravanaOficial;
     private String alias;
     private LocalDate fechaNacimiento;
     private String sexo;
