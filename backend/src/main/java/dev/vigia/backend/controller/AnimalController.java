@@ -10,12 +10,15 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
+import dev.vigia.backend.dto.EstadoReproductivoRequest;
+import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.service.AnimalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -79,6 +82,41 @@ public class AnimalController {
             String emailProductor = authentication.getName();
             animalService.desactivarAnimal(animalId, emailProductor);
             return ResponseEntity.ok().body("Animal desactivado exitosamente");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/estado-reproductivo")
+    @PreAuthorize("hasRole('PRODUCTOR')")
+    public ResponseEntity<?> registrarEstadoReproductivo(
+            @PathVariable("id") Long animalId,
+            @Valid @RequestBody EstadoReproductivoRequest request,
+            Authentication authentication) {
+
+        try {
+            String emailProductor = authentication.getName();
+            EstadoReproductivoResponse response = animalService.registrarEstadoReproductivo(animalId, emailProductor,
+                    request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/{id}/estado-reproductivo/{estadoId}")
+    @PreAuthorize("hasRole('PRODUCTOR')")
+    public ResponseEntity<?> editarEstadoReproductivo(
+            @PathVariable("id") Long animalId,
+            @PathVariable("estadoId") Long estadoId,
+            @Valid @RequestBody dev.vigia.backend.dto.EstadoReproductivoRequest request,
+            Authentication authentication) {
+
+        try {
+            String emailProductor = authentication.getName();
+            dev.vigia.backend.dto.EstadoReproductivoResponse response = animalService.editarEstadoReproductivo(animalId,
+                    estadoId, emailProductor, request);
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
