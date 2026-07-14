@@ -53,6 +53,10 @@ public class AnimalSerciveImpl implements AnimalService {
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
+                if (animalRepository.existsByIdCaravanaOficialAndEstablecimientoId(request.getIdCaravanaOficial(), request.getEstablecimientoId())) {
+                        throw new IllegalArgumentException("El identificador ya se encuentra registrado en este establecimiento.");
+                }
+
                 if (request.getRodeoLoteId() != null) {
                         rodeoLoteRepository.findById(request.getRodeoLoteId())
                                         .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));

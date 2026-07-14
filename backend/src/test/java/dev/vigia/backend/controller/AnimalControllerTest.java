@@ -36,6 +36,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -177,6 +178,7 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         private Long crearAnimalConToken(String nombre, Long estId, Long rodeoId, String token) throws Exception {
                 AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial(UUID.randomUUID().toString());
                 req.setAlias(nombre);
                 req.setEstablecimientoId(estId);
                 req.setRodeoLoteId(rodeoId);
@@ -202,6 +204,7 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void cargarAnimal_conRodeo_success() throws Exception {
                 AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial("CARAVANA-123");
                 req.setAlias("Toro 1");
                 req.setEstablecimientoId(establecimientoId);
                 req.setRodeoLoteId(rodeoLoteId);
@@ -222,13 +225,14 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/animales/crear - Productor carga animal sin rodeoLote (rodeoLoteId null)")
+        @DisplayName("POST /api/v1/animales/crear - Productor carga animal sin rodeoLote retorna 400 (rodeo es obligatorio)")
         @SuppressWarnings("null")
-        void cargarAnimal_sinRodeo_success() throws Exception {
+        void cargarAnimal_sinRodeo_badRequest() throws Exception {
                 AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial("CARAVANA-456");
                 req.setAlias("Vaca Sin Rodeo");
                 req.setEstablecimientoId(establecimientoId);
-                req.setRodeoLoteId(null);
+                req.setRodeoLoteId(null); // It is now @NotNull
                 req.setEstadoActual(EstadoAnimal.ACTIVO);
                 req.setFechaNacimiento(LocalDate.of(2020, 3, 15));
                 req.setRaza("Criolla");
@@ -237,10 +241,42 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(req)))
-                                .andExpect(status().isCreated())
-                                .andExpect(jsonPath("$.alias").value("Vaca Sin Rodeo"));
+                                .andExpect(status().isBadRequest());
+        }
 
-                assertThat(animalRepository.findAll()).hasSize(1);
+        @Test
+        @DisplayName("POST /api/v1/animales/crear - Identificador duplicado en el mismo establecimiento retorna 400")
+        @SuppressWarnings("null")
+        void cargarAnimal_identificadorDuplicado_badRequest() throws Exception {
+                // First animal
+                AnimalRequest req1 = new AnimalRequest();
+                req1.setIdCaravanaOficial("DUP-123");
+                req1.setAlias("Toro Original");
+                req1.setEstablecimientoId(establecimientoId);
+                req1.setRodeoLoteId(rodeoLoteId);
+                req1.setEstadoActual(EstadoAnimal.ACTIVO);
+                req1.setFechaNacimiento(LocalDate.of(2021, 5, 10));
+
+                mockMvc.perform(post("/api/v1/animales")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req1)))
+                                .andExpect(status().isCreated());
+
+                // Second animal with same idCaravanaOficial
+                AnimalRequest req2 = new AnimalRequest();
+                req2.setIdCaravanaOficial("DUP-123");
+                req2.setAlias("Toro Duplicado");
+                req2.setEstablecimientoId(establecimientoId);
+                req2.setRodeoLoteId(rodeoLoteId);
+                req2.setEstadoActual(EstadoAnimal.ACTIVO);
+                req2.setFechaNacimiento(LocalDate.of(2022, 1, 1));
+
+                mockMvc.perform(post("/api/v1/animales")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req2)))
+                                .andExpect(status().isBadRequest());
         }
 
         @Test
@@ -248,6 +284,9 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void cargarAnimal_asAdmin_forbidden() throws Exception {
                 AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial(UUID.randomUUID().toString());
+                req.setFechaNacimiento(LocalDate.of(2022, 1, 1));
+                req.setRodeoLoteId(rodeoLoteId);
                 req.setAlias("Toro Prohibido");
                 req.setEstablecimientoId(establecimientoId);
                 req.setEstadoActual(EstadoAnimal.ACTIVO);
@@ -266,6 +305,9 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void cargarAnimal_sinAuth_forbidden() throws Exception {
                 AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial(UUID.randomUUID().toString());
+                req.setFechaNacimiento(LocalDate.of(2022, 1, 1));
+                req.setRodeoLoteId(rodeoLoteId);
                 req.setAlias("Toro Anon");
                 req.setEstablecimientoId(establecimientoId);
                 req.setEstadoActual(EstadoAnimal.ACTIVO);
@@ -281,6 +323,9 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void cargarAnimal_establecimientoInexistente_badRequest() throws Exception {
                 AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial(UUID.randomUUID().toString());
+                req.setFechaNacimiento(LocalDate.of(2022, 1, 1));
+                req.setRodeoLoteId(rodeoLoteId);
                 req.setAlias("Toro");
                 req.setEstablecimientoId(9999L);
                 req.setEstadoActual(EstadoAnimal.ACTIVO);
@@ -307,6 +352,9 @@ class AnimalControllerTest {
                 otroEst = establecimientoRepository.save(otroEst);
 
                 AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial(UUID.randomUUID().toString());
+                req.setFechaNacimiento(LocalDate.of(2022, 1, 1));
+                req.setRodeoLoteId(rodeoLoteId);
                 req.setAlias("Toro Ajeno");
                 req.setEstablecimientoId(otroEst.getId());
                 req.setEstadoActual(EstadoAnimal.ACTIVO);
@@ -323,9 +371,11 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void cargarAnimal_rodeoInexistente_badRequest() throws Exception {
                 AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial(UUID.randomUUID().toString());
+                req.setFechaNacimiento(LocalDate.of(2022, 1, 1));
+                req.setRodeoLoteId(9999L);
                 req.setAlias("Toro");
                 req.setEstablecimientoId(establecimientoId);
-                req.setRodeoLoteId(9999L);
                 req.setEstadoActual(EstadoAnimal.ACTIVO);
 
                 mockMvc.perform(post("/api/v1/animales")
@@ -344,7 +394,7 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void listarAnimales_asProductor_retornaAnimalesDelEstablecimiento() throws Exception {
                 crearAnimal("Vaca 1", establecimientoId, rodeoLoteId);
-                crearAnimal("Vaca 2", establecimientoId, null);
+                crearAnimal("Vaca 2", establecimientoId, rodeoLoteId);
 
                 mockMvc.perform(get("/api/v1/animales")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -399,10 +449,15 @@ class AnimalControllerTest {
                 otroEst.setEmpleados(new ArrayList<>());
                 otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
                 final Establecimiento savedOtroEst = establecimientoRepository.save(otroEst);
+
+                RodeoLote otroRodeo = new RodeoLote(savedOtroEst);
+                otroRodeo.setNombre("Otro Rodeo");
+                otroRodeo = rodeoLoteRepository.save(otroRodeo);
+
                 final String otroToken = getTokenFor("otro@vigia.dev", "otro123");
 
                 crearAnimal("Animal Est1", establecimientoId, rodeoLoteId);
-                crearAnimalConToken("Animal Est2", savedOtroEst.getId(), null, otroToken);
+                crearAnimalConToken("Animal Est2", savedOtroEst.getId(), otroRodeo.getId(), otroToken);
 
                 mockMvc.perform(get("/api/v1/animales")
                                 .header("Authorization", "Bearer " + adminToken))
@@ -468,9 +523,14 @@ class AnimalControllerTest {
                 otroEst.setEmpleados(new ArrayList<>());
                 otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
                 final Establecimiento savedOtroEst = establecimientoRepository.save(otroEst);
+
+                RodeoLote otroRodeo = new RodeoLote(savedOtroEst);
+                otroRodeo.setNombre("Otro Rodeo");
+                otroRodeo = rodeoLoteRepository.save(otroRodeo);
+
                 final String otroToken = getTokenFor("otro@vigia.dev", "otro123");
 
-                crearAnimalConToken("Animal Ajeno", savedOtroEst.getId(), null, otroToken);
+                crearAnimalConToken("Animal Ajeno", savedOtroEst.getId(), otroRodeo.getId(), otroToken);
 
                 mockMvc.perform(get("/api/v1/animales")
                                 .header("Authorization", "Bearer " + productorToken))
