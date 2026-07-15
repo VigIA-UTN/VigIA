@@ -164,25 +164,6 @@ public class AnimalServiceImpl implements AnimalService {
 
         @Override
         @SuppressWarnings("null")
-        public List<AnimalResponse> listarAnimalesPorEstablecimiento(String emailUsuario, Long establecimientoId) {
-                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
-                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
-                Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
-                                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
-                boolean esProductorOEmpleadoDelEstablecimiento = establecimiento.getEmpleados().stream()
-                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo());
-                if (!esProductorOEmpleadoDelEstablecimiento && !usuario.getRol().equals(Rol.ADMINISTRADOR)) {
-                        throw new IllegalArgumentException(
-                                        "El productor no pertenece a este establecimiento o no está activo.");
-                }
-                return animalRepository.findByEstablecimientoId(establecimientoId)
-                                .stream()
-                                .map(this::mapToResponse)
-                                .collect(Collectors.toList());
-        }
-
-        @Override
-        @SuppressWarnings("null")
         public List<AnimalResponse> listarAnimales(String emailUsuario) {
 
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)

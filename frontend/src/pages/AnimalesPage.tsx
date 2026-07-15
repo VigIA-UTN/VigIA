@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
-import { getAnimalesByEstablecimiento, crearAnimal } from '../api/animalesApi';
+import { crearAnimal, getAnimales } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest } from '../api/animalesApi';
 import { getEstablecimientos } from '../api/establecimientosApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
@@ -43,7 +43,8 @@ export default function AnimalesPage() {
                 if (!establecimientos.length) { setError('No tenés establecimientos asociados.'); return; }
                 const id = establecimientos[0].id;
                 setEstId(id);
-                setAnimales(await getAnimalesByEstablecimiento(id));
+                const animales = await getAnimales();
+                setAnimales(animales);
             } catch (err) {
                 const e = err as { response?: { data?: { message?: string } } };
                 setError(e.response?.data?.message || 'Error al cargar animales.');

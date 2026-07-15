@@ -18,8 +18,6 @@ public interface AnimalService {
 
         List<AnimalResponse> listarAnimales(String emailUsuario);
 
-        List<AnimalResponse> listarAnimalesPorEstablecimiento(String emailUsuario, Long establecimientoId);
-
         EstadoReproductivoResponse registrarEstadoReproductivo(Long animalId, String emailProductor,
                         EstadoReproductivoRequest request);
 
