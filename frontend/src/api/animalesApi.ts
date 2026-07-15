@@ -11,6 +11,7 @@ export interface AnimalResponse {
   raza: string | null;
   estadoActual: EstadoAnimal;
   rodeoLoteId: number | null;
+  rodeoLoteNombre: string | null;
   establecimientoId: number;
   fechaAlta: string;
 }

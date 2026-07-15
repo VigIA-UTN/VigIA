@@ -134,14 +134,14 @@ class RodeoLoteControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeo-lotes/crear - Productor crea rodeoLote exitosamente")
+        @DisplayName("POST /api/v1/rodeo-lotes - Productor crea rodeoLote exitosamente")
         @SuppressWarnings("null")
         void crearRodeoLote_asProductor_success() throws Exception {
                 RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Verano");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -155,14 +155,14 @@ class RodeoLoteControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeo-lotes/crear - Admin recibe 403 Forbidden")
+        @DisplayName("POST /api/v1/rodeo-lotes - Admin recibe 403 Forbidden")
         @SuppressWarnings("null")
         void crearRodeoLote_asAdmin_forbidden() throws Exception {
                 RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo No Permitido");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + adminToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -172,28 +172,28 @@ class RodeoLoteControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeo-lotes/crear - Sin autenticación recibe 401")
+        @DisplayName("POST /api/v1/rodeo-lotes - Sin autenticación recibe 401")
         @SuppressWarnings("null")
         void crearRodeoLote_sinAutenticacion_unauthorized() throws Exception {
                 RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Anonimo");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeo-lotes/crear - Establecimiento no encontrado retorna 400")
+        @DisplayName("POST /api/v1/rodeo-lotes - Establecimiento no encontrado retorna 400")
         @SuppressWarnings("null")
         void crearRodeoLote_establecimientoInexistente_badRequest() throws Exception {
                 RodeoLoteRequest request = new RodeoLoteRequest();
                 request.setNombre("Rodeo Sin Est.");
                 request.setEstablecimientoId(9999L);
 
-                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -201,7 +201,7 @@ class RodeoLoteControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeo-lotes/crear - Productor no pertenece al establecimiento retorna 400")
+        @DisplayName("POST /api/v1/rodeo-lotes - Productor no pertenece al establecimiento retorna 400")
         @SuppressWarnings("null")
         void crearRodeoLote_productorNoPertenece_badRequest() throws Exception {
                 // Crear otro establecimiento sin vincular al productor
@@ -218,7 +218,7 @@ class RodeoLoteControllerTest {
                 request.setNombre("Rodeo Ajeno");
                 request.setEstablecimientoId(otroEst.getId());
 
-                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -226,7 +226,7 @@ class RodeoLoteControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeo-lotes/crear - Productor inactivo en establecimiento retorna 400")
+        @DisplayName("POST /api/v1/rodeo-lotes - Productor inactivo en establecimiento retorna 400")
         @SuppressWarnings("null")
         void crearRodeoLote_productorInactivo_badRequest() throws Exception {
                 // Crear un segundo productor inactivo en el establecimiento
@@ -250,7 +250,7 @@ class RodeoLoteControllerTest {
                 request.setNombre("Rodeo Inactivo");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + tokenInactivo)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -266,7 +266,7 @@ class RodeoLoteControllerTest {
                 request.setNombre("Rodeo Admin View");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -287,7 +287,7 @@ class RodeoLoteControllerTest {
                 request.setNombre("Rodeo Propio");
                 request.setEstablecimientoId(establecimientoId);
 
-                mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -316,7 +316,7 @@ class RodeoLoteControllerTest {
                 request.setNombre("Rodeo Get By Id");
                 request.setEstablecimientoId(establecimientoId);
 
-                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -359,7 +359,7 @@ class RodeoLoteControllerTest {
                 request.setNombre("Rodeo Para Eliminar");
                 request.setEstablecimientoId(establecimientoId);
 
-                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -412,7 +412,7 @@ class RodeoLoteControllerTest {
                 request.setNombre("Rodeo Ajeno Delete");
                 request.setEstablecimientoId(establecimientoId);
 
-                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeo-lotes/crear")
+                MvcResult createResult = mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))

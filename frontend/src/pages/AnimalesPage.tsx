@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
 import { crearAnimal, getAnimales } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest } from '../api/animalesApi';
-import { getEstablecimientos } from '../api/establecimientosApi';
+import { getEstablecimientos, type EstablecimientoResponse } from '../api/establecimientosApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
+import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
 
 function formatFecha(iso: string | null) {
     if (!iso) return '—';
@@ -36,11 +37,18 @@ export default function AnimalesPage() {
     const [form, setForm] = useState<Partial<AnimalRequest>>({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO' });
     const [rodeoLotes, setRodeoLotes] = useState<RodeoLoteResponse[]>([]);
 
+    const [createRodeoModal, setCreateRodeoModal] = useState(false);
+    const [submittingRodeo, setSubmittingRodeo] = useState(false);
+    const [formErrorRodeo, setFormErrorRodeo] = useState<string | null>(null);
+    const [formRodeo, setFormRodeo] = useState<Partial<RodeoRequest>>({ nombre: '', establecimientoId: undefined });
+    const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
+
     useEffect(() => {
         (async () => {
             try {
                 const establecimientos = await getEstablecimientos();
                 if (!establecimientos.length) { setError('No tenés establecimientos asociados.'); return; }
+                setEstablecimientos(establecimientos);
                 const id = establecimientos[0].id;
                 setEstId(id);
                 const animales = await getAnimales();
@@ -73,6 +81,28 @@ export default function AnimalesPage() {
             setFormError(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al crear el animal.');
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleChangeRodeo = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setFormRodeo(prev => ({ ...prev, [name]: value || null }));
+    };
+
+    const handleSubmitRodeo = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!estId) return;
+        setFormErrorRodeo(null);
+        setSubmittingRodeo(true);
+        try {
+            const nuevo = await crearRodeo({ ...formRodeo, establecimientoId: estId } as RodeoRequest);
+            setRodeoLotes(prev => [nuevo, ...prev]);
+            setCreateRodeoModal(false);
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setFormErrorRodeo(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al crear el rodeo.');
+        } finally {
+            setSubmittingRodeo(false);
         }
     };
 
@@ -110,6 +140,9 @@ export default function AnimalesPage() {
                         </button>
                     </div>
                     <div className="animales-header-right">
+                        <Button className="btn-vigia-primary" onClick={() => setCreateRodeoModal(true)}>
+                            <i className="bi bi-plus-lg" /> Rodeo
+                        </Button>
                         <Button className="btn-vigia-primary" onClick={() => { }}>
                             <i className="bi bi-upload" /> Cargar CSV
                         </Button>
@@ -216,6 +249,39 @@ export default function AnimalesPage() {
                 <Modal.Footer>
                     <Button type="submit" form="form-nuevo-animal" disabled={submitting} className="btn-guardar-animal">
                         {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Modal show={createRodeoModal} onHide={() => setCreateRodeoModal(false)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Nuevo Rodeo</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {formErrorRodeo && <Alert variant="danger">{formErrorRodeo}</Alert>}
+                    <Form onSubmit={handleSubmitRodeo} id="form-nuevo-rodeo">
+                        <Form.Group className="mb-3">
+                            <Form.Label>Nombre*</Form.Label>
+                            <Form.Control name="nombre" type="text" placeholder="Ej: #F4829" value={formRodeo.nombre ?? ''} onChange={handleChangeRodeo} required />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Establecimiento</Form.Label>
+                            <Form.Select
+                                name="establecimientoId"
+                                value={formRodeo.establecimientoId ?? ''}
+                                onChange={handleChangeRodeo}
+                            >
+                                <option value="">Seleccioná una opción</option>
+                                {establecimientos.map(e => (
+                                    <option key={e.id} value={e.id}>{e.nombre}</option>
+                                ))}
+                            </Form.Select>
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button type="submit" form="form-nuevo-rodeo" disabled={submittingRodeo} className="btn-guardar-animal">
+                        {submittingRodeo ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
                     </Button>
                 </Modal.Footer>
             </Modal>

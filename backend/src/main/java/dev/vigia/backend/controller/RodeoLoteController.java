@@ -38,7 +38,7 @@ public class RodeoLoteController {
 
     }
 
-    @PostMapping("/crear")
+    @PostMapping
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> generarRodeoLote(
             @Valid @RequestBody RodeoLoteRequest request,
