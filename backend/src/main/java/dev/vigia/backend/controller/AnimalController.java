@@ -42,6 +42,20 @@ public class AnimalController {
         }
     }
 
+    @GetMapping("/establecimiento/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarAnimalesPorEstablecimiento(
+            @PathVariable("id") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<AnimalResponse> response = animalService.listarAnimalesPorEstablecimiento(email, establecimientoId);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<AnimalResponse> getAnimalById(

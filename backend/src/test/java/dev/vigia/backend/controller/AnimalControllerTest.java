@@ -840,4 +840,95 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$.estado").value("GESTANTE"));
         }
 
+        // =========================================================================
+        // GET /api/v1/animales/establecimiento/{id}
+        // =========================================================================
+
+        @Test
+        @DisplayName("GET /api/v1/animales/establecimiento/{id} - Productor obtiene animales de su establecimiento exitosamente")
+        @SuppressWarnings("null")
+        void listarAnimalesPorEstablecimiento_asProductor_success() throws Exception {
+                crearAnimal("Animal Est 1", establecimientoId, rodeoLoteId);
+                crearAnimal("Animal Est 2", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/establecimiento/" + establecimientoId)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(2))
+                                .andExpect(jsonPath("$[0].establecimientoId").value(establecimientoId))
+                                .andExpect(jsonPath("$[1].establecimientoId").value(establecimientoId));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/establecimiento/{id} - Veterinario obtiene animales de su establecimiento exitosamente")
+        @SuppressWarnings("null")
+        void listarAnimalesPorEstablecimiento_asVeterinario_success() throws Exception {
+                crearAnimal("Animal Est Vet", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/establecimiento/" + establecimientoId)
+                                .header("Authorization", "Bearer " + veterinarioToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].alias").value("Animal Est Vet"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/establecimiento/{id} - Campero obtiene animales de su establecimiento exitosamente")
+        @SuppressWarnings("null")
+        void listarAnimalesPorEstablecimiento_asCampero_success() throws Exception {
+                crearAnimal("Animal Est Camp", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/establecimiento/" + establecimientoId)
+                                .header("Authorization", "Bearer " + camperoToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].alias").value("Animal Est Camp"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/establecimiento/{id} - Admin obtiene animales de cualquier establecimiento")
+        @SuppressWarnings("null")
+        void listarAnimalesPorEstablecimiento_asAdmin_success() throws Exception {
+                crearAnimal("Animal Admin Est", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/establecimiento/" + establecimientoId)
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/establecimiento/{id} - Usuario no pertenece al establecimiento retorna 400")
+        @SuppressWarnings("null")
+        void listarAnimalesPorEstablecimiento_usuarioNoPertenece_badRequest() throws Exception {
+                // Crear otro establecimiento sin nuestro productor
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst = establecimientoRepository.save(otroEst);
+
+                mockMvc.perform(get("/api/v1/animales/establecimiento/" + otroEst.getId())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/establecimiento/{id} - Establecimiento inexistente retorna 400")
+        void listarAnimalesPorEstablecimiento_inexistente_badRequest() throws Exception {
+                mockMvc.perform(get("/api/v1/animales/establecimiento/9999")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/establecimiento/{id} - Sin autenticación recibe 403")
+        void listarAnimalesPorEstablecimiento_sinAuth_forbidden() throws Exception {
+                mockMvc.perform(get("/api/v1/animales/establecimiento/" + establecimientoId))
+                                .andExpect(status().isForbidden());
+        }
+
 }

@@ -8,19 +8,21 @@ import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 
 public interface AnimalService {
-    AnimalResponse cargarAnimal(String emailProductor, AnimalRequest request);
+        AnimalResponse cargarAnimal(String emailProductor, AnimalRequest request);
 
-    void desactivarAnimal(Long animalId, String emailProductor);
+        void desactivarAnimal(Long animalId, String emailProductor);
 
-    AnimalResponse getAnimalById(Long animalId, String emailProductor);
+        AnimalResponse getAnimalById(Long animalId, String emailProductor);
 
-    List<AnimalResponse> getAllAnimales();
+        List<AnimalResponse> getAllAnimales();
 
-    List<AnimalResponse> listarAnimales(String emailUsuario);
+        List<AnimalResponse> listarAnimales(String emailUsuario);
 
-    EstadoReproductivoResponse registrarEstadoReproductivo(Long animalId, String emailProductor,
-            EstadoReproductivoRequest request);
+        List<AnimalResponse> listarAnimalesPorEstablecimiento(String emailUsuario, Long establecimientoId);
 
-    EstadoReproductivoResponse editarEstadoReproductivo(Long animalId, Long estadoId, String emailProductor,
-            EstadoReproductivoRequest request);
+        EstadoReproductivoResponse registrarEstadoReproductivo(Long animalId, String emailProductor,
+                        EstadoReproductivoRequest request);
+
+        EstadoReproductivoResponse editarEstadoReproductivo(Long animalId, Long estadoId, String emailProductor,
+                        EstadoReproductivoRequest request);
 }

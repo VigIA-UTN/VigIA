@@ -37,7 +37,7 @@ export async function getAnimalesByRodeoLote(rodeoLoteId: number): Promise<Anima
 }
 
 export async function crearAnimal(data: AnimalRequest): Promise<AnimalResponse> {
-  const response = await axiosClient.post<AnimalResponse>('/animales/crear', data);
+  const response = await axiosClient.post<AnimalResponse>('/animales', data);
   return response.data;
 }
 
