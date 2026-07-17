@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
-import { crearAnimal, getAnimales } from '../api/animalesApi';
+import { cargarAnimalesExcel, crearAnimal, getAnimales } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest } from '../api/animalesApi';
 import { getEstablecimientos, type EstablecimientoResponse } from '../api/establecimientosApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
@@ -25,7 +25,6 @@ export default function AnimalesPage() {
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [estId, setEstId] = useState<number | null>(null);
 
     const [filterCelo, setFilterCelo] = useState(false);
     const [filterSalud, setFilterSalud] = useState(false);
@@ -43,14 +42,17 @@ export default function AnimalesPage() {
     const [formRodeo, setFormRodeo] = useState<Partial<RodeoRequest>>({ nombre: '', establecimientoId: undefined });
     const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
 
+    const [uploadModal, setUploadModal] = useState(false);
+    const [submittingUpload, setSubmittingUpload] = useState(false);
+    const [formErrorUpload, setFormErrorUpload] = useState<string | null>(null);
+    const [fileUpload, setFileUpload] = useState<File | null>(null);
+
     useEffect(() => {
         (async () => {
             try {
                 const establecimientos = await getEstablecimientos();
                 if (!establecimientos.length) { setError('No tenés establecimientos asociados.'); return; }
                 setEstablecimientos(establecimientos);
-                const id = establecimientos[0].id;
-                setEstId(id);
                 const animales = await getAnimales();
                 setAnimales(animales);
             } catch (err) {
@@ -69,11 +71,11 @@ export default function AnimalesPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!estId) return;
+        if (!form.establecimientoId) return;
         setFormError(null);
         setSubmitting(true);
         try {
-            const nuevo = await crearAnimal({ ...form, establecimientoId: estId } as AnimalRequest);
+            const nuevo = await crearAnimal(form as AnimalRequest);
             setAnimales(prev => [nuevo, ...prev]);
             setShowModal(false);
         } catch (err) {
@@ -91,11 +93,11 @@ export default function AnimalesPage() {
 
     const handleSubmitRodeo = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!estId) return;
+        if (!formRodeo.establecimientoId) return;
         setFormErrorRodeo(null);
         setSubmittingRodeo(true);
         try {
-            const nuevo = await crearRodeo({ ...formRodeo, establecimientoId: estId } as RodeoRequest);
+            const nuevo = await crearRodeo(formRodeo as RodeoRequest);
             setRodeoLotes(prev => [nuevo, ...prev]);
             setCreateRodeoModal(false);
         } catch (err) {
@@ -103,6 +105,27 @@ export default function AnimalesPage() {
             setFormErrorRodeo(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al crear el rodeo.');
         } finally {
             setSubmittingRodeo(false);
+        }
+    };
+
+    const handleChangeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        setFileUpload(file ?? null);
+    };
+
+    const handleSubmitUpload = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setFormErrorUpload(null);
+        setSubmittingUpload(true);
+        try {
+            const nuevo = await cargarAnimalesExcel(fileUpload as File);
+            setAnimales(prev => [...prev, ...nuevo]);
+            setUploadModal(false);
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setFormErrorUpload(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al cargar los animales.');
+        } finally {
+            setSubmittingUpload(false);
         }
     };
 
@@ -143,7 +166,7 @@ export default function AnimalesPage() {
                         <Button className="btn-vigia-primary" onClick={() => setCreateRodeoModal(true)}>
                             <i className="bi bi-plus-lg" /> Rodeo
                         </Button>
-                        <Button className="btn-vigia-primary" onClick={() => { }}>
+                        <Button className="btn-vigia-primary" onClick={() => { setUploadModal(true) }}>
                             <i className="bi bi-upload" /> Cargar CSV
                         </Button>
                         <Button className="btn-vigia-primary" onClick={openModal}>
@@ -232,6 +255,19 @@ export default function AnimalesPage() {
                             <Form.Control name="raza" type="text" placeholder="Ej: Holstein" value={form.raza ?? ''} onChange={handleChange} />
                         </Form.Group>
                         <Form.Group className="mb-3">
+                            <Form.Label>Establecimiento</Form.Label>
+                            <Form.Select
+                                name="establecimientoId"
+                                value={form.establecimientoId ?? ''}
+                                onChange={handleChange}
+                            >
+                                <option value="">Seleccioná una opción</option>
+                                {establecimientos.map(e => (
+                                    <option key={e.id} value={e.id}>{e.nombre}</option>
+                                ))}
+                            </Form.Select>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
                             <Form.Label>Lote</Form.Label>
                             <Form.Select
                                 name="rodeoLoteId"
@@ -282,6 +318,26 @@ export default function AnimalesPage() {
                 <Modal.Footer>
                     <Button type="submit" form="form-nuevo-rodeo" disabled={submittingRodeo} className="btn-guardar-animal">
                         {submittingRodeo ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Modal show={uploadModal} onHide={() => setUploadModal(false)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Cargar Animales con Excel</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {formErrorUpload && <Alert variant="danger">{formErrorUpload}</Alert>}
+                    <Form onSubmit={handleSubmitUpload} id="form-cargar-animales">
+                        <Form.Group className="mb-3">
+                            <Form.Label>Archivo*</Form.Label>
+                            <Form.Control name="file" type="file" accept=".xlsx" onChange={handleChangeUpload} required />
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button type="submit" form="form-cargar-animales" disabled={submittingUpload} className="btn-guardar-animal">
+                        {submittingUpload ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
                     </Button>
                 </Modal.Footer>
             </Modal>

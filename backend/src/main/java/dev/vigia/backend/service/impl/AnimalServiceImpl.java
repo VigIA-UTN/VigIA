@@ -1,11 +1,13 @@
 package dev.vigia.backend.service.impl;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
@@ -24,6 +26,7 @@ import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AnimalService;
+import dev.vigia.backend.service.ExcelReaderService;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -35,6 +38,8 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstablecimientoRepository establecimientoRepository;
         private final RodeoLoteRepository rodeoLoteRepository;
         private final EstadoReproductivoRepository estadoReproductivoRepository;
+
+        private final ExcelReaderService excelReaderService;
 
         @Override
         @SuppressWarnings("null")
@@ -337,4 +342,15 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
+        @Override
+        @SuppressWarnings("null")
+        public List<AnimalResponse> cargarAnimalesExcel(MultipartFile file, String emailProductor)
+                        throws IOException {
+
+                List<Animal> animals = excelReaderService.leerYGuardarAnimalesExcel(file, emailProductor);
+
+                return animals.stream()
+                                .map(this::mapToResponse)
+                                .collect(Collectors.toList());
+        }
 }

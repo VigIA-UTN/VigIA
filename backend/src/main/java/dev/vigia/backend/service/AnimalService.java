@@ -1,6 +1,9 @@
 package dev.vigia.backend.service;
 
+import java.io.IOException;
 import java.util.List;
+
+import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
@@ -23,4 +26,7 @@ public interface AnimalService {
 
         EstadoReproductivoResponse editarEstadoReproductivo(Long animalId, Long estadoId, String emailProductor,
                         EstadoReproductivoRequest request);
+
+        List<AnimalResponse> cargarAnimalesExcel(MultipartFile file, String emailProductor)
+                        throws IOException;
 }

@@ -1,5 +1,6 @@
 package dev.vigia.backend.controller;
 
+import java.io.IOException;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -13,7 +14,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
@@ -118,6 +121,23 @@ public class AnimalController {
                     estadoId, emailProductor, request);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/excel")
+    @PreAuthorize("hasRole('PRODUCTOR')")
+    public ResponseEntity<?> cargarAnimalesExcel(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+
+        try {
+            String emailProductor = authentication.getName();
+            List<AnimalResponse> response = animalService.cargarAnimalesExcel(file, emailProductor);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (IOException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

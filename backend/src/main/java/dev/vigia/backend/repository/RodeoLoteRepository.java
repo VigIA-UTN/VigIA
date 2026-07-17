@@ -17,4 +17,7 @@ public interface RodeoLoteRepository extends JpaRepository<RodeoLote, Long> {
     @Query("SELECT r FROM RodeoLote r JOIN r.establecimiento e JOIN e.empleados emp JOIN emp.usuario u WHERE u = :usuario AND emp.activo = true")
     List<RodeoLote> findByEstablecimiento_Empleados_Usuario(Usuario usuario);
 
+    @Query("SELECT r FROM RodeoLote r WHERE r.establecimiento.id = :establecimientoId")
+    List<RodeoLote> findByEstablecimientoID(Long establecimientoId);
+
 }
