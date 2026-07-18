@@ -48,17 +48,17 @@ class EstadoReproductivoCsvServiceTest {
     @Test
     @DisplayName("Falla si faltan columnas en el header")
     void testMissingColumnsHeader() {
-        MockMultipartFile file = createCsv("test.csv", "IdCaravana\nX-123");
+        MockMultipartFile file = createCsv("test.csv", "IdAnimal\n123");
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.parseAndValidate(file));
-        assertEquals("El archivo no tiene las columnas requeridas (IdCaravana, Estado)", ex.getMessage());
+        assertEquals("El archivo no tiene las columnas requeridas (IdAnimal, Estado)", ex.getMessage());
     }
 
     @Test
     @DisplayName("Filas válidas se procesan correctamente")
     void testValidRows() throws IOException {
-        String content = "IdCaravana,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
-                "X-123,GESTANTE,2023-01-01,2023-02-01\n" +
-                "X-124,VACIA,,\n";
+        String content = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+                "123,GESTANTE,2023-01-01,2023-02-01\n" +
+                "124,VACIA,,\n";
         MockMultipartFile file = createCsv("test.csv", content);
 
         EstadoReproductivoParseResult result = service.parseAndValidate(file);
@@ -67,12 +67,12 @@ class EstadoReproductivoCsvServiceTest {
         assertEquals(0, result.getInvalidos().size());
         assertEquals(2, result.getValidos().size());
 
-        assertEquals("X-123", result.getValidos().get(0).getIdCaravanaOficial());
+        assertEquals(123L, result.getValidos().get(0).getAnimalId());
         assertEquals(TipoReproductivo.GESTANTE, result.getValidos().get(0).getEstado());
         assertEquals(LocalDate.of(2023, 1, 1), result.getValidos().get(0).getFechaUltimoParto());
         assertEquals(LocalDate.of(2023, 2, 1), result.getValidos().get(0).getFechaUltimaInseminacion());
 
-        assertEquals("X-124", result.getValidos().get(1).getIdCaravanaOficial());
+        assertEquals(124L, result.getValidos().get(1).getAnimalId());
         assertEquals(TipoReproductivo.VACIA, result.getValidos().get(1).getEstado());
     }
 
@@ -80,10 +80,10 @@ class EstadoReproductivoCsvServiceTest {
     @DisplayName("Manejo de fechas futuras y consistencia")
     void testInvalidDates() throws IOException {
         String futureDate = LocalDate.now().plusDays(1).toString();
-        String content = "IdCaravana,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
-                "X-1,GESTANTE," + futureDate + ",\n" + // Parto futuro
-                "X-2,GESTANTE,," + futureDate + "\n" + // Inseminacion futura
-                "X-3,GESTANTE,2023-02-01,2023-01-01\n"; // Inseminacion antes que parto
+        String content = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+                "1,GESTANTE," + futureDate + ",\n" + // Parto futuro
+                "2,GESTANTE,," + futureDate + "\n" + // Inseminacion futura
+                "3,GESTANTE,2023-02-01,2023-01-01\n"; // Inseminacion antes que parto
 
         MockMultipartFile file = createCsv("test.csv", content);
         EstadoReproductivoParseResult result = service.parseAndValidate(file);
@@ -100,20 +100,22 @@ class EstadoReproductivoCsvServiceTest {
     @Test
     @DisplayName("Estados inválidos o campos vacíos se reportan en la fila")
     void testInvalidFields() throws IOException {
-        String content = "IdCaravana,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+        String content = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
                 ",GESTANTE,,\n" + // Sin ID
-                "X-2,,,\n" + // Sin estado
-                "X-3,ESTADO_FALSO,,\n"; // Estado falso
+                "X-2,GESTANTE,,\n" + // ID invalido (String en vez de Long)
+                "2,,,\n" + // Sin estado
+                "3,ESTADO_FALSO,,\n"; // Estado falso
 
         MockMultipartFile file = createCsv("test.csv", content);
         EstadoReproductivoParseResult result = service.parseAndValidate(file);
 
-        assertEquals(3, result.getProcesados());
+        assertEquals(4, result.getProcesados());
         assertEquals(0, result.getValidos().size());
-        assertEquals(3, result.getInvalidos().size());
+        assertEquals(4, result.getInvalidos().size());
 
-        assertTrue(result.getInvalidos().get(0).getError().contains("IdCaravana es obligatorio"));
-        assertTrue(result.getInvalidos().get(1).getError().contains("Estado es obligatorio"));
-        assertTrue(result.getInvalidos().get(2).getError().contains("Estado inválido"));
+        assertTrue(result.getInvalidos().get(0).getError().contains("IdAnimal es obligatorio"));
+        assertTrue(result.getInvalidos().get(1).getError().contains("IdAnimal debe ser un número entero"));
+        assertTrue(result.getInvalidos().get(2).getError().contains("Estado es obligatorio"));
+        assertTrue(result.getInvalidos().get(3).getError().contains("Estado inválido"));
     }
 }

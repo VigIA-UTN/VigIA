@@ -142,4 +142,20 @@ public class AnimalController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+    @PostMapping("/estado-reproductivo/csv")
+    @PreAuthorize("hasRole('PRODUCTOR')")
+    public ResponseEntity<?> cargarEstadosMasivo(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+
+        try {
+            String emailProductor = authentication.getName();
+            dev.vigia.backend.dto.CargaMasivaEstadoResponse response = animalService.cargarEstadosMasivo(file, emailProductor);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

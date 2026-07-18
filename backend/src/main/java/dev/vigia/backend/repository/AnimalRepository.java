@@ -23,6 +23,7 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
     @EntityGraph(attributePaths = {"rodeoLote", "estadosReproductivos"})
     List<Animal> findByEstadoActualNot(EstadoAnimal estadoActual);
 
+    java.util.Optional<Animal> findByIdCaravanaOficial(String idCaravanaOficial);
+
     boolean existsByIdCaravanaOficialAndEstablecimientoId(String idCaravanaOficial, Long establecimientoId);
 }
-

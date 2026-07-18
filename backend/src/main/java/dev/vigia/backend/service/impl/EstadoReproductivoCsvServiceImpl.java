@@ -74,7 +74,7 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
             
             Row headerRow = sheet.getRow(0);
             if (headerRow == null || headerRow.getPhysicalNumberOfCells() < 2) {
-                throw new IllegalArgumentException("El archivo no tiene las columnas requeridas (IdCaravana, Estado)");
+                throw new IllegalArgumentException("El archivo no tiene las columnas requeridas (IdAnimal, Estado)");
             }
 
             for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
@@ -123,7 +123,7 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
             
             String[] headers = headerLine.split(",");
             if (headers.length < 2) {
-                throw new IllegalArgumentException("El archivo no tiene las columnas requeridas (IdCaravana, Estado)");
+                throw new IllegalArgumentException("El archivo no tiene las columnas requeridas (IdAnimal, Estado)");
             }
 
             String line;
@@ -150,15 +150,23 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
 
     private EstadoReproductivoCsvRequest parseRow(String[] cols) {
         if (cols.length < 2) {
-            throw new IllegalArgumentException("Faltan columnas obligatorias (IdCaravana, Estado)");
+            throw new IllegalArgumentException("Faltan columnas obligatorias (IdAnimal, Estado)");
         }
         
-        String idCaravana = cols[0].trim();
+        String idAnimalStr = cols[0].trim();
         String estadoStr = cols[1].trim();
         
-        if (idCaravana.isEmpty()) {
-            throw new IllegalArgumentException("IdCaravana es obligatorio");
+        if (idAnimalStr.isEmpty()) {
+            throw new IllegalArgumentException("IdAnimal es obligatorio");
         }
+        
+        Long idAnimal;
+        try {
+            idAnimal = Long.parseLong(idAnimalStr);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("IdAnimal debe ser un número entero");
+        }
+        
         if (estadoStr.isEmpty()) {
             throw new IllegalArgumentException("Estado es obligatorio");
         }
@@ -187,7 +195,7 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
         }
         
         return EstadoReproductivoCsvRequest.builder()
-                .idCaravanaOficial(idCaravana)
+                .animalId(idAnimal)
                 .estado(estado)
                 .fechaUltimoParto(fechaParto)
                 .fechaUltimaInseminacion(fechaInseminacion)

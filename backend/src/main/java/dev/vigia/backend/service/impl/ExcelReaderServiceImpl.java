@@ -59,8 +59,8 @@ public class ExcelReaderServiceImpl implements ExcelReaderService {
                     // Crear animal desde la fila
                     Animal animal = createAnimalFromRow(row, email);
 
-                    // Solo agregar si tiene información mínima
-                    if (animal.getIdCaravanaOficial() != null && !animal.getIdCaravanaOficial().isEmpty()) {
+                    // No requerimos IdCaravanaOficial, pero podemos validar que se haya parseado algo básico (ej. rodeo y establecimiento)
+                    if (animal.getEstablecimiento() != null && animal.getRodeoLote() != null) {
                         animals.add(animal);
                     } else {
                         fallidos++;

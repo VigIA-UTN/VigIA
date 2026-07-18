@@ -13,6 +13,10 @@ import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.CargaMasivaResult;
 import dev.vigia.backend.dto.AnimalResponse;
+import dev.vigia.backend.dto.EstadoReproductivoCsvRequest;
+import dev.vigia.backend.dto.EstadoReproductivoParseResult;
+import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
+import dev.vigia.backend.dto.FilaEstadoInvalida;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.model.Animal;
@@ -29,6 +33,8 @@ import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AnimalService;
 import dev.vigia.backend.service.ExcelReaderService;
+import dev.vigia.backend.service.EstadoReproductivoCsvService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -42,6 +48,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstadoReproductivoRepository estadoReproductivoRepository;
 
         private final ExcelReaderService excelReaderService;
+        private final EstadoReproductivoCsvService estadoReproductivoCsvService;
 
         @Override
         @SuppressWarnings("null")
@@ -360,6 +367,63 @@ public class AnimalServiceImpl implements AnimalService {
                                 .fallidos(result.getFallidos())
                                 .exitosos(animalesResponse.size())
                                 .animales(animalesResponse)
+                                .build();
+        }
+
+        @Override
+        @SuppressWarnings("null")
+        @Transactional
+        public CargaMasivaEstadoResponse cargarEstadosMasivo(MultipartFile file, String emailProductor)
+                        throws IOException {
+
+                Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
+
+                EstadoReproductivoParseResult parseResult = estadoReproductivoCsvService.parseAndValidate(file);
+
+                int exitosos = 0;
+                List<FilaEstadoInvalida> errores = parseResult.getInvalidos();
+
+                for (EstadoReproductivoCsvRequest fila : parseResult.getValidos()) {
+                        try {
+                                Animal animal = animalRepository.findById(fila.getAnimalId())
+                                                .orElseThrow(() -> new IllegalArgumentException("Animal con id " + fila.getAnimalId() + " no encontrado."));
+
+                                Establecimiento establecimiento = animal.getEstablecimiento();
+                                boolean productorActivoEnEstablecimiento = establecimiento.getEmpleados().stream()
+                                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
+
+                                if (!productorActivoEnEstablecimiento) {
+                                        throw new IllegalArgumentException("El productor no pertenece al establecimiento del animal.");
+                                }
+
+                                if (animal.getEstadoActual().equals(EstadoAnimal.INACTIVO)) {
+                                        throw new IllegalArgumentException("El animal no está activo.");
+                                }
+
+                                EstadoReproductivo estado = new EstadoReproductivo();
+                                estado.setAnimal(animal);
+                                estado.setUsuarioRegistrador(productorUser);
+                                estado.setEstado(fila.getEstado());
+                                estado.setFechaUltParto(fila.getFechaUltimoParto());
+                                estado.setFechaUltInseminacion(fila.getFechaUltimaInseminacion());
+                                estado.setOrigen(OrigenEstado.CARGA_MASIVA);
+                                estado.setFechaRegistro(LocalDateTime.now());
+
+                                estadoReproductivoRepository.save(estado);
+                                exitosos++;
+                        } catch (Exception e) {
+                                // Find an appropriate row number if possible, or just append with a generic "unknown" row, but wait, we don't have row number in EstadoReproductivoCsvRequest!
+                                // For now just append to invalidos with index -1 or 0
+                                errores.add(new FilaEstadoInvalida(0, fila.getAnimalId() + ": " + e.getMessage()));
+                        }
+                }
+
+                return CargaMasivaEstadoResponse.builder()
+                                .procesados(parseResult.getProcesados())
+                                .exitosos(exitosos)
+                                .fallidos(errores.size())
+                                .errores(errores)
                                 .build();
         }
 }

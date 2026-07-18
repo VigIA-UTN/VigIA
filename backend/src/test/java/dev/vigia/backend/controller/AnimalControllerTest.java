@@ -922,4 +922,46 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().is4xxClientError());
         }
+
+        // =========================================================================
+        // POST /api/v1/animales/estado-reproductivo/csv
+        // =========================================================================
+
+        @Test
+        @DisplayName("POST /api/v1/animales/estado-reproductivo/csv - Carga Exitosa (Productor)")
+        @SuppressWarnings("null")
+        void cargarEstadosExcel_asProductor_success() throws Exception {
+                // Primero creamos el animal para que pueda encontrarlo
+                Animal animal = new Animal();
+                animal.setEstablecimiento(establecimientoRepository.findById(establecimientoId).get());
+                animal.setEstadoActual(EstadoAnimal.ACTIVO);
+                animal.setRaza("Angus");
+                animal = animalRepository.save(animal);
+
+                String csvContent = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+                                animal.getId() + ",GESTANTE,2023-01-01,2023-02-01\n";
+
+                MockMultipartFile file = new MockMultipartFile("file", "estados.csv", "text/csv", csvContent.getBytes());
+
+                mockMvc.perform(multipart("/api/v1/animales/estado-reproductivo/csv")
+                                .file(file)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.procesados").value(1))
+                                .andExpect(jsonPath("$.exitosos").value(1))
+                                .andExpect(jsonPath("$.fallidos").value(0));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/estado-reproductivo/csv - Rechazo por Rol Incorrecto (Admin)")
+        @SuppressWarnings("null")
+        void cargarEstadosExcel_asAdmin_forbidden() throws Exception {
+                String csvContent = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n1,GESTANTE,,\n";
+                MockMultipartFile file = new MockMultipartFile("file", "estados.csv", "text/csv", csvContent.getBytes());
+
+                mockMvc.perform(multipart("/api/v1/animales/estado-reproductivo/csv")
+                                .file(file)
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isForbidden());
+        }
 }
