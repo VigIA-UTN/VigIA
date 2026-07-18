@@ -49,7 +49,7 @@ export async function desactivarAnimal(id: number): Promise<void> {
 export async function cargarAnimalesExcel(file: File): Promise<AnimalResponse[]> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await axiosClient.post<AnimalResponse[]>('/animales/excel', formData, {
+  const response = await axiosClient.post<AnimalResponse[]>('/animales/csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },

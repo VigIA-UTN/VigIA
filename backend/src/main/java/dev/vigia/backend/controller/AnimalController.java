@@ -125,7 +125,7 @@ public class AnimalController {
         }
     }
 
-    @PostMapping("/excel")
+    @PostMapping("/csv")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> cargarAnimalesExcel(
             @RequestParam("file") MultipartFile file,

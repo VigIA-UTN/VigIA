@@ -31,8 +31,9 @@ public class ExcelReaderServiceImpl implements ExcelReaderService {
     public List<Animal> leerYGuardarAnimalesExcel(MultipartFile file, String email) throws IOException {
 
         // Validar que sea un archivo Excel
-        if (!file.getOriginalFilename().toLowerCase().endsWith(".xlsx")
-                && !file.getOriginalFilename().toLowerCase().endsWith(".xls")) {
+        String filename = file.getOriginalFilename();
+        if (filename == null || (!filename.toLowerCase().endsWith(".xlsx")
+                && !filename.toLowerCase().endsWith(".xls"))) {
             throw new IllegalArgumentException("El archivo debe ser un Excel (.xlsx o .xls)");
         }
 
