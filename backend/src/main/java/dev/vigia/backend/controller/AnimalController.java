@@ -91,6 +91,22 @@ public class AnimalController {
         }
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('PRODUCTOR')")
+    public ResponseEntity<?> editarAnimal(
+            @PathVariable("id") Long animalId,
+            @Valid @RequestBody AnimalRequest request,
+            Authentication authentication) {
+
+        try {
+            String emailProductor = authentication.getName();
+            AnimalResponse response = animalService.editarAnimal(animalId, emailProductor, request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PostMapping("/{id}/estado-reproductivo")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> registrarEstadoReproductivo(

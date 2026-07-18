@@ -48,6 +48,23 @@ export default function EmpleadosPage() {
         }
     };
 
+    const [sortField, setSortField] = useState<string | null>(null);
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    const handleSort = (field: string) => {
+        if (sortField === field) {
+            if (sortDirection === 'asc') {
+                setSortDirection('desc');
+            } else {
+                setSortField(null);
+                setSortDirection('asc');
+            }
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
     const filteredEmpleados = empleados.filter(e => {
         const matchesSearch = searchTerm === '' ||
             `${e.nombre} ${e.apellido}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -59,11 +76,27 @@ export default function EmpleadosPage() {
         return matchesSearch && matchesRole;
     });
 
-    return (
-        <div className="empleados-container">
-            <Container>
-                <h2 className="empleados-title">Empleados</h2>
+    const sortedEmpleados = [...filteredEmpleados].sort((a, b) => {
+        if (!sortField) return 0;
+        let valA = a[sortField as keyof UsuarioResponse] as string | number | null;
+        let valB = b[sortField as keyof UsuarioResponse] as string | number | null;
 
+        if (sortField === 'nombre') {
+            valA = `${a.nombre} ${a.apellido}`;
+            valB = `${b.nombre} ${b.apellido}`;
+        }
+
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    return (
+        <div className="vigia-page-container">
+            <Container>
+                <div className="vigia-page-header">
+                    <h2 className="vigia-page-title">Empleados</h2>
+                </div>
                 <div className="d-flex flex-column flex-md-row justify-content-between mb-4 gap-3">
                     <Form.Control
                         type="text"
@@ -91,26 +124,26 @@ export default function EmpleadosPage() {
                         <Spinner animation="border" style={{ color: '#1E3A5F' }} />
                     </div>
                 ) : (
-                    <div className="empleados-table-wrapper">
-                        <table className="empleados-table">
+                    <div className="vigia-table-wrapper">
+                        <table className="vigia-table">
                             <thead>
                                 <tr>
-                                    <th>Nombre Completo</th>
-                                    <th>Email</th>
-                                    <th>Rol</th>
-                                    <th>Establecimiento</th>
+                                    <th onClick={() => handleSort('nombre')} style={{cursor: 'pointer'}}>Nombre Completo {sortField === 'nombre' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                                    <th onClick={() => handleSort('email')} style={{cursor: 'pointer'}}>Email {sortField === 'email' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                                    <th onClick={() => handleSort('rol')} style={{cursor: 'pointer'}}>Rol {sortField === 'rol' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                                    <th onClick={() => handleSort('establecimiento')} style={{cursor: 'pointer'}}>Establecimiento {sortField === 'establecimiento' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredEmpleados.length === 0 ? (
+                                {sortedEmpleados.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="text-center py-4 text-muted">
                                             No se encontraron empleados que coincidan con la búsqueda.
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredEmpleados.map((u) => (
+                                    sortedEmpleados.map((u) => (
                                         <tr key={`${u.id}-${u.establecimientoId}`}>
                                             <td className="fw-medium text-dark">{u.nombre} {u.apellido}</td>
                                             <td>

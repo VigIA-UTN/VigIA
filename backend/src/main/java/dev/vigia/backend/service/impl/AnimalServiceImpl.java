@@ -24,6 +24,7 @@ import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
@@ -92,6 +93,75 @@ public class AnimalServiceImpl implements AnimalService {
 
                 Animal savedAnimal = animalRepository.save(animal);
 
+                return mapToResponse(savedAnimal);
+        }
+
+        @Override
+        @SuppressWarnings("null")
+        public AnimalResponse editarAnimal(Long animalId, String emailProductor, AnimalRequest request) {
+                Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimientoActual = animal.getEstablecimiento();
+                boolean esProductorOEmpleadoDelEstablecimiento = establecimientoActual.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
+
+                if (!esProductorOEmpleadoDelEstablecimiento) {
+                        throw new IllegalArgumentException(
+                                        "El productor no pertenece a este establecimiento o no está activo.");
+                }
+
+                if (animal.getEstadoActual().equals(EstadoAnimal.INACTIVO)) {
+                        throw new IllegalArgumentException("No se puede editar un animal inactivo.");
+                }
+
+                Establecimiento nuevoEstablecimiento = establecimientoActual;
+                if (!request.getEstablecimientoId().equals(establecimientoActual.getId())) {
+                        nuevoEstablecimiento = establecimientoRepository.findById(request.getEstablecimientoId())
+                                        .orElseThrow(() -> new IllegalArgumentException(
+                                                        "Nuevo establecimiento no encontrado."));
+
+                        boolean activoEnNuevoEstablecimiento = nuevoEstablecimiento.getEmpleados().stream()
+                                        .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
+
+                        if (!activoEnNuevoEstablecimiento) {
+                                throw new IllegalArgumentException(
+                                                "El productor no pertenece al nuevo establecimiento destino o no está activo.");
+                        }
+                }
+
+                if (!request.getIdCaravanaOficial().equals(animal.getIdCaravanaOficial()) ||
+                                !request.getEstablecimientoId().equals(establecimientoActual.getId())) {
+
+                        if (animalRepository.existsByIdCaravanaOficialAndEstablecimientoId(
+                                        request.getIdCaravanaOficial(),
+                                        request.getEstablecimientoId())) {
+                                throw new IllegalArgumentException(
+                                                "El identificador ya se encuentra registrado en el establecimiento destino.");
+                        }
+                }
+
+                if (request.getRodeoLoteId() != null) {
+                        RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
+                                        .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                        if (!lote.getEstablecimiento().getId().equals(nuevoEstablecimiento.getId())) {
+                                throw new IllegalArgumentException("El rodeo no pertenece al establecimiento destino.");
+                        }
+                        animal.setRodeoLote(lote);
+                } else {
+                        animal.setRodeoLote(null);
+                }
+
+                animal.setEstablecimiento(nuevoEstablecimiento);
+                animal.setIdCaravanaOficial(request.getIdCaravanaOficial());
+                animal.setAlias(request.getAlias());
+                animal.setFechaNacimiento(request.getFechaNacimiento());
+                animal.setRaza(request.getRaza());
+
+                Animal savedAnimal = animalRepository.save(animal);
                 return mapToResponse(savedAnimal);
         }
 
@@ -387,14 +457,16 @@ public class AnimalServiceImpl implements AnimalService {
                 for (EstadoReproductivoCsvRequest fila : parseResult.getValidos()) {
                         try {
                                 Animal animal = animalRepository.findById(fila.getAnimalId())
-                                                .orElseThrow(() -> new IllegalArgumentException("Animal con id " + fila.getAnimalId() + " no encontrado."));
+                                                .orElseThrow(() -> new IllegalArgumentException("Animal con id "
+                                                                + fila.getAnimalId() + " no encontrado."));
 
                                 Establecimiento establecimiento = animal.getEstablecimiento();
                                 boolean productorActivoEnEstablecimiento = establecimiento.getEmpleados().stream()
                                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                                 if (!productorActivoEnEstablecimiento) {
-                                        throw new IllegalArgumentException("El productor no pertenece al establecimiento del animal.");
+                                        throw new IllegalArgumentException(
+                                                        "El productor no pertenece al establecimiento del animal.");
                                 }
 
                                 if (animal.getEstadoActual().equals(EstadoAnimal.INACTIVO)) {
@@ -413,7 +485,9 @@ public class AnimalServiceImpl implements AnimalService {
                                 estadoReproductivoRepository.save(estado);
                                 exitosos++;
                         } catch (Exception e) {
-                                // Find an appropriate row number if possible, or just append with a generic "unknown" row, but wait, we don't have row number in EstadoReproductivoCsvRequest!
+                                // Find an appropriate row number if possible, or just append with a generic
+                                // "unknown" row, but wait, we don't have row number in
+                                // EstadoReproductivoCsvRequest!
                                 // For now just append to invalidos with index -1 or 0
                                 errores.add(new FilaEstadoInvalida(0, fila.getAnimalId() + ": " + e.getMessage()));
                         }

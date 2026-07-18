@@ -38,6 +38,15 @@ class EstadoReproductivoCsvServiceTest {
     }
 
     @Test
+    @DisplayName("Falla si el archivo excede los 5MB")
+    void testFileTooLarge() {
+        byte[] largeContent = new byte[(5 * 1024 * 1024) + 1]; // 5MB + 1 byte
+        MockMultipartFile file = new MockMultipartFile("file", "test.csv", "text/csv", largeContent);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.parseAndValidate(file));
+        assertEquals("El archivo excede el tamaño máximo permitido (5MB)", ex.getMessage());
+    }
+
+    @Test
     @DisplayName("Falla si la extensión no es válida")
     void testInvalidExtension() {
         MockMultipartFile file = createCsv("test.txt", "header\nvalue");

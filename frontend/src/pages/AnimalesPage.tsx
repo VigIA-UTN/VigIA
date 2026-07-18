@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
-import { cargarAnimalesExcel, crearAnimal, getAnimales } from '../api/animalesApi';
-import type { AnimalResponse, AnimalRequest, CargaMasivaResponse } from '../api/animalesApi';
+import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal } from '../api/animalesApi';
+import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
 import { getEstablecimientos, type EstablecimientoResponse } from '../api/establecimientosApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
@@ -11,7 +12,10 @@ import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
 
 function formatFecha(iso: string | null) {
     if (!iso) return '—';
-    const [y, m] = iso.split('-');
+    const [y, m, d] = iso.split('-');
+    if (d) {
+        return `${d.substring(0, 2)}/${m}/${y}`;
+    }
     return `${m}/${y}`;
 }
 
@@ -22,6 +26,7 @@ function estadoClass(e: string) {
 }
 
 export default function AnimalesPage() {
+    const navigate = useNavigate();
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -47,6 +52,35 @@ export default function AnimalesPage() {
     const [formErrorUpload, setFormErrorUpload] = useState<string | null>(null);
     const [fileUpload, setFileUpload] = useState<File | null>(null);
     const [reporteCarga, setReporteCarga] = useState<CargaMasivaResponse | null>(null);
+
+    const [uploadEstadosModal, setUploadEstadosModal] = useState(false);
+    const [submittingUploadEstados, setSubmittingUploadEstados] = useState(false);
+    const [formErrorUploadEstados, setFormErrorUploadEstados] = useState<string | null>(null);
+    const [fileUploadEstados, setFileUploadEstados] = useState<File | null>(null);
+    const [reporteCargaEstados, setReporteCargaEstados] = useState<CargaMasivaEstadoResponse | null>(null);
+
+    const [sortField, setSortField] = useState<string | null>(null);
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    const fetchAnimales = async () => {
+        try {
+            const data = await getAnimales();
+            setAnimales(data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleDarDeBaja = async (id: number) => {
+        if (!window.confirm("¿Estás seguro de que querés dar de baja a este animal?")) return;
+        try {
+            await desactivarAnimal(id);
+            setAnimales(prev => prev.filter(a => a.id !== id));
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } } };
+            alert(e.response?.data?.message || 'Error al dar de baja el animal.');
+        }
+    };
 
     useEffect(() => {
         (async () => {
@@ -137,7 +171,52 @@ export default function AnimalesPage() {
         setFormErrorUpload(null);
     };
 
+    const handleChangeUploadEstados = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        setFileUploadEstados(file ?? null);
+    };
+
+    const handleSubmitUploadEstados = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!fileUploadEstados) return;
+        setFormErrorUploadEstados(null);
+        setSubmittingUploadEstados(true);
+        try {
+            const result = await cargarEstadosExcel(fileUploadEstados);
+            setReporteCargaEstados(result);
+            await fetchAnimales();
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setFormErrorUploadEstados(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al cargar los estados.');
+        } finally {
+            setSubmittingUploadEstados(false);
+        }
+    };
+
+    const handleCloseUploadEstadosModal = () => {
+        setUploadEstadosModal(false);
+        setReporteCargaEstados(null);
+        setFileUploadEstados(null);
+        setFormErrorUploadEstados(null);
+    };
+
+    const handleSort = (field: string) => {
+        if (sortField === field) {
+            if (sortDirection === 'asc') {
+                setSortDirection('desc');
+            } else {
+                setSortField(null);
+                setSortDirection('asc');
+            }
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
     const filteredAnimales = animales.filter(a => {
+        if (filterCelo && a.estadoReproductivo !== 'CELO') return false;
+        if (filterSalud && a.estadoActual !== 'CON_ALERTA') return false;
         if (!searchTerm) return true;
         const q = searchTerm.toLowerCase();
         return (
@@ -145,6 +224,18 @@ export default function AnimalesPage() {
             (a.alias?.toLowerCase().includes(q) ?? false) ||
             (a.rodeoLoteId !== null && String(a.rodeoLoteId).includes(q))
         );
+    });
+
+    const sortedAnimales = [...filteredAnimales].sort((a, b) => {
+        if (!sortField) return 0;
+        let valA = a[sortField as keyof AnimalResponse] as string | number | null;
+        let valB = b[sortField as keyof AnimalResponse] as string | number | null;
+        if (valA === null || valA === undefined) valA = '';
+        if (valB === null || valB === undefined) valB = '';
+        
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
     });
 
     const openModal = async () => {
@@ -158,11 +249,11 @@ export default function AnimalesPage() {
     };
 
     return (
-        <div className="animales-container">
+        <div className="vigia-page-container">
             <Container>
-                <div className="animales-header">
-                    <div className="animales-header-left">
-                        <h2 className="animales-title mb-0">Animales</h2>
+                <div className="vigia-page-header">
+                    <div className="d-flex align-items-center gap-2">
+                        <h2 className="vigia-page-title">Animales</h2>
                         <button className={`btn-filter${filterCelo ? ' active' : ''}`} onClick={() => setFilterCelo(f => !f)}>
                             <i className="bi bi-search" /> Celo
                         </button>
@@ -170,14 +261,17 @@ export default function AnimalesPage() {
                             <i className="bi bi-heart" /> Salud
                         </button>
                     </div>
-                    <div className="animales-header-right">
-                        <Button className="btn-vigia-primary" onClick={() => setCreateRodeoModal(true)}>
+                    <div className="d-flex align-items-center gap-2">
+                        <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
                             <i className="bi bi-plus-lg" /> Rodeo
                         </Button>
-                        <Button className="btn-vigia-primary" onClick={() => { setUploadModal(true) }}>
+                        <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
+                            <i className="bi bi-upload" /> Cargar Estados
+                        </Button>
+                        <Button className="btn-vigia-success" onClick={() => { setUploadModal(true) }}>
                             <i className="bi bi-upload" /> Cargar CSV
                         </Button>
-                        <Button className="btn-vigia-primary" onClick={openModal}>
+                        <Button className="btn-vigia-success" onClick={openModal}>
                             <i className="bi bi-plus-lg" /> Nuevo
                         </Button>
                     </div>
@@ -201,34 +295,69 @@ export default function AnimalesPage() {
                             <Spinner animation="border" style={{ color: '#1E3A5F' }} />
                         </div>
                     ) : (
-                        <div className="animales-table-wrapper">
-                            <table className="animales-table">
+                        <div className="vigia-table-wrapper">
+                            <table className="vigia-table">
                                 <thead>
                                     <tr>
-                                        <th>Identificador</th>
-                                        <th>Nombre</th>
-                                        <th>Fecha Nacimiento</th>
-                                        <th>Raza</th>
-                                        <th>Rodeo</th>
-                                        <th>Estado</th>
+                                        <th onClick={() => handleSort('idCaravanaOficial')} style={{cursor: 'pointer'}}>
+                                            <div className="d-flex align-items-center justify-content-start">
+                                                Identificador <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'idCaravanaOficial' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                            </div>
+                                        </th>
+                                        <th onClick={() => handleSort('alias')} style={{cursor: 'pointer'}}>
+                                            <div className="d-flex align-items-center justify-content-start">
+                                                Nombre <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'alias' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                            </div>
+                                        </th>
+                                        <th onClick={() => handleSort('fechaNacimiento')} style={{cursor: 'pointer'}}>
+                                            <div className="d-flex align-items-center justify-content-start">
+                                                Fecha Nacimiento <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'fechaNacimiento' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                            </div>
+                                        </th>
+                                        <th onClick={() => handleSort('raza')} style={{cursor: 'pointer'}}>
+                                            <div className="d-flex align-items-center justify-content-start">
+                                                Raza <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'raza' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                            </div>
+                                        </th>
+                                        <th onClick={() => handleSort('rodeoLoteId')} style={{cursor: 'pointer'}}>
+                                            <div className="d-flex align-items-center justify-content-start">
+                                                Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteId' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                            </div>
+                                        </th>
+                                        <th onClick={() => handleSort('estadoActual')} style={{cursor: 'pointer'}}>
+                                            <div className="d-flex align-items-center justify-content-center">
+                                                Estado <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoActual' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                            </div>
+                                        </th>
+                                        <th className="text-center">Acciones</th>
                                     </tr >
                                 </thead >
                                 <tbody>
-                                    {filteredAnimales.length === 0 ? (
+                                    {sortedAnimales.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} className="text-center py-4 text-muted">
+                                            <td colSpan={7} className="text-center py-4 text-muted">
                                                 No se encontraron animales.
                                             </td>
                                         </tr >
                                     ) : (
-                                        filteredAnimales.map(a => (
-                                            <tr key={a.id}>
+                                        sortedAnimales.map(a => (
+                                            <tr key={a.id} className="animal-row">
                                                 <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
                                                 <td>{a.alias || '—'}</td>
                                                 <td>{formatFecha(a.fechaNacimiento)}</td>
                                                 <td>{a.raza || '—'}</td>
                                                 <td>{a.rodeoLoteId ? `#${String(a.rodeoLoteId).padStart(2, '0')}` : '—'}</td>
-                                                <td><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
+                                                <td className="text-center"><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
+                                                <td className="text-center">
+                                                    <div className="d-flex justify-content-center gap-2">
+                                                        <Button variant="outline-primary" size="sm" onClick={() => navigate(`/animales/${a.id}`)}>
+                                                            <i className="bi bi-eye"></i> Ver
+                                                        </Button>
+                                                        <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)}>
+                                                            <i className="bi bi-trash"></i>
+                                                        </Button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         ))
                                     )}
@@ -362,6 +491,52 @@ export default function AnimalesPage() {
                     ) : (
                         <Button type="submit" form="form-cargar-animales" disabled={submittingUpload} className="btn-guardar-animal">
                             {submittingUpload ? <Spinner as="span" animation="border" size="sm" /> : 'Subir Archivo'}
+                        </Button>
+                    )}
+                </Modal.Footer>
+            </Modal>
+            <Modal show={uploadEstadosModal} onHide={handleCloseUploadEstadosModal} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Cargar Estados Reproductivos (CSV)</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {formErrorUploadEstados && <Alert variant="danger">{formErrorUploadEstados}</Alert>}
+                    {reporteCargaEstados ? (
+                        <div>
+                            <Alert variant={reporteCargaEstados.fallidos > 0 ? "warning" : "success"}>Carga procesada</Alert>
+                            <ul>
+                                <li><strong>Procesados:</strong> {reporteCargaEstados.procesados}</li>
+                                <li><strong>Exitosos:</strong> {reporteCargaEstados.exitosos}</li>
+                                <li><strong>Fallidos:</strong> {reporteCargaEstados.fallidos}</li>
+                            </ul>
+                            {reporteCargaEstados.errores && reporteCargaEstados.errores.length > 0 && (
+                                <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                    <strong>Errores:</strong>
+                                    <ul className="mb-0 text-danger" style={{ fontSize: '0.9em' }}>
+                                        {reporteCargaEstados.errores.map((e, idx) => (
+                                            <li key={idx}>Fila {e.fila}: {e.error}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <Form onSubmit={handleSubmitUploadEstados} id="form-cargar-estados">
+                            <Form.Group className="mb-3">
+                                <Form.Label>Archivo (.csv)*</Form.Label>
+                                <Form.Control name="file" type="file" accept=".csv" onChange={handleChangeUploadEstados} required />
+                            </Form.Group>
+                        </Form>
+                    )}
+                </Modal.Body>
+                <Modal.Footer>
+                    {reporteCargaEstados ? (
+                        <Button onClick={handleCloseUploadEstadosModal} className="btn-guardar-animal">
+                            Cerrar
+                        </Button>
+                    ) : (
+                        <Button type="submit" form="form-cargar-estados" disabled={submittingUploadEstados} className="btn-guardar-animal">
+                            {submittingUploadEstados ? <Spinner as="span" animation="border" size="sm" /> : 'Subir Archivo'}
                         </Button>
                     )}
                 </Modal.Footer>

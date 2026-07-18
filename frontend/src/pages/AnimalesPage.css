@@ -1,33 +1,4 @@
-.animales-container {
-    padding-top: 40px;
-    padding-bottom: 40px;
-}
 
-.animales-title {
-    color: #1E3A5F;
-    font-weight: 600;
-    font-size: 2rem;
-}
-
-/* Header row */
-.animales-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-
-.animales-header-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.animales-header-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
 
 /* Divider below header */
 .animales-divider {
@@ -68,43 +39,7 @@
     flex-shrink: 0;
 }
 
-/* Table */
-.animales-table-wrapper {
-    background-color: transparent;
-    border-radius: 0;
-    padding: 0;
-    box-shadow: none;
-}
-
-.animales-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.animales-table th {
-    border-bottom: 1px solid #bbb;
-    padding: 16px 12px;
-    color: #333;
-    font-weight: 600;
-    text-align: center;
-}
-
-.animales-table td {
-    padding: 14px 12px;
-    vertical-align: middle;
-    text-align: center;
-    color: #555;
-    font-size: 0.9rem;
-}
-
-/* Vertical separators only between td cells */
-.animales-table td:not(:last-child) {
-    border-right: 1px solid #e0e0e0;
-}
-
-.animales-table tbody tr:hover {
-    background-color: #f5f8ff;
-}
+/* Table migrada a index.css (.vigia-table) */
 
 /* Estado badge */
 .estado-badge {
@@ -216,4 +151,15 @@
 
 .btn-guardar-animal:hover {
     background-color: #7ab332 !important;
+}
+
+.btn-vigia-success {
+    background-color: #8CC63F !important;
+    border-color: #8CC63F !important;
+    color: white !important;
+}
+
+.btn-vigia-success:hover {
+    background-color: #7ab332 !important;
+    border-color: #7ab332 !important;
 }

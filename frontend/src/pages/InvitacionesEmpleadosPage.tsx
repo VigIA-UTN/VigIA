@@ -39,6 +39,23 @@ export default function InvitacionesEmpleadosPage() {
   const [estadoFilter, setEstadoFilter] = useState('');
   const [establecimientoFilter, setEstablecimientoFilter] = useState('');
 
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (field: string) => {
+      if (sortField === field) {
+          if (sortDirection === 'asc') {
+              setSortDirection('desc');
+          } else {
+              setSortField(null);
+              setSortDirection('asc');
+          }
+      } else {
+          setSortField(field);
+          setSortDirection('asc');
+      }
+  };
+
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
@@ -96,13 +113,15 @@ export default function InvitacionesEmpleadosPage() {
   };
 
   return (
-    <div className="invitaciones-container">
+    <div className="vigia-page-container">
       <Container>
-        {/* Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2 className="invitaciones-title">Personal Invitado</h2>
-          <Button className="btn-vigia-primary" onClick={() => setShowModal(true)}>
-            + Nuevo
+        <div className="vigia-page-header">
+          <h2 className="vigia-page-title">Personal Invitado</h2>
+          <Button
+            className="btn-vigia-success"
+            onClick={() => setShowModal(true)}
+          >
+            <i className="bi bi-person-plus-fill me-2"></i> Nuevo
           </Button>
         </div>
 
@@ -154,14 +173,14 @@ export default function InvitacionesEmpleadosPage() {
             <Spinner animation="border" style={{ color: '#1E3A5F' }} />
           </div>
         ) : (
-          <div className="invitaciones-table-wrapper">
-            <table className="invitaciones-table">
+          <div className="vigia-table-wrapper">
+            <table className="vigia-table">
               <thead>
                 <tr>
-                  <th>Nombre Completo</th>
-                  <th>Email</th>
-                  <th>Establecimiento Asociado</th>
-                  <th>Invitación</th>
+                  <th onClick={() => handleSort('nombreCompleto')} style={{cursor: 'pointer'}}>Nombre Completo {sortField === 'nombreCompleto' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th onClick={() => handleSort('emailDestino')} style={{cursor: 'pointer'}}>Email {sortField === 'emailDestino' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th onClick={() => handleSort('establecimiento')} style={{cursor: 'pointer'}}>Establecimiento Asociado {sortField === 'establecimiento' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th onClick={() => handleSort('estado')} style={{cursor: 'pointer'}}>Invitación {sortField === 'estado' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -173,7 +192,20 @@ export default function InvitacionesEmpleadosPage() {
                     return matchesEmail && matchesEstado && matchesEstablecimiento;
                   });
 
-                  if (filteredInvitaciones.length === 0) {
+                  const sortedInvitaciones = [...filteredInvitaciones].sort((a, b) => {
+                      if (!sortField) return 0;
+                      let valA = a[sortField as keyof InvitacionResponse] as string | number | null;
+                      let valB = b[sortField as keyof InvitacionResponse] as string | number | null;
+
+                      if (valA === null || valA === undefined) valA = '';
+                      if (valB === null || valB === undefined) valB = '';
+
+                      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+                      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+                      return 0;
+                  });
+
+                  if (sortedInvitaciones.length === 0) {
                     return (
                       <tr>
                         <td colSpan={4} className="text-center text-muted py-4">
@@ -183,7 +215,7 @@ export default function InvitacionesEmpleadosPage() {
                     );
                   }
 
-                  return filteredInvitaciones.map((inv, idx) => {
+                  return sortedInvitaciones.map((inv, idx) => {
                     const estadoConf = ESTADO_CONFIG[inv.estado] ?? { label: inv.estado, className: '' };
                     return (
                       <tr key={inv.id ?? idx}>

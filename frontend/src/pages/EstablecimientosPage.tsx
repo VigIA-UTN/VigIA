@@ -138,10 +138,10 @@ export default function EstablecimientosPage() {
   const handleShowModal = () => setShowModal(true);
 
   return (
-    <div className="establecimientos-container">
+    <div className="vigia-page-container">
       <Container>
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-          <h2 className="establecimientos-title mb-0">Establecimientos</h2>
+        <div className="vigia-page-header">
+          <h2 className="vigia-page-title">Establecimientos</h2>
           <div className="d-flex gap-3">
             <Form.Control
               type="text"
@@ -151,8 +151,8 @@ export default function EstablecimientosPage() {
               style={{ maxWidth: '300px' }}
             />
             {rol === 'ADMINISTRADOR' && (
-              <Button className="btn-vigia-primary text-nowrap" onClick={handleShowModal}>
-                + Nuevo
+              <Button className="btn-vigia-success text-nowrap" onClick={handleShowModal}>
+                <i className="bi bi-plus-lg me-2" /> Nuevo
               </Button>
             )}
           </div>
@@ -196,7 +196,7 @@ export default function EstablecimientosPage() {
                     </div>
 
                     <div className="card-actions">
-                      <Button variant="light" className="btn-vigia-primary w-100" onClick={async () => {
+                      <Button variant="light" className="btn-vigia-success w-100" onClick={async () => {
                         setEstablecimientoDetail(est);
                         setShowDetailModal(true);
                         setLoadingLotes(true);

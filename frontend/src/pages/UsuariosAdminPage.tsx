@@ -44,6 +44,23 @@ export default function UsuariosAdminPage() {
     }
   };
 
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (field: string) => {
+      if (sortField === field) {
+          if (sortDirection === 'asc') {
+              setSortDirection('desc');
+          } else {
+              setSortField(null);
+              setSortDirection('asc');
+          }
+      } else {
+          setSortField(field);
+          setSortDirection('asc');
+      }
+  };
+
   const filteredUsuarios = usuarios.filter(u => {
     const matchesSearch = searchTerm === '' || 
         `${u.nombre} ${u.apellido}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -54,10 +71,30 @@ export default function UsuariosAdminPage() {
     return matchesSearch && matchesRole;
   });
 
+  const sortedUsuarios = [...filteredUsuarios].sort((a, b) => {
+      if (!sortField) return 0;
+      let valA = a[sortField as keyof UsuarioResponse] as string | number | null;
+      let valB = b[sortField as keyof UsuarioResponse] as string | number | null;
+
+      if (sortField === 'nombre') {
+          valA = `${a.nombre} ${a.apellido}`;
+          valB = `${b.nombre} ${b.apellido}`;
+      }
+
+      if (valA === null || valA === undefined) valA = '';
+      if (valB === null || valB === undefined) valB = '';
+
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+  });
+
   return (
-    <div className="usuarios-admin-container">
+    <div className="vigia-page-container">
       <Container>
-        <h2 className="usuarios-admin-title">Usuarios</h2>
+        <div className="vigia-page-header">
+          <h2 className="vigia-page-title">Usuarios</h2>
+        </div>
 
         <div className="d-flex flex-column flex-md-row justify-content-between mb-4 gap-3">
           <Form.Control
@@ -73,6 +110,7 @@ export default function UsuariosAdminPage() {
             style={{ maxWidth: '250px' }}
           >
             <option value="">Todos los roles</option>
+            <option value="ADMINISTRADOR">Administrador</option>
             <option value="PRODUCTOR">Productor</option>
             <option value="VETERINARIO">Veterinario</option>
             <option value="CAMPERO">Campero</option>
@@ -86,26 +124,26 @@ export default function UsuariosAdminPage() {
             <Spinner animation="border" style={{ color: '#1E3A5F' }} />
           </div>
         ) : (
-          <div className="usuarios-table-wrapper">
-            <table className="usuarios-table">
+          <div className="vigia-table-wrapper">
+            <table className="vigia-table">
               <thead>
                 <tr>
-                  <th>Nombre Completo</th>
-                  <th>Email</th>
-                  <th>Rol</th>
-                  <th>Estado</th>
+                  <th onClick={() => handleSort('nombre')} style={{cursor: 'pointer'}}>Nombre Completo {sortField === 'nombre' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th onClick={() => handleSort('email')} style={{cursor: 'pointer'}}>Email {sortField === 'email' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th onClick={() => handleSort('rol')} style={{cursor: 'pointer'}}>Rol {sortField === 'rol' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th onClick={() => handleSort('activo')} style={{cursor: 'pointer'}}>Estado {sortField === 'activo' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUsuarios.length === 0 ? (
+                {sortedUsuarios.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="text-center py-4 text-muted">
                       No se encontraron usuarios que coincidan con la búsqueda.
                     </td>
                   </tr>
                 ) : (
-                  filteredUsuarios.map((u) => (
+                  sortedUsuarios.map((u) => (
                     <tr key={u.id}>
                       <td className="fw-medium text-dark">{u.nombre} {u.apellido}</td>
                       <td>

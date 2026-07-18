@@ -1,0 +1,66 @@
+.animal-detail-container {
+    max-width: 900px;
+}
+
+.animal-card {
+    border-radius: 12px;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1E3A5F;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #EBF1F5;
+    padding-bottom: 0.5rem;
+}
+
+.detail-list {
+    font-size: 1rem;
+    color: #4A5568;
+}
+
+.detail-list li {
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px dashed #E2E8F0;
+    padding-bottom: 0.25rem;
+}
+
+.detail-list li:last-child {
+    border-bottom: none;
+}
+
+.detail-list strong {
+    color: #2D3748;
+}
+
+.badge {
+    font-size: 0.85em;
+    padding: 0.35em 0.65em;
+    border-radius: 4px;
+}
+
+.btn-vigia-primary {
+    background-color: #1E3A5F !important;
+    border-color: #1E3A5F !important;
+    color: white !important;
+}
+
+.btn-vigia-primary:hover {
+    background-color: #13253d !important;
+    border-color: #13253d !important;
+}
+
+.btn-guardar-animal {
+    background-color: #8CC63F !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 700 !important;
+}
+
+.btn-guardar-animal:hover {
+    background-color: #7ab332 !important;
+}

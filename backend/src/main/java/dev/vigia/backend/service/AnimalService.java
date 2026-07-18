@@ -14,6 +14,8 @@ import dev.vigia.backend.dto.CargaMasivaResponse;
 public interface AnimalService {
         AnimalResponse cargarAnimal(String emailProductor, AnimalRequest request);
 
+        AnimalResponse editarAnimal(Long animalId, String emailProductor, AnimalRequest request);
+
         void desactivarAnimal(Long animalId, String emailProductor);
 
         AnimalResponse getAnimalById(Long animalId, String emailProductor);

@@ -6,17 +6,37 @@
   user-select: none;
 }
 
-a, button, [role="button"], label,
-input, textarea, select,
-[type="checkbox"], [type="radio"] {
+a,
+button,
+[role="button"],
+label,
+input,
+textarea,
+select,
+[type="checkbox"],
+[type="radio"] {
   cursor: auto;
   user-select: auto;
 }
 
-a { cursor: pointer; }
-button, [role="button"] { cursor: pointer; }
-input, textarea { cursor: text; user-select: text; }
-select { cursor: pointer; }
+a {
+  cursor: pointer;
+}
+
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  cursor: text;
+  user-select: text;
+}
+
+select {
+  cursor: pointer;
+}
 
 html,
 body,
@@ -26,6 +46,7 @@ body,
   height: 100%;
   width: 100%;
   cursor: default;
+  overflow-y: scroll;
 }
 
 /* Fuerza cursor default en contenedores de Bootstrap que heredan cursor de texto */
@@ -41,7 +62,7 @@ body,
 }
 
 .brand-trapezoid {
-  background: linear-gradient(135deg, #A3FECC 0%, #13D4FB 50%, #1EA3FE 100%);
+  background: linear-gradient(135deg, #3B8D99 0%, #2B7295 50%, #1C5A86 100%);
   clip-path: polygon(0% 0%, 100% 0%, 85% 100%, 15% 100%);
   padding: 8px 30px;
   display: inline-flex;
@@ -58,4 +79,74 @@ body,
   max-height: 45px;
   width: auto;
   display: block;
+}
+
+/* Tabla Estándar Global (VigIA Table) */
+.vigia-table-wrapper {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.vigia-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.vigia-table thead tr {
+  border-bottom: 2px solid #e8ecf0;
+}
+
+.vigia-table thead th {
+  padding: 1rem 1.5rem;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  user-select: none;
+  cursor: default;
+}
+
+.vigia-table tbody tr {
+  border-bottom: 1px solid #f0f2f5;
+  transition: background-color 0.15s ease;
+}
+
+.vigia-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.vigia-table tbody tr:hover {
+  background-color: #f8f9fc;
+}
+
+.vigia-table tbody td {
+  padding: 1rem 1.5rem;
+  vertical-align: middle;
+  color: #374151;
+  font-size: 0.95rem;
+  user-select: none;
+  cursor: default;
+}
+
+.vigia-page-container {
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.vigia-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.vigia-page-title {
+    color: #1E3A5F;
+    font-weight: 600;
+    font-size: 2rem;
+    margin-bottom: 0;
 }
