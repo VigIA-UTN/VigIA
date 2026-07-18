@@ -86,6 +86,9 @@ export default function EmpleadosPage() {
             valB = `${b.nombre} ${b.apellido}`;
         }
 
+        if (valA === null || valA === undefined) valA = '';
+        if (valB === null || valB === undefined) valB = '';
+
         if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
         if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
         return 0;

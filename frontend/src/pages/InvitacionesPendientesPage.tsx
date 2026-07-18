@@ -5,6 +5,7 @@ import {
   rechazarInvitacionRequest, 
   type InvitacionResponse 
 } from '../api/invitacionesApi';
+import { useAuthStore } from '../store/authStore';
 import './InvitacionesPendientesPage.css';
 
 export default function InvitacionesPendientesPage() {
@@ -33,16 +34,14 @@ export default function InvitacionesPendientesPage() {
   const handleAceptar = async (id: number) => {
     try {
       await aceptarInvitacionRequest(id);
-      import('../store/authStore').then(({ useAuthStore }) => {
-        const currentRol = useAuthStore.getState().rol;
-        if (currentRol === 'PENDIENTE') {
-          alert('¡Invitación aceptada con éxito! Como tus permisos han cambiado, por favor iniciá sesión nuevamente.');
-          useAuthStore.getState().logout();
-          window.location.href = '/login';
-        } else {
-          fetchInvitaciones();
-        }
-      });
+      const currentRol = useAuthStore.getState().rol;
+      if (currentRol === 'PENDIENTE') {
+        alert('¡Invitación aceptada con éxito! Como tus permisos han cambiado, por favor iniciá sesión nuevamente.');
+        useAuthStore.getState().logout();
+        window.location.href = '/login';
+      } else {
+        fetchInvitaciones();
+      }
     } catch (err) {
       const data = (err as { response?: { data?: { message?: string } | string } }).response?.data;
       const errorMessage = typeof data === 'string' ? data : data?.message;
