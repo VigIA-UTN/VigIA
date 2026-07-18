@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.AnimalRequest;
+import dev.vigia.backend.dto.CargaMasivaResponse;
+import dev.vigia.backend.dto.CargaMasivaResult;
 import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
@@ -344,13 +346,20 @@ public class AnimalServiceImpl implements AnimalService {
 
         @Override
         @SuppressWarnings("null")
-        public List<AnimalResponse> cargarAnimalesExcel(MultipartFile file, String emailProductor)
+        public CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, String emailProductor)
                         throws IOException {
 
-                List<Animal> animals = excelReaderService.leerYGuardarAnimalesExcel(file, emailProductor);
+                CargaMasivaResult result = excelReaderService.leerYGuardarAnimalesExcel(file, emailProductor);
 
-                return animals.stream()
+                List<AnimalResponse> animalesResponse = result.getAnimalesExitosos().stream()
                                 .map(this::mapToResponse)
                                 .collect(Collectors.toList());
+
+                return CargaMasivaResponse.builder()
+                                .procesados(result.getProcesados())
+                                .fallidos(result.getFallidos())
+                                .exitosos(animalesResponse.size())
+                                .animales(animalesResponse)
+                                .build();
         }
 }

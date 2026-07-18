@@ -23,7 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
-import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.dto.CargaMasivaResult;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.repository.AnimalRepository;
@@ -106,11 +106,13 @@ class ExcelReaderServiceTest {
 
         MultipartFile file = generateExcel(headers, rows);
 
-        List<Animal> animales = excelReaderService.leerYGuardarAnimalesExcel(file, "test@vigia.dev");
+        CargaMasivaResult resultado = excelReaderService.leerYGuardarAnimalesExcel(file, "test@vigia.dev");
 
-        assertEquals(2, animales.size());
-        assertEquals("CAR-1", animales.get(0).getIdCaravanaOficial());
-        assertEquals("CAR-2", animales.get(1).getIdCaravanaOficial());
+        assertEquals(2, resultado.getProcesados());
+        assertEquals(0, resultado.getFallidos());
+        assertEquals(2, resultado.getAnimalesExitosos().size());
+        assertEquals("CAR-1", resultado.getAnimalesExitosos().get(0).getIdCaravanaOficial());
+        assertEquals("CAR-2", resultado.getAnimalesExitosos().get(1).getIdCaravanaOficial());
     }
 
     @Test
@@ -136,8 +138,10 @@ class ExcelReaderServiceTest {
 
         MultipartFile file = generateExcel(headers, rows);
 
-        List<Animal> animales = excelReaderService.leerYGuardarAnimalesExcel(file, "test@vigia.dev");
-        assertEquals(0, animales.size());
+        CargaMasivaResult resultado = excelReaderService.leerYGuardarAnimalesExcel(file, "test@vigia.dev");
+        assertEquals(0, resultado.getProcesados());
+        assertEquals(0, resultado.getFallidos());
+        assertEquals(0, resultado.getAnimalesExitosos().size());
     }
 
     @Test
@@ -150,9 +154,10 @@ class ExcelReaderServiceTest {
 
         MultipartFile file = generateExcel(headers, rows);
 
-        assertThrows(IllegalArgumentException.class, () -> {
-            excelReaderService.leerYGuardarAnimalesExcel(file, "test@vigia.dev");
-        });
+        CargaMasivaResult resultado = excelReaderService.leerYGuardarAnimalesExcel(file, "test@vigia.dev");
+        assertEquals(1, resultado.getProcesados());
+        assertEquals(1, resultado.getFallidos());
+        assertEquals(0, resultado.getAnimalesExitosos().size());
     }
 
     @Test

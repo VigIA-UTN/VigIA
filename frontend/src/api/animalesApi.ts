@@ -16,6 +16,13 @@ export interface AnimalResponse {
   fechaAlta: string;
 }
 
+export interface CargaMasivaResponse {
+  procesados: number;
+  exitosos: number;
+  fallidos: number;
+  animales: AnimalResponse[];
+}
+
 export interface AnimalRequest {
   idCaravanaOficial: string | null;
   alias: string | null;
@@ -46,10 +53,10 @@ export async function desactivarAnimal(id: number): Promise<void> {
   await axiosClient.delete(`/animales/${id}`);
 }
 
-export async function cargarAnimalesExcel(file: File): Promise<AnimalResponse[]> {
+export async function cargarAnimalesExcel(file: File): Promise<CargaMasivaResponse> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await axiosClient.post<AnimalResponse[]>('/animales/csv', formData, {
+  const response = await axiosClient.post<CargaMasivaResponse>('/animales/csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },

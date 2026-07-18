@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
+import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.service.AnimalService;
@@ -133,7 +134,7 @@ public class AnimalController {
 
         try {
             String emailProductor = authentication.getName();
-            List<AnimalResponse> response = animalService.cargarAnimalesExcel(file, emailProductor);
+            CargaMasivaResponse response = animalService.cargarAnimalesExcel(file, emailProductor);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
 import { cargarAnimalesExcel, crearAnimal, getAnimales } from '../api/animalesApi';
-import type { AnimalResponse, AnimalRequest } from '../api/animalesApi';
+import type { AnimalResponse, AnimalRequest, CargaMasivaResponse } from '../api/animalesApi';
 import { getEstablecimientos, type EstablecimientoResponse } from '../api/establecimientosApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
@@ -46,6 +46,7 @@ export default function AnimalesPage() {
     const [submittingUpload, setSubmittingUpload] = useState(false);
     const [formErrorUpload, setFormErrorUpload] = useState<string | null>(null);
     const [fileUpload, setFileUpload] = useState<File | null>(null);
+    const [reporteCarga, setReporteCarga] = useState<CargaMasivaResponse | null>(null);
 
     useEffect(() => {
         (async () => {
@@ -118,15 +119,22 @@ export default function AnimalesPage() {
         setFormErrorUpload(null);
         setSubmittingUpload(true);
         try {
-            const nuevo = await cargarAnimalesExcel(fileUpload as File);
-            setAnimales(prev => [...prev, ...nuevo]);
-            setUploadModal(false);
+            const result = await cargarAnimalesExcel(fileUpload as File);
+            setReporteCarga(result);
+            setAnimales(prev => [...prev, ...result.animales]);
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } | string } };
             setFormErrorUpload(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al cargar los animales.');
         } finally {
             setSubmittingUpload(false);
         }
+    };
+
+    const handleCloseUploadModal = () => {
+        setUploadModal(false);
+        setReporteCarga(null);
+        setFileUpload(null);
+        setFormErrorUpload(null);
     };
 
     const filteredAnimales = animales.filter(a => {
@@ -322,23 +330,40 @@ export default function AnimalesPage() {
                 </Modal.Footer>
             </Modal>
 
-            <Modal show={uploadModal} onHide={() => setUploadModal(false)} centered dialogClassName="modal-nuevo-animal">
+            <Modal show={uploadModal} onHide={handleCloseUploadModal} centered dialogClassName="modal-nuevo-animal">
                 <Modal.Header closeButton>
                     <Modal.Title>Cargar Animales con Excel</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     {formErrorUpload && <Alert variant="danger">{formErrorUpload}</Alert>}
-                    <Form onSubmit={handleSubmitUpload} id="form-cargar-animales">
-                        <Form.Group className="mb-3">
-                            <Form.Label>Archivo*</Form.Label>
-                            <Form.Control name="file" type="file" accept=".xlsx" onChange={handleChangeUpload} required />
-                        </Form.Group>
-                    </Form>
+                    {reporteCarga ? (
+                        <div>
+                            <Alert variant="success">¡Carga procesada correctamente!</Alert>
+                            <ul>
+                                <li><strong>Procesados:</strong> {reporteCarga.procesados}</li>
+                                <li><strong>Exitosos:</strong> {reporteCarga.exitosos}</li>
+                                <li><strong>Fallidos:</strong> {reporteCarga.fallidos}</li>
+                            </ul>
+                        </div>
+                    ) : (
+                        <Form onSubmit={handleSubmitUpload} id="form-cargar-animales">
+                            <Form.Group className="mb-3">
+                                <Form.Label>Archivo*</Form.Label>
+                                <Form.Control name="file" type="file" accept=".xlsx,.xls,.csv" onChange={handleChangeUpload} required />
+                            </Form.Group>
+                        </Form>
+                    )}
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button type="submit" form="form-cargar-animales" disabled={submittingUpload} className="btn-guardar-animal">
-                        {submittingUpload ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
-                    </Button>
+                    {reporteCarga ? (
+                        <Button onClick={handleCloseUploadModal} className="btn-guardar-animal">
+                            Cerrar
+                        </Button>
+                    ) : (
+                        <Button type="submit" form="form-cargar-animales" disabled={submittingUpload} className="btn-guardar-animal">
+                            {submittingUpload ? <Spinner as="span" animation="border" size="sm" /> : 'Subir Archivo'}
+                        </Button>
+                    )}
                 </Modal.Footer>
             </Modal>
         </div >

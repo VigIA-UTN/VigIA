@@ -884,7 +884,10 @@ class AnimalControllerTest {
                                 .file(file)
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isCreated())
-                                .andExpect(jsonPath("$[0].alias").value("Vaca Excel"));
+                                .andExpect(jsonPath("$.procesados").value(1))
+                                .andExpect(jsonPath("$.exitosos").value(1))
+                                .andExpect(jsonPath("$.fallidos").value(0))
+                                .andExpect(jsonPath("$.animales[0].alias").value("Vaca Excel"));
         }
 
         @Test

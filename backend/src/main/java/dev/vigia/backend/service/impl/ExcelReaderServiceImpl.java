@@ -9,6 +9,8 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import dev.vigia.backend.dto.CargaMasivaResult;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
@@ -28,7 +30,7 @@ public class ExcelReaderServiceImpl implements ExcelReaderService {
     private final RodeoLoteRepository rodeoLoteRepository;
 
     @Override
-    public List<Animal> leerYGuardarAnimalesExcel(MultipartFile file, String email) throws IOException {
+    public CargaMasivaResult leerYGuardarAnimalesExcel(MultipartFile file, String email) throws IOException {
 
         // Validar que sea un archivo Excel
         String filename = file.getOriginalFilename();
@@ -41,6 +43,8 @@ public class ExcelReaderServiceImpl implements ExcelReaderService {
 
             Sheet sheet = workbook.getSheetAt(0);
             List<Animal> animals = new ArrayList<>();
+            int procesados = 0;
+            int fallidos = 0;
 
             // Iterar sobre las filas (empezar en 1 para saltar encabezados)
             for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
@@ -49,17 +53,30 @@ public class ExcelReaderServiceImpl implements ExcelReaderService {
                     continue;
                 }
 
-                // Crear animal desde la fila
-                Animal animal = createAnimalFromRow(row, email);
+                procesados++;
 
-                // Solo agregar si tiene información mínima
-                if (animal.getIdCaravanaOficial() != null && !animal.getIdCaravanaOficial().isEmpty()) {
-                    animals.add(animal);
+                try {
+                    // Crear animal desde la fila
+                    Animal animal = createAnimalFromRow(row, email);
+
+                    // Solo agregar si tiene información mínima
+                    if (animal.getIdCaravanaOficial() != null && !animal.getIdCaravanaOficial().isEmpty()) {
+                        animals.add(animal);
+                    } else {
+                        fallidos++;
+                    }
+                } catch (Exception e) {
+                    fallidos++;
                 }
             }
 
             List<Animal> saveAnimals = animalRepository.saveAll(animals);
-            return saveAnimals;
+
+            return CargaMasivaResult.builder()
+                    .procesados(procesados)
+                    .fallidos(fallidos)
+                    .animalesExitosos(saveAnimals)
+                    .build();
         }
     }
 
@@ -155,7 +172,7 @@ public class ExcelReaderServiceImpl implements ExcelReaderService {
                 }
             }
         }
-        
+
         return null;
     }
 
