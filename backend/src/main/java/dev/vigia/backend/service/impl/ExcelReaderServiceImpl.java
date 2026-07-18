@@ -137,18 +137,26 @@ public class ExcelReaderServiceImpl implements ExcelReaderService {
             return null;
         }
 
-        if (DateUtil.isCellDateFormatted(cell)) {
-            return formatDate(cell.getDateCellValue());
-        } else {
-            // Intentar convertir número a fecha si no está formateado
-            try {
-                double numericValue = cell.getNumericCellValue();
-                Date date = DateUtil.getJavaDate(numericValue);
-                return formatDate(date);
-            } catch (Exception e) {
-                return String.valueOf((long) cell.getNumericCellValue());
+        if (cell.getCellType() == CellType.STRING) {
+            return cell.getStringCellValue();
+        }
+
+        if (cell.getCellType() == CellType.NUMERIC) {
+            if (DateUtil.isCellDateFormatted(cell)) {
+                return formatDate(cell.getDateCellValue());
+            } else {
+                // Intentar convertir número a fecha si no está formateado
+                try {
+                    double numericValue = cell.getNumericCellValue();
+                    Date date = DateUtil.getJavaDate(numericValue);
+                    return formatDate(date);
+                } catch (Exception e) {
+                    return String.valueOf((long) cell.getNumericCellValue());
+                }
             }
         }
+        
+        return null;
     }
 
     private String evaluateFormulaCell(Cell cell) {

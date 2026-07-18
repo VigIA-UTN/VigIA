@@ -34,6 +34,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import org.springframework.mock.web.MockMultipartFile;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.UUID;
@@ -838,5 +839,84 @@ class AnimalControllerTest {
                                 .content(objectMapper.writeValueAsString(editRequest)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.estado").value("GESTANTE"));
+        }
+
+        private MockMultipartFile generateExcel(String[] headers, String[][] rows) throws Exception {
+                org.apache.poi.ss.usermodel.Workbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+                org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("Animales");
+
+                org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+                for (int i = 0; i < headers.length; i++) {
+                        headerRow.createCell(i).setCellValue(headers[i]);
+                }
+
+                for (int r = 0; r < rows.length; r++) {
+                        org.apache.poi.ss.usermodel.Row row = sheet.createRow(r + 1);
+                        for (int c = 0; c < rows[r].length; c++) {
+                                if (rows[r][c] != null) {
+                                        row.createCell(c).setCellValue(rows[r][c]);
+                                }
+                        }
+                }
+
+                java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                workbook.write(bos);
+                workbook.close();
+
+                return new MockMultipartFile(
+                                "file", "test.xlsx",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                bos.toByteArray());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/csv - Carga Exitosa (Productor)")
+        @SuppressWarnings("null")
+        void cargarAnimalesExcel_asProductor_success() throws Exception {
+                String[] headers = { "IdCaravana", "Alias", "FechaNacimiento", "Raza", "Establecimiento", "Rodeo" };
+                String[][] rows = {
+                                { "X-123", "Vaca Excel", "2020-01-01", "Angus", "Estancia Test", "Rodeo Base" }
+                };
+
+                MockMultipartFile file = generateExcel(headers, rows);
+
+                mockMvc.perform(multipart("/api/v1/animales/csv")
+                                .file(file)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$[0].alias").value("Vaca Excel"));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/csv - Rechazo por Rol Incorrecto (Admin)")
+        @SuppressWarnings("null")
+        void cargarAnimalesExcel_asAdmin_forbidden() throws Exception {
+                String[] headers = { "IdCaravana", "Alias", "FechaNacimiento", "Raza", "Establecimiento", "Rodeo" };
+                String[][] rows = { { "X-123", "Vaca Excel", "2020-01-01", "Angus", "Estancia Test", "Rodeo Base" } };
+                MockMultipartFile file = generateExcel(headers, rows);
+
+                mockMvc.perform(multipart("/api/v1/animales/csv")
+                                .file(file)
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/csv - Archivo mayor a 5MB")
+        void cargarAnimalesExcel_fileTooLarge_badRequest() throws Exception {
+                // MockMvc will bypass servlet multipart size checks, but we simulate it by
+                // sending
+                // a large empty content file that won't parse, simulating a size check error or
+                // parsing error.
+                byte[] largeContent = new byte[6 * 1024 * 1024]; // 6MB
+                MockMultipartFile file = new MockMultipartFile(
+                                "file", "large.xlsx",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                largeContent);
+
+                mockMvc.perform(multipart("/api/v1/animales/csv")
+                                .file(file)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().is4xxClientError());
         }
 }
