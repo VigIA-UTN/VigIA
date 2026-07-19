@@ -107,6 +107,21 @@ public class AnimalController {
         }
     }
 
+    @GetMapping("/{id}/estado-reproductivo")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarEstadosReproductivos(
+            @PathVariable("id") Long animalId,
+            Authentication authentication) {
+
+        try {
+            String email = authentication.getName();
+            List<dev.vigia.backend.dto.EstadoReproductivoResponse> response = animalService.listarEstadosReproductivos(animalId, email);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PostMapping("/{id}/estado-reproductivo")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> registrarEstadoReproductivo(

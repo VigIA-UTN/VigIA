@@ -1,5 +1,5 @@
 .animal-detail-container {
-    max-width: 900px;
+    max-width: 1000px;
 }
 
 .animal-card {
@@ -59,8 +59,27 @@
     border: none !important;
     color: white !important;
     font-weight: 700 !important;
+    width: 100%;
+    padding: 12px !important;
+    font-size: 1.1rem !important;
 }
 
 .btn-guardar-animal:hover {
     background-color: #7ab332 !important;
+}
+
+.btn-vigia-success {
+    background-color: #8CC63F !important;
+    border-color: #8CC63F !important;
+    color: white !important;
+}
+
+.btn-vigia-success:hover {
+    background-color: #7ab332 !important;
+    border-color: #7ab332 !important;
+}
+
+/* Historial table rows */
+.vigia-table tbody tr.fw-semibold td {
+    background-color: #f0f7e6;
 }

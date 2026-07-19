@@ -52,6 +52,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public AnimalResponse cargarAnimal(String emailProductor, AnimalRequest request) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
@@ -97,6 +98,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public AnimalResponse editarAnimal(Long animalId, String emailProductor, AnimalRequest request) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
@@ -193,6 +195,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public AnimalResponse getAnimalById(Long animalId, String emailProductor) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
@@ -247,6 +250,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public List<AnimalResponse> listarAnimales(String emailUsuario) {
 
@@ -499,5 +503,53 @@ public class AnimalServiceImpl implements AnimalService {
                                 .fallidos(errores.size())
                                 .errores(errores)
                                 .build();
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public List<EstadoReproductivoResponse> listarEstadosReproductivos(Long animalId, String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimiento = animal.getEstablecimiento();
+
+                boolean tieneAcceso = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo())
+                                || usuario.getRol().equals(Rol.ADMINISTRADOR);
+
+                if (!tieneAcceso) {
+                        throw new IllegalArgumentException(
+                                        "No tiene acceso a los datos de este animal.");
+                }
+
+                return animal.getEstadosReproductivos().stream()
+                                .map(e -> {
+                                        String registradoPor = null;
+                                        if (e.getUsuarioRegistrador() != null) {
+                                                registradoPor = e.getUsuarioRegistrador().getNombre();
+                                                if (e.getUsuarioRegistrador().getApellido() != null
+                                                                && !e.getUsuarioRegistrador().getApellido().isEmpty()) {
+                                                        registradoPor += " " + e.getUsuarioRegistrador().getApellido();
+                                                }
+                                                if (registradoPor == null || registradoPor.isBlank()) {
+                                                        registradoPor = e.getUsuarioRegistrador().getEmail();
+                                                }
+                                        }
+                                        return EstadoReproductivoResponse.builder()
+                                                        .id(e.getId())
+                                                        .animalId(animal.getId())
+                                                        .estado(e.getEstado().name())
+                                                        .fechaUltimoParto(e.getFechaUltParto())
+                                                        .fechaUltimaInseminacion(e.getFechaUltInseminacion())
+                                                        .origen(e.getOrigen() != null ? e.getOrigen().name() : null)
+                                                        .fechaRegistro(e.getFechaRegistro())
+                                                        .registradoPor(registradoPor)
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
         }
 }

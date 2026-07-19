@@ -38,6 +38,7 @@ export default function AnimalesPage() {
     const [showModal, setShowModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+    const [formSuccess, setFormSuccess] = useState<string | null>(null);
     const [form, setForm] = useState<Partial<AnimalRequest>>({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO' });
     const [rodeoLotes, setRodeoLotes] = useState<RodeoLoteResponse[]>([]);
 
@@ -107,13 +108,25 @@ export default function AnimalesPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.establecimientoId) return;
+        if (!form.establecimientoId) {
+            setFormError('Seleccioná un establecimiento.');
+            return;
+        }
+        if (!form.idCaravanaOficial && !form.alias) {
+            setFormError('Ingresá al menos el identificador o el nombre del animal.');
+            return;
+        }
         setFormError(null);
+        setFormSuccess(null);
         setSubmitting(true);
         try {
             const nuevo = await crearAnimal(form as AnimalRequest);
             setAnimales(prev => [nuevo, ...prev]);
-            setShowModal(false);
+            setFormSuccess('Animal registrado exitosamente.');
+            setTimeout(() => {
+                setShowModal(false);
+                setFormSuccess(null);
+            }, 1200);
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } | string } };
             setFormError(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al crear el animal.');
@@ -221,7 +234,6 @@ export default function AnimalesPage() {
     };
 
     const filteredAnimales = animales.filter(a => {
-        if (filterCelo && a.estadoReproductivo !== 'CELO') return false;
         if (filterSalud && a.estadoActual !== 'CON_ALERTA') return false;
         if (!searchTerm) return true;
         const q = searchTerm.toLowerCase();
@@ -247,6 +259,7 @@ export default function AnimalesPage() {
     const openModal = async () => {
         setForm({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO' });
         setFormError(null);
+        setFormSuccess(null);
         try {
             const lotes = await getRodeoLotes();
             setRodeoLotes(lotes.filter(l => l.activo));
@@ -315,26 +328,48 @@ export default function AnimalesPage() {
                                                 Nombre <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'alias' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                             </div>
                                         </th>
-                                        <th onClick={() => handleSort('fechaNacimiento')} style={{cursor: 'pointer'}}>
-                                            <div className="d-flex align-items-center justify-content-start">
-                                                Fecha Nacimiento <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'fechaNacimiento' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                            </div>
-                                        </th>
-                                        <th onClick={() => handleSort('raza')} style={{cursor: 'pointer'}}>
-                                            <div className="d-flex align-items-center justify-content-start">
-                                                Raza <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'raza' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                            </div>
-                                        </th>
-                                        <th onClick={() => handleSort('rodeoLoteId')} style={{cursor: 'pointer'}}>
-                                            <div className="d-flex align-items-center justify-content-start">
-                                                Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteId' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                            </div>
-                                        </th>
-                                        <th onClick={() => handleSort('estadoActual')} style={{cursor: 'pointer'}}>
-                                            <div className="d-flex align-items-center justify-content-center">
-                                                Estado <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoActual' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                            </div>
-                                        </th>
+                                        {filterCelo ? (
+                                            <>
+                                                <th onClick={() => handleSort('estadoReproductivo')} style={{cursor: 'pointer'}}>
+                                                    <div className="d-flex align-items-center justify-content-start">
+                                                        Estado Reproductivo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                    </div>
+                                                </th>
+                                                <th onClick={() => handleSort('fechaUltimoParto')} style={{cursor: 'pointer'}}>
+                                                    <div className="d-flex align-items-center justify-content-start">
+                                                        Fecha Último Parto <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimoParto' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                    </div>
+                                                </th>
+                                                <th onClick={() => handleSort('fechaUltimaInseminacion')} style={{cursor: 'pointer'}}>
+                                                    <div className="d-flex align-items-center justify-content-start">
+                                                        Fecha Última Inseminación <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimaInseminacion' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                    </div>
+                                                </th>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <th onClick={() => handleSort('fechaNacimiento')} style={{cursor: 'pointer'}}>
+                                                    <div className="d-flex align-items-center justify-content-start">
+                                                        Fecha Nacimiento <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'fechaNacimiento' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                    </div>
+                                                </th>
+                                                <th onClick={() => handleSort('raza')} style={{cursor: 'pointer'}}>
+                                                    <div className="d-flex align-items-center justify-content-start">
+                                                        Raza <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'raza' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                    </div>
+                                                </th>
+                                                <th onClick={() => handleSort('rodeoLoteId')} style={{cursor: 'pointer'}}>
+                                                    <div className="d-flex align-items-center justify-content-start">
+                                                        Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteId' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                    </div>
+                                                </th>
+                                                <th onClick={() => handleSort('estadoActual')} style={{cursor: 'pointer'}}>
+                                                    <div className="d-flex align-items-center justify-content-center">
+                                                        Estado <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoActual' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                    </div>
+                                                </th>
+                                            </>
+                                        )}
                                         <th className="text-center">Acciones</th>
                                     </tr >
                                 </thead >
@@ -350,10 +385,28 @@ export default function AnimalesPage() {
                                             <tr key={a.id} className="animal-row">
                                                 <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
                                                 <td>{a.alias || '—'}</td>
-                                                <td>{formatFecha(a.fechaNacimiento)}</td>
-                                                <td>{a.raza || '—'}</td>
-                                                <td>{a.rodeoLoteId ? `#${String(a.rodeoLoteId).padStart(2, '0')}` : '—'}</td>
-                                                <td className="text-center"><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
+                                                {filterCelo ? (
+                                                    <>
+                                                        <td className="text-center">
+                                                            {a.estadoReproductivo ? (
+                                                                <span className={`badge ${
+                                                                    a.estadoReproductivo === 'GESTANTE' ? 'bg-success' :
+                                                                    a.estadoReproductivo === 'CELO' ? 'bg-danger' :
+                                                                    a.estadoReproductivo === 'VACIA' ? 'bg-secondary' : 'bg-info'
+                                                                }`}>{a.estadoReproductivo}</span>
+                                                            ) : '—'}
+                                                        </td>
+                                                        <td>{formatFecha(a.fechaUltimoParto ?? null)}</td>
+                                                        <td>{formatFecha(a.fechaUltimaInseminacion ?? null)}</td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td>{formatFecha(a.fechaNacimiento)}</td>
+                                                        <td>{a.raza || '—'}</td>
+                                                        <td>{a.rodeoLoteId ? `#${String(a.rodeoLoteId).padStart(2, '0')}` : '—'}</td>
+                                                        <td className="text-center"><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
+                                                    </>
+                                                )}
                                                 <td className="text-center">
                                                     <div className="d-flex justify-content-center gap-2">
                                                         <Button variant="outline-primary" size="sm" onClick={() => navigate(`/animales/${a.id}`)}>
@@ -380,6 +433,7 @@ export default function AnimalesPage() {
                 </Modal.Header>
                 <Modal.Body>
                     {formError && <Alert variant="danger">{formError}</Alert>}
+                    {formSuccess && <Alert variant="success">{formSuccess}</Alert>}
                     <Form onSubmit={handleSubmit} id="form-nuevo-animal">
                         <Form.Group className="mb-3">
                             <Form.Label>Identificador*</Form.Label>

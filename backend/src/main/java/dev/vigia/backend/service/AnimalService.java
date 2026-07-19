@@ -30,6 +30,8 @@ public interface AnimalService {
         EstadoReproductivoResponse editarEstadoReproductivo(Long animalId, Long estadoId, String emailProductor,
                         EstadoReproductivoRequest request);
 
+        List<EstadoReproductivoResponse> listarEstadosReproductivos(Long animalId, String emailUsuario);
+
         dev.vigia.backend.dto.CargaMasivaEstadoResponse cargarEstadosMasivo(MultipartFile file, String emailProductor) throws IOException;
 
         CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, Long establecimientoId, String emailProductor)

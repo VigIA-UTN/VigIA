@@ -98,3 +98,52 @@ export async function cargarEstadosExcel(file: File): Promise<CargaMasivaEstadoR
   });
   return response.data;
 }
+
+export type TipoReproductivo = 'VACIA' | 'GESTANTE' | 'CELO' | 'ANESTRO';
+
+export interface EstadoReproductivoRequest {
+  estado: TipoReproductivo;
+  fechaUltimoParto?: string | null;
+  fechaUltimaInseminacion?: string | null;
+}
+
+export interface EstadoReproductivoResponse {
+  id: number;
+  animalId: number;
+  estado: string;
+  fechaUltimoParto: string | null;
+  fechaUltimaInseminacion: string | null;
+  origen: string | null;
+  fechaRegistro: string;
+  registradoPor: string | null;
+}
+
+export async function registrarEstadoReproductivo(
+  animalId: number,
+  data: EstadoReproductivoRequest
+): Promise<EstadoReproductivoResponse> {
+  const response = await axiosClient.post<EstadoReproductivoResponse>(
+    `/animales/${animalId}/estado-reproductivo`,
+    data
+  );
+  return response.data;
+}
+
+export async function editarEstadoReproductivo(
+  animalId: number,
+  estadoId: number,
+  data: EstadoReproductivoRequest
+): Promise<EstadoReproductivoResponse> {
+  const response = await axiosClient.put<EstadoReproductivoResponse>(
+    `/animales/${animalId}/estado-reproductivo/${estadoId}`,
+    data
+  );
+  return response.data;
+}
+
+export async function getHistorialEstados(animalId: number): Promise<EstadoReproductivoResponse[]> {
+  const response = await axiosClient.get<EstadoReproductivoResponse[]>(
+    `/animales/${animalId}/estado-reproductivo`
+  );
+  return response.data;
+}

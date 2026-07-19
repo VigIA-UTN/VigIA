@@ -7,6 +7,7 @@ import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -31,12 +32,14 @@ public class DataInitializer implements CommandLineRunner {
     private final InvitacionRepository invitacionRepository;
     private final AnimalRepository animalRepository;
     private final RodeoLoteRepository rodeoLoteRepository;
+    private final EstadoReproductivoRepository estadoReproductivoRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     @SuppressWarnings("null")
     public void run(String... args) {
         log.info("[DataInitializer] Limpiando la base de datos para entorno de desarrollo...");
+        estadoReproductivoRepository.deleteAll();
         invitacionRepository.deleteAll();
         animalRepository.deleteAll();
         rodeoLoteRepository.deleteAll();
