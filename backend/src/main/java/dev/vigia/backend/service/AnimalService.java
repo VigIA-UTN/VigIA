@@ -32,6 +32,6 @@ public interface AnimalService {
 
         dev.vigia.backend.dto.CargaMasivaEstadoResponse cargarEstadosMasivo(MultipartFile file, String emailProductor) throws IOException;
 
-        CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, String emailProductor)
+        CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, Long establecimientoId, String emailProductor)
                         throws IOException;
 }

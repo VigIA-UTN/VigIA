@@ -146,11 +146,12 @@ public class AnimalController {
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> cargarAnimalesExcel(
             @RequestParam("file") MultipartFile file,
+            @RequestParam("establecimientoId") Long establecimientoId,
             Authentication authentication) {
 
         try {
             String emailProductor = authentication.getName();
-            CargaMasivaResponse response = animalService.cargarAnimalesExcel(file, emailProductor);
+            CargaMasivaResponse response = animalService.cargarAnimalesExcel(file, establecimientoId, emailProductor);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

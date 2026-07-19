@@ -882,6 +882,7 @@ class AnimalControllerTest {
 
                 mockMvc.perform(multipart("/api/v1/animales/csv")
                                 .file(file)
+                                .param("establecimientoId", establecimientoId.toString())
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.procesados").value(1))
@@ -900,6 +901,7 @@ class AnimalControllerTest {
 
                 mockMvc.perform(multipart("/api/v1/animales/csv")
                                 .file(file)
+                                .param("establecimientoId", establecimientoId.toString())
                                 .header("Authorization", "Bearer " + adminToken))
                                 .andExpect(status().isForbidden());
         }
@@ -907,10 +909,7 @@ class AnimalControllerTest {
         @Test
         @DisplayName("POST /api/v1/animales/csv - Archivo mayor a 5MB")
         void cargarAnimalesExcel_fileTooLarge_badRequest() throws Exception {
-                // MockMvc will bypass servlet multipart size checks, but we simulate it by
-                // sending
-                // a large empty content file that won't parse, simulating a size check error or
-                // parsing error.
+
                 byte[] largeContent = new byte[6 * 1024 * 1024]; // 6MB
                 MockMultipartFile file = new MockMultipartFile(
                                 "file", "large.xlsx",
@@ -941,7 +940,8 @@ class AnimalControllerTest {
                 String csvContent = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
                                 animal.getId() + ",GESTANTE,2023-01-01,2023-02-01\n";
 
-                MockMultipartFile file = new MockMultipartFile("file", "estados.csv", "text/csv", csvContent.getBytes());
+                MockMultipartFile file = new MockMultipartFile("file", "estados.csv", "text/csv",
+                                csvContent.getBytes());
 
                 mockMvc.perform(multipart("/api/v1/animales/estado-reproductivo/csv")
                                 .file(file)
@@ -957,7 +957,8 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void cargarEstadosExcel_asAdmin_forbidden() throws Exception {
                 String csvContent = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n1,GESTANTE,,\n";
-                MockMultipartFile file = new MockMultipartFile("file", "estados.csv", "text/csv", csvContent.getBytes());
+                MockMultipartFile file = new MockMultipartFile("file", "estados.csv", "text/csv",
+                                csvContent.getBytes());
 
                 mockMvc.perform(multipart("/api/v1/animales/estado-reproductivo/csv")
                                 .file(file)

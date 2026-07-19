@@ -6,7 +6,7 @@ export interface AnimalResponse {
   id: number;
   idCaravanaOficial: string | null;
   alias: string | null;
-  fechaNacimiento: string; // ISO date string
+  fechaNacimiento: string;
   raza: string | null;
   estadoActual: EstadoAnimal;
   rodeoLoteId: number | null;
@@ -40,7 +40,7 @@ export interface CargaMasivaEstadoResponse {
 export interface AnimalRequest {
   idCaravanaOficial: string | null;
   alias: string | null;
-  fechaNacimiento: string; // 'YYYY-MM-DD'
+  fechaNacimiento: string;
   raza: string | null;
   rodeoLoteId: number | null;
   estadoActual: EstadoAnimal;
@@ -76,9 +76,10 @@ export async function updateAnimal(id: number, data: AnimalRequest): Promise<Ani
   return response.data;
 }
 
-export async function cargarAnimalesExcel(file: File): Promise<CargaMasivaResponse> {
+export async function cargarAnimalesExcel(file: File, establecimientoId: number): Promise<CargaMasivaResponse> {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('establecimientoId', establecimientoId.toString());
   const response = await axiosClient.post<CargaMasivaResponse>('/animales/csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',

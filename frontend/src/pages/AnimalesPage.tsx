@@ -51,6 +51,7 @@ export default function AnimalesPage() {
     const [submittingUpload, setSubmittingUpload] = useState(false);
     const [formErrorUpload, setFormErrorUpload] = useState<string | null>(null);
     const [fileUpload, setFileUpload] = useState<File | null>(null);
+    const [uploadEstablecimientoId, setUploadEstablecimientoId] = useState<number | ''>('');
     const [reporteCarga, setReporteCarga] = useState<CargaMasivaResponse | null>(null);
 
     const [uploadEstadosModal, setUploadEstadosModal] = useState(false);
@@ -150,10 +151,14 @@ export default function AnimalesPage() {
 
     const handleSubmitUpload = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!uploadEstablecimientoId) {
+            setFormErrorUpload('Por favor seleccioná un establecimiento.');
+            return;
+        }
         setFormErrorUpload(null);
         setSubmittingUpload(true);
         try {
-            const result = await cargarAnimalesExcel(fileUpload as File);
+            const result = await cargarAnimalesExcel(fileUpload as File, Number(uploadEstablecimientoId));
             setReporteCarga(result);
             setAnimales(prev => [...prev, ...result.animales]);
         } catch (err) {
@@ -168,6 +173,7 @@ export default function AnimalesPage() {
         setUploadModal(false);
         setReporteCarga(null);
         setFileUpload(null);
+        setUploadEstablecimientoId('');
         setFormErrorUpload(null);
     };
 
@@ -476,7 +482,38 @@ export default function AnimalesPage() {
                         </div>
                     ) : (
                         <Form onSubmit={handleSubmitUpload} id="form-cargar-animales">
-                            <Form.Group className="mb-3">
+                            <div className="mb-3 text-white" style={{ fontSize: '0.9em' }}>
+                                <p className="mb-1">El archivo debe contener las siguientes columnas en este orden:</p>
+                                <ul>
+                                    <li><strong>IdCaravana</strong> (al menos IdCaravana o Alias debe estar presente)</li>
+                                    <li><strong>Alias</strong> (al menos IdCaravana o Alias debe estar presente)</li>
+                                    <li><strong>FechaNacimiento</strong> (opcional, formato YYYY-MM-DD)</li>
+                                    <li><strong>Raza</strong> (opcional)</li>
+                                    <li><strong>RodeoLote</strong> (opcional, nombre exacto del lote/rodeo, se creará si no existe)</li>
+                                </ul>
+                                <div className="d-flex gap-3 mb-3">
+                                    <a href="/template_animales.csv" download className="d-inline-block">
+                                        <i className="bi bi-filetype-csv me-1" /> Descargar template CSV
+                                    </a>
+                                    <a href="/template_animales.xlsx" download className="d-inline-block">
+                                        <i className="bi bi-filetype-xlsx me-1" /> Descargar template Excel
+                                    </a>
+                                </div>
+                            </div>
+                            <Form.Group controlId="formUploadEstablecimiento" className="mb-3">
+                                <Form.Label>Establecimiento*</Form.Label>
+                                <Form.Select
+                                    value={uploadEstablecimientoId}
+                                    onChange={e => setUploadEstablecimientoId(Number(e.target.value))}
+                                    required
+                                >
+                                    <option value="">Seleccioná una opción</option>
+                                    {establecimientos.map(e => (
+                                        <option key={e.id} value={e.id}>{e.nombre}</option>
+                                    ))}
+                                </Form.Select>
+                            </Form.Group>
+                            <Form.Group controlId="formUploadFile" className="mb-3">
                                 <Form.Label>Archivo*</Form.Label>
                                 <Form.Control name="file" type="file" accept=".xlsx,.xls,.csv" onChange={handleChangeUpload} required />
                             </Form.Group>

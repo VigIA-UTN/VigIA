@@ -33,7 +33,7 @@ import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AnimalService;
-import dev.vigia.backend.service.ExcelReaderService;
+import dev.vigia.backend.service.CargaMasivaService;
 import dev.vigia.backend.service.EstadoReproductivoCsvService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +48,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final RodeoLoteRepository rodeoLoteRepository;
         private final EstadoReproductivoRepository estadoReproductivoRepository;
 
-        private final ExcelReaderService excelReaderService;
+        private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
 
         @Override
@@ -423,10 +423,10 @@ public class AnimalServiceImpl implements AnimalService {
 
         @Override
         @SuppressWarnings("null")
-        public CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, String emailProductor)
+        public CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, Long establecimientoId, String emailProductor)
                         throws IOException {
 
-                CargaMasivaResult result = excelReaderService.leerYGuardarAnimalesExcel(file, emailProductor);
+                CargaMasivaResult result = cargaMasivaService.procesarCargaMasiva(file, establecimientoId, emailProductor);
 
                 List<AnimalResponse> animalesResponse = result.getAnimalesExitosos().stream()
                                 .map(this::mapToResponse)
