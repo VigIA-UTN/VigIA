@@ -31,8 +31,7 @@ export default function AnimalesPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const [filterCelo, setFilterCelo] = useState(false);
-    const [filterSalud, setFilterSalud] = useState(false);
+    const [activeTab, setActiveTab] = useState<'general' | 'celo' | 'salud'>('general');
     const [searchTerm, setSearchTerm] = useState('');
 
     const [showModal, setShowModal] = useState(false);
@@ -234,13 +233,15 @@ export default function AnimalesPage() {
     };
 
     const filteredAnimales = animales.filter(a => {
-        if (filterSalud && a.estadoActual !== 'CON_ALERTA') return false;
+        if (activeTab === 'salud' && a.estadoActual !== 'CON_ALERTA') return false;
         if (!searchTerm) return true;
         const q = searchTerm.toLowerCase();
         return (
-            String(a.id).includes(q) ||
+            (a.idCaravanaOficial?.toLowerCase().includes(q) ?? false) ||
             (a.alias?.toLowerCase().includes(q) ?? false) ||
-            (a.rodeoLoteId !== null && String(a.rodeoLoteId).includes(q))
+            (a.rodeoLoteNombre?.toLowerCase().includes(q) ?? false) ||
+            (a.estadoActual?.toLowerCase().includes(q) ?? false) ||
+            (a.estadoReproductivo?.toLowerCase().includes(q) ?? false)
         );
     });
 
@@ -273,10 +274,13 @@ export default function AnimalesPage() {
                 <div className="vigia-page-header">
                     <div className="d-flex align-items-center gap-2">
                         <h2 className="vigia-page-title">Animales</h2>
-                        <button className={`btn-filter${filterCelo ? ' active' : ''}`} onClick={() => setFilterCelo(f => !f)}>
+                        <button className={`btn-filter${activeTab === 'general' ? ' active' : ''}`} onClick={() => setActiveTab('general')}>
+                            <i className="bi bi-list" /> General
+                        </button>
+                        <button className={`btn-filter${activeTab === 'celo' ? ' active' : ''}`} onClick={() => setActiveTab('celo')}>
                             <i className="bi bi-search" /> Celo
                         </button>
-                        <button className={`btn-filter${filterSalud ? ' active' : ''}`} onClick={() => setFilterSalud(f => !f)}>
+                        <button className={`btn-filter${activeTab === 'salud' ? ' active' : ''}`} onClick={() => setActiveTab('salud')}>
                             <i className="bi bi-heart" /> Salud
                         </button>
                     </div>
@@ -328,7 +332,7 @@ export default function AnimalesPage() {
                                                 Nombre <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'alias' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                             </div>
                                         </th>
-                                        {filterCelo ? (
+                                        {activeTab === 'celo' ? (
                                             <>
                                                 <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-start">
@@ -358,14 +362,19 @@ export default function AnimalesPage() {
                                                         Raza <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'raza' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
-                                                <th onClick={() => handleSort('rodeoLoteId')} style={{ cursor: 'pointer' }}>
+                                                <th onClick={() => handleSort('rodeoLoteNombre')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-start">
-                                                        Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteId' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                        Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteNombre' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
                                                 <th onClick={() => handleSort('estadoActual')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-center">
                                                         Estado <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoActual' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                    </div>
+                                                </th>
+                                                <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }}>
+                                                    <div className="d-flex align-items-center justify-content-center">
+                                                        Reproductivo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
                                             </>
@@ -376,7 +385,7 @@ export default function AnimalesPage() {
                                 <tbody>
                                     {sortedAnimales.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="text-center py-4 text-muted">
+                                            <td colSpan={8} className="text-center py-4 text-muted">
                                                 No se encontraron animales.
                                             </td>
                                         </tr >
@@ -385,7 +394,7 @@ export default function AnimalesPage() {
                                             <tr key={a.id} className="animal-row">
                                                 <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
                                                 <td>{a.alias || '—'}</td>
-                                                {filterCelo ? (
+                                                {activeTab === 'celo' ? (
                                                     <>
                                                         <td className="text-center">
                                                             {a.estadoReproductivo ? (
@@ -402,8 +411,16 @@ export default function AnimalesPage() {
                                                     <>
                                                         <td>{formatFecha(a.fechaNacimiento)}</td>
                                                         <td>{a.raza || '—'}</td>
-                                                        <td>{a.rodeoLoteId ? `#${String(a.rodeoLoteId).padStart(2, '0')}` : '—'}</td>
+                                                        <td>{a.rodeoLoteNombre || '—'}</td>
                                                         <td className="text-center"><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
+                                                        <td className="text-center">
+                                                            {a.estadoReproductivo ? (
+                                                                <span className={`badge ${a.estadoReproductivo === 'GESTANTE' ? 'bg-success' :
+                                                                    a.estadoReproductivo === 'CELO' ? 'bg-danger' :
+                                                                        a.estadoReproductivo === 'VACIA' ? 'bg-secondary' : 'bg-info'
+                                                                    }`}>{a.estadoReproductivo}</span>
+                                                            ) : '—'}
+                                                        </td>
                                                     </>
                                                 )}
                                                 <td className="text-center">
