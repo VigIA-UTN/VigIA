@@ -234,8 +234,6 @@ export default function AnimalDetailPage() {
 
     if (!animal) return null;
 
-    const ultimoEstado = historial[0] ?? null;
-
     return (
         <div className="vigia-page-container animal-detail-container">
             <Container>
