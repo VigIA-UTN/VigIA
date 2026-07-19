@@ -39,14 +39,21 @@ select {
 }
 
 html,
-body,
-#root {
+body {
   margin: 0;
   padding: 0;
   height: 100%;
   width: 100%;
   cursor: default;
-  overflow-y: scroll;
+}
+
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Fuerza cursor default en contenedores de Bootstrap que heredan cursor de texto */

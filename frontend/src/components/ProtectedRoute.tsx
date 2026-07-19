@@ -23,5 +23,12 @@ export default function ProtectedRoute({ roles, children }: ProtectedRouteProps)
     return <Navigate to="/" replace />;
   }
 
-  return <><NavScroll /> {children}</>;
+  return (
+    <>
+      <NavScroll />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {children}
+      </div>
+    </>
+  );
 }
