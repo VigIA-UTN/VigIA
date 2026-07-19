@@ -250,7 +250,7 @@ export default function AnimalesPage() {
         let valB = b[sortField as keyof AnimalResponse] as string | number | null;
         if (valA === null || valA === undefined) valA = '';
         if (valB === null || valB === undefined) valB = '';
-        
+
         if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
         if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
         return 0;
@@ -318,29 +318,29 @@ export default function AnimalesPage() {
                             <table className="vigia-table">
                                 <thead>
                                     <tr>
-                                        <th onClick={() => handleSort('idCaravanaOficial')} style={{cursor: 'pointer'}}>
+                                        <th onClick={() => handleSort('idCaravanaOficial')} style={{ cursor: 'pointer' }}>
                                             <div className="d-flex align-items-center justify-content-start">
                                                 Identificador <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'idCaravanaOficial' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                             </div>
                                         </th>
-                                        <th onClick={() => handleSort('alias')} style={{cursor: 'pointer'}}>
+                                        <th onClick={() => handleSort('alias')} style={{ cursor: 'pointer' }}>
                                             <div className="d-flex align-items-center justify-content-start">
                                                 Nombre <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'alias' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                             </div>
                                         </th>
                                         {filterCelo ? (
                                             <>
-                                                <th onClick={() => handleSort('estadoReproductivo')} style={{cursor: 'pointer'}}>
+                                                <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-start">
                                                         Estado Reproductivo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
-                                                <th onClick={() => handleSort('fechaUltimoParto')} style={{cursor: 'pointer'}}>
+                                                <th onClick={() => handleSort('fechaUltimoParto')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-start">
                                                         Fecha Último Parto <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimoParto' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
-                                                <th onClick={() => handleSort('fechaUltimaInseminacion')} style={{cursor: 'pointer'}}>
+                                                <th onClick={() => handleSort('fechaUltimaInseminacion')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-start">
                                                         Fecha Última Inseminación <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimaInseminacion' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
@@ -348,22 +348,22 @@ export default function AnimalesPage() {
                                             </>
                                         ) : (
                                             <>
-                                                <th onClick={() => handleSort('fechaNacimiento')} style={{cursor: 'pointer'}}>
+                                                <th onClick={() => handleSort('fechaNacimiento')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-start">
                                                         Fecha Nacimiento <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'fechaNacimiento' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
-                                                <th onClick={() => handleSort('raza')} style={{cursor: 'pointer'}}>
+                                                <th onClick={() => handleSort('raza')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-start">
                                                         Raza <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'raza' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
-                                                <th onClick={() => handleSort('rodeoLoteId')} style={{cursor: 'pointer'}}>
+                                                <th onClick={() => handleSort('rodeoLoteId')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-start">
                                                         Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteId' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
-                                                <th onClick={() => handleSort('estadoActual')} style={{cursor: 'pointer'}}>
+                                                <th onClick={() => handleSort('estadoActual')} style={{ cursor: 'pointer' }}>
                                                     <div className="d-flex align-items-center justify-content-center">
                                                         Estado <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoActual' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
@@ -389,11 +389,10 @@ export default function AnimalesPage() {
                                                     <>
                                                         <td className="text-center">
                                                             {a.estadoReproductivo ? (
-                                                                <span className={`badge ${
-                                                                    a.estadoReproductivo === 'GESTANTE' ? 'bg-success' :
+                                                                <span className={`badge ${a.estadoReproductivo === 'GESTANTE' ? 'bg-success' :
                                                                     a.estadoReproductivo === 'CELO' ? 'bg-danger' :
-                                                                    a.estadoReproductivo === 'VACIA' ? 'bg-secondary' : 'bg-info'
-                                                                }`}>{a.estadoReproductivo}</span>
+                                                                        a.estadoReproductivo === 'VACIA' ? 'bg-secondary' : 'bg-info'
+                                                                    }`}>{a.estadoReproductivo}</span>
                                                             ) : '—'}
                                                         </td>
                                                         <td>{formatFecha(a.fechaUltimoParto ?? null)}</td>
@@ -452,7 +451,7 @@ export default function AnimalesPage() {
                             <Form.Control name="raza" type="text" placeholder="Ej: Holstein" value={form.raza ?? ''} onChange={handleChange} />
                         </Form.Group>
                         <Form.Group className="mb-3">
-                            <Form.Label>Establecimiento</Form.Label>
+                            <Form.Label>Establecimiento*</Form.Label>
                             <Form.Select
                                 name="establecimientoId"
                                 value={form.establecimientoId ?? ''}
@@ -465,7 +464,7 @@ export default function AnimalesPage() {
                             </Form.Select>
                         </Form.Group>
                         <Form.Group className="mb-3">
-                            <Form.Label>Lote</Form.Label>
+                            <Form.Label>Lote*</Form.Label>
                             <Form.Select
                                 name="rodeoLoteId"
                                 value={form.rodeoLoteId ?? ''}
@@ -546,10 +545,10 @@ export default function AnimalesPage() {
                                     <li><strong>RodeoLote</strong> (opcional, nombre exacto del lote/rodeo, se creará si no existe)</li>
                                 </ul>
                                 <div className="d-flex gap-3 mb-3">
-                                    <a href="/template_animales.csv" download className="d-inline-block">
+                                    <a href="/template_animales.csv" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
                                         <i className="bi bi-filetype-csv me-1" /> Descargar template CSV
                                     </a>
-                                    <a href="/template_animales.xlsx" download className="d-inline-block">
+                                    <a href="/template_animales.xlsx" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
                                         <i className="bi bi-filetype-xlsx me-1" /> Descargar template Excel
                                     </a>
                                 </div>

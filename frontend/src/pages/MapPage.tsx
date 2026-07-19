@@ -24,26 +24,7 @@ export default function MapPage() {
   };
 
   return (
-    <div style={{ height: '100vh', width: '100vw', margin: 0, padding: 0, position: 'relative' }}>
-      <button
-        onClick={handleLogout}
-        style={{
-          position: 'absolute',
-          top: 16,
-          right: 16,
-          zIndex: 1000,
-          background: '#1E3A5F',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 8,
-          padding: '8px 18px',
-          cursor: 'pointer',
-          fontFamily: 'Outfit, sans-serif',
-          fontWeight: 600,
-        }}
-      >
-        Cerrar sesión
-      </button>
+    <div style={{ height: '100%', width: '100%', margin: 0, padding: 0, position: 'relative' }}>
       <MapContainer center={CENTRO_CAMPO} zoom={15} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

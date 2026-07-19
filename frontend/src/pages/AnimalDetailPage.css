@@ -1,5 +1,6 @@
 .animal-detail-container {
     max-width: 1000px;
+    margin: 0 auto;
 }
 
 .animal-card {

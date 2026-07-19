@@ -355,9 +355,6 @@ export default function AnimalDetailPage() {
                                     <ul className="list-unstyled detail-list">
                                         <li><strong>Establecimiento:</strong> #{animal.establecimientoId}</li>
                                         <li><strong>Rodeo/Lote:</strong> {animal.rodeoLoteNombre || (animal.rodeoLoteId ? `#${String(animal.rodeoLoteId).padStart(2, '0')}` : '—')}</li>
-                                        <li><strong>Estado Reproductivo:</strong> {estadoReproductivoBadge(animal.estadoReproductivo)}</li>
-                                        <li><strong>Último Parto:</strong> {formatFechaLocal(animal.fechaUltimoParto)}</li>
-                                        <li><strong>Última Inseminación:</strong> {formatFechaLocal(animal.fechaUltimaInseminacion)}</li>
                                         <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
                                     </ul>
                                 </Col>
