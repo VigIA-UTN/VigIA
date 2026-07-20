@@ -148,7 +148,12 @@ export default function AnimalDetailPage() {
 
     const openNuevoEstadoModal = () => {
         setEditingEstado(null);
-        setEstadoForm(EMPTY_ESTADO_FORM);
+        const lastEstado = historial.length > 0 ? historial[0] : null;
+        setEstadoForm({
+            estado: 'VACIA',
+            fechaUltimoParto: lastEstado?.fechaUltimoParto || null,
+            fechaUltimaInseminacion: lastEstado?.fechaUltimaInseminacion || null,
+        });
         setEstadoFormError(null);
         setEstadoSuccess(null);
         setShowEstadoModal(true);
@@ -176,6 +181,31 @@ export default function AnimalDetailPage() {
         if (!id) return;
         setEstadoFormError(null);
         setEstadoSuccess(null);
+
+        if (estadoForm.fechaUltimoParto && estadoForm.fechaUltimaInseminacion) {
+            const fParto = new Date(estadoForm.fechaUltimoParto);
+            const fInsem = new Date(estadoForm.fechaUltimaInseminacion);
+            if (fInsem > fParto && estadoForm.estado !== 'GESTANTE') {
+                setEstadoFormError('La fecha de última inseminación no puede ser posterior al último parto sin un estado de gestación.');
+                return;
+            }
+        }
+
+        if (estadoForm.fechaUltimoParto) {
+            const referenceIndex = editingEstado ? 1 : 0;
+            const refEstado = historial.length > referenceIndex ? historial[referenceIndex] : null;
+            if (refEstado?.fechaUltimoParto) {
+                const fPartoNuevo = new Date(estadoForm.fechaUltimoParto);
+                const fPartoAnterior = new Date(refEstado.fechaUltimoParto);
+                if (fPartoNuevo < fPartoAnterior) {
+                    setEstadoFormError(
+                        `La fecha de último parto no puede ser anterior a la ya registrada (${refEstado.fechaUltimoParto.split('-').reverse().join('/')}).`
+                    );
+                    return;
+                }
+            }
+        }
+
         setSubmittingEstado(true);
         try {
             if (editingEstado) {
