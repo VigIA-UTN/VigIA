@@ -13,7 +13,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EstadoReproductivoCsvRequest {
-    private Long animalId;
+    private String idCaravana;
+    private String alias;
     private TipoReproductivo estado;
     private LocalDate fechaUltimoParto;
     private LocalDate fechaUltimaInseminacion;

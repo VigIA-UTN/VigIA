@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.AnimalRequest;
@@ -315,13 +316,6 @@ public class AnimalServiceImpl implements AnimalService {
                         throw new IllegalArgumentException("La fecha de última inseminación no puede ser futura.");
                 }
 
-                if (request.getFechaUltimoParto() != null && request.getFechaUltimaInseminacion() != null) {
-                        if (request.getFechaUltimoParto().isAfter(request.getFechaUltimaInseminacion())) {
-                                throw new IllegalArgumentException(
-                                                "La fecha de último parto no puede ser posterior a la última inseminación.");
-                        }
-                }
-
                 EstadoReproductivo estado = new EstadoReproductivo();
                 estado.setAnimal(animal);
                 estado.setUsuarioRegistrador(productorUser);
@@ -391,13 +385,6 @@ public class AnimalServiceImpl implements AnimalService {
                         throw new IllegalArgumentException("La fecha de última inseminación no puede ser futura.");
                 }
 
-                if (request.getFechaUltimoParto() != null && request.getFechaUltimaInseminacion() != null) {
-                        if (request.getFechaUltimoParto().isAfter(request.getFechaUltimaInseminacion())) {
-                                throw new IllegalArgumentException(
-                                                "La fecha de último parto no puede ser posterior a la última inseminación.");
-                        }
-                }
-
                 estado.setEstado(request.getEstado());
                 estado.setFechaUltParto(request.getFechaUltimoParto());
                 estado.setFechaUltInseminacion(request.getFechaUltimaInseminacion());
@@ -427,10 +414,12 @@ public class AnimalServiceImpl implements AnimalService {
 
         @Override
         @SuppressWarnings("null")
-        public CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, Long establecimientoId, String emailProductor)
+        public CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, Long establecimientoId,
+                        String emailProductor)
                         throws IOException {
 
-                CargaMasivaResult result = cargaMasivaService.procesarCargaMasiva(file, establecimientoId, emailProductor);
+                CargaMasivaResult result = cargaMasivaService.procesarCargaMasiva(file, establecimientoId,
+                                emailProductor);
 
                 List<AnimalResponse> animalesResponse = result.getAnimalesExitosos().stream()
                                 .map(this::mapToResponse)
@@ -447,11 +436,23 @@ public class AnimalServiceImpl implements AnimalService {
         @Override
         @SuppressWarnings("null")
         @Transactional
-        public CargaMasivaEstadoResponse cargarEstadosMasivo(MultipartFile file, String emailProductor)
+        public CargaMasivaEstadoResponse cargarEstadosMasivo(MultipartFile file, Long establecimientoId,
+                        String emailProductor)
                         throws IOException {
 
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
+
+                Establecimiento establecimientoSeleccionado = establecimientoRepository.findById(establecimientoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+
+                boolean productorActivoEnEstablecimiento = establecimientoSeleccionado.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
+
+                if (!productorActivoEnEstablecimiento) {
+                        throw new IllegalArgumentException(
+                                        "El productor no pertenece al establecimiento seleccionado.");
+                }
 
                 EstadoReproductivoParseResult parseResult = estadoReproductivoCsvService.parseAndValidate(file);
 
@@ -460,17 +461,23 @@ public class AnimalServiceImpl implements AnimalService {
 
                 for (EstadoReproductivoCsvRequest fila : parseResult.getValidos()) {
                         try {
-                                Animal animal = animalRepository.findById(fila.getAnimalId())
-                                                .orElseThrow(() -> new IllegalArgumentException("Animal con id "
-                                                                + fila.getAnimalId() + " no encontrado."));
+                                Animal animal = null;
+                                if (fila.getIdCaravana() != null && !fila.getIdCaravana().isEmpty()) {
+                                        animal = animalRepository
+                                                        .findByIdCaravanaOficialAndEstablecimientoId(
+                                                                        fila.getIdCaravana(), establecimientoId)
+                                                        .orElse(null);
+                                }
+                                if (animal == null && fila.getAlias() != null && !fila.getAlias().isEmpty()) {
+                                        animal = animalRepository
+                                                        .findByAliasAndEstablecimientoId(fila.getAlias(),
+                                                                        establecimientoId)
+                                                        .orElse(null);
+                                }
 
-                                Establecimiento establecimiento = animal.getEstablecimiento();
-                                boolean productorActivoEnEstablecimiento = establecimiento.getEmpleados().stream()
-                                                .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
-
-                                if (!productorActivoEnEstablecimiento) {
+                                if (animal == null) {
                                         throw new IllegalArgumentException(
-                                                        "El productor no pertenece al establecimiento del animal.");
+                                                        "Animal no encontrado con los identificadores proporcionados en este establecimiento.");
                                 }
 
                                 if (animal.getEstadoActual().equals(EstadoAnimal.INACTIVO)) {
@@ -489,12 +496,19 @@ public class AnimalServiceImpl implements AnimalService {
                                 estadoReproductivoRepository.save(estado);
                                 exitosos++;
                         } catch (Exception e) {
-                                // Find an appropriate row number if possible, or just append with a generic
-                                // "unknown" row, but wait, we don't have row number in
-                                // EstadoReproductivoCsvRequest!
-                                // For now just append to invalidos with index -1 or 0
-                                errores.add(new FilaEstadoInvalida(0, fila.getAnimalId() + ": " + e.getMessage()));
+                                String animalIdentifier = fila.getIdCaravana() != null ? fila.getIdCaravana()
+                                                : fila.getAlias();
+                                errores.add(new FilaEstadoInvalida(0, animalIdentifier + ": " + e.getMessage()));
                         }
+                }
+
+                if (!errores.isEmpty()) {
+                        try {
+                                TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+                        } catch (org.springframework.transaction.NoTransactionException e) {
+                                // Ignorar en unit tests sin proxy
+                        }
+                        exitosos = 0;
                 }
 
                 return CargaMasivaEstadoResponse.builder()

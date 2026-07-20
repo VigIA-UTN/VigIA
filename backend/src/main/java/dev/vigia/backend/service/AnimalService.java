@@ -10,6 +10,7 @@ import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
+import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 
 public interface AnimalService {
         AnimalResponse cargarAnimal(String emailProductor, AnimalRequest request);
@@ -32,7 +33,8 @@ public interface AnimalService {
 
         List<EstadoReproductivoResponse> listarEstadosReproductivos(Long animalId, String emailUsuario);
 
-        dev.vigia.backend.dto.CargaMasivaEstadoResponse cargarEstadosMasivo(MultipartFile file, String emailProductor) throws IOException;
+        CargaMasivaEstadoResponse cargarEstadosMasivo(MultipartFile file, Long establecimientoId, String emailProductor)
+                        throws IOException;
 
         CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, Long establecimientoId, String emailProductor)
                         throws IOException;

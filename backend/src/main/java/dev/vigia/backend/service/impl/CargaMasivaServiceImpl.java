@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.multipart.MultipartFile;
 import dev.vigia.backend.dto.CargaMasivaResult;
 import dev.vigia.backend.model.Animal;
@@ -30,9 +32,17 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
     private final List<FileParserService> parsers;
 
     @Override
+    @Transactional
     @SuppressWarnings("null")
     public CargaMasivaResult procesarCargaMasiva(MultipartFile file, Long establecimientoId, String email)
             throws IOException, IllegalArgumentException {
+
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("El archivo está vacío");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new IllegalArgumentException("El archivo excede el tamaño máximo permitido (5MB)");
+        }
 
         Establecimiento establecimientoSeleccionado = establecimientoRepository.findById(establecimientoId)
                 .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
@@ -69,6 +79,15 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
             } catch (Exception e) {
                 fallidos++;
             }
+        }
+
+        if (fallidos > 0) {
+            try {
+                TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            } catch (org.springframework.transaction.NoTransactionException e) {
+                // Ignorar en unit tests sin proxy
+            }
+            animals.clear();
         }
 
         List<Animal> saveAnimals = animalRepository.saveAll(animals);

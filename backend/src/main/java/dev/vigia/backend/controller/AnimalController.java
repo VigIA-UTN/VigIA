@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
+import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
@@ -115,7 +116,8 @@ public class AnimalController {
 
         try {
             String email = authentication.getName();
-            List<dev.vigia.backend.dto.EstadoReproductivoResponse> response = animalService.listarEstadosReproductivos(animalId, email);
+            List<dev.vigia.backend.dto.EstadoReproductivoResponse> response = animalService
+                    .listarEstadosReproductivos(animalId, email);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -123,7 +125,7 @@ public class AnimalController {
     }
 
     @PostMapping("/{id}/estado-reproductivo")
-    @PreAuthorize("hasRole('PRODUCTOR')")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> registrarEstadoReproductivo(
             @PathVariable("id") Long animalId,
             @Valid @RequestBody EstadoReproductivoRequest request,
@@ -140,7 +142,7 @@ public class AnimalController {
     }
 
     @PutMapping("/{id}/estado-reproductivo/{estadoId}")
-    @PreAuthorize("hasRole('PRODUCTOR')")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> editarEstadoReproductivo(
             @PathVariable("id") Long animalId,
             @PathVariable("estadoId") Long estadoId,
@@ -174,15 +176,18 @@ public class AnimalController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
     @PostMapping("/estado-reproductivo/csv")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> cargarEstadosMasivo(
             @RequestParam("file") MultipartFile file,
+            @RequestParam("establecimientoId") Long establecimientoId,
             Authentication authentication) {
 
         try {
             String emailProductor = authentication.getName();
-            dev.vigia.backend.dto.CargaMasivaEstadoResponse response = animalService.cargarEstadosMasivo(file, emailProductor);
+            CargaMasivaEstadoResponse response = animalService.cargarEstadosMasivo(file, establecimientoId,
+                    emailProductor);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

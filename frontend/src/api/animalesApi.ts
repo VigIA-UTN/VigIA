@@ -88,9 +88,10 @@ export async function cargarAnimalesExcel(file: File, establecimientoId: number)
   return response.data;
 }
 
-export async function cargarEstadosExcel(file: File): Promise<CargaMasivaEstadoResponse> {
+export async function cargarEstadosExcel(file: File, establecimientoId: number): Promise<CargaMasivaEstadoResponse> {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('establecimientoId', establecimientoId.toString());
   const response = await axiosClient.post<CargaMasivaEstadoResponse>('/animales/estado-reproductivo/csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',

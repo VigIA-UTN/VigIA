@@ -73,8 +73,8 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
             Sheet sheet = workbook.getSheetAt(0);
             
             Row headerRow = sheet.getRow(0);
-            if (headerRow == null || headerRow.getPhysicalNumberOfCells() < 2) {
-                throw new IllegalArgumentException("El archivo no tiene las columnas requeridas (IdAnimal, Estado)");
+            if (headerRow == null || headerRow.getPhysicalNumberOfCells() < 3) {
+                throw new IllegalArgumentException("El archivo no tiene las columnas requeridas (IdCaravana, Alias, Estado)");
             }
 
             for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
@@ -84,9 +84,9 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
                 }
                 
                 procesadosWrapper[0]++;
-                String[] cols = new String[4];
+                String[] cols = new String[5];
                 
-                for(int c = 0; c < 4; c++) {
+                for(int c = 0; c < 5; c++) {
                     Cell cell = row.getCell(c);
                     cols[c] = getCellValueAsString(cell);
                 }
@@ -122,8 +122,8 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
             }
             
             String[] headers = headerLine.split(",");
-            if (headers.length < 2) {
-                throw new IllegalArgumentException("El archivo no tiene las columnas requeridas (IdAnimal, Estado)");
+            if (headers.length < 3) {
+                throw new IllegalArgumentException("El archivo no tiene las columnas requeridas (IdCaravana, Alias, Estado)");
             }
 
             String line;
@@ -149,22 +149,16 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
     }
 
     private EstadoReproductivoCsvRequest parseRow(String[] cols) {
-        if (cols.length < 2) {
-            throw new IllegalArgumentException("Faltan columnas obligatorias (IdAnimal, Estado)");
+        if (cols.length < 3) {
+            throw new IllegalArgumentException("Faltan columnas obligatorias (IdCaravana, Alias, Estado)");
         }
         
-        String idAnimalStr = cols[0].trim();
-        String estadoStr = cols[1].trim();
+        String idCaravana = cols[0].trim();
+        String alias = cols[1].trim();
+        String estadoStr = cols[2].trim();
         
-        if (idAnimalStr.isEmpty()) {
-            throw new IllegalArgumentException("IdAnimal es obligatorio");
-        }
-        
-        Long idAnimal;
-        try {
-            idAnimal = Long.parseLong(idAnimalStr);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("IdAnimal debe ser un número entero");
+        if (idCaravana.isEmpty() && alias.isEmpty()) {
+            throw new IllegalArgumentException("IdCaravana o Alias son obligatorios");
         }
         
         if (estadoStr.isEmpty()) {
@@ -179,23 +173,20 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
         }
         
         LocalDate fechaParto = null;
-        if (cols.length > 2 && !cols[2].trim().isEmpty()) {
-            fechaParto = parseDate(cols[2].trim(), "FechaUltimoParto");
+        if (cols.length > 3 && !cols[3].trim().isEmpty()) {
+            fechaParto = parseDate(cols[3].trim(), "FechaUltimoParto");
         }
         
         LocalDate fechaInseminacion = null;
-        if (cols.length > 3 && !cols[3].trim().isEmpty()) {
-            fechaInseminacion = parseDate(cols[3].trim(), "FechaUltimaInseminacion");
+        if (cols.length > 4 && !cols[4].trim().isEmpty()) {
+            fechaInseminacion = parseDate(cols[4].trim(), "FechaUltimaInseminacion");
         }
         
-        if (fechaParto != null && fechaInseminacion != null) {
-            if (fechaInseminacion.isBefore(fechaParto)) {
-                throw new IllegalArgumentException("FechaUltimaInseminacion (" + fechaInseminacion + ") no puede ser anterior a FechaUltimoParto (" + fechaParto + ")");
-            }
-        }
+
         
         return EstadoReproductivoCsvRequest.builder()
-                .animalId(idAnimal)
+                .idCaravana(idCaravana)
+                .alias(alias)
                 .estado(estado)
                 .fechaUltimoParto(fechaParto)
                 .fechaUltimaInseminacion(fechaInseminacion)

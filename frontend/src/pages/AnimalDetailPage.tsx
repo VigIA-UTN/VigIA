@@ -237,9 +237,9 @@ export default function AnimalDetailPage() {
     return (
         <div className="vigia-page-container animal-detail-container">
             <Container>
-                <div className="vigia-page-header mb-4">
-                    <h2 className="vigia-page-title text-nowrap">Ficha del Animal: {animal.alias || animal.idCaravanaOficial || `#${animal.id}`}</h2>
-                    <div className="d-flex align-items-center gap-2">
+                <div className="vigia-page-header mb-4 flex-wrap gap-3">
+                    <h2 className="vigia-page-title text-break pe-3 mb-0">Ficha del Animal: {animal.alias || animal.idCaravanaOficial || `#${animal.id}`}</h2>
+                    <div className="d-flex align-items-center gap-2 flex-shrink-0">
                         {rol === 'PRODUCTOR' && !isEditing && (
                             <Button className="btn-vigia-primary px-4" onClick={() => setIsEditing(true)}>
                                 <i className="bi bi-pencil me-2" /> Editar
@@ -276,12 +276,12 @@ export default function AnimalDetailPage() {
                 {formError && <Alert variant="danger">{formError}</Alert>}
 
                 <Card className="shadow-sm border-0 animal-card mb-4">
-                    <Card.Body>
+                    <Card.Body className="p-4 p-md-5">
                         {isEditing ? (
                             <Form>
+                                <h4 className="section-title mb-4">Información General</h4>
                                 <Row className="g-4">
                                     <Col md={6}>
-                                        <h4 className="section-title">Información General</h4>
                                         <Form.Group className="mb-3">
                                             <Form.Label className="fw-bold">Identificador Oficial</Form.Label>
                                             <Form.Control name="idCaravanaOficial" value={form.idCaravanaOficial ?? ''} onChange={handleChange} />
@@ -298,17 +298,8 @@ export default function AnimalDetailPage() {
                                             <Form.Label className="fw-bold">Raza</Form.Label>
                                             <Form.Control name="raza" value={form.raza ?? ''} onChange={handleChange} />
                                         </Form.Group>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label className="fw-bold">Estado Actual</Form.Label>
-                                            <div>
-                                                <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>
-                                                    {animal.estadoActual}
-                                                </span>
-                                            </div>
-                                        </Form.Group>
                                     </Col>
                                     <Col md={6}>
-                                        <h4 className="section-title">Ubicación y Reproducción</h4>
                                         <Form.Group className="mb-3">
                                             <Form.Label className="fw-bold">Establecimiento</Form.Label>
                                             <Form.Select name="establecimientoId" value={form.establecimientoId ?? ''} onChange={handleChange}>
@@ -327,36 +318,42 @@ export default function AnimalDetailPage() {
                                                 ))}
                                             </Form.Select>
                                         </Form.Group>
+                                        <Form.Group className="mb-3">
+                                            <Form.Label className="fw-bold">Estado Actual</Form.Label>
+                                            <div>
+                                                <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>
+                                                    {animal.estadoActual}
+                                                </span>
+                                            </div>
+                                        </Form.Group>
                                         <ul className="list-unstyled detail-list mt-4">
-                                            <li><strong>Estado Reproductivo:</strong> {estadoReproductivoBadge(animal.estadoReproductivo)}</li>
-                                            <li><strong>Último Parto:</strong> {formatFechaLocal(animal.fechaUltimoParto)}</li>
-                                            <li><strong>Última Inseminación:</strong> {formatFechaLocal(animal.fechaUltimaInseminacion)}</li>
                                             <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
                                         </ul>
                                     </Col>
                                 </Row>
                             </Form>
                         ) : (
-                            <Row className="g-4">
-                                <Col md={6}>
-                                    <h4 className="section-title">Información General</h4>
-                                    <ul className="list-unstyled detail-list">
-                                        <li><strong>Identificador Oficial:</strong> {animal.idCaravanaOficial || '—'}</li>
-                                        <li><strong>Nombre/Alias:</strong> {animal.alias || '—'}</li>
-                                        <li><strong>Fecha de Nacimiento:</strong> {formatFechaLocal(animal.fechaNacimiento)}</li>
-                                        <li><strong>Raza:</strong> {animal.raza || '—'}</li>
-                                        <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
-                                    </ul>
-                                </Col>
-                                <Col md={6}>
-                                    <h4 className="section-title">Ubicación y Reproducción</h4>
-                                    <ul className="list-unstyled detail-list">
-                                        <li><strong>Establecimiento:</strong> #{animal.establecimientoId}</li>
-                                        <li><strong>Rodeo/Lote:</strong> {animal.rodeoLoteNombre || (animal.rodeoLoteId ? `#${String(animal.rodeoLoteId).padStart(2, '0')}` : '—')}</li>
-                                        <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
-                                    </ul>
-                                </Col>
-                            </Row>
+                            <>
+                                <h4 className="section-title mb-4">Información General</h4>
+                                <Row className="g-4">
+                                    <Col md={6}>
+                                        <ul className="list-unstyled detail-list">
+                                            <li><strong>Identificador Oficial:</strong> {animal.idCaravanaOficial || '—'}</li>
+                                            <li><strong>Nombre/Alias:</strong> {animal.alias || '—'}</li>
+                                            <li><strong>Fecha de Nacimiento:</strong> {formatFechaLocal(animal.fechaNacimiento)}</li>
+                                            <li><strong>Raza:</strong> {animal.raza || '—'}</li>
+                                        </ul>
+                                    </Col>
+                                    <Col md={6}>
+                                        <ul className="list-unstyled detail-list">
+                                            <li><strong>Establecimiento:</strong> #{animal.establecimientoId}</li>
+                                            <li><strong>Rodeo/Lote:</strong> {animal.rodeoLoteNombre || (animal.rodeoLoteId ? `#${String(animal.rodeoLoteId).padStart(2, '0')}` : '—')}</li>
+                                            <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
+                                            <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
+                                        </ul>
+                                    </Col>
+                                </Row>
+                            </>
                         )}
                     </Card.Body>
                 </Card>
@@ -366,7 +363,7 @@ export default function AnimalDetailPage() {
                     <Card.Body>
                         <div className="d-flex justify-content-between align-items-center mb-3">
                             <h4 className="section-title mb-0">Historial Reproductivo</h4>
-                            {rol === 'PRODUCTOR' && (
+                            {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
                                 <Button className="btn-vigia-success btn-sm px-3" onClick={openNuevoEstadoModal}>
                                     <i className="bi bi-plus-lg me-1" /> Registrar estado
                                 </Button>
@@ -390,7 +387,7 @@ export default function AnimalDetailPage() {
                                             <th>Origen</th>
                                             <th>Registrado por</th>
                                             <th>Fecha Registro</th>
-                                            {rol === 'PRODUCTOR' && <th className="text-center">Acciones</th>}
+                                            {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && <th className="text-center">Acciones</th>}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -406,7 +403,7 @@ export default function AnimalDetailPage() {
                                                 </td>
                                                 <td>{h.registradoPor || '—'}</td>
                                                 <td>{formatDateTime(h.fechaRegistro)}</td>
-                                                {rol === 'PRODUCTOR' && (
+                                                {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
                                                     <td className="text-center">
                                                         {idx === 0 && (
                                                             <Button

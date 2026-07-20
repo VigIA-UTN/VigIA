@@ -194,13 +194,19 @@ export default function AnimalesPage() {
         setFileUploadEstados(file ?? null);
     };
 
+    const [uploadEstablecimientoIdEstados, setUploadEstablecimientoIdEstados] = useState<number | ''>('');
+
     const handleSubmitUploadEstados = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!uploadEstablecimientoIdEstados) {
+            setFormErrorUploadEstados('Por favor seleccioná un establecimiento.');
+            return;
+        }
         if (!fileUploadEstados) return;
         setFormErrorUploadEstados(null);
         setSubmittingUploadEstados(true);
         try {
-            const result = await cargarEstadosExcel(fileUploadEstados);
+            const result = await cargarEstadosExcel(fileUploadEstados, Number(uploadEstablecimientoIdEstados));
             setReporteCargaEstados(result);
             await fetchAnimales();
         } catch (err) {
@@ -215,6 +221,7 @@ export default function AnimalesPage() {
         setUploadEstadosModal(false);
         setReporteCargaEstados(null);
         setFileUploadEstados(null);
+        setUploadEstablecimientoIdEstados('');
         setFormErrorUploadEstados(null);
     };
 
@@ -292,10 +299,10 @@ export default function AnimalesPage() {
                             <i className="bi bi-upload" /> Cargar Estados
                         </Button>
                         <Button className="btn-vigia-success" onClick={() => { setUploadModal(true) }}>
-                            <i className="bi bi-upload" /> Cargar CSV
+                            <i className="bi bi-upload" /> Cargar Animales
                         </Button>
                         <Button className="btn-vigia-success" onClick={openModal}>
-                            <i className="bi bi-plus-lg" /> Nuevo
+                            <i className="bi bi-plus-lg" /> Animal
                         </Button>
                     </div>
                 </div>
@@ -543,7 +550,9 @@ export default function AnimalesPage() {
                     {formErrorUpload && <Alert variant="danger">{formErrorUpload}</Alert>}
                     {reporteCarga ? (
                         <div>
-                            <Alert variant="success">¡Carga procesada correctamente!</Alert>
+                            <Alert variant={reporteCarga.fallidos > 0 ? "warning" : "success"}>
+                                {reporteCarga.fallidos > 0 ? "Carga fallida. Se encontraron errores y no se guardó ningún registro." : "¡Carga procesada correctamente!"}
+                            </Alert>
                             <ul>
                                 <li><strong>Procesados:</strong> {reporteCarga.procesados}</li>
                                 <li><strong>Exitosos:</strong> {reporteCarga.exitosos}</li>
@@ -604,7 +613,7 @@ export default function AnimalesPage() {
             </Modal>
             <Modal show={uploadEstadosModal} onHide={handleCloseUploadEstadosModal} centered dialogClassName="modal-nuevo-animal">
                 <Modal.Header closeButton>
-                    <Modal.Title>Cargar Estados Reproductivos (CSV)</Modal.Title>
+                    <Modal.Title>Cargar Estados Reproductivos</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     {formErrorUploadEstados && <Alert variant="danger">{formErrorUploadEstados}</Alert>}
@@ -629,9 +638,40 @@ export default function AnimalesPage() {
                         </div>
                     ) : (
                         <Form onSubmit={handleSubmitUploadEstados} id="form-cargar-estados">
+                            <div className="mb-3 text-white" style={{ fontSize: '0.9em' }}>
+                                <p className="mb-1">El archivo debe contener las siguientes columnas en este orden:</p>
+                                <ul>
+                                    <li><strong>IdCaravana</strong> (al menos IdCaravana o Alias debe estar presente)</li>
+                                    <li><strong>Alias</strong> (al menos IdCaravana o Alias debe estar presente)</li>
+                                    <li><strong>Estado</strong> (VACIA, GESTANTE, CELO, ANESTRO)</li>
+                                    <li><strong>FechaUltimoParto</strong> (opcional, formato YYYY-MM-DD)</li>
+                                    <li><strong>FechaUltimaInseminacion</strong> (opcional, formato YYYY-MM-DD)</li>
+                                </ul>
+                                <div className="d-flex gap-3 mb-3">
+                                    <a href="/template_estados.csv" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
+                                        <i className="bi bi-filetype-csv me-1" /> Descargar template CSV
+                                    </a>
+                                    <a href="/template_estados.xlsx" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
+                                        <i className="bi bi-filetype-xlsx me-1" /> Descargar template Excel
+                                    </a>
+                                </div>
+                            </div>
+                            <Form.Group controlId="formUploadEstablecimientoEstados" className="mb-3">
+                                <Form.Label>Establecimiento*</Form.Label>
+                                <Form.Select
+                                    value={uploadEstablecimientoIdEstados}
+                                    onChange={e => setUploadEstablecimientoIdEstados(Number(e.target.value))}
+                                    required
+                                >
+                                    <option value="">Seleccioná una opción</option>
+                                    {establecimientos.map(e => (
+                                        <option key={e.id} value={e.id}>{e.nombre}</option>
+                                    ))}
+                                </Form.Select>
+                            </Form.Group>
                             <Form.Group className="mb-3">
-                                <Form.Label>Archivo (.csv)*</Form.Label>
-                                <Form.Control name="file" type="file" accept=".csv" onChange={handleChangeUploadEstados} required />
+                                <Form.Label>Archivo*</Form.Label>
+                                <Form.Control name="file" type="file" accept=".xlsx,.xls,.csv" onChange={handleChangeUploadEstados} required />
                             </Form.Group>
                         </Form>
                     )}

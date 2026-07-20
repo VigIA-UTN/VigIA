@@ -33,7 +33,8 @@ class EstadoReproductivoCsvServiceTest {
     @DisplayName("Falla si el archivo está vacío")
     void testEmptyFile() {
         MockMultipartFile file = new MockMultipartFile("file", "test.csv", "text/csv", new byte[0]);
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.parseAndValidate(file));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.parseAndValidate(file));
         assertEquals("El archivo está vacío", ex.getMessage());
     }
 
@@ -42,7 +43,8 @@ class EstadoReproductivoCsvServiceTest {
     void testFileTooLarge() {
         byte[] largeContent = new byte[(5 * 1024 * 1024) + 1]; // 5MB + 1 byte
         MockMultipartFile file = new MockMultipartFile("file", "test.csv", "text/csv", largeContent);
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.parseAndValidate(file));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.parseAndValidate(file));
         assertEquals("El archivo excede el tamaño máximo permitido (5MB)", ex.getMessage());
     }
 
@@ -50,24 +52,26 @@ class EstadoReproductivoCsvServiceTest {
     @DisplayName("Falla si la extensión no es válida")
     void testInvalidExtension() {
         MockMultipartFile file = createCsv("test.txt", "header\nvalue");
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.parseAndValidate(file));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.parseAndValidate(file));
         assertEquals("El archivo debe ser un CSV (.csv) o Excel (.xlsx, .xls)", ex.getMessage());
     }
 
     @Test
     @DisplayName("Falla si faltan columnas en el header")
     void testMissingColumnsHeader() {
-        MockMultipartFile file = createCsv("test.csv", "IdAnimal\n123");
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.parseAndValidate(file));
-        assertEquals("El archivo no tiene las columnas requeridas (IdAnimal, Estado)", ex.getMessage());
+        MockMultipartFile file = createCsv("test.csv", "IdCaravana\n123");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.parseAndValidate(file));
+        assertEquals("El archivo no tiene las columnas requeridas (IdCaravana, Alias, Estado)", ex.getMessage());
     }
 
     @Test
     @DisplayName("Filas válidas se procesan correctamente")
     void testValidRows() throws IOException {
-        String content = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
-                "123,GESTANTE,2023-01-01,2023-02-01\n" +
-                "124,VACIA,,\n";
+        String content = "IdCaravana,Alias,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+                "123,,GESTANTE,2023-01-01,2023-02-01\n" +
+                "124,,VACIA,,\n";
         MockMultipartFile file = createCsv("test.csv", content);
 
         EstadoReproductivoParseResult result = service.parseAndValidate(file);
@@ -76,12 +80,12 @@ class EstadoReproductivoCsvServiceTest {
         assertEquals(0, result.getInvalidos().size());
         assertEquals(2, result.getValidos().size());
 
-        assertEquals(123L, result.getValidos().get(0).getAnimalId());
+        assertEquals("123", result.getValidos().get(0).getIdCaravana());
         assertEquals(TipoReproductivo.GESTANTE, result.getValidos().get(0).getEstado());
         assertEquals(LocalDate.of(2023, 1, 1), result.getValidos().get(0).getFechaUltimoParto());
         assertEquals(LocalDate.of(2023, 2, 1), result.getValidos().get(0).getFechaUltimaInseminacion());
 
-        assertEquals(124L, result.getValidos().get(1).getAnimalId());
+        assertEquals("124", result.getValidos().get(1).getIdCaravana());
         assertEquals(TipoReproductivo.VACIA, result.getValidos().get(1).getEstado());
     }
 
@@ -89,10 +93,28 @@ class EstadoReproductivoCsvServiceTest {
     @DisplayName("Manejo de fechas futuras y consistencia")
     void testInvalidDates() throws IOException {
         String futureDate = LocalDate.now().plusDays(1).toString();
-        String content = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
-                "1,GESTANTE," + futureDate + ",\n" + // Parto futuro
-                "2,GESTANTE,," + futureDate + "\n" + // Inseminacion futura
-                "3,GESTANTE,2023-02-01,2023-01-01\n"; // Inseminacion antes que parto
+        String content = "IdCaravana,Alias,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+                "1,,GESTANTE," + futureDate + ",\n" + // Parto futuro
+                "2,,GESTANTE,," + futureDate + "\n"; // Inseminacion futura
+
+        MockMultipartFile file = createCsv("test.csv", content);
+        EstadoReproductivoParseResult result = service.parseAndValidate(file);
+
+        assertEquals(2, result.getProcesados());
+        assertEquals(0, result.getValidos().size());
+        assertEquals(2, result.getInvalidos().size());
+
+        assertTrue(result.getInvalidos().get(0).getError().contains("no puede ser una fecha futura"));
+        assertTrue(result.getInvalidos().get(1).getError().contains("no puede ser una fecha futura"));
+    }
+
+    @Test
+    @DisplayName("Estados inválidos o campos vacíos se reportan en la fila")
+    void testInvalidFields() throws IOException {
+        String content = "IdCaravana,Alias,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+                ",,GESTANTE,,\n" + // Sin ID ni Alias
+                "2,,,\n" + // Sin estado
+                "3,,ESTADO_FALSO,,\n"; // Estado falso
 
         MockMultipartFile file = createCsv("test.csv", content);
         EstadoReproductivoParseResult result = service.parseAndValidate(file);
@@ -101,30 +123,8 @@ class EstadoReproductivoCsvServiceTest {
         assertEquals(0, result.getValidos().size());
         assertEquals(3, result.getInvalidos().size());
 
-        assertTrue(result.getInvalidos().get(0).getError().contains("no puede ser una fecha futura"));
-        assertTrue(result.getInvalidos().get(1).getError().contains("no puede ser una fecha futura"));
-        assertTrue(result.getInvalidos().get(2).getError().contains("no puede ser anterior a FechaUltimoParto"));
-    }
-
-    @Test
-    @DisplayName("Estados inválidos o campos vacíos se reportan en la fila")
-    void testInvalidFields() throws IOException {
-        String content = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
-                ",GESTANTE,,\n" + // Sin ID
-                "X-2,GESTANTE,,\n" + // ID invalido (String en vez de Long)
-                "2,,,\n" + // Sin estado
-                "3,ESTADO_FALSO,,\n"; // Estado falso
-
-        MockMultipartFile file = createCsv("test.csv", content);
-        EstadoReproductivoParseResult result = service.parseAndValidate(file);
-
-        assertEquals(4, result.getProcesados());
-        assertEquals(0, result.getValidos().size());
-        assertEquals(4, result.getInvalidos().size());
-
-        assertTrue(result.getInvalidos().get(0).getError().contains("IdAnimal es obligatorio"));
-        assertTrue(result.getInvalidos().get(1).getError().contains("IdAnimal debe ser un número entero"));
-        assertTrue(result.getInvalidos().get(2).getError().contains("Estado es obligatorio"));
-        assertTrue(result.getInvalidos().get(3).getError().contains("Estado inválido"));
+        assertTrue(result.getInvalidos().get(0).getError().contains("IdCaravana o Alias son obligatorios"));
+        assertTrue(result.getInvalidos().get(1).getError().contains("Estado es obligatorio"));
+        assertTrue(result.getInvalidos().get(2).getError().contains("Estado inválido"));
     }
 }

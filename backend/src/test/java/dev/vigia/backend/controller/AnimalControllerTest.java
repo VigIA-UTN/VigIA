@@ -777,9 +777,9 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/animales/{id}/estado-reproductivo - Falla por consistencia de fechas (parto > inseminación)")
+        @DisplayName("POST /api/v1/animales/{id}/estado-reproductivo - Exito con cualquier fecha")
         @SuppressWarnings("null")
-        void registrarEstadoReproductivo_fechasInconsistentes_badRequest() throws Exception {
+        void registrarEstadoReproductivo_fechasCualquiera_success() throws Exception {
                 Long animalId = crearAnimal("Vaca 3", establecimientoId, rodeoLoteId);
 
                 EstadoReproductivoRequest request = new EstadoReproductivoRequest();
@@ -791,7 +791,7 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isCreated());
         }
 
         @Test
@@ -934,17 +934,19 @@ class AnimalControllerTest {
                 Animal animal = new Animal();
                 animal.setEstablecimiento(establecimientoRepository.findById(establecimientoId).get());
                 animal.setEstadoActual(EstadoAnimal.ACTIVO);
+                animal.setIdCaravanaOficial("CARAVANA-123");
                 animal.setRaza("Angus");
                 animal = animalRepository.save(animal);
 
-                String csvContent = "IdAnimal,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
-                                animal.getId() + ",GESTANTE,2023-01-01,2023-02-01\n";
+                String csvContent = "IdCaravana,Alias,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+                                animal.getIdCaravanaOficial() + ",,GESTANTE,2023-01-01,2023-02-01\n";
 
                 MockMultipartFile file = new MockMultipartFile("file", "estados.csv", "text/csv",
                                 csvContent.getBytes());
 
                 mockMvc.perform(multipart("/api/v1/animales/estado-reproductivo/csv")
                                 .file(file)
+                                .param("establecimientoId", establecimientoId.toString())
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.procesados").value(1))
@@ -962,6 +964,7 @@ class AnimalControllerTest {
 
                 mockMvc.perform(multipart("/api/v1/animales/estado-reproductivo/csv")
                                 .file(file)
+                                .param("establecimientoId", establecimientoId.toString())
                                 .header("Authorization", "Bearer " + adminToken))
                                 .andExpect(status().isForbidden());
         }
