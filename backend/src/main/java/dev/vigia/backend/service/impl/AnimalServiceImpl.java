@@ -428,8 +428,9 @@ public class AnimalServiceImpl implements AnimalService {
                 return CargaMasivaResponse.builder()
                                 .procesados(result.getProcesados())
                                 .fallidos(result.getFallidos())
-                                .exitosos(animalesResponse.size())
+                                .exitosos(result.getAnimalesExitosos().size())
                                 .animales(animalesResponse)
+                                .errores(result.getErrores())
                                 .build();
         }
 

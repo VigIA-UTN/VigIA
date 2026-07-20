@@ -26,10 +26,25 @@ public class ExcelParserServiceImpl implements FileParserService {
         List<String[]> rowsData = new ArrayList<>();
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
+            
+            // Validar las columnas en la primera fila (encabezado o datos)
+            Row firstRow = sheet.getRow(0);
+            if (firstRow == null || firstRow.getLastCellNum() < 5) {
+                // If row 0 is null, try row 1
+                Row secondRow = sheet.getRow(1);
+                if (secondRow == null || secondRow.getLastCellNum() < 5) {
+                    throw new IllegalArgumentException("El archivo Excel debe tener al menos 5 columnas.");
+                }
+            }
+            
             for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
                 Row row = sheet.getRow(rowIndex);
                 if (row == null) {
                     continue;
+                }
+
+                if (row.getLastCellNum() < 5) {
+                    throw new IllegalArgumentException("Todas las filas del archivo Excel deben tener al menos 5 columnas.");
                 }
 
                 String[] data = new String[5];

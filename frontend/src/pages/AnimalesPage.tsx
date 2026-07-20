@@ -558,6 +558,18 @@ export default function AnimalesPage() {
                                 <li><strong>Exitosos:</strong> {reporteCarga.exitosos}</li>
                                 <li><strong>Fallidos:</strong> {reporteCarga.fallidos}</li>
                             </ul>
+                            {reporteCarga.errores && reporteCarga.errores.length > 0 && (
+                                <div className="mt-3">
+                                    <h6 className="fw-bold">Detalle de errores:</h6>
+                                    <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                        <ul className="text-danger mb-0" style={{ fontSize: '0.9em' }}>
+                                            {reporteCarga.errores.map((err, i) => (
+                                                <li key={i}>{err}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <Form onSubmit={handleSubmitUpload} id="form-cargar-animales">

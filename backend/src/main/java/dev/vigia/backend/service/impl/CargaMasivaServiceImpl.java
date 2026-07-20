@@ -66,18 +66,36 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
         List<Animal> animals = new ArrayList<>();
         int procesados = 0;
         int fallidos = 0;
+        java.util.Set<String> caravanasEnArchivo = new java.util.HashSet<>();
+        List<String> errores = new ArrayList<>();
 
         for (String[] data : parsedRows) {
             procesados++;
             try {
+                String idCaravana = data.length > 0 ? data[0] : null;
+                if (idCaravana != null) {
+                    idCaravana = idCaravana.trim();
+                    if (!idCaravana.isEmpty()) {
+                        if (caravanasEnArchivo.contains(idCaravana)) {
+                            throw new IllegalArgumentException("ID Caravana duplicado en el archivo: " + idCaravana);
+                        }
+                        if (animalRepository.existsByIdCaravanaOficialAndEstablecimientoId(idCaravana, establecimientoId)) {
+                            throw new IllegalArgumentException("El ID Caravana " + idCaravana + " ya existe en el establecimiento.");
+                        }
+                        caravanasEnArchivo.add(idCaravana);
+                    }
+                }
+
                 Animal animal = createAnimalFromData(data, establecimientoSeleccionado);
                 if (animal.getEstablecimiento() != null) {
                     animals.add(animal);
                 } else {
                     fallidos++;
+                    errores.add("Fila " + procesados + ": Establecimiento nulo");
                 }
             } catch (Exception e) {
                 fallidos++;
+                errores.add("Fila " + procesados + ": " + e.getMessage());
             }
         }
 
@@ -96,6 +114,7 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
                 .procesados(procesados)
                 .fallidos(fallidos)
                 .animalesExitosos(saveAnimals)
+                .errores(errores)
                 .build();
     }
 

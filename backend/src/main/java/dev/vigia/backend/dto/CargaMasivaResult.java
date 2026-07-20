@@ -16,4 +16,5 @@ public class CargaMasivaResult {
     private int procesados;
     private int fallidos;
     private List<Animal> animalesExitosos;
+    private List<String> errores;
 }

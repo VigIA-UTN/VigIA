@@ -23,6 +23,7 @@ export interface CargaMasivaResponse {
   exitosos: number;
   fallidos: number;
   animales: AnimalResponse[];
+  errores?: string[];
 }
 
 export interface FilaEstadoInvalida {
