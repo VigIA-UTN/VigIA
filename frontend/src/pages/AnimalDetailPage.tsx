@@ -191,10 +191,7 @@ export default function AnimalDetailPage() {
             }
         }
 
-        // Validar que la fecha de último parto no sea anterior a la ya registrada
         if (estadoForm.fechaUltimoParto) {
-            // Al editar: comparar con el registro anterior (historial[1] si estamos editando historial[0])
-            // Al crear nuevo: comparar con el registro más reciente (historial[0])
             const referenceIndex = editingEstado ? 1 : 0;
             const refEstado = historial.length > referenceIndex ? historial[referenceIndex] : null;
             if (refEstado?.fechaUltimoParto) {
