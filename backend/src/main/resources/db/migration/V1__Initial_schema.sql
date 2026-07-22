@@ -71,3 +71,21 @@ CREATE TABLE estados_reproductivos (
     origen VARCHAR(50),
     fecha_registro TIMESTAMP
 );
+
+CREATE TABLE alertas (
+    id BIGSERIAL PRIMARY KEY,
+    animal_id BIGINT REFERENCES animales(id),
+    usuario_confirmacion_id BIGINT REFERENCES usuarios(id),
+    tipo VARCHAR(255),
+    severidad VARCHAR(50),
+    ts_generacion TIMESTAMP NOT NULL,
+    disparador VARCHAR(50) NOT NULL,
+    valor_umbral DOUBLE PRECISION NOT NULL,
+    valor_detectado DOUBLE PRECISION,
+    estado VARCHAR(50) NOT NULL,
+    ts_confirmacion TIMESTAMP,
+    motivo_descarte VARCHAR(255),
+    ventana_inicio_ins TIMESTAMP,
+    ventana_fin_ins TIMESTAMP,
+    accion_recomendada VARCHAR(255)
+);
