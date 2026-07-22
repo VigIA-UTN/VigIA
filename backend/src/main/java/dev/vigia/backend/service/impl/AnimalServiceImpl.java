@@ -253,7 +253,7 @@ public class AnimalServiceImpl implements AnimalService {
         @Override
         @Transactional
         @SuppressWarnings("null")
-        public List<AnimalResponse> listarAnimales(String emailUsuario) {
+        public List<AnimalResponse> listarAnimales(String emailUsuario, Long establecimientoId) {
 
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
@@ -271,6 +271,18 @@ public class AnimalServiceImpl implements AnimalService {
                 if (establecimientos.isEmpty()) {
                         throw new IllegalArgumentException(
                                         "El usuario no pertenece a ningún establecimiento activo.");
+                }
+
+                if (establecimientoId != null) {
+                        boolean pertenece = establecimientos.stream().anyMatch(e -> e.getId().equals(establecimientoId));
+                        if (!pertenece) {
+                                throw new org.springframework.security.access.AccessDeniedException("No tiene acceso a este establecimiento");
+                        }
+                        return animalRepository
+                                        .findByEstablecimientoIdInAndEstadoActualNot(List.of(establecimientoId), EstadoAnimal.INACTIVO)
+                                        .stream()
+                                        .map(this::mapToResponse)
+                                        .collect(Collectors.toList());
                 }
 
                 List<Long> establecimientoIds = establecimientos.stream()

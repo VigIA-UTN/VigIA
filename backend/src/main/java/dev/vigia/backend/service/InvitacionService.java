@@ -13,7 +13,7 @@ public interface InvitacionService {
 
     List<InvitacionResponse> listarInvitacionesProductor();
 
-    List<InvitacionResponse> listarInvitacionesEmpleado(String emailProductor);
+    List<InvitacionResponse> listarInvitacionesEmpleado(String emailProductor, Long establecimientoId);
 
     List<InvitacionResponse> listarMisInvitaciones(String email);
 

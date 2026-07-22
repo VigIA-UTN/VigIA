@@ -15,6 +15,6 @@ public interface RodeoLoteService {
 
     List<RodeoLoteResponse> getAllRodeoLotes();
 
-    List<RodeoLoteResponse> getRodeoLotesByUsuario(String emailUsuario);
+    List<RodeoLoteResponse> getRodeoLotesByUsuario(String emailUsuario, Long establecimientoId);
 
 }

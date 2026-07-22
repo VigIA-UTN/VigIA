@@ -7,7 +7,7 @@ import java.util.List;
 public interface UsuarioService {
     List<UsuarioResponse> getProductores();
     void desactivarProductor(Long id);
-    List<UsuarioResponse> getEmpleados(String emailProductor);
+    List<UsuarioResponse> getEmpleados(String emailProductor, Long establecimientoId);
     void removerEmpleado(String emailProductor, Long empleadoId, Long establecimientoId);
     List<UsuarioResponse> getAllUsuariosNoAdmins();
     void toggleUsuarioEstado(Long id);

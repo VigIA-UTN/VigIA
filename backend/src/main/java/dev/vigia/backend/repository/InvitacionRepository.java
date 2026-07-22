@@ -25,5 +25,7 @@ public interface InvitacionRepository extends JpaRepository<Invitacion, Long> {
 
     List<Invitacion> findByCreador_EmailAndTipoInvitacionOrderByFechaCreacionDesc(String creadorEmail, TipoInvitacion tipoInvitacion);
 
+    List<Invitacion> findByCreador_EmailAndEstablecimiento_IdAndTipoInvitacionOrderByFechaCreacionDesc(String creadorEmail, Long establecimientoId, TipoInvitacion tipoInvitacion);
+
     List<Invitacion> findByEmailDestinoAndEstadoInvitacionOrderByFechaCreacionDesc(String emailDestino, EstadoInvitacion estadoInvitacion);
 }

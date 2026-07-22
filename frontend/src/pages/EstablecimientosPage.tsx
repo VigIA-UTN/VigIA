@@ -202,8 +202,8 @@ export default function EstablecimientosPage() {
                         setLoadingLotes(true);
                         setErrorLote(null);
                         try {
-                          const allLotes = await getRodeoLotes();
-                          setLotesDetalle(allLotes.filter(l => l.establecimientoId === est.id));
+                          const allLotes = await getRodeoLotes(est.id);
+                          setLotesDetalle(allLotes);
                         } catch {
                           setErrorLote('Error al cargar lotes');
                         } finally {

@@ -48,8 +48,9 @@ export interface AnimalRequest {
   establecimientoId: number;
 }
 
-export async function getAnimales(): Promise<AnimalResponse[]> {
-  const response = await axiosClient.get<AnimalResponse[]>(`/animales`);
+export async function getAnimales(establecimientoId?: number): Promise<AnimalResponse[]> {
+  const url = establecimientoId ? `/animales?establecimientoId=${establecimientoId}` : `/animales`;
+  const response = await axiosClient.get<AnimalResponse[]>(url);
   return response.data;
 }
 

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
 import java.security.Principal;
 import java.util.List;
@@ -34,12 +35,6 @@ public class UsuarioController {
         }
     }
 
-    @GetMapping("/empleados")
-    @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<List<UsuarioResponse>> getEmpleados(Principal principal) {
-        return ResponseEntity.ok(usuarioService.getEmpleados(principal.getName()));
-    }
-
     @DeleteMapping("/empleados/{establecimientoId}/{id}")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<Void> desactivarEmpleado(@PathVariable Long establecimientoId, @PathVariable Long id, Principal principal) {
@@ -55,6 +50,20 @@ public class UsuarioController {
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<List<UsuarioResponse>> getAllUsuarios() {
         return ResponseEntity.ok(usuarioService.getAllUsuariosNoAdmins());
+    }
+
+    @GetMapping("/empleados")
+    @PreAuthorize("hasRole('PRODUCTOR')")
+    public ResponseEntity<?> getEmpleados(
+            @RequestParam(name = "establecimientoId", required = false) Long establecimientoId,
+            Authentication authentication) {
+        try {
+            return ResponseEntity.ok(usuarioService.getEmpleados(authentication.getName(), establecimientoId));
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @PatchMapping("/{id}/estado")

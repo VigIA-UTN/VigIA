@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import dev.vigia.backend.dto.RodeoLoteRequest;
@@ -29,13 +30,20 @@ public class RodeoLoteController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
-    public ResponseEntity<List<RodeoLoteResponse>> getAllRodeoLotes(Authentication authentication) {
-        if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"))) {
-            return ResponseEntity.ok(rodeoLoteService.getAllRodeoLotes());
-        } else {
-            return ResponseEntity.ok(rodeoLoteService.getRodeoLotesByUsuario(authentication.getName()));
+    public ResponseEntity<?> getAllRodeoLotes(
+            @RequestParam(name = "establecimientoId", required = false) Long establecimientoId,
+            Authentication authentication) {
+        try {
+            if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"))) {
+                return ResponseEntity.ok(rodeoLoteService.getAllRodeoLotes());
+            } else {
+                return ResponseEntity.ok(rodeoLoteService.getRodeoLotesByUsuario(authentication.getName(), establecimientoId));
+            }
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
-
     }
 
     @PostMapping

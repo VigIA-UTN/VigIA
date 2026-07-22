@@ -23,7 +23,7 @@ public interface AnimalService {
 
         List<AnimalResponse> getAllAnimales();
 
-        List<AnimalResponse> listarAnimales(String emailUsuario);
+        List<AnimalResponse> listarAnimales(String emailUsuario, Long establecimientoId);
 
         EstadoReproductivoResponse registrarEstadoReproductivo(Long animalId, String emailProductor,
                         EstadoReproductivoRequest request);

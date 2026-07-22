@@ -1,19 +1,75 @@
+import { useEffect } from 'react';
 import Container from 'react-bootstrap/Container';
 import Nav from 'react-bootstrap/Nav';
 import Navbar from 'react-bootstrap/Navbar';
+import Form from 'react-bootstrap/Form';
 import { Link } from 'react-router-dom';
 import logoImg from '../assets/logo.png';
 import { useAuthStore } from '../store/authStore';
+import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { getEstablecimientos } from '../api/establecimientosApi';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 function NavScroll() {
     const { rol, logout } = useAuthStore();
     const isAdmin = rol === 'ADMINISTRADOR';
 
+    const {
+        establecimientos,
+        selectedId,
+        setEstablecimientos,
+        setSelectedId,
+    } = useEstablecimientoStore();
+
+    // Load establecimientos on mount (non-admin only)
+    useEffect(() => {
+        if (isAdmin || !rol) return;
+        (async () => {
+            try {
+                const data = await getEstablecimientos();
+                setEstablecimientos(
+                    data.map((e) => ({ id: e.id, nombre: e.nombre, activo: e.activo }))
+                );
+            } catch {
+                // silently fail — the pages will show their own errors
+            }
+        })();
+    }, [isAdmin, rol, setEstablecimientos]);
+
+    const activeEstablecimientos = establecimientos.filter((e) => e.activo);
+
     const getDashboardRoute = () => {
         if (isAdmin) return '/establecimientos';
         return '/';
     };
+
+    const establecimientoSelector = !isAdmin && activeEstablecimientos.length > 0 && (
+        <Form.Select
+            size="sm"
+            value={selectedId ?? ''}
+            onChange={(e) => setSelectedId(Number(e.target.value))}
+            style={{
+                backgroundColor: 'rgba(255,255,255,0.12)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: 500,
+                maxWidth: '220px',
+                minWidth: '140px',
+                cursor: 'pointer',
+                backdropFilter: 'blur(4px)',
+            }}
+            aria-label="Seleccionar establecimiento"
+            id="navbar-establecimiento-selector"
+        >
+            {activeEstablecimientos.map((e) => (
+                <option key={e.id} value={e.id} style={{ color: '#1E3A5F', backgroundColor: '#fff' }}>
+                    {e.nombre}
+                </option>
+            ))}
+        </Form.Select>
+    );
 
     return (
         <Navbar expand="lg" style={{ backgroundColor: '#1E3A5F' }} variant="dark" className='p-0'>
@@ -26,8 +82,9 @@ function NavScroll() {
                     </div>
                 </Navbar.Brand>
 
-                {/* Botón Logout (Desktop) posicionado absoluto a la derecha para no romper el centrado */}
-                <div className="d-none d-lg-block position-absolute end-0 pe-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
+                {/* Botón Logout + Selector (Desktop) posicionado absoluto a la derecha */}
+                <div className="d-none d-lg-flex align-items-center gap-2 position-absolute end-0 pe-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
+                    {establecimientoSelector}
                     <button className="btn btn-outline-light btn-sm" onClick={logout}>
                         <i className="bi bi-box-arrow-right me-1"></i> Cerrar sesión
                     </button>
@@ -69,8 +126,9 @@ function NavScroll() {
                             </>
                         )}
 
-                        {/* Botón Logout (Mobile) */}
-                        <div className="d-lg-none mt-3 mb-2 w-100">
+                        {/* Selector + Logout (Mobile) */}
+                        <div className="d-lg-none mt-3 mb-2 w-100 d-flex flex-column align-items-center gap-2">
+                            {establecimientoSelector}
                             <button className="btn btn-outline-danger btn-sm" onClick={logout}>
                                 <i className="bi bi-box-arrow-right me-1"></i> Cerrar sesión
                             </button>

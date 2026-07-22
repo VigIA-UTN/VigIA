@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Container, Spinner, Alert, Button, Form } from 'react-bootstrap';
 import { getEmpleados, removerEmpleado } from '../api/usuariosApi';
 import type { UsuarioResponse } from '../api/usuariosApi';
+import { useEstablecimientoStore } from '../store/establecimientoStore';
 import './EmpleadosPage.css';
 
 export default function EmpleadosPage() {
+    const selectedId = useEstablecimientoStore((s) => s.selectedId);
     const [empleados, setEmpleados] = useState<UsuarioResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -18,7 +20,11 @@ export default function EmpleadosPage() {
             try {
                 setLoading(true);
                 setError(null);
-                const data = await getEmpleados();
+                if (!selectedId) {
+                    setEmpleados([]);
+                    return;
+                }
+                const data = await getEmpleados(selectedId);
                 setEmpleados(data);
             } catch (err) {
                 const axiosError = err as { response?: { data?: { message?: string } } };
@@ -29,7 +35,7 @@ export default function EmpleadosPage() {
         };
 
         fetchUsuarios();
-    }, []);
+    }, [selectedId]);
 
     const handleRemoverEmpleado = async (id: number, establecimientoId: number) => {
         if (!window.confirm('¿Estás seguro de que querés quitar a este empleado del establecimiento?')) {
@@ -66,6 +72,8 @@ export default function EmpleadosPage() {
     };
 
     const filteredEmpleados = empleados.filter(e => {
+        if (selectedId && e.establecimientoId !== selectedId) return false;
+
         const matchesSearch = searchTerm === '' ||
             `${e.nombre} ${e.apellido}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
             e.email.toLowerCase().includes(searchTerm.toLowerCase()) ||

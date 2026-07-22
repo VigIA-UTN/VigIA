@@ -52,8 +52,10 @@ public class InvitacionController {
 
     @GetMapping("/empleado")
     @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<List<InvitacionResponse>> listarInvitacionesEmpleado(Authentication authentication) {
-        return ResponseEntity.ok(invitacionService.listarInvitacionesEmpleado(authentication.getName()));
+    public ResponseEntity<List<InvitacionResponse>> listarInvitacionesEmpleado(
+            @RequestParam(name = "establecimientoId", required = false) Long establecimientoId,
+            Authentication authentication) {
+        return ResponseEntity.ok(invitacionService.listarInvitacionesEmpleado(authentication.getName(), establecimientoId));
     }
 
     @GetMapping("/mis-invitaciones")

@@ -43,12 +43,24 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @SuppressWarnings("null")
-    public List<UsuarioResponse> getEmpleados(String emailProductor) {
+    public List<UsuarioResponse> getEmpleados(String emailProductor, Long establecimientoId) {
         Usuario productor = usuarioRepository.findByEmail(emailProductor)
                 .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
 
-        List<Establecimiento> establecimientos = establecimientoRepository
-                .findActiveEstablecimientoByUsuarioId(productor.getId());
+        List<Establecimiento> establecimientos;
+        if (establecimientoId != null) {
+            Establecimiento est = establecimientoRepository.findById(establecimientoId)
+                    .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado"));
+            boolean pertenece = est.getEmpleados().stream()
+                    .anyMatch(v -> v.getUsuario().equals(productor) && v.isActivo());
+            if (!pertenece) {
+                throw new org.springframework.security.access.AccessDeniedException("No tiene acceso a este establecimiento");
+            }
+            establecimientos = List.of(est);
+        } else {
+            establecimientos = establecimientoRepository
+                    .findActiveEstablecimientoByUsuarioId(productor.getId());
+        }
 
         List<UsuarioResponse> responses = new ArrayList<>();
         for (Establecimiento est : establecimientos) {

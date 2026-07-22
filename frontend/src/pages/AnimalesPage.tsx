@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
 import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
-import { getEstablecimientos, type EstablecimientoResponse } from '../api/establecimientosApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
+import { useEstablecimientoStore } from '../store/establecimientoStore';
 
 function formatFecha(iso: string | null) {
     if (!iso) return '—';
@@ -27,6 +27,7 @@ function estadoClass(e: string) {
 
 export default function AnimalesPage() {
     const navigate = useNavigate();
+    const selectedId = useEstablecimientoStore((s) => s.selectedId);
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -44,14 +45,12 @@ export default function AnimalesPage() {
     const [createRodeoModal, setCreateRodeoModal] = useState(false);
     const [submittingRodeo, setSubmittingRodeo] = useState(false);
     const [formErrorRodeo, setFormErrorRodeo] = useState<string | null>(null);
-    const [formRodeo, setFormRodeo] = useState<Partial<RodeoRequest>>({ nombre: '', establecimientoId: undefined });
-    const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
+    const [formRodeo, setFormRodeo] = useState<Partial<RodeoRequest>>({ nombre: '' });
 
     const [uploadModal, setUploadModal] = useState(false);
     const [submittingUpload, setSubmittingUpload] = useState(false);
     const [formErrorUpload, setFormErrorUpload] = useState<string | null>(null);
     const [fileUpload, setFileUpload] = useState<File | null>(null);
-    const [uploadEstablecimientoId, setUploadEstablecimientoId] = useState<number | ''>('');
     const [reporteCarga, setReporteCarga] = useState<CargaMasivaResponse | null>(null);
 
     const [uploadEstadosModal, setUploadEstadosModal] = useState(false);
@@ -65,7 +64,7 @@ export default function AnimalesPage() {
 
     const fetchAnimales = async () => {
         try {
-            const data = await getAnimales();
+            const data = await getAnimales(selectedId || undefined);
             setAnimales(data);
         } catch (err) {
             console.error(err);
@@ -86,10 +85,8 @@ export default function AnimalesPage() {
     useEffect(() => {
         (async () => {
             try {
-                const establecimientos = await getEstablecimientos();
-                if (!establecimientos.length) { setError('No tenés establecimientos asociados.'); return; }
-                setEstablecimientos(establecimientos);
-                const animales = await getAnimales();
+                if (!selectedId) { setError('No tenés establecimientos asociados.'); return; }
+                const animales = await getAnimales(selectedId);
                 setAnimales(animales);
             } catch (err) {
                 const e = err as { response?: { data?: { message?: string } } };
@@ -98,7 +95,7 @@ export default function AnimalesPage() {
                 setLoading(false);
             }
         })();
-    }, []);
+    }, [selectedId]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -107,8 +104,8 @@ export default function AnimalesPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.establecimientoId) {
-            setFormError('Seleccioná un establecimiento.');
+        if (!selectedId) {
+            setFormError('No hay establecimiento seleccionado.');
             return;
         }
         if (!form.idCaravanaOficial && !form.alias) {
@@ -119,7 +116,7 @@ export default function AnimalesPage() {
         setFormSuccess(null);
         setSubmitting(true);
         try {
-            const nuevo = await crearAnimal(form as AnimalRequest);
+            const nuevo = await crearAnimal({ ...form, establecimientoId: selectedId } as AnimalRequest);
             setAnimales(prev => [nuevo, ...prev]);
             setFormSuccess('Animal registrado exitosamente.');
             setTimeout(() => {
@@ -141,11 +138,11 @@ export default function AnimalesPage() {
 
     const handleSubmitRodeo = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formRodeo.establecimientoId) return;
+        if (!selectedId) return;
         setFormErrorRodeo(null);
         setSubmittingRodeo(true);
         try {
-            const nuevo = await crearRodeo(formRodeo as RodeoRequest);
+            const nuevo = await crearRodeo({ ...formRodeo, establecimientoId: selectedId } as RodeoRequest);
             setRodeoLotes(prev => [nuevo, ...prev]);
             setCreateRodeoModal(false);
         } catch (err) {
@@ -163,14 +160,14 @@ export default function AnimalesPage() {
 
     const handleSubmitUpload = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!uploadEstablecimientoId) {
-            setFormErrorUpload('Por favor seleccioná un establecimiento.');
+        if (!selectedId) {
+            setFormErrorUpload('No hay establecimiento seleccionado.');
             return;
         }
         setFormErrorUpload(null);
         setSubmittingUpload(true);
         try {
-            const result = await cargarAnimalesExcel(fileUpload as File, Number(uploadEstablecimientoId));
+            const result = await cargarAnimalesExcel(fileUpload as File, selectedId);
             setReporteCarga(result);
             setAnimales(prev => [...prev, ...result.animales]);
         } catch (err) {
@@ -185,7 +182,6 @@ export default function AnimalesPage() {
         setUploadModal(false);
         setReporteCarga(null);
         setFileUpload(null);
-        setUploadEstablecimientoId('');
         setFormErrorUpload(null);
     };
 
@@ -194,19 +190,17 @@ export default function AnimalesPage() {
         setFileUploadEstados(file ?? null);
     };
 
-    const [uploadEstablecimientoIdEstados, setUploadEstablecimientoIdEstados] = useState<number | ''>('');
-
     const handleSubmitUploadEstados = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!uploadEstablecimientoIdEstados) {
-            setFormErrorUploadEstados('Por favor seleccioná un establecimiento.');
+        if (!selectedId) {
+            setFormErrorUploadEstados('No hay establecimiento seleccionado.');
             return;
         }
         if (!fileUploadEstados) return;
         setFormErrorUploadEstados(null);
         setSubmittingUploadEstados(true);
         try {
-            const result = await cargarEstadosExcel(fileUploadEstados, Number(uploadEstablecimientoIdEstados));
+            const result = await cargarEstadosExcel(fileUploadEstados, selectedId);
             setReporteCargaEstados(result);
             await fetchAnimales();
         } catch (err) {
@@ -221,7 +215,6 @@ export default function AnimalesPage() {
         setUploadEstadosModal(false);
         setReporteCargaEstados(null);
         setFileUploadEstados(null);
-        setUploadEstablecimientoIdEstados('');
         setFormErrorUploadEstados(null);
     };
 
@@ -240,6 +233,8 @@ export default function AnimalesPage() {
     };
 
     const filteredAnimales = animales.filter(a => {
+        // Filter by selected establecimiento
+        if (selectedId && a.establecimientoId !== selectedId) return false;
         if (activeTab === 'salud' && a.estadoActual !== 'CON_ALERTA') return false;
         if (!searchTerm) return true;
         const q = searchTerm.toLowerCase();
@@ -269,7 +264,7 @@ export default function AnimalesPage() {
         setFormError(null);
         setFormSuccess(null);
         try {
-            const lotes = await getRodeoLotes();
+            const lotes = await getRodeoLotes(selectedId || undefined);
             setRodeoLotes(lotes.filter(l => l.activo));
         } catch { setRodeoLotes([]); }
         setShowModal(true);
@@ -475,19 +470,6 @@ export default function AnimalesPage() {
                             <Form.Control name="raza" type="text" placeholder="Ej: Holstein" value={form.raza ?? ''} onChange={handleChange} />
                         </Form.Group>
                         <Form.Group className="mb-3">
-                            <Form.Label>Establecimiento*</Form.Label>
-                            <Form.Select
-                                name="establecimientoId"
-                                value={form.establecimientoId ?? ''}
-                                onChange={handleChange}
-                            >
-                                <option value="">Seleccioná una opción</option>
-                                {establecimientos.map(e => (
-                                    <option key={e.id} value={e.id}>{e.nombre}</option>
-                                ))}
-                            </Form.Select>
-                        </Form.Group>
-                        <Form.Group className="mb-3">
                             <Form.Label>Lote*</Form.Label>
                             <Form.Select
                                 name="rodeoLoteId"
@@ -519,19 +501,6 @@ export default function AnimalesPage() {
                         <Form.Group className="mb-3">
                             <Form.Label>Nombre*</Form.Label>
                             <Form.Control name="nombre" type="text" placeholder="Ej: #F4829" value={formRodeo.nombre ?? ''} onChange={handleChangeRodeo} required />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Establecimiento</Form.Label>
-                            <Form.Select
-                                name="establecimientoId"
-                                value={formRodeo.establecimientoId ?? ''}
-                                onChange={handleChangeRodeo}
-                            >
-                                <option value="">Seleccioná una opción</option>
-                                {establecimientos.map(e => (
-                                    <option key={e.id} value={e.id}>{e.nombre}</option>
-                                ))}
-                            </Form.Select>
                         </Form.Group>
                     </Form>
                 </Modal.Body>
@@ -591,19 +560,6 @@ export default function AnimalesPage() {
                                     </a>
                                 </div>
                             </div>
-                            <Form.Group controlId="formUploadEstablecimiento" className="mb-3">
-                                <Form.Label>Establecimiento*</Form.Label>
-                                <Form.Select
-                                    value={uploadEstablecimientoId}
-                                    onChange={e => setUploadEstablecimientoId(Number(e.target.value))}
-                                    required
-                                >
-                                    <option value="">Seleccioná una opción</option>
-                                    {establecimientos.map(e => (
-                                        <option key={e.id} value={e.id}>{e.nombre}</option>
-                                    ))}
-                                </Form.Select>
-                            </Form.Group>
                             <Form.Group controlId="formUploadFile" className="mb-3">
                                 <Form.Label>Archivo*</Form.Label>
                                 <Form.Control name="file" type="file" accept=".xlsx,.xls,.csv" onChange={handleChangeUpload} required />
@@ -668,19 +624,6 @@ export default function AnimalesPage() {
                                     </a>
                                 </div>
                             </div>
-                            <Form.Group controlId="formUploadEstablecimientoEstados" className="mb-3">
-                                <Form.Label>Establecimiento*</Form.Label>
-                                <Form.Select
-                                    value={uploadEstablecimientoIdEstados}
-                                    onChange={e => setUploadEstablecimientoIdEstados(Number(e.target.value))}
-                                    required
-                                >
-                                    <option value="">Seleccioná una opción</option>
-                                    {establecimientos.map(e => (
-                                        <option key={e.id} value={e.id}>{e.nombre}</option>
-                                    ))}
-                                </Form.Select>
-                            </Form.Group>
                             <Form.Group className="mb-3">
                                 <Form.Label>Archivo*</Form.Label>
                                 <Form.Control name="file" type="file" accept=".xlsx,.xls,.csv" onChange={handleChangeUploadEstados} required />

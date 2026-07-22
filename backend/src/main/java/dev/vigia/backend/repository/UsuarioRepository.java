@@ -13,4 +13,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByEmail(String email);
 
     List<Usuario> findByRolAndActivoTrue(Rol rol);
+
+    @org.springframework.data.jpa.repository.Query("SELECT u FROM Usuario u JOIN Empleado e ON e.usuario.id = u.id WHERE e.establecimiento.id = :establecimientoId AND e.activo = true AND u.activo = true")
+    List<Usuario> findEmpleadosByEstablecimientoId(@org.springframework.data.repository.query.Param("establecimientoId") Long establecimientoId);
 }

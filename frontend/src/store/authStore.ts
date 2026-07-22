@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useEstablecimientoStore } from './establecimientoStore';
 
 const TOKEN_KEY = 'vigia-jwt';
 
@@ -31,6 +32,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+        useEstablecimientoStore.getState().clear();
         set({
           token: null,
           email: null,

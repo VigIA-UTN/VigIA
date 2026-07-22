@@ -8,8 +8,9 @@ export interface RodeoLoteResponse {
   fechaAlta: string;
 }
 
-export async function getRodeoLotes(): Promise<RodeoLoteResponse[]> {
-  const response = await axiosClient.get<RodeoLoteResponse[]>('/rodeo-lotes');
+export async function getRodeoLotes(establecimientoId?: number): Promise<RodeoLoteResponse[]> {
+  const url = establecimientoId ? `/rodeo-lotes?establecimientoId=${establecimientoId}` : '/rodeo-lotes';
+  const response = await axiosClient.get<RodeoLoteResponse[]>(url);
   return response.data;
 }
 

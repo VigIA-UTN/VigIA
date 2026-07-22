@@ -222,11 +222,17 @@ public class InvitacionServiceImpl implements InvitacionService {
                                 .toList();
         }
 
-        public List<InvitacionResponse> listarInvitacionesEmpleado(String emailProductor) {
-                return invitacionRepository
-                                .findByCreador_EmailAndTipoInvitacionOrderByFechaCreacionDesc(emailProductor,
-                                                TipoInvitacion.EMPLEADO)
-                                .stream()
+        public List<InvitacionResponse> listarInvitacionesEmpleado(String emailProductor, Long establecimientoId) {
+                List<Invitacion> invitaciones;
+                if (establecimientoId != null) {
+                        invitaciones = invitacionRepository.findByCreador_EmailAndEstablecimiento_IdAndTipoInvitacionOrderByFechaCreacionDesc(
+                                        emailProductor, establecimientoId, TipoInvitacion.EMPLEADO);
+                } else {
+                        invitaciones = invitacionRepository.findByCreador_EmailAndTipoInvitacionOrderByFechaCreacionDesc(
+                                        emailProductor, TipoInvitacion.EMPLEADO);
+                }
+
+                return invitaciones.stream()
                                 .map(inv -> {
                                         Usuario usuario = usuarioRepository.findByEmail(inv.getEmailDestino())
                                                         .orElse(null);

@@ -13,7 +13,6 @@ import {
     type EstadoReproductivoRequest,
     type TipoReproductivo,
 } from '../api/animalesApi';
-import { getEstablecimientos, type EstablecimientoResponse } from '../api/establecimientosApi';
 import { getRodeoLotes, type RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { useAuthStore } from '../store/authStore';
 import './AnimalDetailPage.css';
@@ -65,7 +64,6 @@ export default function AnimalDetailPage() {
     const [formError, setFormError] = useState<string | null>(null);
 
     const [form, setForm] = useState<Partial<AnimalRequest>>({});
-    const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
     const [rodeoLotes, setRodeoLotes] = useState<RodeoLoteResponse[]>([]);
 
     // Historial de estados reproductivos
@@ -109,9 +107,7 @@ export default function AnimalDetailPage() {
                 });
 
                 if (rol === 'PRODUCTOR') {
-                    const est = await getEstablecimientos();
-                    setEstablecimientos(est);
-                    const lotes = await getRodeoLotes();
+                    const lotes = await getRodeoLotes(data.establecimientoId);
                     setRodeoLotes(lotes.filter(l => l.activo));
                 }
 
@@ -332,18 +328,13 @@ export default function AnimalDetailPage() {
                                     <Col md={6}>
                                         <Form.Group className="mb-3">
                                             <Form.Label className="fw-bold">Establecimiento</Form.Label>
-                                            <Form.Select name="establecimientoId" value={form.establecimientoId ?? ''} onChange={handleChange}>
-                                                <option value="">Seleccioná un establecimiento</option>
-                                                {establecimientos.map(e => (
-                                                    <option key={e.id} value={e.id}>{e.nombre}</option>
-                                                ))}
-                                            </Form.Select>
+                                            <Form.Control plaintext readOnly value={`#${animal.establecimientoId}`} />
                                         </Form.Group>
                                         <Form.Group className="mb-3">
                                             <Form.Label className="fw-bold">Rodeo/Lote</Form.Label>
                                             <Form.Select name="rodeoLoteId" value={form.rodeoLoteId ?? ''} onChange={handleChange}>
                                                 <option value="">Sin rodeo</option>
-                                                {rodeoLotes.filter(l => l.establecimientoId === Number(form.establecimientoId)).map(l => (
+                                                {rodeoLotes.filter(l => l.establecimientoId === animal.establecimientoId).map(l => (
                                                     <option key={l.id} value={l.id}>{l.nombre}</option>
                                                 ))}
                                             </Form.Select>

@@ -35,8 +35,9 @@ export async function crearInvitacionProductor(
   return response.data;
 }
 
-export async function getInvitacionesEmpleado(): Promise<InvitacionResponse[]> {
-  const response = await axiosClient.get<InvitacionResponse[]>('/invitaciones/empleado');
+export async function getInvitacionesEmpleado(establecimientoId?: number): Promise<InvitacionResponse[]> {
+  const url = establecimientoId ? `/invitaciones/empleado?establecimientoId=${establecimientoId}` : '/invitaciones/empleado';
+  const response = await axiosClient.get<InvitacionResponse[]>(url);
   return response.data;
 }
 

@@ -109,11 +109,23 @@ public class RodeoLoteServiceImpl implements RodeoLoteService {
         }
 
         @Override
-        public List<RodeoLoteResponse> getRodeoLotesByUsuario(String emailProductor) {
+        public List<RodeoLoteResponse> getRodeoLotesByUsuario(String emailProductor, Long establecimientoId) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                List<RodeoLote> rodeoLotes = rodeoLoteRepository.findByEstablecimiento_Empleados_Usuario(productorUser);
+                List<RodeoLote> rodeoLotes;
+                if (establecimientoId != null) {
+                        List<Establecimiento> establecimientos = establecimientoRepository
+                                        .findActiveEstablecimientoByUsuarioEmail(emailProductor);
+                        boolean pertenece = establecimientos.stream().anyMatch(e -> e.getId().equals(establecimientoId));
+                        if (!pertenece) {
+                                throw new org.springframework.security.access.AccessDeniedException("No tiene acceso a este establecimiento");
+                        }
+                        rodeoLotes = rodeoLoteRepository.findByEstablecimientoId(establecimientoId);
+                } else {
+                        rodeoLotes = rodeoLoteRepository.findByEstablecimiento_Empleados_Usuario(productorUser);
+                }
+
                 return rodeoLotes.stream()
                                 .map(this::mapToResponse)
                                 .collect(java.util.stream.Collectors.toList());

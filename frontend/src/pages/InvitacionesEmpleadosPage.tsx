@@ -8,13 +8,11 @@ import {
   crearInvitacionEmpleado,
 } from '../api/invitacionesApi';
 import type { InvitacionResponse } from '../api/invitacionesApi';
-import { getEstablecimientos } from '../api/establecimientosApi';
-import type { EstablecimientoResponse } from '../api/establecimientosApi';
+import { useEstablecimientoStore } from '../store/establecimientoStore';
 import './InvitacionesPage.css';
 
 const schema = z.object({
   email: z.string().email('Debe ser un email válido'),
-  establecimientoId: z.number({ message: 'Seleccione un establecimiento' }).min(1, 'Seleccione un establecimiento'),
   rol: z.enum(['VETERINARIO', 'CAMPERO'], { message: 'Debe ser un rol válido' })
 });
 
@@ -28,7 +26,7 @@ const ESTADO_CONFIG: Record<string, { label: string; className: string }> = {
 
 export default function InvitacionesEmpleadosPage() {
   const [invitaciones, setInvitaciones] = useState<InvitacionResponse[]>([]);
-  const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
+  const selectedId = useEstablecimientoStore((s) => s.selectedId);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -37,7 +35,6 @@ export default function InvitacionesEmpleadosPage() {
 
   const [emailFilter, setEmailFilter] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
-  const [establecimientoFilter, setEstablecimientoFilter] = useState('');
 
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -56,7 +53,7 @@ export default function InvitacionesEmpleadosPage() {
       }
   };
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
@@ -64,12 +61,12 @@ export default function InvitacionesEmpleadosPage() {
     const load = async () => {
       try {
         setLoading(true);
-        const [inv, est] = await Promise.all([
-          getInvitacionesEmpleado(),
-          getEstablecimientos(),
-        ]);
+        if (!selectedId) {
+          setInvitaciones([]);
+          return;
+        }
+        const inv = await getInvitacionesEmpleado(selectedId);
         setInvitaciones(inv);
-        setEstablecimientos(est);
       } catch (err) {
         const axiosError = err as { response?: { data?: { message?: string } } };
         setError(axiosError.response?.data?.message || 'Error al cargar datos');
@@ -78,21 +75,19 @@ export default function InvitacionesEmpleadosPage() {
       }
     };
     load();
-  }, []);
-
-  useEffect(() => {
-    if (showModal && establecimientos.length === 1) {
-      setValue('establecimientoId', establecimientos[0].id);
-    }
-  }, [showModal, establecimientos, setValue]);
+  }, [selectedId]);
 
   const onSubmit = async (data: FormData) => {
+    if (!selectedId) {
+      setError('No hay establecimiento seleccionado.');
+      return;
+    }
     try {
       setSubmitting(true);
       setError(null);
-      const nueva = await crearInvitacionEmpleado(data);
+      const nueva = await crearInvitacionEmpleado({ ...data, establecimientoId: selectedId });
       setSuccessMsg(`Invitación enviada correctamente a ${nueva.emailDestino}.`);
-      const invActualizadas = await getInvitacionesEmpleado();
+      const invActualizadas = await getInvitacionesEmpleado(selectedId);
       setInvitaciones(invActualizadas);
       handleCloseModal();
     } catch (err) {
@@ -106,9 +101,6 @@ export default function InvitacionesEmpleadosPage() {
   const handleCloseModal = () => {
     setShowModal(false);
     reset();
-    if (establecimientos.length === 1) {
-      setValue('establecimientoId', establecimientos[0].id);
-    }
     setError(null);
   };
 
@@ -155,16 +147,6 @@ export default function InvitacionesEmpleadosPage() {
             <option value="USADA">USADA</option>
             <option value="EXPIRADA">EXPIRADA</option>
           </Form.Select>
-          <Form.Select
-            value={establecimientoFilter}
-            onChange={(e) => setEstablecimientoFilter(e.target.value)}
-            style={{ flex: 1, maxWidth: '250px' }}
-          >
-            <option value="">Todos los establecimientos</option>
-            {establecimientos.map(e => (
-              <option key={e.id} value={e.nombre}>{e.nombre}</option>
-            ))}
-          </Form.Select>
         </div>
 
         {/* Tabla */}
@@ -188,8 +170,7 @@ export default function InvitacionesEmpleadosPage() {
                   const filteredInvitaciones = invitaciones.filter(inv => {
                     const matchesEmail = emailFilter === '' || inv.emailDestino.toLowerCase().includes(emailFilter.toLowerCase());
                     const matchesEstado = estadoFilter === '' || inv.estado === estadoFilter;
-                    const matchesEstablecimiento = establecimientoFilter === '' || (inv.establecimiento && inv.establecimiento === establecimientoFilter);
-                    return matchesEmail && matchesEstado && matchesEstablecimiento;
+                    return matchesEmail && matchesEstado;
                   });
 
                   const sortedInvitaciones = [...filteredInvitaciones].sort((a, b) => {
@@ -278,8 +259,6 @@ export default function InvitacionesEmpleadosPage() {
                   className="email-clear-btn"
                   onClick={() => {
                     reset({ email: '', rol: undefined });
-                    if (establecimientos.length === 1) setValue('establecimientoId', establecimientos[0].id);
-                    else setValue('establecimientoId', 0);
                   }}
                   tabIndex={-1}
                 >
@@ -290,35 +269,6 @@ export default function InvitacionesEmpleadosPage() {
                 </Form.Control.Feedback>
               </div>
             </Form.Group>
-
-            {establecimientos.length > 1 ? (
-              <Form.Group className="mb-3">
-                <Form.Label>Establecimiento</Form.Label>
-                <Form.Select
-                  {...register('establecimientoId', { valueAsNumber: true })}
-                  isInvalid={!!errors.establecimientoId}
-                  defaultValue=""
-                >
-                  <option value="" disabled>Seleccioná una opción</option>
-                  {establecimientos.filter(e => e.activo).map(e => (
-                    <option key={e.id} value={e.id}>{e.nombre}</option>
-                  ))}
-                </Form.Select>
-                <Form.Control.Feedback type="invalid">
-                  {errors.establecimientoId?.message}
-                </Form.Control.Feedback>
-              </Form.Group>
-            ) : (
-              establecimientos.length === 1 && (
-                <input type="hidden" {...register('establecimientoId', { valueAsNumber: true })} value={establecimientos[0].id} />
-              )
-            )}
-
-            {establecimientos.length === 0 && (
-              <Alert variant="warning" className="mb-3">
-                No tenés ningún establecimiento activo. No podés generar invitaciones.
-              </Alert>
-            )}
 
             <Form.Group className="mb-4">
               <Form.Label>Rol</Form.Label>
@@ -337,7 +287,7 @@ export default function InvitacionesEmpleadosPage() {
             </Form.Group>
           </Modal.Body>
           <Modal.Footer>
-            <button type="submit" className="btn-generar" disabled={submitting || establecimientos.length === 0}>
+            <button type="submit" className="btn-generar" disabled={submitting || !selectedId}>
               {submitting ? <Spinner size="sm" animation="border" /> : 'Generar Invitación'}
             </button>
           </Modal.Footer>

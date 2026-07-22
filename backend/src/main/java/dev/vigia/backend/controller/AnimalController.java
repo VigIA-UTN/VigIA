@@ -37,11 +37,15 @@ public class AnimalController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
-    public ResponseEntity<?> listarAnimales(Authentication authentication) {
+    public ResponseEntity<?> listarAnimales(
+            @RequestParam(name = "establecimientoId", required = false) Long establecimientoId,
+            Authentication authentication) {
         try {
             String email = authentication.getName();
-            List<AnimalResponse> response = animalService.listarAnimales(email);
+            List<AnimalResponse> response = animalService.listarAnimales(email, establecimientoId);
             return ResponseEntity.ok(response);
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
