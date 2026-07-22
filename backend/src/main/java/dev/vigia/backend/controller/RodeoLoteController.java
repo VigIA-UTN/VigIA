@@ -1,7 +1,5 @@
 package dev.vigia.backend.controller;
 
-import java.util.List;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,7 +35,8 @@ public class RodeoLoteController {
             if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"))) {
                 return ResponseEntity.ok(rodeoLoteService.getAllRodeoLotes());
             } else {
-                return ResponseEntity.ok(rodeoLoteService.getRodeoLotesByUsuario(authentication.getName(), establecimientoId));
+                return ResponseEntity
+                        .ok(rodeoLoteService.getRodeoLotesByUsuario(authentication.getName(), establecimientoId));
             }
         } catch (org.springframework.security.access.AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());

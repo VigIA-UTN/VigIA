@@ -8,9 +8,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.service.AlertaService;
@@ -46,6 +48,34 @@ public class AlertaController {
             String email = authentication.getName();
             List<AlertaResponse> response =
                     alertaService.listarAlertasCelo(email, establecimientoId, estado);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * GET /api/v1/alertas/{id}?establecimientoId={id}
+     * <p>
+     * Obtiene el detalle completo de una alerta.
+     *
+     * @param alertaId          ID de la alerta
+     * @param establecimientoId ID del establecimiento actualmente seleccionado
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con el detalle de la alerta, 400 si hay error, 403 si acceso denegado
+     */
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> obtenerDetalleAlerta(
+            @PathVariable("id") Long alertaId,
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            AlertaDetalleResponse response =
+                    alertaService.obtenerDetalleAlerta(email, establecimientoId, alertaId);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());

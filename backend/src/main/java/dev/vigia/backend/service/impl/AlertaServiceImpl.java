@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Establecimiento;
@@ -20,54 +21,100 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AlertaServiceImpl implements AlertaService {
 
-    private final AlertaRepository alertaRepository;
-    private final UsuarioRepository usuarioRepository;
-    private final EstablecimientoRepository establecimientoRepository;
+        private final AlertaRepository alertaRepository;
+        private final UsuarioRepository usuarioRepository;
+        private final EstablecimientoRepository establecimientoRepository;
 
-    @Override
-    public List<AlertaResponse> listarAlertasCelo(
-            String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
+        @Override
+        public List<AlertaResponse> listarAlertasCelo(
+                        String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
 
-        // 1. Validar que el usuario existe
-        usuarioRepository.findByEmail(emailUsuario)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+                // 1. Validar que el usuario existe
+                usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-        // 2. Verificar que el usuario realmente pertenece al establecimiento seleccionado.
-        //    Esto garantiza el aislamiento multi-tenant: un usuario no puede consultar
-        //    datos de un establecimiento ajeno aunque conozca su ID.
-        List<Establecimiento> establecimientos =
-                establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+                // 2. Verificar que el usuario realmente pertenece al establecimiento
+                // seleccionado.
+                // Esto garantiza el aislamiento multi-tenant: un usuario no puede consultar
+                // datos de un establecimiento ajeno aunque conozca su ID.
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
-        boolean perteneceAlEstablecimiento = establecimientos.stream()
-                .anyMatch(e -> e.getId().equals(establecimientoId));
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
 
-        if (!perteneceAlEstablecimiento) {
-            throw new AccessDeniedException(
-                    "El usuario no pertenece al establecimiento indicado o no está activo.");
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento indicado o no está activo.");
+                }
+
+                // 3. Consultar alertas del establecimiento seleccionado según filtro
+                List<Alerta> alertas = (estado == null)
+                                ? alertaRepository.findCeloByEstablecimiento(establecimientoId)
+                                : alertaRepository.findCeloByEstablecimientoAndEstado(establecimientoId, estado);
+
+                // 4. Mapear a DTO
+                return alertas.stream()
+                                .map(this::toResponse)
+                                .collect(Collectors.toList());
         }
 
-        // 3. Consultar alertas del establecimiento seleccionado según filtro
-        List<Alerta> alertas = (estado == null)
-                ? alertaRepository.findCeloByEstablecimiento(establecimientoId)
-                : alertaRepository.findCeloByEstablecimientoAndEstado(establecimientoId, estado);
+        @Override
+        @SuppressWarnings("null")
+        public AlertaDetalleResponse obtenerDetalleAlerta(
+                        String emailUsuario, Long establecimientoId, Long alertaId) {
 
-        // 4. Mapear a DTO
-        return alertas.stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
+                usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-    // -------------------------------------------------------------------------
-    // Mapeo
-    // -------------------------------------------------------------------------
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
-    private AlertaResponse toResponse(Alerta alerta) {
-        return AlertaResponse.builder()
-                .id(alerta.getId())
-                .tipo(alerta.getTipo())
-                .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
-                .tsGeneracion(alerta.getTsGeneracion())
-                .estado(alerta.getEstado())
-                .build();
-    }
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento indicado o no está activo.");
+                }
+
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
+
+                if (alerta.getAnimal() == null || alerta.getAnimal().getEstablecimiento() == null ||
+                                !alerta.getAnimal().getEstablecimiento().getId().equals(establecimientoId)) {
+                        throw new AccessDeniedException("La alerta no pertenece al establecimiento indicado.");
+                }
+
+                String ventanaOptima = null;
+                if (alerta.getVentanaInicioIns() != null && alerta.getVentanaFinIns() != null) {
+                        long horas = java.time.Duration.between(alerta.getVentanaInicioIns(), alerta.getVentanaFinIns())
+                                        .toHours();
+                        ventanaOptima = horas + " horas";
+                }
+
+                return AlertaDetalleResponse.builder()
+                                .id(alerta.getId())
+                                .animalId(alerta.getAnimal().getId())
+                                .animalCaravanaOficial(alerta.getAnimal().getIdCaravanaOficial())
+                                .animalAlias(alerta.getAnimal().getAlias())
+                                .animalRaza(alerta.getAnimal().getRaza())
+                                .tsGeneracion(alerta.getTsGeneracion())
+                                .ventanaOptimaHoras(ventanaOptima)
+                                .ventanaInicioIns(alerta.getVentanaInicioIns())
+                                .ventanaFinIns(alerta.getVentanaFinIns())
+                                .datoDisparador(alerta.getDisparador())
+                                .estadoActual(alerta.getEstado())
+                                .build();
+        }
+
+        private AlertaResponse toResponse(Alerta alerta) {
+                return AlertaResponse.builder()
+                                .id(alerta.getId())
+                                .tipo(alerta.getTipo())
+                                .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
+                                .tsGeneracion(alerta.getTsGeneracion())
+                                .estado(alerta.getEstado())
+                                .build();
+        }
 }
