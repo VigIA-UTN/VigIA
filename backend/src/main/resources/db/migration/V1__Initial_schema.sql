@@ -49,6 +49,15 @@ CREATE TABLE rodeo_lote (
     fecha_alta TIMESTAMP
 );
 
+CREATE TABLE caravanas (
+    id BIGSERIAL PRIMARY KEY,
+    codigo VARCHAR(255) NOT NULL UNIQUE,
+    fecha_asignacion DATE,
+    ultima_senial TIMESTAMP,
+    fecha_alta DATE,
+    activo SMALLINT NOT NULL DEFAULT 1
+);
+
 CREATE TABLE animales (
     id BIGSERIAL PRIMARY KEY,
     establecimiento_id BIGINT REFERENCES establecimientos(id),
@@ -58,7 +67,8 @@ CREATE TABLE animales (
     fecha_nacimiento DATE,
     raza VARCHAR(255),
     estado_actual VARCHAR(50),
-    fecha_alta DATE
+    fecha_alta DATE,
+    caravana_id BIGINT REFERENCES caravanas(id)
 );
 
 CREATE TABLE estados_reproductivos (
@@ -88,4 +98,18 @@ CREATE TABLE alertas (
     ventana_inicio_ins TIMESTAMP,
     ventana_fin_ins TIMESTAMP,
     accion_recomendada VARCHAR(255)
+);
+
+CREATE TABLE telemetria (
+    id BIGSERIAL PRIMARY KEY,
+    fecha_hora TIMESTAMP NOT NULL,
+    caravana_id BIGINT NOT NULL REFERENCES caravanas(id),
+    latitud DOUBLE PRECISION,
+    longitud DOUBLE PRECISION,
+    accel_x DOUBLE PRECISION,
+    accel_y DOUBLE PRECISION,
+    accel_z DOUBLE PRECISION,
+    nivel_rumia DOUBLE PRECISION,
+    bateria DOUBLE PRECISION,
+    estado_inferencia VARCHAR(50) DEFAULT 'PENDIENTE'
 );

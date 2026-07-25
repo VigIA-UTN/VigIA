@@ -57,9 +57,13 @@ Cuando termines de trabajar, así es como bajás todo para liberar recursos en t
 
 ---
 
-### Extras: Microservicios de Machine Learning
-Si necesitás que el backend se comunique con los módulos de Python, podés levantar todo el ecosistema de dependencias rápidamente. Desde la carpeta `/infra` ejecutá:
+### Extras: Microservicios de Machine Learning y Pipeline Batch
+El backend ahora cuenta con un **Pipeline de Procesamiento Analítico** desarrollado en Spring Batch. Este pipeline se encarga de recolectar la telemetría pendiente de cada animal y procesarla asíncronamente conectándose con los microservicios ML.
 
-```bash
-docker-compose up -d db ml-celo ml-salud ml-geo
-```
+- Si querés probar el flujo feliz (donde la inferencia es exitosa), necesitás levantar los contenedores de ML. Desde la carpeta `/infra` ejecutá:
+
+   ```bash
+   docker-compose up -d db ml-celo ml-salud ml-geo
+   ```
+
+- **Resiliencia (Circuit Breaker):** No es estrictamente obligatorio levantar los contenedores ML para correr el backend. Si el microservicio de Celo está apagado o tarda en responder, el patrón Circuit Breaker (Resilience4j) capturará el error tras 1 reintento, marcará la telemetría como `"INFERENCIA_PENDIENTE"` en base de datos, y permitirá que la aplicación siga funcionando sin perder los datos de campo.

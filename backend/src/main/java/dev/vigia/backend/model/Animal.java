@@ -24,7 +24,10 @@ public class Animal {
     @JoinColumn(name = "establecimiento_id")
     private Establecimiento establecimiento;
 
-    // ToDo: CARABANA
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "caravana_id")
+    private Caravana caravana;
+
     // ToDO: PERFIL REFERENCIA
 
     @ManyToOne(fetch = FetchType.LAZY)
