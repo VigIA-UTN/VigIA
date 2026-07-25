@@ -12,15 +12,17 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CeloPredictRequestDTO {
-    private List<VectorAceleracionDTO> seriesTemporales;
+    private List<PuntoTelemetriaDTO> seriesTemporales;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class VectorAceleracionDTO {
+    public static class PuntoTelemetriaDTO {
         private Double x;
         private Double y;
         private Double z;
+        private Double latitud;
+        private Double longitud;
     }
 }

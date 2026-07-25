@@ -118,11 +118,13 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
     }
 
     private CeloPredictRequestDTO buildRequest(List<Telemetria> telemetriaList) {
-        List<CeloPredictRequestDTO.VectorAceleracionDTO> series = telemetriaList.stream()
-                .map(t -> CeloPredictRequestDTO.VectorAceleracionDTO.builder()
+        List<CeloPredictRequestDTO.PuntoTelemetriaDTO> series = telemetriaList.stream()
+                .map(t -> CeloPredictRequestDTO.PuntoTelemetriaDTO.builder()
                         .x(t.getAccelX())
                         .y(t.getAccelY())
                         .z(t.getAccelZ())
+                        .latitud(t.getLatitud())
+                        .longitud(t.getLongitud())
                         .build())
                 .collect(Collectors.toList());
 

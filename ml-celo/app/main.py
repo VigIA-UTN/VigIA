@@ -10,32 +10,30 @@ from typing import List
 
 app = FastAPI(title="VigIA - Microservicio de Detección de Celo")
 
-
-class AccelPoint(BaseModel):
+class PuntoTelemetria(BaseModel):
     x: float
     y: float
     z: float
-    timestamp: str
-
+    latitud: float
+    longitud: float
 
 class PrediccionCeloResponse(BaseModel):
     evento_celo: bool
     confianza_modelo: float
     ventana_optima_horas: int
 
-
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "ml-celo"}
 
-
 @app.post("/api/internal/ml/celo/predict", response_model=PrediccionCeloResponse)
-def predict(serie: List[AccelPoint]):
+def predict(serie: List[PuntoTelemetria]):
     """
-    Request: serie temporal del vector de aceleración (x,y,z)
-    de las últimas 24 horas del animal.
+    Request: serie temporal de la telemetría del animal de las últimas 24 horas.
     """
-    # TODO: reemplazar por la inferencia real del modelo entrenado
+    # TODO: calcular la distancia euclidiana entre los puntos (lat, lon) de la serie
+    # para reconstruir la distancia recorrida en cada intervalo, y luego inyectar 
+    # la matriz final de (288, 5) a model.predict().
     return PrediccionCeloResponse(
         evento_celo=False,
         confianza_modelo=0.0,

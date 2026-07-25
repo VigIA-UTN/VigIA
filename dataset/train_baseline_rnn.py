@@ -5,7 +5,7 @@ Entrena una RNN (LSTM) baseline sobre el dataset generado por
 generate_dataset.py, para detectar celo a partir de ventanas de 24hs de
 aceleracion (x,y,z).
 
-Requisitos: pip install tensorflow scikit-learn numpy pandas
+Requisitos: pip install tensorflow scikit-learn numpy pandas pyarrow
 
 Uso:
     python3 train_baseline_rnn.py --dataset-dir dataset
@@ -33,7 +33,8 @@ from sklearn.metrics import classification_report, confusion_matrix
 
 
 def add_magnitude(X: np.ndarray) -> np.ndarray:
-    mag = np.sqrt((X ** 2).sum(axis=-1, keepdims=True))
+    # Calcula la magnitud solo de los ejes x, y, z (los primeros 3)
+    mag = np.sqrt((X[..., :3] ** 2).sum(axis=-1, keepdims=True))
     return np.concatenate([X, mag], axis=-1)
 
 
@@ -79,17 +80,68 @@ def main():
     args = parser.parse_args()
 
     d = Path(args.dataset_dir)
-    X = np.load(d / "X.npy")
-    y = np.load(d / "y.npy")
-    metadata = pd.read_csv(d / "metadata.csv")
-    groups = metadata["caravana_id"].to_numpy()
+    
+    print("Cargando dataset crudo (parquet)...")
+    df = pd.read_parquet(d / "telemetria.parquet")
+    
+    # Asegurarnos de que esta ordenado por caravana_id y fecha_hora
+    df = df.sort_values(by=["caravana_id", "fecha_hora"])
+    
+    # Agrupar por caravana y por fecha (día)
+    df["fecha"] = df["fecha_hora"].dt.date
+    grouped = df.groupby(["caravana_id", "fecha"])
+    
+    X_list = []
+    y_list = []
+    groups_list = []
+    
+    print("Reconstruyendo secuencias...")
+    for (caravana_id, fecha), group in grouped:
+        if len(group) != 288:
+            continue # Descartar días incompletos
+            
+        accel = group[["accel_x", "accel_y", "accel_z"]].to_numpy(dtype=np.float32)
+        
+        # Calcular distancia_recorrida (aproximación euclidiana simple escalada)
+        # Podria usarse Haversine, pero como es generada de forma plana, sirve de proxy.
+        lat = group["latitud"].to_numpy()
+        lon = group["longitud"].to_numpy()
+        dist_eucl = np.sqrt(np.diff(lat)**2 + np.diff(lon)**2) * 100000 # Escalar a "metros" aprox
+        dist_arr = np.concatenate([[0], dist_eucl]).astype(np.float32)
+        
+        # Juntar aceleración y distancia como 4 features
+        features = np.column_stack([accel, dist_arr])
+        
+        # Si en cualquier momento del día el animal estuvo en celo, se etiqueta el día entero
+        label = int(group["is_celo"].any())
+        
+        X_list.append(features)
+        y_list.append(label)
+        groups_list.append(caravana_id)
+        
+    X = np.array(X_list)
+    y = np.array(y_list)
+    groups = np.array(groups_list)
+    
+    print(f"Dataset reconstruido: X shape {X.shape}, y shape {y.shape}")
 
-    X = add_magnitude(X)  # (n, 288, 4)
+    X = add_magnitude(X)  # Pasa a (n, 288, 5) porque ya traia 4 features
+
+    print("\n--- INSTRUCCIONES DE SPLIT DE DATOS ---")
+    print("El modelo requiere Datos de Entrenamiento, Validación y Prueba.")
+    print("Para evitar el 'data leakage' (que el modelo memorice a un animal),")
+    print("se utiliza `GroupShuffleSplit` agrupando por `caravana_id`.")
+    print("De esta forma, los animales usados en Train NUNCA aparecen en Test.")
+    print("---------------------------------------\n")
 
     train_idx, val_idx, test_idx = group_split(X, y, groups, seed=args.seed)
     X_train, y_train = X[train_idx], y[train_idx]
     X_val, y_val = X[val_idx], y[val_idx]
     X_test, y_test = X[test_idx], y[test_idx]
+
+    print(f"Datos de Entrenamiento: {len(X_train)} días/ventanas")
+    print(f"Datos de Validación: {len(X_val)} días/ventanas")
+    print(f"Datos de Prueba: {len(X_test)} días/ventanas")
 
     # Normalizacion con estadisticas SOLO de train
     mean = X_train.mean(axis=(0, 1), keepdims=True)

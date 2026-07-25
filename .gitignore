@@ -30,4 +30,5 @@ Thumbs.db
 # Datasets
 dataset/*.npy
 dataset/*.csv
+dataset/*.parquet
 dataset/dataset_summary.json
