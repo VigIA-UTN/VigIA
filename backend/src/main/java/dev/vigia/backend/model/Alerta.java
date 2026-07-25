@@ -72,4 +72,10 @@ public class Alerta {
 
     @Column(name = "accion_recomendada")
     private String accionRecomendada;
+
+    @Column(name = "confianza_modelo") // TODO: REVISAR
+    private Float confianzaModelo;
+
+    @Column(name = "ventana_optima_horas") // TODO: REVISAR
+    private Integer ventanaOptimaHoras;
 }

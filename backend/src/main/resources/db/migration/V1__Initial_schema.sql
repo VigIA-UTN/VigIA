@@ -97,7 +97,9 @@ CREATE TABLE alertas (
     motivo_descarte VARCHAR(255),
     ventana_inicio_ins TIMESTAMP,
     ventana_fin_ins TIMESTAMP,
-    accion_recomendada VARCHAR(255)
+    accion_recomendada VARCHAR(255),
+    confianza_modelo DOUBLE PRECISION, -- TODO: REVISAR
+    ventana_optima_horas INT -- TODO: REVISAR
 );
 
 CREATE TABLE telemetria (

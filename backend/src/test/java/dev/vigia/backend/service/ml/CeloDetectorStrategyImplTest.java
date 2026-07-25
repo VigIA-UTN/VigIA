@@ -2,12 +2,13 @@ package dev.vigia.backend.service.ml;
 
 import dev.vigia.backend.model.EstadoInferencia;
 import dev.vigia.backend.model.Telemetria;
+import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import java.util.Arrays;
 import java.util.List;
 
@@ -23,6 +24,12 @@ class CeloDetectorStrategyImplTest {
 
     @MockBean
     private TelemetriaRepository telemetriaRepository;
+
+    @MockBean
+    private AlertaRepository alertaRepository;
+
+    @MockBean
+    private RabbitTemplate rabbitTemplate;
 
     @Test
     @SuppressWarnings("null")
