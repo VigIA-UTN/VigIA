@@ -26,3 +26,8 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Datasets
+dataset/*.npy
+dataset/*.csv
+dataset/dataset_summary.json
