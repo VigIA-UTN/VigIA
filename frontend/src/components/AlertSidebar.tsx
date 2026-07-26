@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { getAlertasCelo, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { useAuthStore } from '../store/authStore';
+import type { Client, IMessage } from '@stomp/stompjs';
 
 interface AlertSidebarProps {
   onClose: () => void;
@@ -29,7 +31,44 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
       }
     };
     fetchAlertas();
-    return () => { isMounted = false; };
+
+    let stompClient: Client | null = null;
+
+    // STOMP WebSocket Connection
+    import('@stomp/stompjs').then(({ Client }) => {
+      const token = useAuthStore.getState().token;
+      
+      // Pasamos el token como parámetro en la URL porque la API nativa
+      // de WebSockets en los navegadores no permite enviar headers HTTP custom (como Authorization).
+      const wsUrl = token 
+        ? `ws://localhost:8080/ws-alertas?token=${token}` 
+        : 'ws://localhost:8080/ws-alertas';
+
+      stompClient = new Client({
+        brokerURL: wsUrl,
+        onConnect: () => {
+          console.log('Connected to WebSockets');
+          stompClient?.subscribe('/topic/alertas', (message: IMessage) => {
+            console.log("Mensaje WS recibido:", message.body);
+            if (message.body && isMounted) {
+              const newAlerta = JSON.parse(message.body) as AlertaResponse;
+              setAlertas((prev) => [newAlerta, ...prev]);
+            }
+          });
+        },
+        onStompError: (frame) => {
+          console.error('Broker reported error: ' + frame.headers['message']);
+        },
+      });
+      stompClient.activate();
+    });
+
+    return () => {
+      isMounted = false;
+      if (stompClient) {
+        stompClient.deactivate();
+      }
+    };
   }, [selectedId]);
 
   const formatTime = (ts: string) => {
