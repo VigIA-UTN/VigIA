@@ -1,7 +1,7 @@
 package dev.vigia.backend;
 
 import org.junit.jupiter.api.Test;
-import java.io.FileOutputStream;
+import java.io.ByteArrayOutputStream;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -41,8 +41,8 @@ public class GenerateExcelTemplateTest {
         row3.createCell(3).setCellValue("");
         row3.createCell(4).setCellValue("");
         
-        try (FileOutputStream fileOut = new FileOutputStream("../frontend/public/template_animales.xlsx")) {
-            workbook.write(fileOut);
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            workbook.write(out);
         }
         workbook.close();
     }
@@ -80,8 +80,8 @@ public class GenerateExcelTemplateTest {
         row3.createCell(3).setCellValue("");
         row3.createCell(4).setCellValue("");
         
-        try (FileOutputStream fileOut = new FileOutputStream("../frontend/public/template_estados.xlsx")) {
-            workbook.write(fileOut);
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            workbook.write(out);
         }
         workbook.close();
     }
