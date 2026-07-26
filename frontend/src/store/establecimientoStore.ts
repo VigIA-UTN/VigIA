@@ -5,6 +5,8 @@ export interface EstablecimientoInfo {
   id: number;
   nombre: string;
   activo: boolean;
+  latitud?: number;
+  longitud?: number;
 }
 
 interface EstablecimientoState {

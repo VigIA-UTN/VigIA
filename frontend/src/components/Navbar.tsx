@@ -28,7 +28,7 @@ function NavScroll() {
             try {
                 const data = await getEstablecimientos();
                 setEstablecimientos(
-                    data.map((e) => ({ id: e.id, nombre: e.nombre, activo: e.activo }))
+                    data.map((e) => ({ id: e.id, nombre: e.nombre, activo: e.activo, latitud: e.latitud, longitud: e.longitud }))
                 );
             } catch {
                 // silently fail — the pages will show their own errors
@@ -82,10 +82,14 @@ function NavScroll() {
                     </div>
                 </Navbar.Brand>
 
-                {/* Botón Logout + Selector (Desktop) posicionado absoluto a la derecha */}
-                <div className="d-none d-lg-flex align-items-center gap-2 position-absolute end-0 pe-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
+                {/* Selector (Desktop) posicionado absoluto a la izquierda */}
+                <div className="d-none d-lg-flex align-items-center gap-2 position-absolute start-0 ps-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
                     {establecimientoSelector}
-                    <button className="btn btn-outline-light btn-sm" onClick={logout}>
+                </div>
+
+                {/* Botón Logout (Desktop) posicionado absoluto a la derecha */}
+                <div className="d-none d-lg-flex align-items-center gap-2 position-absolute end-0 pe-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
+                    <button className="btn btn-outline-light btn-sm text-nowrap" onClick={logout}>
                         <i className="bi bi-box-arrow-right me-1"></i> Cerrar sesión
                     </button>
                 </div>
@@ -129,7 +133,7 @@ function NavScroll() {
                         {/* Selector + Logout (Mobile) */}
                         <div className="d-lg-none mt-3 mb-2 w-100 d-flex flex-column align-items-center gap-2">
                             {establecimientoSelector}
-                            <button className="btn btn-outline-danger btn-sm" onClick={logout}>
+                            <button className="btn btn-outline-danger btn-sm text-nowrap" onClick={logout}>
                                 <i className="bi bi-box-arrow-right me-1"></i> Cerrar sesión
                             </button>
                         </div>
