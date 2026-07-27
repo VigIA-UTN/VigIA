@@ -11,6 +11,7 @@ import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -116,5 +117,53 @@ public class AlertaServiceImpl implements AlertaService {
                                 .tsGeneracion(alerta.getTsGeneracion())
                                 .estado(alerta.getEstado())
                                 .build();
+        }
+
+        @Override
+        public AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId,
+                        EstadoAlerta nuevoEstado) {
+
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
+
+                Long establecimientoId = alerta.getAnimal().getEstablecimiento().getId();
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento indicado o no está activo.");
+                }
+
+                EstadoAlerta estadoAnterior = alerta.getEstado();
+
+                if (estadoAnterior == EstadoAlerta.PENDIENTE && nuevoEstado == EstadoAlerta.CONFIRMADA) {
+                        alerta.setTsConfirmacion(java.time.LocalDateTime.now());
+                        alerta.setUsuarioConfirmacion(usuario);
+                        alerta.setEstado(nuevoEstado);
+                } else if (estadoAnterior == EstadoAlerta.PENDIENTE && nuevoEstado == EstadoAlerta.DESCARTADA) {
+                        alerta.setEstado(nuevoEstado);
+                } else {
+                        throw new IllegalArgumentException("Estado inválido para la actualización.");
+                }
+                Alerta actualizado = alertaRepository.save(alerta);
+
+                /*
+                 * String ventanaOptima = null;
+                 * if (actualizado.getVentanaInicioIns() != null &&
+                 * actualizado.getVentanaFinIns() != null) {
+                 * long horas = java.time.Duration.between(actualizado.getVentanaInicioIns(),
+                 * actualizado.getVentanaFinIns()).toHours();
+                 * ventanaOptima = horas + " horas";
+                 * }
+                 */
+
+                return this.toResponse(actualizado);
         }
 }

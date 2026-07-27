@@ -15,3 +15,13 @@ export async function getAlertasCelo(establecimientoId: number, estado?: string)
   const response = await axiosClient.get<AlertaResponse[]>(url);
   return response.data;
 }
+
+export async function updateAlertaEstado(
+  alertaId: number,
+  nuevoEstado: 'CONFIRMADA' | 'DESCARTADA'
+): Promise<AlertaResponse> {
+  const response = await axiosClient.put<AlertaResponse>(
+    `/alertas/estado/${alertaId}?estado=${nuevoEstado}`
+  );
+  return response.data;
+}

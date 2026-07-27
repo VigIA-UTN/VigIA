@@ -44,4 +44,6 @@ public interface AlertaService {
      *                                  la alerta no pertenece al establecimiento
      */
     AlertaDetalleResponse obtenerDetalleAlerta(String emailUsuario, Long establecimientoId, Long alertaId);
+
+    AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId, EstadoAlerta estado);
 }

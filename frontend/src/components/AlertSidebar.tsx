@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Form from 'react-bootstrap/Form';
-import { getAlertasCelo, type AlertaResponse } from '../api/alertaApi';
+import { getAlertasCelo, updateAlertaEstado, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import type { Client, IMessage } from '@stomp/stompjs';
@@ -11,8 +11,17 @@ interface AlertSidebarProps {
 
 export default function AlertSidebar({ onClose }: AlertSidebarProps) {
   const { selectedId } = useEstablecimientoStore();
+  const { rol } = useAuthStore();
   const [alertas, setAlertas] = useState<AlertaResponse[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Menú contextual
+  const [menuAlertaId, setMenuAlertaId] = useState<number | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR';
 
   useEffect(() => {
     if (!selectedId) return;
@@ -71,9 +80,48 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
     };
   }, [selectedId]);
 
+  // Cerrar menú al hacer click fuera
+  useEffect(() => {
+    if (menuAlertaId === null) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuAlertaId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuAlertaId]);
+
   const formatTime = (ts: string) => {
     const date = new Date(ts);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const handleAlertClick = (alerta: AlertaResponse, e: React.MouseEvent<HTMLDivElement>) => {
+    if (!canActOnAlerts || alerta.estado !== 'PENDIENTE') return;
+    if (menuAlertaId === alerta.id) {
+      setMenuAlertaId(null);
+      setMenuPos(null);
+      return;
+    }
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    setMenuPos({ top: rect.top - 8, left: rect.left + rect.width / 2 });
+    setMenuAlertaId(alerta.id);
+  };
+
+  const handleAccion = async (alertaId: number, nuevoEstado: 'CONFIRMADA' | 'DESCARTADA') => {
+    setActionLoading(true);
+    try {
+      const updated = await updateAlertaEstado(alertaId, nuevoEstado);
+      setAlertas(prev =>
+        prev.map(a => a.id === alertaId ? { ...a, estado: updated.estado } : a)
+      );
+      setMenuAlertaId(null);
+    } catch (error) {
+      console.error('Error actualizando alerta:', error);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
@@ -143,30 +191,43 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
           const bgColor = isWarning ? 'bg-warning' : 'bg-danger';
           const iconColor = isWarning ? 'text-dark' : 'text-white';
           const iconClass = isWarning ? 'bi-exclamation-triangle-fill' : 'bi-exclamation-octagon-fill';
-          
+          const isClickable = canActOnAlerts && isWarning;
+          const isMenuOpen = menuAlertaId === alerta.id;
+
           return (
-            <div key={alerta.id} className="card shadow-sm border-0 rounded-4" style={{ overflow: 'hidden' }}>
-              <div className="d-flex h-100">
-                <div className={`${bgColor}`} style={{ width: '8px' }}></div>
-                <div className="card-body p-3 d-flex gap-3 w-100">
-                  <div 
-                    className={`${bgColor} ${iconColor} rounded-3 d-flex align-items-center justify-content-center`} 
-                    style={{ width: '45px', height: '45px', flexShrink: 0 }}
-                  >
-                    <i className={`bi ${iconClass} fs-4`}></i>
-                  </div>
-                  <div className="w-100">
-                    <div className="d-flex justify-content-between align-items-start mb-1">
-                      <h6 className="m-0 fw-bold lh-sm">
-                        #{alerta.animalId} en {alerta.tipo || 'CELO'}
-                      </h6>
-                      <small className="text-muted" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap', marginLeft: '8px' }}>
-                        {formatTime(alerta.tsGeneracion)}
+            <div key={alerta.id}>
+              <div
+                className={`card shadow-sm border-0 rounded-4 ${isClickable ? 'alerta-clickable' : ''}`}
+                style={{
+                  overflow: 'hidden',
+                  cursor: isClickable ? 'pointer' : 'default',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  outline: isMenuOpen ? '2px solid #1E3A5F' : 'none',
+                }}
+                onClick={(e) => handleAlertClick(alerta, e)}
+              >
+                <div className="d-flex h-100">
+                  <div className={`${bgColor}`} style={{ width: '8px' }}></div>
+                  <div className="card-body p-3 d-flex gap-3 w-100">
+                    <div 
+                      className={`${bgColor} ${iconColor} rounded-3 d-flex align-items-center justify-content-center`} 
+                      style={{ width: '45px', height: '45px', flexShrink: 0 }}
+                    >
+                      <i className={`bi ${iconClass} fs-4`}></i>
+                    </div>
+                    <div className="w-100">
+                      <div className="d-flex justify-content-between align-items-start mb-1">
+                        <h6 className="m-0 fw-bold lh-sm">
+                          #{alerta.animalId} en {alerta.tipo || 'CELO'}
+                        </h6>
+                        <small className="text-muted" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap', marginLeft: '8px' }}>
+                          {formatTime(alerta.tsGeneracion)}
+                        </small>
+                      </div>
+                      <small className="text-muted lh-sm d-block">
+                        Estado de la alerta: {alerta.estado}
                       </small>
                     </div>
-                    <small className="text-muted lh-sm d-block">
-                      Estado de la alerta: {alerta.estado}
-                    </small>
                   </div>
                 </div>
               </div>
@@ -174,6 +235,79 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
           );
         })}
       </div>
+
+      {/* Menú de acción con position:fixed para no ser cortado por overflow:auto */}
+      {menuAlertaId !== null && menuPos && (
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: menuPos.top,
+            left: menuPos.left,
+            transform: 'translate(-50%, -100%)',
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
+            border: '1.5px solid #e0e0e0',
+            padding: '10px',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            minWidth: '230px',
+            animation: 'fadeInUp 0.15s ease',
+          }}
+        >
+          <p className="m-0 text-center fw-semibold" style={{ fontSize: '0.8rem', color: '#1E3A5F' }}>
+            ¿Qué deseas hacer con esta alerta?
+          </p>
+          <div className="d-flex gap-2">
+            <button
+              className="btn btn-sm fw-semibold d-flex align-items-center justify-content-center gap-1 flex-grow-1"
+              style={{
+                backgroundColor: '#198754',
+                color: 'white',
+                borderRadius: '8px',
+                border: 'none',
+                padding: '7px 10px',
+                fontSize: '0.82rem',
+              }}
+              disabled={actionLoading}
+              onClick={(e) => { e.stopPropagation(); handleAccion(menuAlertaId, 'CONFIRMADA'); }}
+            >
+              <i className="bi bi-check-circle-fill"></i>
+              {actionLoading ? '...' : 'Confirmar'}
+            </button>
+            <button
+              className="btn btn-sm fw-semibold d-flex align-items-center justify-content-center gap-1 flex-grow-1"
+              style={{
+                backgroundColor: '#dc3545',
+                color: 'white',
+                borderRadius: '8px',
+                border: 'none',
+                padding: '7px 10px',
+                fontSize: '0.82rem',
+              }}
+              disabled={actionLoading}
+              onClick={(e) => { e.stopPropagation(); handleAccion(menuAlertaId, 'DESCARTADA'); }}
+            >
+              <i className="bi bi-x-circle-fill"></i>
+              {actionLoading ? '...' : 'Descartar'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        .alerta-clickable:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 16px rgba(0,0,0,0.15) !important;
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translate(-50%, calc(-100% + 6px)); }
+          to   { opacity: 1; transform: translate(-50%, -100%); }
+        }
+      `}</style>
     </div>
   );
 }
