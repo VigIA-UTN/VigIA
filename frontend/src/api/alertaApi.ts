@@ -6,6 +6,7 @@ export interface AlertaResponse {
   animalId: number;
   tsGeneracion: string;
   estado: string;
+  gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';
 }
 
 export async function getAlertasCelo(establecimientoId: number, estado?: string): Promise<AlertaResponse[]> {
