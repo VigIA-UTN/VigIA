@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Form from 'react-bootstrap/Form';
-import { getAlertasCelo, updateAlertaEstado, type AlertaResponse } from '../api/alertaApi';
+import { getAlertasCelo, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import type { Client, IMessage } from '@stomp/stompjs';
@@ -12,7 +12,7 @@ interface AlertSidebarProps {
 
 export default function AlertSidebar({ onClose }: AlertSidebarProps) {
   const { selectedId } = useEstablecimientoStore();
-  const { rol } = useAuthStore();
+
   const [alertas, setAlertas] = useState<AlertaResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -20,7 +20,7 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
   const [selectedAlerta, setSelectedAlerta] = useState<AlertaResponse | null>(null);
   const [viewedIds, setViewedIds] = useState<Set<number>>(new Set());
 
-  const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR';
+
 
   useEffect(() => {
     if (!selectedId) return;

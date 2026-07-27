@@ -40,8 +40,6 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete }
   };
 
   let date = new Date();
-  let formatTimeStr = '--:--';
-  let formatMonth = '--';
   let detectedText = 'Fecha desconocida';
   let windowStart = new Date();
   let windowEnd = new Date();
@@ -51,15 +49,16 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete }
       date = new Date(alerta.tsGeneracion);
       if (isNaN(date.getTime())) throw new Error("Invalid date");
     }
-    formatTimeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    formatMonth = date.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
-    detectedText = `Detectado el ${formatMonth} a las ${formatTimeStr}`;
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const monthStr = date.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    detectedText = `Detectado el ${monthStr} a las ${timeStr}`;
     windowStart = new Date(date.getTime() - 6 * 60 * 60 * 1000);
     windowEnd = date;
   } catch (e) {
     console.error("Error parsing date:", e, alerta?.tsGeneracion);
   }
-  
+
+
   const formatHour = (d: Date) => isNaN(d.getTime()) ? '--:--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const formatDateOnly = (d: Date) => isNaN(d.getTime()) ? '--' : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
   return (
