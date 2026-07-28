@@ -1,5 +1,6 @@
 package dev.vigia.backend.config;
 
+import org.springframework.amqp.core.AnonymousQueue;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.FanoutExchange;
@@ -9,6 +10,8 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Configuration
 public class RabbitMQConfig {
@@ -24,7 +27,8 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue alertasQueue() {
-        return new Queue(ALERTAS_QUEUE, true);
+        // AnonymousQueue crea una cola temporal y exclusiva por instancia para fanout
+        return new AnonymousQueue();
     }
 
     @Bean
@@ -34,7 +38,7 @@ public class RabbitMQConfig {
 
     @Bean
     @SuppressWarnings("null")
-    public Jackson2JsonMessageConverter messageConverter(com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+    public Jackson2JsonMessageConverter messageConverter(ObjectMapper objectMapper) {
         return new Jackson2JsonMessageConverter(objectMapper);
     }
 

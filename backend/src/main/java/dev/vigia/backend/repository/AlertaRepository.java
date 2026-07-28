@@ -46,4 +46,16 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
     Optional<Alerta> findByIdAndEstablecimiento(
             @Param("id") Long id,
             @Param("establecimientoId") Long establecimientoId);
+
+    /**
+     * Lista alertas de celo para recuperar mensajes perdidos mediante Last-Event-ID.
+     */
+    @Query("SELECT a FROM Alerta a " +
+           "WHERE a.animal.establecimiento.id = :establecimientoId " +
+           "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
+           "AND a.id > :lastId " +
+           "ORDER BY a.id ASC")
+    List<Alerta> findCeloByEstablecimientoAndIdGreaterThanOrderByIdAsc(
+            @Param("establecimientoId") Long establecimientoId,
+            @Param("lastId") Long lastId);
 }

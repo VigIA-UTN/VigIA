@@ -32,259 +32,266 @@ import dev.vigia.backend.service.impl.AlertaServiceImpl;
 @ExtendWith(MockitoExtension.class)
 public class AlertaServiceImplTest {
 
-    @Mock
-    private AlertaRepository alertaRepository;
+        @Mock
+        private AlertaRepository alertaRepository;
 
-    @Mock
-    private UsuarioRepository usuarioRepository;
+        @Mock
+        private UsuarioRepository usuarioRepository;
 
-    @Mock
-    private EstablecimientoRepository establecimientoRepository;
+        @Mock
+        private EstablecimientoRepository establecimientoRepository;
 
-    @InjectMocks
-    private AlertaServiceImpl alertaService;
+        @InjectMocks
+        private AlertaServiceImpl alertaService;
 
-    private Usuario mockUsuario;
-    private Establecimiento mockEstablecimiento;
-    private Animal mockAnimal;
-    private Alerta mockAlerta;
+        private Usuario mockUsuario;
+        private Establecimiento mockEstablecimiento;
+        private Animal mockAnimal;
+        private Alerta mockAlerta;
 
-    private final String EMAIL = "test@test.com";
-    private final Long ESTABLECIMIENTO_ID = 1L;
-    private final Long ALERTA_ID = 100L;
+        private final String EMAIL = "test@test.com";
+        private final Long ESTABLECIMIENTO_ID = 1L;
+        private final Long ALERTA_ID = 100L;
 
-    @BeforeEach
-    void setUp() {
-        mockUsuario = new Usuario();
-        mockUsuario.setEmail(EMAIL);
+        @BeforeEach
+        void setUp() {
+                mockUsuario = new Usuario();
+                mockUsuario.setEmail(EMAIL);
 
-        mockEstablecimiento = new Establecimiento();
-        mockEstablecimiento.setId(ESTABLECIMIENTO_ID);
+                mockEstablecimiento = new Establecimiento();
+                mockEstablecimiento.setId(ESTABLECIMIENTO_ID);
 
-        mockAnimal = new Animal();
-        mockAnimal.setId(10L);
-        mockAnimal.setEstablecimiento(mockEstablecimiento);
-        mockAnimal.setIdCaravanaOficial("CAR-123");
-        mockAnimal.setAlias("Lola");
+                mockAnimal = new Animal();
+                mockAnimal.setId(10L);
+                mockAnimal.setEstablecimiento(mockEstablecimiento);
+                mockAnimal.setIdCaravanaOficial("CAR-123");
+                mockAnimal.setAlias("Lola");
 
-        mockAlerta = new Alerta();
-        mockAlerta.setId(ALERTA_ID);
-        mockAlerta.setAnimal(mockAnimal);
-        mockAlerta.setTsGeneracion(LocalDateTime.now());
-        mockAlerta.setEstado(EstadoAlerta.PENDIENTE);
-        mockAlerta.setDisparador(DisparadorAlerta.CELO);
-        mockAlerta.setValorDetectado(98.5);
-        mockAlerta.setVentanaInicioIns(LocalDateTime.now().plusHours(2));
-        mockAlerta.setVentanaFinIns(LocalDateTime.now().plusHours(14));
-    }
+                mockAlerta = new Alerta();
+                mockAlerta.setId(ALERTA_ID);
+                mockAlerta.setAnimal(mockAnimal);
+                mockAlerta.setTsGeneracion(LocalDateTime.now());
+                mockAlerta.setEstado(EstadoAlerta.PENDIENTE);
+                mockAlerta.setDisparador(DisparadorAlerta.CELO);
+                mockAlerta.setValorDetectado(98.5);
+                mockAlerta.setVentanaInicioIns(LocalDateTime.now().plusHours(2));
+                mockAlerta.setVentanaFinIns(LocalDateTime.now().plusHours(14));
+        }
 
-    // --- Tests para listarAlertasCelo ---
+        // --- Tests para listarAlertasCelo ---
 
-    @Test
-    void listarAlertasCelo_Success() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(List.of(mockEstablecimiento));
-        when(alertaRepository.findCeloByEstablecimiento(ESTABLECIMIENTO_ID))
-                .thenReturn(List.of(mockAlerta));
+        @Test
+        void listarAlertasCelo_Success() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findCeloByEstablecimiento(ESTABLECIMIENTO_ID))
+                                .thenReturn(List.of(mockAlerta));
 
-        // Act
-        List<AlertaResponse> result = alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null);
+                // Act
+                List<AlertaResponse> result = alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null);
 
-        // Assert
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals(ALERTA_ID, result.get(0).getId());
-        verify(alertaRepository, times(1)).findCeloByEstablecimiento(ESTABLECIMIENTO_ID);
-    }
+                // Assert
+                assertNotNull(result);
+                assertEquals(1, result.size());
+                assertEquals(ALERTA_ID, result.get(0).getId());
+                verify(alertaRepository, times(1)).findCeloByEstablecimiento(ESTABLECIMIENTO_ID);
+        }
 
-    @Test
-    void listarAlertasCelo_ThrowsIllegalArgumentException_WhenUsuarioNotFound() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+        @Test
+        void listarAlertasCelo_ThrowsIllegalArgumentException_WhenUsuarioNotFound() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        assertThrows(IllegalArgumentException.class,
-                () -> alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null));
-    }
+                // Act & Assert
+                assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null));
+        }
 
-    @Test
-    void listarAlertasCelo_ThrowsAccessDeniedException_WhenUserNotBelongsToEstablecimiento() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(Collections.emptyList()); // Usuario no está en ningún establecimiento
+        @Test
+        void listarAlertasCelo_ThrowsAccessDeniedException_WhenUserNotBelongsToEstablecimiento() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(Collections.emptyList()); // Usuario no está en ningún establecimiento
 
-        // Act & Assert
-        assertThrows(AccessDeniedException.class,
-                () -> alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null));
-    }
+                // Act & Assert
+                assertThrows(AccessDeniedException.class,
+                                () -> alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null));
+        }
 
-    // --- Tests para obtenerDetalleAlerta ---
+        // --- Tests para obtenerDetalleAlerta ---
 
-    @Test
-    @SuppressWarnings("null")
-    void obtenerDetalleAlerta_Success() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(List.of(mockEstablecimiento));
-        when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_Success() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
 
-        // Act
-        AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+                // Act
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
 
-        // Assert
-        assertNotNull(result);
-        assertEquals(ALERTA_ID, result.getId());
-        assertEquals("CAR-123", result.getAnimalCaravanaOficial());
-        assertEquals("12 horas", result.getVentanaOptimaHoras());
-    }
+                // Assert
+                assertNotNull(result);
+                assertEquals(ALERTA_ID, result.getId());
+                assertEquals("CAR-123", result.getAnimalCaravanaOficial());
+                assertEquals("12 horas", result.getVentanaOptimaHoras());
+        }
 
-    @Test
-    @SuppressWarnings("null")
-    void obtenerDetalleAlerta_ThrowsAccessDeniedException_WhenAlertNotBelongsToEstablecimiento() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(List.of(mockEstablecimiento));
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_ThrowsAccessDeniedException_WhenAlertNotBelongsToEstablecimiento() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
 
-        Establecimiento otroEstablecimiento = new Establecimiento();
-        otroEstablecimiento.setId(99L);
-        mockAlerta.getAnimal().setEstablecimiento(otroEstablecimiento);
+                Establecimiento otroEstablecimiento = new Establecimiento();
+                otroEstablecimiento.setId(99L);
+                mockAlerta.getAnimal().setEstablecimiento(otroEstablecimiento);
 
-        when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
 
-        // Act & Assert
-        AccessDeniedException exception = assertThrows(AccessDeniedException.class,
-                () -> alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID));
-        assertEquals("La alerta no pertenece al establecimiento indicado.", exception.getMessage());
-    }
+                // Act & Assert
+                AccessDeniedException exception = assertThrows(AccessDeniedException.class,
+                                () -> alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID));
+                assertEquals("La alerta no pertenece al establecimiento indicado.", exception.getMessage());
+        }
 
-    @Test
-    @SuppressWarnings("null")
-    void obtenerDetalleAlerta_ThrowsIllegalArgumentException_WhenAlertNotFound() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(List.of(mockEstablecimiento));
-        when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.empty());
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_ThrowsIllegalArgumentException_WhenAlertNotFound() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID));
-        assertEquals("Alerta no encontrada.", exception.getMessage());
-    }
+                // Act & Assert
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID));
+                assertEquals("Alerta no encontrada.", exception.getMessage());
+        }
 
-    // --- Tests para actualizarEstadoAlerta ---
+        // --- Tests para actualizarEstadoAlerta ---
 
-    @Test
-    void actualizarEstadoAlerta_Success_Confirmada() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(List.of(mockEstablecimiento));
-        when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
+        @Test
+        @SuppressWarnings("null")
+        void actualizarEstadoAlerta_Success_Confirmada() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
 
-        // Act
-        AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA);
+                // Act
+                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA);
 
-        // Assert
-        assertNotNull(result);
-        assertEquals(EstadoAlerta.CONFIRMADA, result.getEstado());
-        verify(alertaRepository, times(1)).save(mockAlerta);
-    }
+                // Assert
+                assertNotNull(result);
+                assertEquals(EstadoAlerta.CONFIRMADA, result.getEstado());
+                verify(alertaRepository, times(1)).save(mockAlerta);
+        }
 
-    @Test
-    void actualizarEstadoAlerta_Success_Descartada() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(List.of(mockEstablecimiento));
-        when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
+        @Test
+        @SuppressWarnings("null")
+        void actualizarEstadoAlerta_Success_Descartada() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
 
-        // Act
-        AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.DESCARTADA);
+                // Act
+                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.DESCARTADA);
 
-        // Assert
-        assertNotNull(result);
-        assertEquals(EstadoAlerta.DESCARTADA, result.getEstado());
-        verify(alertaRepository, times(1)).save(mockAlerta);
-    }
+                // Assert
+                assertNotNull(result);
+                assertEquals(EstadoAlerta.DESCARTADA, result.getEstado());
+                verify(alertaRepository, times(1)).save(mockAlerta);
+        }
 
-    @Test
-    void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenUsuarioNotFound() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+        @Test
+        @SuppressWarnings("null")
+        void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenUsuarioNotFound() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
-        assertEquals("Usuario no encontrado.", exception.getMessage());
-        verify(alertaRepository, never()).save(any());
-    }
+                // Act & Assert
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                assertEquals("Usuario no encontrado.", exception.getMessage());
+                verify(alertaRepository, never()).save(any());
+        }
 
-    @Test
-    void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaNotFound() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.empty());
+        @Test
+        @SuppressWarnings("null")
+        void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaNotFound() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
-        assertEquals("Alerta no encontrada.", exception.getMessage());
-        verify(alertaRepository, never()).save(any());
-    }
+                // Act & Assert
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                assertEquals("Alerta no encontrada.", exception.getMessage());
+                verify(alertaRepository, never()).save(any());
+        }
 
-    @Test
-    void actualizarEstadoAlerta_ThrowsAccessDeniedException_WhenUserNotBelongsToEstablecimiento() {
-        // Arrange
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(Collections.emptyList()); // sin pertenencia
+        @Test
+        @SuppressWarnings("null")
+        void actualizarEstadoAlerta_ThrowsAccessDeniedException_WhenUserNotBelongsToEstablecimiento() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(Collections.emptyList()); // sin pertenencia
 
-        // Act & Assert
-        assertThrows(AccessDeniedException.class,
-                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
-        verify(alertaRepository, never()).save(any());
-    }
+                // Act & Assert
+                assertThrows(AccessDeniedException.class,
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                verify(alertaRepository, never()).save(any());
+        }
 
-    @Test
-    void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaYaConfirmada() {
-        // Arrange: la alerta ya está CONFIRMADA, se intenta confirmar de nuevo
-        mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+        @Test
+        @SuppressWarnings("null")
+        void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaYaConfirmada() {
+                // Arrange: la alerta ya está CONFIRMADA, se intenta confirmar de nuevo
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
 
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(List.of(mockEstablecimiento));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
 
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
-        assertEquals("Estado inválido para la actualización.", exception.getMessage());
-        verify(alertaRepository, never()).save(any());
-    }
+                // Act & Assert
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                assertEquals("Estado inválido para la actualización.", exception.getMessage());
+                verify(alertaRepository, never()).save(any());
+        }
 
-    @Test
-    void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaYaDescartada() {
-        // Arrange: alerta ya DESCARTADA, se intenta confirmar
-        mockAlerta.setEstado(EstadoAlerta.DESCARTADA);
+        @Test
+        @SuppressWarnings("null")
+        void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaYaDescartada() {
+                // Arrange: alerta ya DESCARTADA, se intenta confirmar
+                mockAlerta.setEstado(EstadoAlerta.DESCARTADA);
 
-        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-        when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
-        when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
-                .thenReturn(List.of(mockEstablecimiento));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
 
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
-        assertEquals("Estado inválido para la actualización.", exception.getMessage());
-        verify(alertaRepository, never()).save(any());
-    }
+                // Act & Assert
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                assertEquals("Estado inválido para la actualización.", exception.getMessage());
+                verify(alertaRepository, never()).save(any());
+        }
 }

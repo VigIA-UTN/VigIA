@@ -12,11 +12,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.http.MediaType;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.service.AlertaService;
+import dev.vigia.backend.service.SseAlertaPublisher;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -25,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 public class AlertaController {
 
     private final AlertaService alertaService;
+    private final SseAlertaPublisher sseAlertaPublisher;
 
     /**
      * GET /api/v1/alertas/celo?establecimientoId={id}&estado={estado}
@@ -102,5 +106,14 @@ public class AlertaController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamAlertas(
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            @RequestParam(name = "lastEventId", required = false) Long lastEventId,
+            Authentication authentication) {
+
+        return sseAlertaPublisher.registrarClienteSse(establecimientoId, lastEventId);
     }
 }

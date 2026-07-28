@@ -11,7 +11,9 @@ import lombok.Data;
 public class AlertaResponse {
     private Long id;
     private String tipo;
+    private String severidad;
+    private EstadoAlerta estado;
     private Long animalId;
     private LocalDateTime tsGeneracion;
-    private EstadoAlerta estado;
+    private String detalle;
 }

@@ -1,5 +1,6 @@
 package dev.vigia.backend.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -120,6 +121,7 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         @Override
+        @SuppressWarnings("null")
         public AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId,
                         EstadoAlerta nuevoEstado) {
 
@@ -143,11 +145,10 @@ public class AlertaServiceImpl implements AlertaService {
 
                 EstadoAlerta estadoAnterior = alerta.getEstado();
 
-                if (estadoAnterior == EstadoAlerta.PENDIENTE && nuevoEstado == EstadoAlerta.CONFIRMADA) {
-                        alerta.setTsConfirmacion(java.time.LocalDateTime.now());
+                if (estadoAnterior == EstadoAlerta.PENDIENTE &&
+                                (nuevoEstado == EstadoAlerta.CONFIRMADA || nuevoEstado == EstadoAlerta.DESCARTADA)) {
+                        alerta.setTsConfirmacion(LocalDateTime.now());
                         alerta.setUsuarioConfirmacion(usuario);
-                        alerta.setEstado(nuevoEstado);
-                } else if (estadoAnterior == EstadoAlerta.PENDIENTE && nuevoEstado == EstadoAlerta.DESCARTADA) {
                         alerta.setEstado(nuevoEstado);
                 } else {
                         throw new IllegalArgumentException("Estado inválido para la actualización.");

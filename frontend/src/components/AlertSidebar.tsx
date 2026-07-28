@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Form from 'react-bootstrap/Form';
 import { getAlertasCelo, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
-import type { Client, IMessage } from '@stomp/stompjs';
 import AlertDetailSidebar from './AlertDetailSidebar';
 
 interface AlertSidebarProps {
@@ -20,7 +19,8 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
   const [selectedAlerta, setSelectedAlerta] = useState<AlertaResponse | null>(null);
   const [viewedIds, setViewedIds] = useState<Set<number>>(new Set());
 
-
+  // Ref to track the highest received ID for Last-Event-ID recovery
+  const maxAlertaIdRef = useRef<number>(0);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -31,6 +31,9 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
         const data = await getAlertasCelo(selectedId);
         if (isMounted) {
           setAlertas(data);
+          if (data.length > 0) {
+            maxAlertaIdRef.current = Math.max(...data.map(a => a.id));
+          }
         }
       } catch (error) {
         console.error("Error fetching alertas:", error);
@@ -40,42 +43,43 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
     };
     fetchAlertas();
 
-    let stompClient: Client | null = null;
+    // Setup SSE connection
+    const token = useAuthStore.getState().token;
+    let sseUrl = `http://localhost:8080/api/v1/alertas/stream?establecimientoId=${selectedId}`;
+    if (token) {
+      sseUrl += `&token=${token}`;
+    }
+    if (maxAlertaIdRef.current > 0) {
+      sseUrl += `&lastEventId=${maxAlertaIdRef.current}`;
+    }
 
-    // STOMP WebSocket Connection
-    import('@stomp/stompjs').then(({ Client }) => {
-      const token = useAuthStore.getState().token;
+    const eventSource = new EventSource(sseUrl);
 
-      // Pasamos el token como parámetro en la URL porque la API nativa
-      // de WebSockets en los navegadores no permite enviar headers HTTP custom (como Authorization).
-      const wsUrl = token
-        ? `ws://localhost:8080/ws-alertas?token=${token}`
-        : 'ws://localhost:8080/ws-alertas';
+    eventSource.onmessage = (event) => {
+      if (!isMounted) return;
+      const newAlerta = JSON.parse(event.data) as AlertaResponse;
+      console.log("Alerta SSE recibida:", newAlerta);
 
-      stompClient = new Client({
-        brokerURL: wsUrl,
-        onConnect: () => {
-          console.log('Connected to WebSockets');
-          stompClient?.subscribe('/topic/alertas', (message: IMessage) => {
-            console.log("Mensaje WS recibido:", message.body);
-            if (message.body && isMounted) {
-              const newAlerta = JSON.parse(message.body) as AlertaResponse;
-              setAlertas((prev) => [newAlerta, ...prev]);
-            }
-          });
-        },
-        onStompError: (frame) => {
-          console.error('Broker reported error: ' + frame.headers['message']);
-        },
+      // Update max ID
+      if (newAlerta.id > maxAlertaIdRef.current) {
+        maxAlertaIdRef.current = newAlerta.id;
+      }
+
+      // Evitamos duplicados si el backend manda perdidas que justo entraron en la request inicial
+      setAlertas((prev) => {
+        if (prev.some(a => a.id === newAlerta.id)) return prev;
+        return [newAlerta, ...prev];
       });
-      stompClient.activate();
-    });
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("SSE connection error:", error);
+      // EventSource tries to reconnect automatically.
+    };
 
     return () => {
       isMounted = false;
-      if (stompClient) {
-        stompClient.deactivate();
-      }
+      eventSource.close();
     };
   }, [selectedId]);
 
