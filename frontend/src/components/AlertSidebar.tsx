@@ -89,7 +89,6 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
   };
 
   const handleAlertClick = (alerta: AlertaResponse) => {
-    if (alerta.estado !== 'PENDIENTE') return;
     setViewedIds(prev => new Set(prev).add(alerta.id));
     setSelectedAlerta(alerta);
   };
@@ -194,7 +193,7 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
           {!loading && alertas.map((alerta) => {
             const isPendiente = alerta.estado === 'PENDIENTE';
             const isResolved = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
-            const isClickable = isPendiente;
+            const isClickable = true;
             const isMenuOpen = selectedAlerta?.id === alerta.id;
             const isUnread = isPendiente && !viewedIds.has(alerta.id);
 
