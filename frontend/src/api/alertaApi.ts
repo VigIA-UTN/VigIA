@@ -26,3 +26,24 @@ export async function updateAlertaEstado(
   );
   return response.data;
 }
+
+export interface AlertaDetalleResponse {
+  id: number;
+  animalId: number;
+  animalCaravanaOficial: string;
+  animalAlias: string;
+  animalRaza: string;
+  tsGeneracion: string;
+  ventanaOptimaHoras: string;
+  ventanaInicioIns: string;
+  ventanaFinIns: string;
+  datoDisparador: string;
+  estadoActual: string;
+}
+
+export async function getAlertaDetalle(alertaId: number, establecimientoId: number): Promise<AlertaDetalleResponse> {
+  const response = await axiosClient.get<AlertaDetalleResponse>(
+    `/alertas/${alertaId}?establecimientoId=${establecimientoId}`
+  );
+  return response.data;
+}
