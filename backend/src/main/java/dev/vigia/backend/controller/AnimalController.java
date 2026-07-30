@@ -24,6 +24,7 @@ import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
+import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.service.AnimalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -157,6 +158,21 @@ public class AnimalController {
             String emailProductor = authentication.getName();
             dev.vigia.backend.dto.EstadoReproductivoResponse response = animalService.editarEstadoReproductivo(animalId,
                     estadoId, emailProductor, request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/intervenciones")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarIntervenciones(
+            @PathVariable("id") Long animalId,
+            Authentication authentication) {
+
+        try {
+            String email = authentication.getName();
+            List<IntervencionResponse> response = animalService.listarIntervenciones(animalId, email);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

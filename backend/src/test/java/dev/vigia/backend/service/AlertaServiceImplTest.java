@@ -27,7 +27,9 @@ import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
+import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.service.impl.AlertaServiceImpl;
+import dev.vigia.backend.model.Intervencion;
 
 @ExtendWith(MockitoExtension.class)
 public class AlertaServiceImplTest {
@@ -40,6 +42,9 @@ public class AlertaServiceImplTest {
 
         @Mock
         private EstablecimientoRepository establecimientoRepository;
+
+        @Mock
+        private IntervencionRepository intervencionRepository;
 
         @InjectMocks
         private AlertaServiceImpl alertaService;
@@ -190,12 +195,13 @@ public class AlertaServiceImplTest {
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
 
                 // Act
-                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA);
+                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas");
 
                 // Assert
                 assertNotNull(result);
                 assertEquals(EstadoAlerta.CONFIRMADA, result.getEstado());
                 verify(alertaRepository, times(1)).save(mockAlerta);
+                verify(intervencionRepository, times(1)).save(any(Intervencion.class));
         }
 
         @Test
@@ -209,7 +215,7 @@ public class AlertaServiceImplTest {
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
 
                 // Act
-                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.DESCARTADA);
+                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.DESCARTADA, "Notas");
 
                 // Assert
                 assertNotNull(result);
@@ -225,7 +231,7 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
                 assertEquals("Usuario no encontrado.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
@@ -239,7 +245,7 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
                 assertEquals("Alerta no encontrada.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
@@ -255,7 +261,7 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 assertThrows(AccessDeniedException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
                 verify(alertaRepository, never()).save(any());
         }
 
@@ -272,7 +278,7 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
                 assertEquals("Estado inválido para la actualización.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
@@ -290,7 +296,7 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
                 assertEquals("Estado inválido para la actualización.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }

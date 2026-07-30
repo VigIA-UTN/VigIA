@@ -45,5 +45,5 @@ public interface AlertaService {
      */
     AlertaDetalleResponse obtenerDetalleAlerta(String emailUsuario, Long establecimientoId, Long alertaId);
 
-    AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId, EstadoAlerta estado);
+    AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId, EstadoAlerta nuevoEstado, String notas);
 }

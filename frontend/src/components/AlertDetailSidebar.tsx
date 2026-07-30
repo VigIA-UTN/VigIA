@@ -63,7 +63,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete }
     setActionLoading(true);
     try {
       // Si la alerta es un mock, el backend va a tirar 404/500, lo atajamos acá para que actualice igual visualmente.
-      await updateAlertaEstado(alerta.id, nuevoEstado).catch(err => {
+      await updateAlertaEstado(alerta.id, nuevoEstado, notas).catch(err => {
         console.warn('Backend falló (probablemente es un mock alert), forzando update frontend:', err);
       });
       
@@ -220,6 +220,11 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete }
                   <div>
                     <small className="text-muted d-block mb-1">Estado</small>
                     <span className="fw-semibold text-dark">{estadoVisual}</span>
+                    {detalle?.usuarioAccion && estadoVisual !== 'PENDIENTE' && (
+                      <small className="d-block text-muted mt-1" style={{ fontSize: '0.75rem' }}>
+                        por {detalle.usuarioAccion}
+                      </small>
+                    )}
                   </div>
                   {detalle?.animalRaza && (
                     <div>
@@ -236,6 +241,44 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete }
                 </div>
               </div>
             </div>
+
+            {/* Ultimos Estados Reproductivos */}
+            {detalle?.ultimosEstadosReproductivos && detalle.ultimosEstadosReproductivos.length > 0 && (
+              <div>
+                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
+                  <i className="bi bi-activity"></i> Últimos estados reproductivos
+                </h6>
+                <div className="d-flex flex-column gap-2">
+                  {detalle.ultimosEstadosReproductivos.map((estado, idx) => (
+                    <div key={estado.id || idx} className="card border-0 shadow-sm rounded-3">
+                      <div className="card-body py-2 px-3 d-flex justify-content-between align-items-center">
+                        <div>
+                          <span className="fw-semibold d-block" style={{ color: '#1E3A5F' }}>
+                            {estado.estado.replace(/_/g, ' ')}
+                          </span>
+                          <small className="text-muted d-block" style={{ fontSize: '0.8rem' }}>
+                            {estado.fechaRegistro ? new Date(estado.fechaRegistro).toLocaleDateString() : '--'}
+                            {estado.registradoPor ? ` • ${estado.registradoPor}` : ''}
+                          </small>
+                        </div>
+                        <div className="text-end">
+                          {estado.fechaUltimoParto && (
+                            <small className="d-block text-muted" style={{ fontSize: '0.75rem' }}>
+                              Parto: {new Date(estado.fechaUltimoParto).toLocaleDateString()}
+                            </small>
+                          )}
+                          {estado.fechaUltimaInseminacion && (
+                            <small className="d-block text-muted" style={{ fontSize: '0.75rem' }}>
+                              Insem: {new Date(estado.fechaUltimaInseminacion).toLocaleDateString()}
+                            </small>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Notas */}
             <div>

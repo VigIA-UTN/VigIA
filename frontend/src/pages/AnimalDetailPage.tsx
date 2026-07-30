@@ -12,6 +12,8 @@ import {
     type EstadoReproductivoResponse,
     type EstadoReproductivoRequest,
     type TipoReproductivo,
+    getIntervenciones,
+    type IntervencionResponse
 } from '../api/animalesApi';
 import { getRodeoLotes, type RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { useAuthStore } from '../store/authStore';
@@ -70,6 +72,10 @@ export default function AnimalDetailPage() {
     const [historial, setHistorial] = useState<EstadoReproductivoResponse[]>([]);
     const [loadingHistorial, setLoadingHistorial] = useState(false);
 
+    // Intervenciones
+    const [intervenciones, setIntervenciones] = useState<IntervencionResponse[]>([]);
+    const [loadingIntervenciones, setLoadingIntervenciones] = useState(false);
+
     // Modal de estado reproductivo
     const [showEstadoModal, setShowEstadoModal] = useState(false);
     const [editingEstado, setEditingEstado] = useState<EstadoReproductivoResponse | null>(null); // null = nuevo, not null = editar
@@ -87,6 +93,18 @@ export default function AnimalDetailPage() {
             // no-op: historial is optional
         } finally {
             setLoadingHistorial(false);
+        }
+    };
+
+    const fetchIntervencionesData = async (animalId: number) => {
+        setLoadingIntervenciones(true);
+        try {
+            const data = await getIntervenciones(animalId);
+            setIntervenciones(data);
+        } catch {
+            // no-op: intervenciones is optional
+        } finally {
+            setLoadingIntervenciones(false);
         }
     };
 
@@ -111,7 +129,8 @@ export default function AnimalDetailPage() {
                     setRodeoLotes(lotes.filter(l => l.activo));
                 }
 
-                await fetchHistorial(Number(id));
+                fetchHistorial(data.id);
+                fetchIntervencionesData(data.id);
             } catch (err) {
                 const e = err as { response?: { data?: { message?: string } } };
                 setError(e.response?.data?.message || 'Error al cargar la ficha del animal.');
@@ -437,6 +456,46 @@ export default function AnimalDetailPage() {
                                                         )}
                                                     </td>
                                                 )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </Card.Body>
+                </Card>
+
+                {/* ── Sección Intervenciones ── */}
+                <Card className="shadow-sm border-0 animal-card mt-4">
+                    <Card.Body>
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                            <h4 className="section-title mb-0">Intervenciones</h4>
+                        </div>
+
+                        {loadingIntervenciones ? (
+                            <div className="text-center py-3">
+                                <Spinner animation="border" size="sm" style={{ color: '#1E3A5F' }} />
+                            </div>
+                        ) : intervenciones.length === 0 ? (
+                            <p className="text-muted text-center py-3">No hay intervenciones registradas para este animal.</p>
+                        ) : (
+                            <div className="table-responsive">
+                                <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha y Hora</th>
+                                            <th>ID Alerta</th>
+                                            <th>Interventor</th>
+                                            <th>Descripción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {intervenciones.map((intv) => (
+                                            <tr key={intv.id}>
+                                                <td>{formatDateTime(intv.fechaHora)}</td>
+                                                <td>{intv.alertaId ? `#${intv.alertaId}` : '—'}</td>
+                                                <td>{intv.interventor || '—'}</td>
+                                                <td>{intv.descripcion}</td>
                                             </tr>
                                         ))}
                                     </tbody>

@@ -15,7 +15,9 @@ import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
+import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.service.AlertaService;
 import lombok.RequiredArgsConstructor;
 
@@ -26,6 +28,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final AlertaRepository alertaRepository;
         private final UsuarioRepository usuarioRepository;
         private final EstablecimientoRepository establecimientoRepository;
+        private final IntervencionRepository intervencionRepository;
 
         @Override
         public List<AlertaResponse> listarAlertasCelo(
@@ -63,6 +66,7 @@ public class AlertaServiceImpl implements AlertaService {
 
         @Override
         @SuppressWarnings("null")
+        @org.springframework.transaction.annotation.Transactional(readOnly = true)
         public AlertaDetalleResponse obtenerDetalleAlerta(
                         String emailUsuario, Long establecimientoId, Long alertaId) {
 
@@ -95,6 +99,43 @@ public class AlertaServiceImpl implements AlertaService {
                         ventanaOptima = horas + " horas";
                 }
 
+                List<dev.vigia.backend.dto.EstadoReproductivoResponse> ultimosEstados = alerta.getAnimal().getEstadosReproductivos().stream()
+                                .limit(5)
+                                .map(e -> {
+                                        String registradoPor = null;
+                                        if (e.getUsuarioRegistrador() != null) {
+                                                registradoPor = e.getUsuarioRegistrador().getNombre();
+                                                if (e.getUsuarioRegistrador().getApellido() != null && !e.getUsuarioRegistrador().getApellido().isEmpty()) {
+                                                        registradoPor += " " + e.getUsuarioRegistrador().getApellido();
+                                                }
+                                                if (registradoPor == null || registradoPor.isBlank()) {
+                                                        registradoPor = e.getUsuarioRegistrador().getEmail();
+                                                }
+                                        }
+                                        return dev.vigia.backend.dto.EstadoReproductivoResponse.builder()
+                                                        .id(e.getId())
+                                                        .animalId(alerta.getAnimal().getId())
+                                                        .estado(e.getEstado().name())
+                                                        .fechaUltimoParto(e.getFechaUltParto())
+                                                        .fechaUltimaInseminacion(e.getFechaUltInseminacion())
+                                                        .origen(e.getOrigen() != null ? e.getOrigen().name() : null)
+                                                        .fechaRegistro(e.getFechaRegistro())
+                                                        .registradoPor(registradoPor)
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
+
+                String usuarioAccionStr = null;
+                if (alerta.getUsuarioConfirmacion() != null) {
+                        usuarioAccionStr = alerta.getUsuarioConfirmacion().getNombre();
+                        if (alerta.getUsuarioConfirmacion().getApellido() != null && !alerta.getUsuarioConfirmacion().getApellido().isEmpty()) {
+                                usuarioAccionStr += " " + alerta.getUsuarioConfirmacion().getApellido();
+                        }
+                        if (usuarioAccionStr == null || usuarioAccionStr.isBlank()) {
+                                usuarioAccionStr = alerta.getUsuarioConfirmacion().getEmail();
+                        }
+                }
+
                 return AlertaDetalleResponse.builder()
                                 .id(alerta.getId())
                                 .animalId(alerta.getAnimal().getId())
@@ -107,6 +148,8 @@ public class AlertaServiceImpl implements AlertaService {
                                 .ventanaFinIns(alerta.getVentanaFinIns())
                                 .datoDisparador(alerta.getDisparador())
                                 .estadoActual(alerta.getEstado())
+                                .usuarioAccion(usuarioAccionStr)
+                                .ultimosEstadosReproductivos(ultimosEstados)
                                 .build();
         }
 
@@ -122,8 +165,9 @@ public class AlertaServiceImpl implements AlertaService {
 
         @Override
         @SuppressWarnings("null")
+        @org.springframework.transaction.annotation.Transactional
         public AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId,
-                        EstadoAlerta nuevoEstado) {
+                        EstadoAlerta nuevoEstado, String notas) {
 
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
@@ -150,10 +194,27 @@ public class AlertaServiceImpl implements AlertaService {
                         alerta.setTsConfirmacion(LocalDateTime.now());
                         alerta.setUsuarioConfirmacion(usuario);
                         alerta.setEstado(nuevoEstado);
+                        
+                        if (nuevoEstado == EstadoAlerta.DESCARTADA && notas != null && !notas.trim().isEmpty()) {
+                                alerta.setMotivoDescarte(notas.trim());
+                        }
                 } else {
                         throw new IllegalArgumentException("Estado inválido para la actualización.");
                 }
                 Alerta actualizado = alertaRepository.save(alerta);
+
+                if (nuevoEstado == EstadoAlerta.CONFIRMADA) {
+                        Intervencion intervencion = new Intervencion();
+                        intervencion.setAlerta(actualizado);
+                        intervencion.setAnimal(actualizado.getAnimal());
+                        intervencion.setInterventor(usuario);
+                        
+                        String descripcion = (notas != null && !notas.trim().isEmpty()) ? notas.trim() : "Inseminación confirmada";
+                        intervencion.setDescripcion(descripcion);
+                        
+                        intervencion.setFechaHora(LocalDateTime.now());
+                        intervencionRepository.save(intervencion);
+                }
 
                 /*
                  * String ventanaOptima = null;

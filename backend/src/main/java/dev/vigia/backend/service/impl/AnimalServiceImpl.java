@@ -31,6 +31,7 @@ import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
+import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AnimalService;
@@ -48,6 +49,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstablecimientoRepository establecimientoRepository;
         private final RodeoLoteRepository rodeoLoteRepository;
         private final EstadoReproductivoRepository estadoReproductivoRepository;
+        private final IntervencionRepository intervencionRepository;
 
         private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
@@ -575,6 +577,49 @@ public class AnimalServiceImpl implements AnimalService {
                                                         .origen(e.getOrigen() != null ? e.getOrigen().name() : null)
                                                         .fechaRegistro(e.getFechaRegistro())
                                                         .registradoPor(registradoPor)
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public List<dev.vigia.backend.dto.IntervencionResponse> listarIntervenciones(Long animalId, String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimiento = animal.getEstablecimiento();
+
+                boolean tieneAcceso = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo())
+                                || usuario.getRol().equals(Rol.ADMINISTRADOR);
+
+                if (!tieneAcceso) {
+                        throw new IllegalArgumentException(
+                                        "No tiene acceso a los datos de este animal.");
+                }
+
+                return intervencionRepository.findByAnimalIdOrderByFechaHoraDesc(animalId).stream()
+                                .map(i -> {
+                                        String interventorStr = i.getInterventor().getNombre();
+                                        if (i.getInterventor().getApellido() != null && !i.getInterventor().getApellido().isEmpty()) {
+                                                interventorStr += " " + i.getInterventor().getApellido();
+                                        }
+                                        if (interventorStr == null || interventorStr.isBlank()) {
+                                                interventorStr = i.getInterventor().getEmail();
+                                        }
+
+                                        return dev.vigia.backend.dto.IntervencionResponse.builder()
+                                                        .id(i.getId())
+                                                        .alertaId(i.getAlerta() != null ? i.getAlerta().getId() : null)
+                                                        .animalId(i.getAnimal().getId())
+                                                        .interventor(interventorStr)
+                                                        .descripcion(i.getDescripcion())
+                                                        .fechaHora(i.getFechaHora())
                                                         .build();
                                 })
                                 .collect(Collectors.toList());

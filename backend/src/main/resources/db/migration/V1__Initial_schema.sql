@@ -115,3 +115,12 @@ CREATE TABLE telemetria (
     bateria DOUBLE PRECISION,
     estado_inferencia VARCHAR(50) DEFAULT 'PENDIENTE'
 );
+
+CREATE TABLE intervenciones (
+    id BIGSERIAL PRIMARY KEY,
+    alerta_id BIGINT REFERENCES alertas(id),
+    animal_id BIGINT NOT NULL REFERENCES animales(id),
+    interventor_id BIGINT NOT NULL REFERENCES usuarios(id),
+    descripcion VARCHAR(1000) NOT NULL,
+    fecha_hora TIMESTAMP NOT NULL
+);

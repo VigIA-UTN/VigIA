@@ -23,4 +23,6 @@ public class AlertaDetalleResponse {
     private LocalDateTime ventanaFinIns;
     private DisparadorAlerta datoDisparador;
     private EstadoAlerta estadoActual;
+    private String usuarioAccion;
+    private java.util.List<EstadoReproductivoResponse> ultimosEstadosReproductivos;
 }

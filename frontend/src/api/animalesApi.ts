@@ -150,3 +150,17 @@ export async function getHistorialEstados(animalId: number): Promise<EstadoRepro
   );
   return response.data;
 }
+
+export interface IntervencionResponse {
+  id: number;
+  alertaId: number | null;
+  animalId: number;
+  interventor: string;
+  descripcion: string;
+  fechaHora: string;
+}
+
+export async function getIntervenciones(animalId: number): Promise<IntervencionResponse[]> {
+  const response = await axiosClient.get<IntervencionResponse[]>(`/animales/${animalId}/intervenciones`);
+  return response.data;
+}

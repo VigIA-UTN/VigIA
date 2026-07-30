@@ -99,10 +99,11 @@ public class AlertaController {
     public ResponseEntity<?> actualizarEstadoAlerta(
             @PathVariable("id") Long alertaId,
             @RequestParam(name = "estado") EstadoAlerta nuevoEstado,
+            @RequestParam(name = "notas", required = false) String notas,
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            AlertaResponse response = alertaService.actualizarEstadoAlerta(email, alertaId, nuevoEstado);
+            AlertaResponse response = alertaService.actualizarEstadoAlerta(email, alertaId, nuevoEstado, notas);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
