@@ -32,6 +32,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -45,24 +46,36 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-@DisplayName("AlertaController — PUT /api/v1/alertas/estado/{id}")
+@DisplayName("AlertaController Tests")
 class AlertaControllerTest {
 
-    @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
-    @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private AuthService authService;
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private AuthService authService;
 
-    @Autowired private AlertaRepository alertaRepository;
-    @Autowired private AnimalRepository animalRepository;
-    @Autowired private RodeoLoteRepository rodeoLoteRepository;
-    @Autowired private EstablecimientoRepository establecimientoRepository;
-    @Autowired private UsuarioRepository usuarioRepository;
-    @Autowired private InvitacionRepository invitacionRepository;
-    @Autowired private EstadoReproductivoRepository estadoReproductivoRepository;
+    @Autowired
+    private AlertaRepository alertaRepository;
+    @Autowired
+    private AnimalRepository animalRepository;
+    @Autowired
+    private RodeoLoteRepository rodeoLoteRepository;
+    @Autowired
+    private EstablecimientoRepository establecimientoRepository;
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+    @Autowired
+    private InvitacionRepository invitacionRepository;
+    @Autowired
+    private EstadoReproductivoRepository estadoReproductivoRepository;
 
     private Long alertaId;
     private Long alertaOtroEstId;
+    private Long establecimientoId;
 
     private String productorToken;
     private String veterinarioToken;
@@ -99,6 +112,7 @@ class AlertaControllerTest {
         est.getEmpleados().add(new Empleado(est, veterinario));
         est.getEmpleados().add(new Empleado(est, campero));
         est = establecimientoRepository.save(est);
+        establecimientoId = est.getId();
 
         // Animal en el establecimiento principal
         RodeoLote rodeo = new RodeoLote(est);
@@ -300,6 +314,44 @@ class AlertaControllerTest {
                 .header("Authorization", "Bearer " + productorToken)
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
+    }
+
+    // =========================================================================
+    // GET /api/v1/alertas/{id} (Detalle)
+    // =========================================================================
+
+    @Test
+    @DisplayName("Detalle alerta existente → 200 OK")
+    @SuppressWarnings("null")
+    void obtenerDetalleAlerta_exitoso_returns200() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/{id}", alertaId)
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(alertaId));
+    }
+
+    @Test
+    @DisplayName("Detalle alerta inexistente → 404 Not Found")
+    @SuppressWarnings("null")
+    void obtenerDetalleAlerta_inexistente_returns404() throws Exception {
+        mockMvc.perform(
+                MockMvcRequestBuilders.get("/api/v1/alertas/{id}", 999999L)
+                        .header("Authorization", "Bearer " + productorToken)
+                        .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Detalle alerta de otro establecimiento → 403 Forbidden")
+    @SuppressWarnings("null")
+    void obtenerDetalleAlerta_accesoCruzado_returns403() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/{id}", alertaOtroEstId)
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isForbidden());
     }
 
     // =========================================================================

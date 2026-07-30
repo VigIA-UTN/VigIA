@@ -87,6 +87,9 @@ public class AlertaController {
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
         } catch (IllegalArgumentException e) {
+            if ("Alerta no encontrada.".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
