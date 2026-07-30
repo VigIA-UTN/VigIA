@@ -7,8 +7,37 @@ el inicio de un evento reproductivo (Documento de Arquitectura, sección 3.1).
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
+import json
+from pathlib import Path
+
+try:
+    import tensorflow as tf
+except ImportError:
+    tf = None
 
 app = FastAPI(title="VigIA - Microservicio de Detección de Celo")
+
+model = None
+norm_stats = None
+
+@app.on_event("startup")
+def load_ml_model():
+    global model, norm_stats
+    if tf is None:
+        print("ADVERTENCIA: tensorflow no está instalado. No se podrá cargar el modelo.")
+        return
+
+    models_dir = Path(__file__).parent / "models"
+    model_path = models_dir / "modelo_celo_lstm.keras"
+    norm_path = models_dir / "normalizacion.json"
+    
+    if model_path.exists() and norm_path.exists():
+        model = tf.keras.models.load_model(model_path)
+        with open(norm_path, "r") as f:
+            norm_stats = json.load(f)
+        print("Modelo y estadísticas de normalización cargados correctamente.")
+    else:
+        print(f"ADVERTENCIA: No se encontró el modelo en {models_dir}. Ejecute el script de entrenamiento primero.")
 
 class PuntoTelemetria(BaseModel):
     x: float

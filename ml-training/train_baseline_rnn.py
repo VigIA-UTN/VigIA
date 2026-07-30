@@ -229,11 +229,18 @@ def main():
     with open(Path(args.models_dir) / "latest.json", "w") as f:
         json.dump({"latest_run_id": run_id, "path": str(run_dir)}, f, indent=2)
 
+    import shutil
+    export_dir = Path(__file__).resolve().parent.parent / "ml-celo" / "app" / "models"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(run_dir / "modelo_celo_lstm.keras", export_dir / "modelo_celo_lstm.keras")
+    shutil.copy(run_dir / "normalizacion.json", export_dir / "normalizacion.json")
+
     print(f"\nCorrida guardada en: {run_dir}/")
     print(f"  - modelo_celo_lstm.keras")
     print(f"  - normalizacion.json (necesario para inferencia)")
     print(f"  - run_summary.json (hiperparámetros y métricas, para comparar corridas)")
     print(f"Puntero actualizado en: {Path(args.models_dir) / 'latest.json'}")
+    print(f"Modelo exportado exitosamente a: {export_dir}")
 
 
 if __name__ == "__main__":
