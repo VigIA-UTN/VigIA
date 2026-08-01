@@ -2,7 +2,7 @@ package dev.vigia.backend.service.ml;
 
 import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
-import dev.vigia.backend.dto.ml.CeloPredictRequestDTO;
+import dev.vigia.backend.dto.ml.PuntoTelemetriaDTO;
 import dev.vigia.backend.dto.ml.CeloPredictResponseDTO;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
@@ -55,7 +55,7 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
             return;
         }
 
-        CeloPredictRequestDTO requestDTO = buildRequest(telemetriaList);
+        List<PuntoTelemetriaDTO> requestDTO = buildRequest(telemetriaList);
 
         log.info("Llamando a microservicio de celo con correlationId: {}", correlationId);
 
@@ -117,19 +117,13 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
         telemetriaRepository.saveAll(telemetriaList);
     }
 
-    private CeloPredictRequestDTO buildRequest(List<Telemetria> telemetriaList) {
-        List<CeloPredictRequestDTO.PuntoTelemetriaDTO> series = telemetriaList.stream()
-                .map(t -> CeloPredictRequestDTO.PuntoTelemetriaDTO.builder()
-                        .x(t.getAccelX())
-                        .y(t.getAccelY())
-                        .z(t.getAccelZ())
+    private List<PuntoTelemetriaDTO> buildRequest(List<Telemetria> telemetriaList) {
+        return telemetriaList.stream()
+                .map(t -> PuntoTelemetriaDTO.builder()
+                        .moveState(t.getMoveState())
                         .latitud(t.getLatitud())
                         .longitud(t.getLongitud())
                         .build())
                 .collect(Collectors.toList());
-
-        return CeloPredictRequestDTO.builder()
-                .seriesTemporales(series)
-                .build();
     }
 }

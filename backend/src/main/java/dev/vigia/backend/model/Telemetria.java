@@ -28,14 +28,8 @@ public class Telemetria {
     private Double latitud;
     private Double longitud;
 
-    @Column(name = "accel_x")
-    private Double accelX;
-
-    @Column(name = "accel_y")
-    private Double accelY;
-
-    @Column(name = "accel_z")
-    private Double accelZ;
+    @Column(name = "move_state")
+    private Integer moveState;
 
     @Column(name = "nivel_rumia")
     private Double nivelRumia;

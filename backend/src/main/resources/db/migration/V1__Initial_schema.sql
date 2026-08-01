@@ -108,9 +108,7 @@ CREATE TABLE telemetria (
     caravana_id BIGINT NOT NULL REFERENCES caravanas(id),
     latitud DOUBLE PRECISION,
     longitud DOUBLE PRECISION,
-    accel_x DOUBLE PRECISION,
-    accel_y DOUBLE PRECISION,
-    accel_z DOUBLE PRECISION,
+    move_state INT,
     nivel_rumia DOUBLE PRECISION,
     bateria DOUBLE PRECISION,
     estado_inferencia VARCHAR(50) DEFAULT 'PENDIENTE'

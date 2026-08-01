@@ -4,10 +4,17 @@ Evalúa el aumento sostenido de actividad motora para diagnosticar
 el inicio de un evento reproductivo (Documento de Arquitectura, sección 3.1).
 """
 
-from fastapi import FastAPI
+# pyrefly: ignore [missing-import]
+from fastapi import FastAPI, Request, Response
+# pyrefly: ignore [missing-import]
+from fastapi.responses import JSONResponse
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 from typing import List
 import json
+import math
+# pyrefly: ignore [missing-import]
+import numpy as np
 from pathlib import Path
 
 try:
@@ -54,16 +61,61 @@ def health():
     return {"status": "ok", "service": "ml-celo"}
 
 @app.post("/api/internal/ml/celo/predict", response_model=PrediccionCeloResponse)
-def predict(serie: List[PuntoTelemetria]):
+async def predict(request: Request, response: Response, serie: List[PuntoTelemetria]):
     """
     Request: serie temporal de la telemetría del animal de las últimas 24 horas.
     """
-    # TODO: calcular la distancia euclidiana entre los puntos (lat, lon) de la serie
-    # para reconstruir la distancia recorrida en cada intervalo, y luego inyectar 
-    # la matriz final de (288, 2) a model.predict() con las features: 
-    # [moveState, distancia_recorrida].
-    return PrediccionCeloResponse(
-        evento_celo=False,
-        confianza_modelo=0.0,
-        ventana_optima_horas=0,
-    )
+    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
+    print(f"[{correlation_id}] Request recibida para predicción de celo con {len(serie)} puntos.")
+    response.headers["X-Correlation-ID"] = correlation_id
+    
+    try:
+        if model is None:
+            raise ValueError("El modelo de machine learning no está cargado.")
+            
+        if not serie:
+            raise ValueError("La serie de telemetría está vacía.")
+            
+        features = []
+        for i in range(len(serie)):
+            ms = serie[i].moveState
+            if i == 0:
+                dist = 0.0
+            else:
+                lat1, lon1 = serie[i-1].latitud, serie[i-1].longitud
+                lat2, lon2 = serie[i].latitud, serie[i].longitud
+                dist = math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2)
+            features.append([float(ms), float(dist)])
+            
+        X_input = np.array([features])
+        
+        if norm_stats is not None:
+            mean = np.array(norm_stats["mean"])
+            std = np.array(norm_stats["std"])
+            # Evitar división por cero
+            std = np.where(std == 0, 1e-7, std)
+            X_input = (X_input - mean) / std
+            
+        y_pred_prob = model.predict(X_input, verbose=0)
+        prob = float(y_pred_prob[0][0])
+        evento = prob > 0.5
+        ventana = 12 if evento else 0
+        
+        print(f"[{correlation_id}] Inferencia exitosa: celo={evento}, confianza={prob:.4f}")
+        
+        return PrediccionCeloResponse(
+            evento_celo=evento,
+            confianza_modelo=prob,
+            ventana_optima_horas=ventana
+        )
+    except Exception as e:
+        print(f"[{correlation_id}] Error durante la inferencia: {str(e)}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "Internal Server Error",
+                "mensaje": str(e),
+                "trace_id": correlation_id
+            },
+            headers={"X-Correlation-ID": correlation_id}
+        )
