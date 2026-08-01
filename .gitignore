@@ -5,6 +5,7 @@ backend/target/
 # Python
 **/venv/
 **/.venv/
+ml-training/.venv/
 **/__pycache__/
 **/*.pyc
 
