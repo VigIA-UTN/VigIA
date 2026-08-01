@@ -22,7 +22,6 @@ import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,25 +32,26 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-
 import org.springframework.mock.web.MockMultipartFile;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 @DisplayName("AnimalController — Tests")
+
 class AnimalControllerTest {
 
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory;
+    @MockBean
+    private ConnectionFactory connectionFactory;
 
         @Autowired
         private MockMvc mockMvc;

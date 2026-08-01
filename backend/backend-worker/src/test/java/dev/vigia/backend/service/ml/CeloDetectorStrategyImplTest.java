@@ -11,16 +11,17 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import java.util.Arrays;
 import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 @SpringBootTest
+
 class CeloDetectorStrategyImplTest {
 
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory;
+    @MockBean
+    private ConnectionFactory connectionFactory;
 
     @Autowired
     private CeloDetectorStrategyImpl celoDetectorStrategy;

@@ -12,9 +12,7 @@ import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
-
 import org.junit.jupiter.api.BeforeEach;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,22 +22,23 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("RodeoLoteController — Tests")
+
 class RodeoLoteControllerTest {
 
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory;
+    @MockBean
+    private ConnectionFactory connectionFactory;
 
         @Autowired
         private MockMvc mockMvc;

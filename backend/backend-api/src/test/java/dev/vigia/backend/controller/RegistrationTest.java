@@ -15,22 +15,23 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("Registro de Usuarios")
+
 class RegistrationTest {
 
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory;
+    @MockBean
+    private ConnectionFactory connectionFactory;
 
     @Autowired
     private MockMvc mockMvc;

@@ -21,7 +21,6 @@ import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
 import jakarta.transaction.Transactional;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,24 +32,25 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 @DisplayName("AlertaController Tests")
+
 class AlertaControllerTest {
 
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory;
+    @MockBean
+    private ConnectionFactory connectionFactory;
 
     @Autowired
     private MockMvc mockMvc;

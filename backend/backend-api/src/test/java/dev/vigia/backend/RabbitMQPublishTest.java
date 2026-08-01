@@ -11,14 +11,15 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-
 import java.time.LocalDateTime;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 @SpringBootTest
+
 class RabbitMQPublishTest {
 
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory;
+    @MockBean
+    private ConnectionFactory connectionFactory;
 
     @MockBean
     private RabbitTemplate rabbitTemplate;
