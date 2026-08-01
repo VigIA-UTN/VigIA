@@ -40,9 +40,7 @@ def load_ml_model():
         print(f"ADVERTENCIA: No se encontró el modelo en {models_dir}. Ejecute el script de entrenamiento primero.")
 
 class PuntoTelemetria(BaseModel):
-    x: float
-    y: float
-    z: float
+    moveState: int
     latitud: float
     longitud: float
 
@@ -62,7 +60,8 @@ def predict(serie: List[PuntoTelemetria]):
     """
     # TODO: calcular la distancia euclidiana entre los puntos (lat, lon) de la serie
     # para reconstruir la distancia recorrida en cada intervalo, y luego inyectar 
-    # la matriz final de (288, 5) a model.predict().
+    # la matriz final de (288, 2) a model.predict() con las features: 
+    # [moveState, distancia_recorrida].
     return PrediccionCeloResponse(
         evento_celo=False,
         confianza_modelo=0.0,

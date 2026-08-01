@@ -4,31 +4,12 @@ generate_dataset.py (v2)
 Generador sintético y reproducible del dataset de telemetría para VigIA,
 basado en estudios de comportamiento bovino y dinámica del rodeo en pastoreo.
 
-Cambios respecto a v1:
-- Random walk CORRELACIONADO (con heading/rumbo persistente) en vez de pasos
-  independientes: una vaca real no cambia de dirección bruscamente cada 5 min.
-- Rampa de actividad SUAVE (sigmoide) entre periestro y celo, en vez de un
-  escalón binario: la RNN puede aprender la tendencia de "acercamiento" al celo.
-- Amplitudes de aceleración CALIBRADAS con datos reales de ear-tag/collar en
-  pastoreo libre (dataset público db-cow-walking, Morales-Vargas et al. 2025,
-  Universidad de La Frontera, Chile). Ver constantes en CALIBRATED_* abajo.
-- Detección de MONTA sin depender de proximidad entre animales: se modela
-  como un evento de orientación (pitch alto, tren delantero levantado) +
-  pico de varianza dinámica simultáneo, resumidos en la ventana de 5 min
-  (igual que reportaría un ear-tag LoRaWAN real, que no manda raw accel).
-  Se agregan también eventos de "pitch alto sin spike" durante pastoreo
-  normal (cabeza agachada), para que el modelo NO aprenda "pitch alto = celo"
-  de forma espuria.
-
-Reglas biológicas aplicadas:
-- Ciclo estral: ~21 días.
-- Duración del celo: ~15 hs.
-- Dinámica: aumento de actividad, reducción de rumia, trayectorias más
-  erráticas (menos lineales), y eventos de monta.
-
-El dataset resultante (`telemetria.parquet`) emula 1 a 1 las columnas de la
-base de datos de producción (latitud, longitud, accel_x, accel_y, accel_z,
-nivel_rumia, bateria, etc.), mas las etiquetas de celo, periestro y monta.
+Cambios respecto a v1 y v2:
+- Se eliminó la generación de acelerometría cruda (`accel_x`, `y`, `z`) y `pitch_deg` para alinearlo
+  estrictamente con el Protocol Spec del collar Lansitec (Payload Tipo 0x2 Heartbeat).
+- Ahora el simulador genera `vibstate` (0-9), donde 0 es reposo/rumia, 2-6 es pastoreo/caminata,
+  y 7-9 es alta actividad (corrida, monta, inquietud por celo).
+- Se mantiene el GPS (`latitud`, `longitud`) para el cálculo de distancias.
 """
 
 import argparse
@@ -40,18 +21,7 @@ import pandas as pd
 SAMPLES_PER_DAY = 288  # 1 lectura cada 5 minutos (24 * 60 / 5)
 MINUTES_PER_SAMPLE = 5
 
-# --- Constantes calibradas con datos reales (db-cow-walking, ear-tag/collar,
-#     pastoreo libre, Temuco, Chile). Magnitudes de aceleración cruda en g,
-#     convertidas desde m/s^2 (/9.81). Representan el DESVÍO ESTÁNDAR de la
-#     magnitud de aceleración dentro de una ventana, por comportamiento. ---
-CALIBRATED_STD_RESTING = 0.024   # rumia / descanso: casi estático
-CALIBRATED_STD_WALKING = 0.138   # caminata
-CALIBRATED_STD_GRAZING = 0.212   # pastoreo activo (cabeza en movimiento)
-CALIBRATED_STD_MISC = 0.140      # sacudidas, rascado, etc.
-
-# Multiplicador de celo sobre el baseline de pastoreo (se aplica ADEMÁS de
-# la elevada varianza propia del pastoreo/caminata en el pico de estro).
-CELO_AMPLITUDE_MULTIPLIER = (2.2, 3.2)
+# El nivel de vibstate del collar Lansitec va de 0 (reposo) a 9 (alta aceleración)
 
 
 def build_dataset(n_animales: int, dias: int, seed: int):
@@ -164,86 +134,34 @@ def build_dataset(n_animales: int, dias: int, seed: int):
         lon[:, t] = lon[:, t - 1] + step_lon + pull_lon
 
     # ------------------------------------------------------------------
-    # 3. Acelerometría, Rumia y Eventos de Monta (calibrado con datos reales)
+    # 3. Estado de Vibración (VIBSTATE)
     # ------------------------------------------------------------------
-    print("Generando acelerometría, rumia y eventos de monta...")
+    print("Generando estados de vibración (VIBSTATE)...")
     hours_of_day = (np.arange(T) * MINUTES_PER_SAMPLE / 60.0) % 24.0
-    # Ritmo circadiano asimétrico: sube rápido 06-12hs, baja más lento 12-20hs
-    # (calibrado con perfil observado en ear-tags, PMC11154254)
+    
+    # Ritmo circadiano: más actividad de día (6 a 20hs)
     activity_base = np.where(
-        (hours_of_day >= 6) & (hours_of_day < 12),
-        (hours_of_day - 6) / 6,
-        np.where(
-            (hours_of_day >= 12) & (hours_of_day < 20),
-            1.0 - 0.7 * (hours_of_day - 12) / 8,
-            0.15,
-        )
+        (hours_of_day >= 6) & (hours_of_day < 20),
+        rng.uniform(0.4, 0.8, (n_animales, T)),  # de día, más chances de caminar/pastar
+        rng.uniform(0.0, 0.3, (n_animales, T))   # de noche, más chances de dormir
     )
-    activity_base = np.clip(activity_base, 0.1, 1.0)
-    activity = np.tile(activity_base, (n_animales, 1))
-
-    prob_rumia = 1.0 - activity
-    # Antes: multiplicador arbitrario 0.2 / 0.7. Ahora, basado en la relación
-    # real de varianzas resting vs. grazing (~0.024 / 0.212 ≈ 0.11-0.13):
-    prob_rumia = prob_rumia * (1.0 - intensidad * 0.85)  # cae ~85% en pico de celo
-
-    rumia_raw = rng.random((n_animales, T)) < prob_rumia
-
-    # Amplitud (desvío) base por tick: interpolamos entre resting y grazing
-    # según el nivel de actividad, luego sumamos el extra de celo.
-    amplitude = CALIBRATED_STD_RESTING + activity * (CALIBRATED_STD_GRAZING - CALIBRATED_STD_RESTING)
-    amplitude = np.where(rumia_raw, CALIBRATED_STD_RESTING, amplitude)
-    celo_extra = rng.uniform(*CELO_AMPLITUDE_MULTIPLIER, size=(n_animales, T))
-    amplitude = amplitude * (1.0 + intensidad * (celo_extra - 1.0))
-
-    accel_x = rng.normal(0, 1, (n_animales, T)) * amplitude
-    accel_y = rng.normal(0, 1, (n_animales, T)) * amplitude
-    accel_z = 1.0 + rng.normal(0, 1, (n_animales, T)) * amplitude
-
-    # --- Pitch (orientación) base: en reposo casi todo el peso es accel_z.
-    # Un evento de monta implica levantar el tren delantero -> parte de la
-    # componente de gravedad "migra" de Z hacia X (pitch ~30-45°). ---
-    pitch_deg = np.zeros((n_animales, T), dtype=np.float32)
-    is_monta = np.zeros((n_animales, T), dtype=bool)
-
-    # Probabilidad de monta por tick, proporcional a la intensidad de celo,
-    # ya que representa la fracción de esos 5 minutos con un evento de monta.
-    prob_monta = intensidad ** 2 * 0.12  # techo ~12% de los ticks en pico de celo
-    monta_draw = rng.random((n_animales, T)) < prob_monta
-    is_monta[monta_draw] = True
-
-    # Falsos positivos de pitch: cabeza agachada pastando, SIN spike dinámico.
-    # Objetivo: que el modelo aprenda que pitch alto solo no alcanza.
-    prob_pitch_pastoreo = np.where(rumia_raw, 0.0, activity * 0.03)
-    pitch_pastoreo_draw = rng.random((n_animales, T)) < prob_pitch_pastoreo
-
-    n_monta = int(monta_draw.sum())
-    if n_monta > 0:
-        pitch_deg[monta_draw] = rng.uniform(30, 45, n_monta)
-        # Redistribuir gravedad: Z baja, X sube, en proporción al pitch
-        theta = np.radians(pitch_deg[monta_draw])
-        idx = np.argwhere(monta_draw)
-        accel_z_vals = np.cos(theta)
-        accel_x_vals = np.sin(theta) * rng.choice([-1, 1], n_monta)
-        for k, (a, t) in enumerate(idx):
-            accel_z[a, t] = accel_z_vals[k] + rng.normal(0, 0.05)
-            accel_x[a, t] += accel_x_vals[k]
-            # Pico dinámico simultáneo (resumen agregado de la ventana)
-            spike_amp = rng.uniform(3.0, 6.0)
-            accel_x[a, t] += rng.choice([-1, 1]) * spike_amp * 0.5
-            accel_y[a, t] += rng.choice([-1, 1]) * spike_amp * 0.5
-
-    n_pitch_pastoreo = int(pitch_pastoreo_draw.sum())
-    if n_pitch_pastoreo > 0:
-        pitch_deg[pitch_pastoreo_draw] = rng.uniform(20, 40, n_pitch_pastoreo)
-        theta = np.radians(pitch_deg[pitch_pastoreo_draw])
-        idx = np.argwhere(pitch_pastoreo_draw)
-        accel_z_vals = np.cos(theta)
-        accel_x_vals = np.sin(theta) * rng.choice([-1, 1], n_pitch_pastoreo)
-        for k, (a, t) in enumerate(idx):
-            accel_z[a, t] = accel_z_vals[k] + rng.normal(0, 0.05)
-            accel_x[a, t] += accel_x_vals[k]
-            # SIN spike dinámico extra: la varianza sigue siendo la de pastoreo normal
+    
+    # Probabilidad de descanso (vibstate 0-1) vs actividad normal (vibstate 2-6)
+    # Baja la prob de descanso si está en celo (intensidad alta)
+    is_resting = rng.random((n_animales, T)) > (activity_base + intensidad * 0.5)
+    
+    # Asignar estados base
+    vibstate = np.where(is_resting, rng.integers(0, 2, (n_animales, T)), rng.integers(2, 7, (n_animales, T)))
+    
+    # Agregar picos de alta actividad por celo
+    # La probabilidad de un pico de vibstate alto es proporcional a la intensidad de celo al cuadrado
+    prob_high_vib = intensidad ** 2 * 0.15 # hasta 15% de los ticks en pico de celo
+    high_vib_mask = rng.random((n_animales, T)) < prob_high_vib
+    vibstate[high_vib_mask] = rng.integers(7, 10, high_vib_mask.sum())
+    
+    # Falsos positivos de alta vibración (arreo, susto) independientes del celo
+    fp_mask = rng.random((n_animales, T)) < 0.005 # 0.5%
+    vibstate[fp_mask] = rng.integers(7, 10, fp_mask.sum())
 
     # ------------------------------------------------------------------
     # 4. Batería
@@ -267,16 +185,11 @@ def build_dataset(n_animales: int, dias: int, seed: int):
         "fecha_hora": fecha_hora,
         "latitud": np.round(lat.flatten(), 6),
         "longitud": np.round(lon.flatten(), 6),
-        "accel_x": np.round(accel_x.flatten().astype(np.float32), 4),
-        "accel_y": np.round(accel_y.flatten().astype(np.float32), 4),
-        "accel_z": np.round(accel_z.flatten().astype(np.float32), 4),
-        "pitch_deg": np.round(pitch_deg.flatten(), 2),
-        "nivel_rumia": np.where(rumia_raw.flatten(), 1.0, 0.0).astype(np.float32),
+        "vibstate": vibstate.flatten(),
         "bateria": np.round(bateria.flatten().astype(np.float32), 2),
         "intensidad_celo": np.round(intensidad.flatten(), 4),
         "is_celo": is_celo.flatten(),
         "is_periestro": is_periestro.flatten(),
-        "is_monta": is_monta.flatten(),
     })
 
     return df, metadata_list
@@ -302,7 +215,6 @@ def main():
         json.dump(metadata, f, indent=2, ensure_ascii=False)
 
     print("¡Generación completada con éxito!")
-    print(f"Eventos de monta generados: {int(df['is_monta'].sum())}")
     print(f"Ticks en celo: {int(df['is_celo'].sum())} | en periestro: {int(df['is_periestro'].sum())}")
 
 

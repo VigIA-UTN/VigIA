@@ -4,6 +4,7 @@ backend/target/
 
 # Python
 **/venv/
+**/.venv/
 **/__pycache__/
 **/*.pyc
 
@@ -28,7 +29,10 @@ Thumbs.db
 !.env.example
 
 # Datasets
-dataset/*.npy
-dataset/*.csv
-dataset/*.parquet
-dataset/dataset_summary.json
+ml-training/dataset/*.npy
+ml-training/dataset/*.csv
+ml-training/dataset/*.parquet
+ml-training/dataset/*.json
+
+# Modelos entrenados (historial)
+ml-training/models/

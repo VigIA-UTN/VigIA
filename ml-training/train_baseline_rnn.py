@@ -4,16 +4,13 @@ train_baseline_rnn.py (v2)
 Entrena una RNN (LSTM) baseline sobre el dataset generado por
 generate_dataset.py v2, para detectar celo a partir de ventanas de 24hs.
 
-Cambios respecto a v1:
-- Suma pitch_deg e is_monta como features (ahora la ventana es
-  (288, 7): accel_x, accel_y, accel_z, magnitud, distancia_recorrida,
-  pitch_deg, is_monta), aprovechando la señal de orientación/monta que
-  generate_dataset.py v2 ya calcula por tick.
+Cambios respecto a versiones anteriores:
+- Se eliminaron las variables `accel_x`, `y`, `z`, `pitch_deg` e `is_monta`.
+- Ahora el modelo se entrena EXCLUSIVAMENTE con 2 features: `vibstate` (0-9)
+  y `distancia_recorrida` (metros), que son los únicos datos de movimiento
+  que el collar Lansitec transmite por LoRaWAN según su Protocol Spec.
 - Los pesos, la normalización y las métricas de cada corrida se guardan en
-  una carpeta versionada bajo --models-dir (default "models/"), con un
-  nombre que incluye timestamp + seed, y un run_summary.json al lado con
-  hiperparámetros y métricas de test. Ver docstring al final del archivo
-  para la justificación de este esquema mientras no hay nada desplegado.
+  una carpeta versionada bajo --models-dir (default "models/").
 
 Requisitos: pip install tensorflow scikit-learn numpy pandas pyarrow
 
@@ -32,10 +29,7 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.metrics import classification_report, confusion_matrix
 
 
-def add_magnitude(X: np.ndarray) -> np.ndarray:
-    # Calcula la magnitud solo de los ejes x, y, z (los primeros 3)
-    mag = np.sqrt((X[..., :3] ** 2).sum(axis=-1, keepdims=True))
-    return np.concatenate([X, mag], axis=-1)
+
 
 
 def group_split(X, y, groups, test_size=0.2, val_size=0.2, seed=42):
@@ -101,29 +95,15 @@ def main():
         if len(group) != 288:
             continue  # Descartar días incompletos
 
-        accel = group[["accel_x", "accel_y", "accel_z"]].to_numpy(dtype=np.float32)
+        vibstate = group["vibstate"].to_numpy(dtype=np.float32)
 
         lat = group["latitud"].to_numpy()
         lon = group["longitud"].to_numpy()
         dist_eucl = np.sqrt(np.diff(lat) ** 2 + np.diff(lon) ** 2) * 100000
         dist_arr = np.concatenate([[0], dist_eucl]).astype(np.float32)
 
-        # pitch_deg e is_monta: presentes desde generate_dataset.py v2.
-        # Si el dataset viene de una versión vieja sin estas columnas,
-        # se completan en cero para no romper compatibilidad hacia atrás.
-        if "pitch_deg" in group.columns:
-            pitch = group["pitch_deg"].to_numpy(dtype=np.float32)
-        else:
-            pitch = np.zeros(288, dtype=np.float32)
-
-        if "is_monta" in group.columns:
-            monta = group["is_monta"].to_numpy(dtype=np.float32)
-        else:
-            monta = np.zeros(288, dtype=np.float32)
-
-        # accel(3) + distancia(1) + pitch(1) + monta(1) = 6 features
-        # (add_magnitude() suma una 7ma: la magnitud de accel)
-        features = np.column_stack([accel, dist_arr, pitch, monta])
+        # vibstate(1) + distancia(1) = 2 features
+        features = np.column_stack([vibstate, dist_arr])
 
         label = int(group["is_celo"].any())
 
@@ -137,7 +117,7 @@ def main():
 
     print(f"Dataset reconstruido: X shape {X.shape}, y shape {y.shape}")
 
-    X = add_magnitude(X)  # (n, 288, 6) -> (n, 288, 7)
+
 
     print("\n--- INSTRUCCIONES DE SPLIT DE DATOS ---")
     print("Se utiliza GroupShuffleSplit agrupando por caravana_id, para que")
@@ -215,8 +195,7 @@ def main():
         "n_train": len(X_train),
         "n_val": len(X_val),
         "n_test": len(X_test),
-        "feature_order": ["accel_x", "accel_y", "accel_z", "distancia_recorrida",
-                           "pitch_deg", "is_monta", "magnitud_accel"],
+        "feature_order": ["vibstate", "distancia_recorrida"],
         "input_shape": list(X_train.shape[1:]),
         "test_classification_report": report,
         "test_confusion_matrix": cm.tolist(),
