@@ -1,0 +1,48 @@
+spring:
+  profiles:
+    active: test
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+  mail:
+    host: localhost
+    port: 1025
+
+cors:
+  allowed-origins: http://localhost:3000
+
+jwt:
+  secret: testSecretKeyForVigiaApplicationWhichNeedsToBeAtLeast256BitsLong123
+  expiration: 86400000
+
+vigia:
+  ml:
+    celo-url: http://localhost:8001
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      celoML:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
+  retry:
+    instances:
+      celoML:
+        maxAttempts: 2
+        waitDuration: 500ms
+  timelimiter:
+    instances:
+      celoML:
+        timeoutDuration: 2000ms

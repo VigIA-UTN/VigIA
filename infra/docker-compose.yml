@@ -13,11 +13,32 @@ services:
       - vigia_pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d
 
-  backend:
-    build: ../backend
-    container_name: vigia-backend
+  backend-api:
+    build:
+      context: ../backend
+      target: api
+    container_name: vigia-backend-api
+    restart: on-failure
     ports:
       - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${POSTGRES_DB:-vigia}
+      - DB_USER=${POSTGRES_USER:-vigia_user}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-vigia_dev_password}
+      - SPRING_RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - db
+      - rabbitmq
+
+  backend-worker:
+    build:
+      context: ../backend
+      target: worker
+    container_name: vigia-backend-worker
+    restart: on-failure
+    ports:
+      - "8081:8081"
     environment:
       - DB_HOST=db
       - DB_NAME=${POSTGRES_DB:-vigia}
@@ -26,11 +47,19 @@ services:
       - ML_CELO_URL=http://ml-celo:8001
       - ML_SALUD_URL=http://ml-salud:8002
       - ML_GEO_URL=http://ml-geo:8003
+      - SPRING_RABBITMQ_HOST=rabbitmq
     depends_on:
       - db
       - ml-celo
       - ml-salud
       - ml-geo
+      - rabbitmq
+      - backend-api
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
 
   ml-celo:
     build: ../ml-celo
@@ -58,6 +87,17 @@ services:
     volumes:
       - ../ml-geo/app:/app/app
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload" ]
+
+  simulador:
+    build: ../simulador
+    container_name: vigia-simulador
+    environment:
+      - API_URL=http://backend-worker:8081/api/v1/ingesta/uplink
+      - NUM_ANIMALES=10
+      - INTERVALO_SEGUNDOS=10
+    depends_on:
+      backend-worker:
+        condition: service_healthy
 
   mail:
     image: axllent/mailpit

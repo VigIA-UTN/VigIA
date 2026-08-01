@@ -1,0 +1,36 @@
+package dev.vigia.backend.config;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class BatchScheduler {
+
+    private final JobLauncher jobLauncher;
+    private final Job celoJob;
+
+    /**
+     * Se ejecuta cada 30 segundos para procesar las telemetrías pendientes.
+     */
+    @Scheduled(fixedRate = 10000)
+    public void runCeloJob() {
+        try {
+            log.info("Iniciando ejecución programada del Job de Celo");
+            JobParameters parameters = new JobParametersBuilder()
+                    .addLong("time", System.currentTimeMillis())
+                    .toJobParameters();
+            
+            jobLauncher.run(celoJob, parameters);
+        } catch (Exception e) {
+            log.error("Error al ejecutar el Job de Celo: {}", e.getMessage(), e);
+        }
+    }
+}
