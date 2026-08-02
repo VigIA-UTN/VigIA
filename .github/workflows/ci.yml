@@ -99,6 +99,14 @@ jobs:
         run: |
           python -m compileall .
 
+      - name: Run Tests
+        run: |
+          if [ -d "tests" ]; then
+            python -m pytest tests/ -v
+          else
+            echo "No tests found."
+          fi
+
   docker-build:
     name: Docker Compose Build
     runs-on: ubuntu-latest
