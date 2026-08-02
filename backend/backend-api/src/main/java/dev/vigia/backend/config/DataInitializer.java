@@ -17,10 +17,6 @@ import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.EstadoAnimal;
-import dev.vigia.backend.model.Alerta;
-import dev.vigia.backend.model.DisparadorAlerta;
-import dev.vigia.backend.model.EstadoAlerta;
-import dev.vigia.backend.model.SeveridadAlerta;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -114,7 +110,7 @@ public class DataInitializer implements CommandLineRunner {
         vaca2.setAlias("Margarita");
         vaca2.setEstadoActual(EstadoAnimal.ACTIVO);
         vaca2.setFechaNacimiento(LocalDate.of(2021, 5, 10));
-        
+
         Caravana caravana2 = new Caravana();
         caravana2.setCodigo("VIGIA-ARG-002");
         caravana2.setActivo(true);
@@ -123,29 +119,7 @@ public class DataInitializer implements CommandLineRunner {
         vaca2.setCaravana(caravana2);
         animalRepository.save(vaca2);
 
-        Alerta alerta1 = new Alerta();
-        alerta1.setAnimal(vaca1);
-        alerta1.setTipo("CELO");
-        alerta1.setSeveridad(SeveridadAlerta.ALTA);
-        alerta1.setTsGeneracion(java.time.LocalDateTime.now().minusMinutes(2));
-        alerta1.setDisparador(DisparadorAlerta.CELO);
-        alerta1.setValorUmbral(0.8);
-        alerta1.setValorDetectado(0.85);
-        alerta1.setEstado(EstadoAlerta.PENDIENTE);
-        alertaRepository.save(alerta1);
-
-        Alerta alerta2 = new Alerta();
-        alerta2.setAnimal(vaca2);
-        alerta2.setTipo("CELO");
-        alerta2.setSeveridad(SeveridadAlerta.MEDIA);
-        alerta2.setTsGeneracion(java.time.LocalDateTime.now().minusHours(1));
-        alerta2.setDisparador(DisparadorAlerta.CELO);
-        alerta2.setValorUmbral(0.8);
-        alerta2.setValorDetectado(0.9);
-        alerta2.setEstado(EstadoAlerta.CONFIRMADA);
-        alertaRepository.save(alerta2);
-
-        log.info("[DataInitializer] ✅ Animales y alertas de prueba generados.");
+        log.info("[DataInitializer] ✅ Animales de prueba generados.");
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
         log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");

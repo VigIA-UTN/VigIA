@@ -55,6 +55,17 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
             return;
         }
 
+        Animal animal = telemetriaList.get(0).getCaravana().getAnimal();
+        if (animal != null && alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(animal, DisparadorAlerta.CELO, java.time.LocalDateTime.now().minusHours(24))) {
+            log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente (últimas 24hs).", animal.getId());
+            List<Telemetria> pendientes = telemetriaList.stream()
+                    .filter(t -> t.getEstadoInferencia() == EstadoInferencia.PENDIENTE)
+                    .collect(Collectors.toList());
+            pendientes.forEach(t -> t.setEstadoInferencia(EstadoInferencia.COMPLETADO));
+            telemetriaRepository.saveAll(pendientes);
+            return;
+        }
+
         List<PuntoTelemetriaDTO> requestDTO = buildRequest(telemetriaList);
 
         log.info("Llamando a microservicio de celo con correlationId: {}", correlationId);
@@ -76,8 +87,6 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
 
         if (response != null && response.isEventoCelo()) {
             log.info("¡Evento de celo detectado con confianza {}!", response.getConfianzaModelo());
-
-            Animal animal = telemetriaList.get(0).getCaravana().getAnimal();
 
             Alerta alerta = new Alerta();
             alerta.setAnimal(animal);

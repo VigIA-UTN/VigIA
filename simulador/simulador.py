@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 # Configuración
 API_URL = os.getenv("API_URL", "http://backend-worker:8080/api/v1/ingesta/uplink")
 NUM_ANIMALES = int(os.getenv("NUM_ANIMALES", 200))
-INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 10)) # 5 minutos
+INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 30)) # 30 segundos (pruebas rápidas)
 
 # Coordenadas iniciales: La Pampa, Argentina
 LAT_INICIAL = -36.61234
@@ -70,8 +70,8 @@ def main():
     print("Inyectando 300 puntos de historial anómalo para VIGIA-ARG-001 (simulando 24 horas de celo previo)...")
     estado_001 = animales["VIGIA-ARG-001"]
     for i in range(300, 0, -1):
-        # Extend the simulated time gap to 5 minutes (300 seconds) per point, which equals ~25 hours of history
-        past_time = datetime.utcnow() - timedelta(seconds=i*300)
+        # Gap de tiempo equivalente al intervalo del simulador
+        past_time = datetime.utcnow() - timedelta(seconds=i*INTERVALO_SEGUNDOS)
         estado_001["lat"] += random.uniform(3.0, 5.0) * random.choice([-1, 1])
         estado_001["lon"] += random.uniform(3.0, 5.0) * random.choice([-1, 1])
         payload = {

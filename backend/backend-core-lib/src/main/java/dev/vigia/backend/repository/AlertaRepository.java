@@ -1,5 +1,6 @@
 package dev.vigia.backend.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -9,53 +10,68 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.EstadoAlerta;
 
 @Repository
 public interface AlertaRepository extends JpaRepository<Alerta, Long> {
 
-    /**
-     * Lista alertas de celo (disparador = CELO) de un establecimiento concreto,
-     * ordenadas por tsGeneracion descendente.
-     */
-    @Query("SELECT a FROM Alerta a " +
-           "WHERE a.animal.establecimiento.id = :establecimientoId " +
-           "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
-           "ORDER BY a.tsGeneracion DESC")
-    List<Alerta> findCeloByEstablecimiento(@Param("establecimientoId") Long establecimientoId);
+       /**
+        * Lista alertas de celo (disparador = CELO) de un establecimiento concreto,
+        * ordenadas por tsGeneracion descendente.
+        */
+       @Query("SELECT a FROM Alerta a " +
+                     "WHERE a.animal.establecimiento.id = :establecimientoId " +
+                     "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
+                     "ORDER BY a.tsGeneracion DESC")
+       List<Alerta> findCeloByEstablecimiento(@Param("establecimientoId") Long establecimientoId);
 
-    /**
-     * Lista alertas de celo filtradas por estado, ordenadas por tsGeneracion descendente.
-     */
-    @Query("SELECT a FROM Alerta a " +
-           "WHERE a.animal.establecimiento.id = :establecimientoId " +
-           "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
-           "AND a.estado = :estado " +
-           "ORDER BY a.tsGeneracion DESC")
-    List<Alerta> findCeloByEstablecimientoAndEstado(
-            @Param("establecimientoId") Long establecimientoId,
-            @Param("estado") EstadoAlerta estado);
+       /**
+        * Lista alertas de celo filtradas por estado, ordenadas por tsGeneracion
+        * descendente.
+        */
+       @Query("SELECT a FROM Alerta a " +
+                     "WHERE a.animal.establecimiento.id = :establecimientoId " +
+                     "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
+                     "AND a.estado = :estado " +
+                     "ORDER BY a.tsGeneracion DESC")
+       List<Alerta> findCeloByEstablecimientoAndEstado(
+                     @Param("establecimientoId") Long establecimientoId,
+                     @Param("estado") EstadoAlerta estado);
 
-    /**
-     * Busca una alerta verificando que pertenece al establecimiento indicado.
-     * Útil para validar aislamiento antes de operar sobre ella.
-     */
-    @Query("SELECT a FROM Alerta a " +
-           "WHERE a.id = :id " +
-           "AND a.animal.establecimiento.id = :establecimientoId")
-    Optional<Alerta> findByIdAndEstablecimiento(
-            @Param("id") Long id,
-            @Param("establecimientoId") Long establecimientoId);
+       /**
+        * Busca una alerta verificando que pertenece al establecimiento indicado.
+        * Útil para validar aislamiento antes de operar sobre ella.
+        */
+       @Query("SELECT a FROM Alerta a " +
+                     "WHERE a.id = :id " +
+                     "AND a.animal.establecimiento.id = :establecimientoId")
+       Optional<Alerta> findByIdAndEstablecimiento(
+                     @Param("id") Long id,
+                     @Param("establecimientoId") Long establecimientoId);
 
-    /**
-     * Lista alertas de celo para recuperar mensajes perdidos mediante Last-Event-ID.
-     */
-    @Query("SELECT a FROM Alerta a " +
-           "WHERE a.animal.establecimiento.id = :establecimientoId " +
-           "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
-           "AND a.id > :lastId " +
-           "ORDER BY a.id ASC")
-    List<Alerta> findCeloByEstablecimientoAndIdGreaterThanOrderByIdAsc(
-            @Param("establecimientoId") Long establecimientoId,
-            @Param("lastId") Long lastId);
+       /**
+        * Lista alertas de celo para recuperar mensajes perdidos mediante
+        * Last-Event-ID.
+        */
+       @Query("SELECT a FROM Alerta a " +
+                     "WHERE a.animal.establecimiento.id = :establecimientoId " +
+                     "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
+                     "AND a.id > :lastId " +
+                     "ORDER BY a.id ASC")
+       List<Alerta> findCeloByEstablecimientoAndIdGreaterThanOrderByIdAsc(
+                     @Param("establecimientoId") Long establecimientoId,
+                     @Param("lastId") Long lastId);
+
+       /**
+        * Verifica si existe una alerta reciente para un animal y un disparador en
+        * particular.
+        * Útil para implementar períodos de enfriamiento (cooldown) y no repetir
+        * alertas.
+        */
+       boolean existsByAnimalAndDisparadorAndTsGeneracionAfter(
+                     Animal animal,
+                     DisparadorAlerta disparador,
+                     LocalDateTime tsGeneracion);
 }

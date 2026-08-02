@@ -20,14 +20,15 @@ public class BatchScheduler {
     /**
      * Se ejecuta cada 30 segundos para procesar las telemetrías pendientes.
      */
-    @Scheduled(fixedRate = 10000)
+    @Scheduled(fixedRate = 30000)
+    @SuppressWarnings("null")
     public void runCeloJob() {
         try {
             log.info("Iniciando ejecución programada del Job de Celo");
             JobParameters parameters = new JobParametersBuilder()
                     .addLong("time", System.currentTimeMillis())
                     .toJobParameters();
-            
+
             jobLauncher.run(celoJob, parameters);
         } catch (Exception e) {
             log.error("Error al ejecutar el Job de Celo: {}", e.getMessage(), e);
