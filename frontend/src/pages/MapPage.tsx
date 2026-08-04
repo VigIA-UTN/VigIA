@@ -60,11 +60,14 @@ export default function MapPage() {
 
   const activeEstablecimiento = establecimientos.find(e => e.id === selectedId);
 
-  const center: [number, number] = activeEstablecimiento?.latitud != null && activeEstablecimiento?.longitud != null
-    ? [activeEstablecimiento.latitud, activeEstablecimiento.longitud]
-    : CENTRO_CAMPO;
+  const animalConPosicion = animales.find(a => a.latitud != null && a.longitud != null);
 
-  const popupText = activeEstablecimiento ? activeEstablecimiento.nombre : 'Punto de referencia del campo (placeholder)';
+  const center: [number, number] = animalConPosicion
+    ? [animalConPosicion.latitud!, animalConPosicion.longitud!]
+    : activeEstablecimiento?.latitud != null && activeEstablecimiento?.longitud != null
+      ? [activeEstablecimiento.latitud, activeEstablecimiento.longitud]
+      : CENTRO_CAMPO;
+
 
   return (
     <div style={{ height: '100%', width: '100%', margin: 0, padding: 0, position: 'relative', overflow: 'hidden' }}>
@@ -75,9 +78,6 @@ export default function MapPage() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <MapUpdater center={center} />
-        <Marker position={center}>
-          <Popup>{popupText}</Popup>
-        </Marker>
         {animales.map(animal => {
           if (animal.latitud == null || animal.longitud == null) return null;
           return (

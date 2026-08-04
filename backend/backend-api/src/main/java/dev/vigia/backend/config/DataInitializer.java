@@ -2,6 +2,7 @@ package dev.vigia.backend.config;
 
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
+import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.model.Empleado;
@@ -10,6 +11,7 @@ import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
+import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.AlertaRepository;
@@ -17,6 +19,7 @@ import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.EstadoAnimal;
+import dev.vigia.backend.model.EstadoInferencia;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -25,6 +28,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -42,12 +46,14 @@ public class DataInitializer implements CommandLineRunner {
     private final AlertaRepository alertaRepository;
     private final IntervencionRepository intervencionRepository;
     private final CaravanaRepository caravanaRepository;
+    private final TelemetriaRepository telemetriaRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     @SuppressWarnings("null")
     public void run(String... args) {
         log.info("[DataInitializer] Limpiando la base de datos para entorno de desarrollo...");
+        telemetriaRepository.deleteAll();
         intervencionRepository.deleteAll();
         alertaRepository.deleteAll();
         estadoReproductivoRepository.deleteAll();
@@ -118,6 +124,31 @@ public class DataInitializer implements CommandLineRunner {
 
         vaca2.setCaravana(caravana2);
         animalRepository.save(vaca2);
+
+        Animal vaca3 = new Animal(est, lote2);
+        vaca3.setIdCaravanaOficial("99999");
+        vaca3.setAlias("Sin Datos Recientes");
+        vaca3.setEstadoActual(EstadoAnimal.ACTIVO);
+        vaca3.setFechaNacimiento(LocalDate.of(2022, 3, 15));
+
+        Caravana caravana3 = new Caravana();
+        caravana3.setCodigo("VIGIA-ARG-999");
+        caravana3.setActivo(true);
+        caravanaRepository.save(caravana3);
+
+        vaca3.setCaravana(caravana3);
+        animalRepository.save(vaca3);
+
+        Telemetria telemetriaStale = new Telemetria();
+        telemetriaStale.setCaravana(caravana3);
+        telemetriaStale.setFechaHora(LocalDateTime.now().minusHours(1));
+        telemetriaStale.setLatitud(-36.61100);
+        telemetriaStale.setLongitud(-64.21400);
+        telemetriaStale.setBateria(45.0);
+        telemetriaStale.setNivelRumia(50.0);
+        telemetriaStale.setMoveState(1);
+        telemetriaStale.setEstadoInferencia(EstadoInferencia.COMPLETADO);
+        telemetriaRepository.save(telemetriaStale);
 
         log.info("[DataInitializer] ✅ Animales de prueba generados.");
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
