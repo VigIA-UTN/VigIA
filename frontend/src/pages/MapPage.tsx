@@ -53,13 +53,23 @@ export default function MapPage() {
   const [resumenAlertas, setResumenAlertas] = useState<AlertaResumenResponse | null>(null);
 
   useEffect(() => {
-    if (selectedId) {
-      getAnimalesMapa(selectedId).then(setAnimales).catch(console.error);
-      getResumenAlertas(selectedId).then(setResumenAlertas).catch(console.error);
-    } else {
-      getAnimalesMapa().then(setAnimales).catch(console.error);
-      setResumenAlertas(null);
-    }
+    const fetchDatos = async () => {
+      try {
+        if (selectedId) {
+          const animalesData = await getAnimalesMapa(selectedId);
+          setAnimales(animalesData);
+          const resumenData = await getResumenAlertas(selectedId);
+          setResumenAlertas(resumenData);
+        } else {
+          const animalesData = await getAnimalesMapa();
+          setAnimales(animalesData);
+          setResumenAlertas(null);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchDatos();
   }, [selectedId]);
 
   const activeEstablecimiento = establecimientos.find(e => e.id === selectedId);
