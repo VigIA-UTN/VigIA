@@ -9,7 +9,9 @@ import org.springframework.stereotype.Service;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.Usuario;
@@ -62,6 +64,51 @@ public class AlertaServiceImpl implements AlertaService {
                 return alertas.stream()
                                 .map(this::toResponse)
                                 .collect(Collectors.toList());
+        }
+
+        @Override
+        public AlertaResumenResponse obtenerResumenAlertas(String emailUsuario, Long establecimientoId) {
+                // 1. Validar que el usuario existe
+                usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                // 2. Verificar pertenencia al establecimiento
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento indicado o no está activo.");
+                }
+
+                // 3. Consultar la BD agrupando por disparador
+                List<Object[]> conteos = alertaRepository.countAlertasActivasPorDisparador(establecimientoId);
+
+                long reproductivo = 0;
+                long sanitario = 0;
+                long geoespacial = 0;
+
+                for (Object[] row : conteos) {
+                        DisparadorAlerta disparador = (DisparadorAlerta) row[0];
+                        long count = ((Number) row[1]).longValue();
+
+                        if (disparador == DisparadorAlerta.CELO) {
+                                reproductivo = count;
+                        } else if (disparador == DisparadorAlerta.SALUD) {
+                                sanitario = count;
+                        } else if (disparador == DisparadorAlerta.ABIGEATO) {
+                                geoespacial = count;
+                        }
+                }
+
+                return AlertaResumenResponse.builder()
+                                .reproductivo(reproductivo)
+                                .sanitario(sanitario)
+                                .geoespacial(geoespacial)
+                                .build();
         }
 
         @Override

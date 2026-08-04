@@ -74,4 +74,14 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      Animal animal,
                      DisparadorAlerta disparador,
                      LocalDateTime tsGeneracion);
+
+       /**
+        * Cuenta las alertas activas (estado PENDIENTE) agrupadas por tipo (disparador)
+        * para un establecimiento específico.
+        */
+       @Query("SELECT a.disparador, COUNT(a) FROM Alerta a " +
+                     "WHERE a.animal.establecimiento.id = :establecimientoId " +
+                     "AND a.estado = dev.vigia.backend.model.EstadoAlerta.PENDIENTE " +
+                     "GROUP BY a.disparador")
+       List<Object[]> countAlertasActivasPorDisparador(@Param("establecimientoId") Long establecimientoId);
 }

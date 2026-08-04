@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import AlertSidebar from '../components/AlertSidebar';
 import { type AnimalMapa, getAnimalesMapa } from '../api/animalesApi';
+import { type AlertaResumenResponse, getResumenAlertas } from '../api/alertaApi';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -49,12 +50,15 @@ export default function MapPage() {
   const { establecimientos, selectedId } = useEstablecimientoStore();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [animales, setAnimales] = useState<AnimalMapa[]>([]);
+  const [resumenAlertas, setResumenAlertas] = useState<AlertaResumenResponse | null>(null);
 
   useEffect(() => {
     if (selectedId) {
       getAnimalesMapa(selectedId).then(setAnimales).catch(console.error);
+      getResumenAlertas(selectedId).then(setResumenAlertas).catch(console.error);
     } else {
       getAnimalesMapa().then(setAnimales).catch(console.error);
+      setResumenAlertas(null);
     }
   }, [selectedId]);
 
@@ -129,6 +133,44 @@ export default function MapPage() {
         >
           <i className="bi bi-bell-fill" style={{ color: '#13D4FB' }}></i> Alertas
         </button>
+      )}
+
+      {/* Resumen de Alertas Cards */}
+      {resumenAlertas && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            zIndex: 1000,
+            display: 'flex',
+            gap: '10px'
+          }}
+        >
+          {/* Tarjeta Reproductivo */}
+          <div className="card text-center" style={{ minWidth: '100px', backgroundColor: 'rgba(255, 255, 255, 0.9)', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>
+            <div className="card-body p-2">
+              <h6 className="card-title text-muted mb-1" style={{ fontSize: '0.8rem' }}>Reproductivo</h6>
+              <h4 className="card-text mb-0 fw-bold" style={{ color: '#0d6efd' }}>{resumenAlertas.reproductivo}</h4>
+            </div>
+          </div>
+          
+          {/* Tarjeta Sanitario */}
+          <div className="card text-center" style={{ minWidth: '100px', backgroundColor: 'rgba(255, 255, 255, 0.9)', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>
+            <div className="card-body p-2">
+              <h6 className="card-title text-muted mb-1" style={{ fontSize: '0.8rem' }}>Sanitario</h6>
+              <h4 className="card-text mb-0 fw-bold" style={{ color: '#198754' }}>{resumenAlertas.sanitario}</h4>
+            </div>
+          </div>
+
+          {/* Tarjeta Geoespacial */}
+          <div className="card text-center" style={{ minWidth: '100px', backgroundColor: 'rgba(255, 255, 255, 0.9)', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>
+            <div className="card-body p-2">
+              <h6 className="card-title text-muted mb-1" style={{ fontSize: '0.8rem' }}>Geoespacial</h6>
+              <h4 className="card-text mb-0 fw-bold" style={{ color: '#dc3545' }}>{resumenAlertas.geoespacial}</h4>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Sidebar de Alertas */}

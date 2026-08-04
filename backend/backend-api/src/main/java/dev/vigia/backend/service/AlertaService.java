@@ -4,9 +4,15 @@ import java.util.List;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.model.EstadoAlerta;
 
 public interface AlertaService {
+
+    /**
+     * Retorna el conteo de alertas activas agrupadas por tipo.
+     */
+    AlertaResumenResponse obtenerResumenAlertas(String emailUsuario, Long establecimientoId);
 
     /**
      * Retorna las alertas de celo del establecimiento seleccionado por el usuario

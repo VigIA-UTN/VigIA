@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.service.AlertaService;
 import dev.vigia.backend.service.SseAlertaPublisher;
@@ -29,6 +30,27 @@ public class AlertaController {
 
     private final AlertaService alertaService;
     private final SseAlertaPublisher sseAlertaPublisher;
+
+    /**
+     * GET /api/v1/alertas/resumen?establecimientoId={id}
+     * <p>
+     * Devuelve el conteo de alertas activas agrupadas por tipo.
+     */
+    @GetMapping("/resumen")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> obtenerResumenAlertas(
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            AlertaResumenResponse response = alertaService.obtenerResumenAlertas(email, establecimientoId);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 
     /**
      * GET /api/v1/alertas/celo?establecimientoId={id}&estado={estado}

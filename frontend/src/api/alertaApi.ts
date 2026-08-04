@@ -60,3 +60,14 @@ export async function getAlertaDetalle(alertaId: number, establecimientoId: numb
   );
   return response.data;
 }
+
+export interface AlertaResumenResponse {
+  reproductivo: number;
+  sanitario: number;
+  geoespacial: number;
+}
+
+export async function getResumenAlertas(establecimientoId: number): Promise<AlertaResumenResponse> {
+  const response = await axiosClient.get<AlertaResumenResponse>(`/alertas/resumen?establecimientoId=${establecimientoId}`);
+  return response.data;
+}
