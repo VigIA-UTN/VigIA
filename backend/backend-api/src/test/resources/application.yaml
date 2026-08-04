@@ -17,6 +17,10 @@ spring:
   mail:
     host: localhost
     port: 1025
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
 
 cors:
   allowed-origins: http://localhost:3000

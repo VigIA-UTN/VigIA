@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
@@ -25,6 +26,8 @@ public interface AnimalService {
         List<AnimalResponse> getAllAnimales();
 
         List<AnimalResponse> listarAnimales(String emailUsuario, Long establecimientoId);
+
+        List<AnimalMapaResponse> getPosicionesMapa(String emailUsuario, Long establecimientoId);
 
         EstadoReproductivoResponse registrarEstadoReproductivo(Long animalId, String emailProductor,
                         EstadoReproductivoRequest request);

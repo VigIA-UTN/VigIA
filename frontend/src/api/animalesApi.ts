@@ -64,6 +64,21 @@ export async function getAnimalesByRodeoLote(rodeoLoteId: number): Promise<Anima
   return response.data;
 }
 
+export interface AnimalMapa {
+  id: number;
+  identificador: string | null;
+  latitud: number | null;
+  longitud: number | null;
+  tsUltimaPosicion: string | null;
+  sinDatosRecientes: boolean;
+}
+
+export async function getAnimalesMapa(establecimientoId?: number): Promise<AnimalMapa[]> {
+  const url = establecimientoId ? `/animales/mapa?establecimientoId=${establecimientoId}` : `/animales/mapa`;
+  const response = await axiosClient.get<AnimalMapa[]>(url);
+  return response.data;
+}
+
 export async function crearAnimal(data: AnimalRequest): Promise<AnimalResponse> {
   const response = await axiosClient.post<AnimalResponse>('/animales', data);
   return response.data;

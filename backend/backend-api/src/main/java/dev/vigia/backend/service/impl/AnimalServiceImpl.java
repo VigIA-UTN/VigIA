@@ -4,12 +4,15 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.multipart.MultipartFile;
 
+import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.CargaMasivaResult;
@@ -27,12 +30,14 @@ import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
+import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
+import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AnimalService;
 import dev.vigia.backend.service.CargaMasivaService;
@@ -50,6 +55,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final RodeoLoteRepository rodeoLoteRepository;
         private final EstadoReproductivoRepository estadoReproductivoRepository;
         private final IntervencionRepository intervencionRepository;
+        private final TelemetriaRepository telemetriaRepository;
 
         private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
@@ -276,12 +282,15 @@ public class AnimalServiceImpl implements AnimalService {
                 }
 
                 if (establecimientoId != null) {
-                        boolean pertenece = establecimientos.stream().anyMatch(e -> e.getId().equals(establecimientoId));
+                        boolean pertenece = establecimientos.stream()
+                                        .anyMatch(e -> e.getId().equals(establecimientoId));
                         if (!pertenece) {
-                                throw new org.springframework.security.access.AccessDeniedException("No tiene acceso a este establecimiento");
+                                throw new org.springframework.security.access.AccessDeniedException(
+                                                "No tiene acceso a este establecimiento");
                         }
                         return animalRepository
-                                        .findByEstablecimientoIdInAndEstadoActualNot(List.of(establecimientoId), EstadoAnimal.INACTIVO)
+                                        .findByEstablecimientoIdInAndEstadoActualNot(List.of(establecimientoId),
+                                                        EstadoAnimal.INACTIVO)
                                         .stream()
                                         .map(this::mapToResponse)
                                         .collect(Collectors.toList());
@@ -296,6 +305,74 @@ public class AnimalServiceImpl implements AnimalService {
                                 .stream()
                                 .map(this::mapToResponse)
                                 .collect(Collectors.toList());
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public List<AnimalMapaResponse> getPosicionesMapa(String emailUsuario, Long establecimientoId) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                List<Animal> animales;
+                if (usuario.getRol().equals(Rol.ADMINISTRADOR)) {
+                        animales = animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO);
+                        if (establecimientoId != null) {
+                                animales = animales.stream()
+                                                .filter(a -> a.getEstablecimiento().getId().equals(establecimientoId))
+                                                .collect(Collectors.toList());
+                        }
+                } else {
+                        List<Establecimiento> establecimientos = establecimientoRepository
+                                        .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                        if (establecimientos.isEmpty()) {
+                                throw new IllegalArgumentException(
+                                                "El usuario no pertenece a ningún establecimiento activo.");
+                        }
+
+                        if (establecimientoId != null) {
+                                boolean pertenece = establecimientos.stream()
+                                                .anyMatch(e -> e.getId().equals(establecimientoId));
+                                if (!pertenece) {
+                                        throw new AccessDeniedException("No tiene acceso a este establecimiento");
+                                }
+                                animales = animalRepository.findByEstablecimientoIdInAndEstadoActualNot(
+                                                List.of(establecimientoId), EstadoAnimal.INACTIVO);
+                        } else {
+                                List<Long> establecimientoIds = establecimientos.stream()
+                                                .map(Establecimiento::getId)
+                                                .collect(Collectors.toList());
+                                animales = animalRepository.findByEstablecimientoIdInAndEstadoActualNot(
+                                                establecimientoIds, EstadoAnimal.INACTIVO);
+                        }
+                }
+
+                LocalDateTime hace15Minutos = LocalDateTime.now().minusMinutes(15);
+
+                return animales.stream().map(animal -> {
+                        AnimalMapaResponse.AnimalMapaResponseBuilder builder = AnimalMapaResponse.builder()
+                                        .id(animal.getId())
+                                        .identificador(animal.getIdCaravanaOficial());
+
+                        if (animal.getCaravana() != null) {
+                                Optional<Telemetria> ultimaPos = telemetriaRepository
+                                                .findFirstByCaravanaOrderByFechaHoraDesc(animal.getCaravana());
+                                if (ultimaPos.isPresent()) {
+                                        Telemetria t = ultimaPos.get();
+                                        builder.latitud(t.getLatitud());
+                                        builder.longitud(t.getLongitud());
+                                        builder.tsUltimaPosicion(t.getFechaHora());
+                                        builder.sinDatosRecientes(t.getFechaHora().isBefore(hace15Minutos));
+                                } else {
+                                        builder.sinDatosRecientes(true);
+                                }
+                        } else {
+                                builder.sinDatosRecientes(true);
+                        }
+
+                        return builder.build();
+                }).collect(Collectors.toList());
         }
 
         @Override
@@ -585,7 +662,8 @@ public class AnimalServiceImpl implements AnimalService {
         @Override
         @Transactional
         @SuppressWarnings("null")
-        public List<dev.vigia.backend.dto.IntervencionResponse> listarIntervenciones(Long animalId, String emailUsuario) {
+        public List<dev.vigia.backend.dto.IntervencionResponse> listarIntervenciones(Long animalId,
+                        String emailUsuario) {
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
@@ -606,7 +684,8 @@ public class AnimalServiceImpl implements AnimalService {
                 return intervencionRepository.findByAnimalIdOrderByFechaHoraDesc(animalId).stream()
                                 .map(i -> {
                                         String interventorStr = i.getInterventor().getNombre();
-                                        if (i.getInterventor().getApellido() != null && !i.getInterventor().getApellido().isEmpty()) {
+                                        if (i.getInterventor().getApellido() != null
+                                                        && !i.getInterventor().getApellido().isEmpty()) {
                                                 interventorStr += " " + i.getInterventor().getApellido();
                                         }
                                         if (interventorStr == null || interventorStr.isBlank()) {

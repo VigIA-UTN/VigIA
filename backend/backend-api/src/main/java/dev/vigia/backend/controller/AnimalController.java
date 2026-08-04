@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
@@ -45,7 +47,23 @@ public class AnimalController {
             String email = authentication.getName();
             List<AnimalResponse> response = animalService.listarAnimales(email, establecimientoId);
             return ResponseEntity.ok(response);
-        } catch (org.springframework.security.access.AccessDeniedException e) {
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/mapa")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> getPosicionesMapa(
+            @RequestParam(name = "establecimientoId", required = false) Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<AnimalMapaResponse> response = animalService.getPosicionesMapa(email, establecimientoId);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

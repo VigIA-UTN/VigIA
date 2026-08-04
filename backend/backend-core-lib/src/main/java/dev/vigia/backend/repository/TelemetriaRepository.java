@@ -7,9 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface TelemetriaRepository extends JpaRepository<Telemetria, Long> {
     List<Telemetria> findByEstadoInferencia(EstadoInferencia estadoInferencia);
     List<Telemetria> findByCaravanaAndEstadoInferenciaAndFechaHoraAfter(Caravana caravana, EstadoInferencia estadoInferencia, LocalDateTime fechaHora);
     List<Telemetria> findByCaravanaAndFechaHoraAfterOrderByFechaHoraAsc(Caravana caravana, LocalDateTime fechaHora);
+    Optional<Telemetria> findFirstByCaravanaOrderByFechaHoraDesc(Caravana caravana);
 }

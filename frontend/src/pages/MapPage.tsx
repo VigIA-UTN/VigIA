@@ -4,6 +4,7 @@ import L from 'leaflet';
 import { useEffect, useState } from 'react';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import AlertSidebar from '../components/AlertSidebar';
+import { type AnimalMapa, getAnimalesMapa } from '../api/animalesApi';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -11,6 +12,26 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+const staleIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const defaultIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
 });
 
 const CENTRO_CAMPO: [number, number] = [-34.6037, -58.3816];
@@ -27,6 +48,15 @@ function MapUpdater({ center }: { center: [number, number] }) {
 export default function MapPage() {
   const { establecimientos, selectedId } = useEstablecimientoStore();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [animales, setAnimales] = useState<AnimalMapa[]>([]);
+
+  useEffect(() => {
+    if (selectedId) {
+      getAnimalesMapa(selectedId).then(setAnimales).catch(console.error);
+    } else {
+      getAnimalesMapa().then(setAnimales).catch(console.error);
+    }
+  }, [selectedId]);
 
   const activeEstablecimiento = establecimientos.find(e => e.id === selectedId);
 
@@ -48,6 +78,34 @@ export default function MapPage() {
         <Marker position={center}>
           <Popup>{popupText}</Popup>
         </Marker>
+        {animales.map(animal => {
+          if (animal.latitud == null || animal.longitud == null) return null;
+          return (
+            <Marker 
+              key={animal.id} 
+              position={[animal.latitud, animal.longitud]}
+              icon={animal.sinDatosRecientes ? staleIcon : defaultIcon}
+            >
+              <Popup>
+                <div>
+                  <strong>{animal.identificador || `Animal #${animal.id}`}</strong>
+                  <br />
+                  <small>
+                    Última posición:{' '}
+                    {animal.tsUltimaPosicion 
+                      ? new Date(animal.tsUltimaPosicion.endsWith('Z') ? animal.tsUltimaPosicion : animal.tsUltimaPosicion + 'Z').toLocaleString() 
+                      : 'N/A'}
+                  </small>
+                  {animal.sinDatosRecientes && (
+                    <div style={{ marginTop: '5px' }}>
+                      <span className="badge bg-danger">Sin datos recientes</span>
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
 
       {/* Botón de Alertas */}
