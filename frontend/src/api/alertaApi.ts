@@ -17,6 +17,22 @@ export async function getAlertasCelo(establecimientoId: number, estado?: string)
   return response.data;
 }
 
+/**
+ * Returns the most recent PENDIENTE alert for a specific animal,
+ * by fetching the full establishment alert list and filtering client-side.
+ * Falls back to the most recent alert of any status if none is PENDIENTE.
+ */
+export async function getAlertaParaAnimal(
+  establecimientoId: number,
+  animalId: number
+): Promise<AlertaResponse | null> {
+  const todas = await getAlertasCelo(establecimientoId);
+  const delAnimal = todas.filter(a => a.animalId === animalId);
+  if (delAnimal.length === 0) return null;
+  const pendiente = delAnimal.find(a => a.estado === 'PENDIENTE');
+  return pendiente ?? delAnimal[0];
+}
+
 export async function updateAlertaEstado(
   alertaId: number,
   nuevoEstado: 'CONFIRMADA' | 'DESCARTADA',

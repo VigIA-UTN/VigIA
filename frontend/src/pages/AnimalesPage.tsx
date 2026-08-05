@@ -9,6 +9,9 @@ import './AnimalesPage.css';
 import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { getAlertaParaAnimal } from '../api/alertaApi';
+import type { AlertaResponse } from '../api/alertaApi';
+import AlertDetailSidebar from '../components/AlertDetailSidebar';
 
 function formatFecha(iso: string | null) {
     if (!iso) return '—';
@@ -62,12 +65,56 @@ export default function AnimalesPage() {
     const [sortField, setSortField] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
+    // Alert detail overlay
+    const [selectedAlertaForAnimal, setSelectedAlertaForAnimal] = useState<AlertaResponse | null>(null);
+    const [loadingAlerta, setLoadingAlerta] = useState<number | null>(null); // stores the animalId being loaded
+
     const fetchAnimales = async () => {
         try {
             const data = await getAnimales(selectedId || undefined);
             setAnimales(data);
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleVerAlerta = async (animal: AnimalResponse) => {
+        if (!selectedId) return;
+        setLoadingAlerta(animal.id);
+        try {
+            const alerta = await getAlertaParaAnimal(selectedId, animal.id);
+            if (alerta) {
+                setSelectedAlertaForAnimal(alerta);
+            } else {
+                // Fallback: synthesize a minimal AlertaResponse so the detail panel
+                // can still open and show what info is available from the backend.
+                const fallback: AlertaResponse = {
+                    id: 0,
+                    animalId: animal.id,
+                    tipo: 'CELO',
+                    estado: animal.estadoActual,
+                    tsGeneracion: new Date().toISOString(),
+                };
+                setSelectedAlertaForAnimal(fallback);
+            }
+        } catch (err) {
+            console.error('Error al cargar alerta del animal:', err);
+        } finally {
+            setLoadingAlerta(null);
+        }
+    };
+
+    const handleAlertaActionComplete = (alertaId: number, nuevoEstado: 'CONFIRMADA' | 'DESCARTADA') => {
+        if (alertaId === 0) return; // fallback mock — no backend update needed
+        // Optimistically update the animal's estado if the alert was resolved
+        if (nuevoEstado === 'CONFIRMADA' || nuevoEstado === 'DESCARTADA') {
+            setAnimales(prev =>
+                prev.map(a =>
+                    a.id === selectedAlertaForAnimal?.animalId
+                        ? { ...a, estadoActual: 'ACTIVO' }
+                        : a
+                )
+            );
         }
     };
 
@@ -271,6 +318,7 @@ export default function AnimalesPage() {
     };
 
     return (
+        <>
         <div className="vigia-page-container">
             <Container>
                 <div className="vigia-page-header">
@@ -430,6 +478,19 @@ export default function AnimalesPage() {
                                                         <Button variant="outline-primary" size="sm" onClick={() => navigate(`/animales/${a.id}`)}>
                                                             <i className="bi bi-eye"></i> Ver
                                                         </Button>
+                                                        {a.estadoActual === 'CON_ALERTA' && (
+                                                            <Button
+                                                                variant="outline-warning"
+                                                                size="sm"
+                                                                title="Ver detalle de alerta"
+                                                                disabled={loadingAlerta === a.id}
+                                                                onClick={() => handleVerAlerta(a)}
+                                                            >
+                                                                {loadingAlerta === a.id
+                                                                    ? <Spinner as="span" animation="border" size="sm" />
+                                                                    : <><i className="bi bi-bell-fill"></i> Alerta</>}
+                                                            </Button>
+                                                        )}
                                                         <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)}>
                                                             <i className="bi bi-trash"></i>
                                                         </Button>
@@ -643,6 +704,18 @@ export default function AnimalesPage() {
                     )}
                 </Modal.Footer>
             </Modal>
-        </div >
+        </div>
+
+        {/* Alert detail overlay — rendered at page root so position:fixed works correctly */}
+        {selectedAlertaForAnimal && (
+            <AlertDetailSidebar
+                alerta={selectedAlertaForAnimal}
+                mode="fixed"
+                onClose={() => setSelectedAlertaForAnimal(null)}
+                onActionComplete={handleAlertaActionComplete}
+            />
+        )}
+    </>
     );
 }
+
