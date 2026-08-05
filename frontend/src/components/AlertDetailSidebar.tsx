@@ -8,9 +8,12 @@ interface AlertDetailSidebarProps {
   alerta: AlertaResponse;
   onClose: () => void;
   onActionComplete: (alertaId: number, nuevoEstado: 'CONFIRMADA' | 'DESCARTADA') => void;
+  /** 'absolute' (default) positions relative to nearest positioned ancestor (MapPage).
+   *  'fixed' positions relative to the viewport — use this when rendering from AnimalesPage. */
+  mode?: 'absolute' | 'fixed';
 }
 
-export default function AlertDetailSidebar({ alerta, onClose, onActionComplete }: AlertDetailSidebarProps) {
+export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, mode = 'absolute' }: AlertDetailSidebarProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [notas, setNotas] = useState('');
@@ -107,10 +110,25 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete }
   const formatHour = (d: Date) => isNaN(d.getTime()) ? '--:--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const formatDateOnly = (d: Date) => isNaN(d.getTime()) ? '--' : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
   
+  // Calculate dynamic bar percentages based on a 24-hour window centered around the event
+  let startPerc = 15;
+  let endPerc = 85;
+  if (!isNaN(windowStart.getTime()) && !isNaN(windowEnd.getTime())) {
+    const windowDuration = windowEnd.getTime() - windowStart.getTime();
+    const midPoint = windowStart.getTime() + windowDuration / 2;
+    const totalMs = 24 * 60 * 60 * 1000;
+    
+    // The grey line represents a 24-hour period centered on the midpoint of our window
+    const grayStart = midPoint - totalMs / 2;
+    
+    startPerc = Math.max(0, ((windowStart.getTime() - grayStart) / totalMs) * 100);
+    endPerc = Math.min(100, ((windowEnd.getTime() - grayStart) / totalMs) * 100);
+  }
+
   return (
     <div
       style={{
-        position: 'absolute',
+        position: mode === 'fixed' ? 'fixed' : 'absolute',
         top: 0,
         right: 0,
         bottom: 0,
@@ -183,11 +201,11 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete }
                     <small className="text-muted">{formatDateOnly(windowStart)}</small>
                   </div>
                   
-                  <div className="flex-grow-1 mx-3 position-relative d-flex align-items-center justify-content-center">
+                  <div className="flex-grow-1 mx-3 position-relative d-flex align-items-center justify-content-start">
                     <div style={{ height: '4px', width: '100%', backgroundColor: '#E0E0E0', position: 'absolute' }}></div>
-                    <div style={{ height: '8px', width: '70%', backgroundColor: '#E05252', position: 'absolute', borderRadius: '4px' }}></div>
-                    <div style={{ position: 'absolute', left: '15%', height: '16px', width: '2px', backgroundColor: '#333' }}></div>
-                    <div style={{ position: 'absolute', right: '15%', height: '16px', width: '2px', backgroundColor: '#333' }}></div>
+                    <div style={{ height: '8px', left: `${startPerc}%`, width: `${endPerc - startPerc}%`, backgroundColor: '#E05252', position: 'absolute', borderRadius: '4px' }}></div>
+                    <div style={{ position: 'absolute', left: `${startPerc}%`, height: '16px', width: '2px', backgroundColor: '#333' }}></div>
+                    <div style={{ position: 'absolute', left: `${endPerc}%`, height: '16px', width: '2px', backgroundColor: '#333' }}></div>
                   </div>
 
                   <div className="text-center">

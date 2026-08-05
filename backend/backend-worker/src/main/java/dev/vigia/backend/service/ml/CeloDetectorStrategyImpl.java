@@ -99,6 +99,10 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
             alerta.setEstado(EstadoAlerta.PENDIENTE);
             alerta.setConfianzaModelo(response.getConfianzaModelo());
             alerta.setVentanaOptimaHoras(response.getVentanaOptimaHoras());
+            
+            // TODO: REVISAR con el equipo si esta es la formula final para las ventanas
+            alerta.setVentanaInicioIns(alerta.getTsGeneracion());
+            alerta.setVentanaFinIns(alerta.getTsGeneracion().plusHours(response.getVentanaOptimaHoras()));
 
             alerta = alertaRepository.save(alerta);
 
