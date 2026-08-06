@@ -1,3 +1,4 @@
+import type { AlertaResponse } from './alertaApi';
 import axiosClient from './axiosClient';
 
 export type EstadoAnimal = 'ACTIVO' | 'CON_ALERTA' | 'INACTIVO';
@@ -71,6 +72,7 @@ export interface AnimalMapa {
   longitud: number | null;
   tsUltimaPosicion: string | null;
   sinDatosRecientes: boolean;
+  alertasAnimal: AlertaResponse[]
 }
 
 export async function getAnimalesMapa(establecimientoId?: number): Promise<AnimalMapa[]> {

@@ -35,6 +35,36 @@ const defaultIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const alertaBajaIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const alertaMediaIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const alertaAltaIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
 const CENTRO_CAMPO: [number, number] = [-34.6037, -58.3816];
 
 function MapUpdater({ center }: { center: [number, number] }) {
@@ -44,6 +74,15 @@ function MapUpdater({ center }: { center: [number, number] }) {
     map.flyTo([lat, lng], map.getZoom(), { duration: 1.5 });
   }, [lat, lng, map]);
   return null;
+}
+
+function determinarIcono(animal: AnimalMapa) {
+  if (animal.sinDatosRecientes) return staleIcon;
+  if (animal.alertasAnimal.length === 0) return defaultIcon;
+  if (animal.alertasAnimal.some(a => a.severidad !== null && a.severidad === 'ALTA')) return alertaAltaIcon;
+  if (animal.alertasAnimal.some(a => a.severidad !== null && a.severidad === 'MEDIA')) return alertaMediaIcon;
+  if (animal.alertasAnimal.some(a => a.severidad !== null && a.severidad === 'BAJA')) return alertaBajaIcon;
+  return defaultIcon;
 }
 
 export default function MapPage() {
@@ -98,7 +137,7 @@ export default function MapPage() {
             <Marker
               key={animal.id}
               position={[animal.latitud, animal.longitud]}
-              icon={animal.sinDatosRecientes ? staleIcon : defaultIcon}
+              icon={determinarIcono(animal)}
             >
               <Popup>
                 <div>
