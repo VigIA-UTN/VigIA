@@ -35,6 +35,23 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(alertasQueue).to(alertasExchange);
     }
 
+    public static final String TELEMETRIA_EXCHANGE = "telemetria.exchange";
+
+    @Bean
+    public FanoutExchange telemetriaExchange() {
+        return new FanoutExchange(TELEMETRIA_EXCHANGE);
+    }
+
+    @Bean
+    public Queue telemetriaQueue() {
+        return new AnonymousQueue();
+    }
+
+    @Bean
+    public Binding telemetriaBinding(Queue telemetriaQueue, FanoutExchange telemetriaExchange) {
+        return BindingBuilder.bind(telemetriaQueue).to(telemetriaExchange);
+    }
+
     @Bean
     @SuppressWarnings("null")
     public Jackson2JsonMessageConverter messageConverter(ObjectMapper objectMapper) {

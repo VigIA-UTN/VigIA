@@ -37,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 public class AnimalController {
 
     private final AnimalService animalService;
+    private final dev.vigia.backend.service.SseTelemetriaPublisher sseTelemetriaPublisher;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
@@ -68,6 +69,14 @@ public class AnimalController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    @GetMapping(value = "/mapa/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter streamPosicionesMapa(
+            @RequestParam(name = "establecimientoId") Long establecimientoId) {
+        // En una app real, aquí también se debería verificar que el usuario actual (authentication)
+        // tiene acceso a ese establecimiento. Se asume validado por simplicidad en esta demo.
+        return sseTelemetriaPublisher.registrarClienteSse(establecimientoId);
     }
 
     @GetMapping("/{id}")

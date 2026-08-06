@@ -75,8 +75,8 @@ public class DataInitializer implements CommandLineRunner {
 
         Establecimiento est = new Establecimiento();
         est.setNombre("Establecimiento de Prueba");
-        est.setLatitud(-34.6037);
-        est.setLongitud(-58.3816);
+        est.setLatitud(-34.943317);
+        est.setLongitud(-59.225728);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
 
@@ -126,24 +126,52 @@ public class DataInitializer implements CommandLineRunner {
         animalRepository.save(vaca2);
 
         Animal vaca3 = new Animal(est, lote2);
-        vaca3.setIdCaravanaOficial("99999");
+        vaca3.setIdCaravanaOficial("33333");
         vaca3.setAlias("Sin Datos Recientes");
         vaca3.setEstadoActual(EstadoAnimal.ACTIVO);
         vaca3.setFechaNacimiento(LocalDate.of(2022, 3, 15));
 
         Caravana caravana3 = new Caravana();
-        caravana3.setCodigo("VIGIA-ARG-999");
+        caravana3.setCodigo("VIGIA-ARG-003");
         caravana3.setActivo(true);
         caravanaRepository.save(caravana3);
 
         vaca3.setCaravana(caravana3);
         animalRepository.save(vaca3);
 
+        Animal vaca4 = new Animal(est, lote2);
+        vaca4.setIdCaravanaOficial("44444");
+        vaca4.setAlias("Blanca");
+        vaca4.setEstadoActual(EstadoAnimal.ACTIVO);
+        vaca4.setFechaNacimiento(LocalDate.of(2021, 8, 20));
+
+        Caravana caravana4 = new Caravana();
+        caravana4.setCodigo("VIGIA-ARG-004");
+        caravana4.setActivo(true);
+        caravanaRepository.save(caravana4);
+
+        vaca4.setCaravana(caravana4);
+        animalRepository.save(vaca4);
+
+        Animal vaca5 = new Animal(est, lote1);
+        vaca5.setIdCaravanaOficial("55555");
+        vaca5.setAlias("Pinta");
+        vaca5.setEstadoActual(EstadoAnimal.ACTIVO);
+        vaca5.setFechaNacimiento(LocalDate.of(2022, 1, 10));
+
+        Caravana caravana5 = new Caravana();
+        caravana5.setCodigo("VIGIA-ARG-005");
+        caravana5.setActivo(true);
+        caravanaRepository.save(caravana5);
+
+        vaca5.setCaravana(caravana5);
+        animalRepository.save(vaca5);
+
         Telemetria telemetriaStale = new Telemetria();
         telemetriaStale.setCaravana(caravana3);
         telemetriaStale.setFechaHora(LocalDateTime.now().minusHours(1));
-        telemetriaStale.setLatitud(-36.61100);
-        telemetriaStale.setLongitud(-64.21400);
+        telemetriaStale.setLatitud(-34.943317);
+        telemetriaStale.setLongitud(-59.225728);
         telemetriaStale.setBateria(45.0);
         telemetriaStale.setNivelRumia(50.0);
         telemetriaStale.setMoveState(1);

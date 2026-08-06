@@ -31,4 +31,6 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
     Optional<Animal> findByAliasAndEstablecimientoId(String alias, Long establecimientoId);
 
     boolean existsByIdCaravanaOficialAndEstablecimientoId(String idCaravanaOficial, Long establecimientoId);
+
+    Optional<Animal> findByCaravanaId(Long caravanaId);
 }

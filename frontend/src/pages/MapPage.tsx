@@ -3,6 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useState } from 'react';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { useAuthStore } from '../store/authStore';
 import AlertSidebar from '../components/AlertSidebar';
 import { type AnimalMapa, getAnimalesMapa } from '../api/animalesApi';
 import { type AlertaResumenResponse, getResumenAlertas } from '../api/alertaApi';
@@ -111,14 +112,58 @@ export default function MapPage() {
     fetchDatos();
   }, [selectedId]);
 
+  useEffect(() => {
+    if (!selectedId) return;
+
+    let isMounted = true;
+    const token = useAuthStore.getState().token;
+    let sseUrl = `http://localhost:8080/api/v1/animales/mapa/stream?establecimientoId=${selectedId}`;
+    if (token) {
+      sseUrl += `&token=${token}`;
+    }
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onmessage = (event) => {
+      if (!isMounted) return;
+      try {
+        const telemetriaEvent = JSON.parse(event.data);
+        setAnimales(prevAnimales => {
+          return prevAnimales.map(animal => {
+            if (animal.id === telemetriaEvent.animalId) {
+              return {
+                ...animal,
+                latitud: telemetriaEvent.latitud,
+                longitud: telemetriaEvent.longitud,
+                tsUltimaPosicion: telemetriaEvent.fechaHora
+              };
+            }
+            return animal;
+          });
+        });
+      } catch (error) {
+        console.error('Error parseando evento SSE de telemetría', error);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE Error de telemetría', error);
+      eventSource.close();
+    };
+
+    return () => {
+      isMounted = false;
+      eventSource.close();
+    };
+  }, [selectedId]);
+
   const activeEstablecimiento = establecimientos.find(e => e.id === selectedId);
 
   const animalConPosicion = animales.find(a => a.latitud != null && a.longitud != null);
 
-  const center: [number, number] = animalConPosicion
-    ? [animalConPosicion.latitud!, animalConPosicion.longitud!]
-    : activeEstablecimiento?.latitud != null && activeEstablecimiento?.longitud != null
-      ? [activeEstablecimiento.latitud, activeEstablecimiento.longitud]
+  const center: [number, number] = activeEstablecimiento?.latitud != null && activeEstablecimiento?.longitud != null
+    ? [activeEstablecimiento.latitud, activeEstablecimiento.longitud]
+    : animalConPosicion
+      ? [animalConPosicion.latitud!, animalConPosicion.longitud!]
       : CENTRO_CAMPO;
 
 
@@ -127,8 +172,8 @@ export default function MapPage() {
       <MapContainer center={center} zoom={15} zoomControl={false} style={{ height: '100%', width: '100%', zIndex: 1 }}>
         <ZoomControl position="bottomright" />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
         <MapUpdater center={center} />
         {animales.map(animal => {

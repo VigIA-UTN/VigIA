@@ -96,8 +96,8 @@ services:
     container_name: vigia-simulador
     environment:
       - API_URL=http://backend-worker:8081/api/v1/ingesta/uplink
-      - NUM_ANIMALES=10
-      - INTERVALO_SEGUNDOS=10
+      - NUM_ANIMALES=5
+      - INTERVALO_SEGUNDOS=5
     depends_on:
       backend-worker:
         condition: service_healthy
