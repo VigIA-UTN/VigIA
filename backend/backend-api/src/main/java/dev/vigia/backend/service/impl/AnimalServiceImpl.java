@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.multipart.MultipartFile;
 
+import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.CargaMasivaResponse;
@@ -23,6 +24,7 @@ import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.FilaEstadoInvalida;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
+import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
@@ -32,6 +34,7 @@ import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
@@ -50,6 +53,7 @@ import lombok.RequiredArgsConstructor;
 public class AnimalServiceImpl implements AnimalService {
 
         private final AnimalRepository animalRepository;
+        private final AlertaRepository alertaRepository;
         private final UsuarioRepository usuarioRepository;
         private final EstablecimientoRepository establecimientoRepository;
         private final RodeoLoteRepository rodeoLoteRepository;
@@ -370,6 +374,12 @@ public class AnimalServiceImpl implements AnimalService {
                         } else {
                                 builder.sinDatosRecientes(true);
                         }
+
+                        List<Alerta> alertasAnimal = alertaRepository.alertasAnimalActivas(animal.getId());
+                        List<AlertaResponse> alertasAnimalResponse = alertasAnimal.stream()
+                                        .map(this::alertaToAlertaResponse)
+                                        .collect(Collectors.toList());
+                        builder.alertasAnimal(alertasAnimalResponse);
 
                         return builder.build();
                 }).collect(Collectors.toList());
@@ -702,5 +712,16 @@ public class AnimalServiceImpl implements AnimalService {
                                                         .build();
                                 })
                                 .collect(Collectors.toList());
+        }
+
+        private AlertaResponse alertaToAlertaResponse(Alerta alerta) {
+                return AlertaResponse.builder()
+                                .id(alerta.getId())
+                                .tipo(alerta.getTipo())
+                                .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
+                                .tsGeneracion(alerta.getTsGeneracion())
+                                .estado(alerta.getEstado())
+                                .severidad(alerta.getSeveridad().name())
+                                .build();
         }
 }

@@ -3,6 +3,7 @@ services:
     image: timescale/timescaledb:latest-pg16
     container_name: vigia-db
     restart: unless-stopped
+    command: [ "postgres", "-c", "listen_addresses=*" ]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-vigia}
       POSTGRES_USER: ${POSTGRES_USER:-vigia_user}
@@ -58,7 +59,7 @@ services:
       - rabbitmq
       - backend-api
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8081/actuator/health"]
+      test: [ "CMD", "wget", "--quiet", "--spider", "http://localhost:8081/actuator/health" ]
       interval: 5s
       timeout: 3s
       retries: 15

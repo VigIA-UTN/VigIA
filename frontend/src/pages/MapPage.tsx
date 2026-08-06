@@ -41,7 +41,7 @@ function MapUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   const [lat, lng] = center;
   useEffect(() => {
-    map.flyTo([lat, lng], map.getZoom(), { duration: 1.5});
+    map.flyTo([lat, lng], map.getZoom(), { duration: 1.5 });
   }, [lat, lng, map]);
   return null;
 }
@@ -95,8 +95,8 @@ export default function MapPage() {
         {animales.map(animal => {
           if (animal.latitud == null || animal.longitud == null) return null;
           return (
-            <Marker 
-              key={animal.id} 
+            <Marker
+              key={animal.id}
               position={[animal.latitud, animal.longitud]}
               icon={animal.sinDatosRecientes ? staleIcon : defaultIcon}
             >
@@ -106,8 +106,8 @@ export default function MapPage() {
                   <br />
                   <small>
                     Última posición:{' '}
-                    {animal.tsUltimaPosicion 
-                      ? new Date(animal.tsUltimaPosicion.endsWith('Z') ? animal.tsUltimaPosicion : animal.tsUltimaPosicion + 'Z').toLocaleString() 
+                    {animal.tsUltimaPosicion
+                      ? new Date(animal.tsUltimaPosicion.endsWith('Z') ? animal.tsUltimaPosicion : animal.tsUltimaPosicion + 'Z').toLocaleString()
                       : 'N/A'}
                   </small>
                   {animal.sinDatosRecientes && (
@@ -164,7 +164,7 @@ export default function MapPage() {
               <h4 className="card-text mb-0 fw-bold" style={{ color: '#0d6efd' }}>{resumenAlertas.reproductivo}</h4>
             </div>
           </div>
-          
+
           {/* Tarjeta Sanitario */}
           <div className="card text-center" style={{ minWidth: '100px', backgroundColor: 'rgba(255, 255, 255, 0.9)', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>
             <div className="card-body p-2">

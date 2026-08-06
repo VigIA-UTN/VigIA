@@ -84,4 +84,7 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      "AND a.estado = dev.vigia.backend.model.EstadoAlerta.PENDIENTE " +
                      "GROUP BY a.disparador")
        List<Object[]> countAlertasActivasPorDisparador(@Param("establecimientoId") Long establecimientoId);
+
+       @Query("SELECT a FROM Alerta a WHERE a.animal.id = :animalId AND a.estado = 'PENDIENTE'")
+       List<Alerta> alertasAnimalActivas(@Param("animalId") Long animalId);
 }

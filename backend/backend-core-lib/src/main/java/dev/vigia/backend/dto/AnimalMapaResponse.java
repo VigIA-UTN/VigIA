@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -14,4 +15,5 @@ public class AnimalMapaResponse {
     private Double longitud;
     private LocalDateTime tsUltimaPosicion;
     private boolean sinDatosRecientes;
+    private List<AlertaResponse> alertasAnimal;
 }
