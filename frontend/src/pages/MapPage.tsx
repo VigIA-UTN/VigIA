@@ -6,7 +6,7 @@ import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertSidebar from '../components/AlertSidebar';
 import { type AnimalMapa, getAnimalesMapa } from '../api/animalesApi';
-import { type AlertaResumenResponse, getResumenAlertas } from '../api/alertaApi';
+import { type AlertaResumenResponse, type AlertaResponse, getResumenAlertas } from '../api/alertaApi';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -89,6 +89,7 @@ function determinarIcono(animal: AnimalMapa) {
 export default function MapPage() {
   const { establecimientos, selectedId } = useEstablecimientoStore();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [selectedAlertaMap, setSelectedAlertaMap] = useState<AlertaResponse | null>(null);
   const [animales, setAnimales] = useState<AnimalMapa[]>([]);
   const [resumenAlertas, setResumenAlertas] = useState<AlertaResumenResponse | null>(null);
 
@@ -194,6 +195,54 @@ export default function MapPage() {
                       ? new Date(animal.tsUltimaPosicion.endsWith('Z') ? animal.tsUltimaPosicion : animal.tsUltimaPosicion + 'Z').toLocaleString()
                       : 'N/A'}
                   </small>
+                  <br />
+                  {animal.alertasAnimal?.length > 0 ? (
+                    <div className="mt-2">
+                      <strong className="d-block mb-1 text-secondary" style={{ fontSize: '0.85rem' }}>Alertas:</strong>
+                      <div className="d-flex flex-column gap-1">
+                        {animal.alertasAnimal.map((alerta) => {
+                          const severidad = alerta.severidad || (alerta.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
+                          const badgeBg = severidad === 'ALTA' ? '#FED7D7' : severidad === 'MEDIA' ? '#FEFCBF' : '#C6F6D5';
+                          const badgeColor = severidad === 'ALTA' ? '#C53030' : severidad === 'MEDIA' ? '#B7791F' : '#276749';
+
+                          return (
+                            <button
+                              key={alerta.id}
+                              type="button"
+                              onClick={() => { setIsAlertsOpen(true); setSelectedAlertaMap(alerta) }}
+                              className="btn btn-sm text-start border-0 p-2 rounded-3 d-flex align-items-center justify-content-between gap-2"
+                              style={{
+                                backgroundColor: '#F8FAFC',
+                                transition: 'background-color 0.15s ease',
+                                cursor: 'pointer',
+                                width: '100%',
+                                border: '1px solid #E2E8F0'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E2E8F0')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                            >
+                              <div className="d-flex align-items-center gap-1">
+                                <span
+                                  className="badge"
+                                  style={{ backgroundColor: badgeBg, color: badgeColor, fontSize: '0.7rem' }}
+                                >
+                                  {severidad}
+                                </span>
+                                <span className="fw-semibold" style={{ color: '#1E3A5F', fontSize: '0.8rem' }}>
+                                  {alerta.tipo || 'CELO'}
+                                </span>
+                              </div>
+                              <i className="bi bi-chevron-right text-secondary" style={{ fontSize: '0.75rem' }}></i>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-1">
+                      <small className="text-muted">La vaca no cuenta con alertas</small>
+                    </div>
+                  )}
                   {animal.sinDatosRecientes && (
                     <div style={{ marginTop: '5px' }}>
                       <span className="badge bg-danger">Sin datos recientes</span>
@@ -209,7 +258,7 @@ export default function MapPage() {
       {/* Botón de Alertas */}
       {!isAlertsOpen && (
         <button
-          onClick={() => setIsAlertsOpen(true)}
+          onClick={() => { setSelectedAlertaMap(null); setIsAlertsOpen(true) }}
           className="btn d-flex align-items-center gap-2 fw-bold"
           style={{
             position: 'absolute',
@@ -268,9 +317,10 @@ export default function MapPage() {
       )}
 
       {/* Sidebar de Alertas */}
-      {isAlertsOpen && (
-        <AlertSidebar onClose={() => setIsAlertsOpen(false)} />
-      )}
+      {isAlertsOpen ? (
+        <AlertSidebar onClose={() => setIsAlertsOpen(false)} externalAlert={selectedAlertaMap} />
+      ) : null}
+
     </div>
   );
 }

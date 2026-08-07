@@ -7,9 +7,10 @@ import AlertDetailSidebar from './AlertDetailSidebar';
 
 interface AlertSidebarProps {
   onClose: () => void;
+  externalAlert: AlertaResponse | null
 }
 
-export default function AlertSidebar({ onClose }: AlertSidebarProps) {
+export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarProps) {
   const { selectedId } = useEstablecimientoStore();
 
   const [alertas, setAlertas] = useState<AlertaResponse[]>([]);
@@ -116,6 +117,12 @@ export default function AlertSidebar({ onClose }: AlertSidebarProps) {
       onClose();
     }, 280); // Ligeramente menor a 300ms para evitar parpadeos
   };
+
+  useEffect(() => {
+    if (externalAlert) {
+      setSelectedAlerta(externalAlert);
+    }
+  }, [externalAlert]);
 
   return (
     <>
