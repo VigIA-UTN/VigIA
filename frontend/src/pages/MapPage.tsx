@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useState } from 'react';
@@ -7,7 +7,8 @@ import { useAuthStore } from '../store/authStore';
 import AlertSidebar from '../components/AlertSidebar';
 import { type AnimalMapa, getAnimalesMapa } from '../api/animalesApi';
 import { type AlertaResumenResponse, type AlertaResponse, getResumenAlertas } from '../api/alertaApi';
-
+import AnimalDetailSidebar from '../components/AnimalDetailSidebar';
+import AlertDetailSidebar from '../components/AlertDetailSidebar';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -68,12 +69,19 @@ const alertaAltaIcon = new L.Icon({
 
 const CENTRO_CAMPO: [number, number] = [-34.6037, -58.3816];
 
-function MapUpdater({ center }: { center: [number, number] }) {
+function MapUpdater({ center, trigger }: { center: [number, number], trigger: {lat: number, lng: number, t: number} | null }) {
   const map = useMap();
   const [lat, lng] = center;
   useEffect(() => {
     map.flyTo([lat, lng], map.getZoom(), { duration: 1.5 });
   }, [lat, lng, map]);
+
+  useEffect(() => {
+    if (trigger) {
+      map.flyTo([trigger.lat, trigger.lng], Math.max(map.getZoom(), 16), { duration: 1.5 });
+    }
+  }, [trigger, map]);
+
   return null;
 }
 
@@ -92,6 +100,8 @@ export default function MapPage() {
   const [selectedAlertaMap, setSelectedAlertaMap] = useState<AlertaResponse | null>(null);
   const [animales, setAnimales] = useState<AnimalMapa[]>([]);
   const [resumenAlertas, setResumenAlertas] = useState<AlertaResumenResponse | null>(null);
+  const [selectedAnimalMap, setSelectedAnimalMap] = useState<AnimalMapa | null>(null);
+  const [flyToTrigger, setFlyToTrigger] = useState<{lat: number, lng: number, t: number} | null>(null);
 
   useEffect(() => {
     const fetchDatos = async () => {
@@ -176,7 +186,7 @@ export default function MapPage() {
           attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
-        <MapUpdater center={center} />
+        <MapUpdater center={center} trigger={flyToTrigger} />
         {animales.map(animal => {
           if (animal.latitud == null || animal.longitud == null) return null;
           return (
@@ -184,73 +194,12 @@ export default function MapPage() {
               key={animal.id}
               position={[animal.latitud, animal.longitud]}
               icon={determinarIcono(animal)}
-            >
-              <Popup>
-                <div>
-                  <strong>{animal.identificador || `Animal #${animal.id}`}</strong>
-                  <br />
-                  <small>
-                    Última posición:{' '}
-                    {animal.tsUltimaPosicion
-                      ? new Date(animal.tsUltimaPosicion.endsWith('Z') ? animal.tsUltimaPosicion : animal.tsUltimaPosicion + 'Z').toLocaleString()
-                      : 'N/A'}
-                  </small>
-                  <br />
-                  {animal.alertasAnimal?.length > 0 ? (
-                    <div className="mt-2">
-                      <strong className="d-block mb-1 text-secondary" style={{ fontSize: '0.85rem' }}>Alertas:</strong>
-                      <div className="d-flex flex-column gap-1">
-                        {animal.alertasAnimal.map((alerta) => {
-                          const severidad = alerta.severidad || (alerta.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
-                          const badgeBg = severidad === 'ALTA' ? '#FED7D7' : severidad === 'MEDIA' ? '#FEFCBF' : '#C6F6D5';
-                          const badgeColor = severidad === 'ALTA' ? '#C53030' : severidad === 'MEDIA' ? '#B7791F' : '#276749';
-
-                          return (
-                            <button
-                              key={alerta.id}
-                              type="button"
-                              onClick={() => { setIsAlertsOpen(true); setSelectedAlertaMap(alerta) }}
-                              className="btn btn-sm text-start border-0 p-2 rounded-3 d-flex align-items-center justify-content-between gap-2"
-                              style={{
-                                backgroundColor: '#F8FAFC',
-                                transition: 'background-color 0.15s ease',
-                                cursor: 'pointer',
-                                width: '100%',
-                                border: '1px solid #E2E8F0'
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E2E8F0')}
-                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                            >
-                              <div className="d-flex align-items-center gap-1">
-                                <span
-                                  className="badge"
-                                  style={{ backgroundColor: badgeBg, color: badgeColor, fontSize: '0.7rem' }}
-                                >
-                                  {severidad}
-                                </span>
-                                <span className="fw-semibold" style={{ color: '#1E3A5F', fontSize: '0.8rem' }}>
-                                  {alerta.tipo || 'CELO'}
-                                </span>
-                              </div>
-                              <i className="bi bi-chevron-right text-secondary" style={{ fontSize: '0.75rem' }}></i>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-1">
-                      <small className="text-muted">La vaca no cuenta con alertas</small>
-                    </div>
-                  )}
-                  {animal.sinDatosRecientes && (
-                    <div style={{ marginTop: '5px' }}>
-                      <span className="badge bg-danger">Sin datos recientes</span>
-                    </div>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
+              eventHandlers={{
+                click: () => {
+                  setSelectedAnimalMap(animal);
+                },
+              }}
+            />
           );
         })}
       </MapContainer>
@@ -320,6 +269,35 @@ export default function MapPage() {
       {isAlertsOpen ? (
         <AlertSidebar onClose={() => setIsAlertsOpen(false)} externalAlert={selectedAlertaMap} />
       ) : null}
+
+      {/* Sidebar de Detalle de Animal */}
+      {selectedAnimalMap && (
+        <AnimalDetailSidebar
+          animalMapa={selectedAnimalMap}
+          onClose={() => setSelectedAnimalMap(null)}
+          onAlertClick={(alerta) => setSelectedAlertaMap(alerta)}
+          onLocateClick={() => {
+            if (selectedAnimalMap.latitud != null && selectedAnimalMap.longitud != null) {
+              setFlyToTrigger({ lat: selectedAnimalMap.latitud, lng: selectedAnimalMap.longitud, t: Date.now() });
+            }
+          }}
+        />
+      )}
+
+      {/* Sidebar de Detalle de Alerta Independiente (si no está abierto el AlertSidebar general) */}
+      {selectedAlertaMap && !isAlertsOpen && (
+        <AlertDetailSidebar
+          alerta={selectedAlertaMap}
+          onClose={() => setSelectedAlertaMap(null)}
+          onActionComplete={(id, estado) => {
+            // Actualización local opcional, el SSE de alertas/telemetría debería refrescar
+            setAnimales(prev => prev.map(a => ({
+              ...a,
+              alertasAnimal: a.alertasAnimal.map(al => al.id === id ? { ...al, estado } : al)
+            })));
+          }}
+        />
+      )}
 
     </div>
   );
