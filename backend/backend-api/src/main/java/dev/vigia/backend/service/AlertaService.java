@@ -15,6 +15,12 @@ public interface AlertaService {
     AlertaResumenResponse obtenerResumenAlertas(String emailUsuario, Long establecimientoId);
 
     /**
+     * Retorna alertas de un establecimiento opcionalmente filtradas por tipo,
+     * severidad y estado. Ordenadas por severidad descendente.
+     */
+    List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo, String severidad, EstadoAlerta estado);
+
+    /**
      * Retorna las alertas de celo del establecimiento seleccionado por el usuario
      * en la página principal (toggle de establecimientos en el mapa),
      * opcionalmente filtradas por estado.

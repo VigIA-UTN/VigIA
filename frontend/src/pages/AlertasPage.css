@@ -1,0 +1,63 @@
+/* Reutilizamos muchas clases globales de AnimalesPage.css y EstablecimientosPage.css, 
+   estas son clases especificas para alertas si hicieran falta */
+
+.alerta-row td {
+    vertical-align: middle;
+}
+
+.severidad-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.severidad-alta {
+    background-color: #FED7D7;
+    color: #C53030;
+}
+
+.severidad-media {
+    background-color: #FEFCBF;
+    color: #B7791F;
+}
+
+.severidad-baja {
+    background-color: #C6F6D5;
+    color: #276749;
+}
+
+.estado-alerta-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.estado-pendiente {
+    background-color: #EDF2F7;
+    color: #4A5568;
+    border: 1px solid #CBD5E0;
+}
+
+.estado-confirmada {
+    background-color: #C6F6D5;
+    color: #2F855A;
+}
+
+.estado-descartada {
+    background-color: #FED7D7;
+    color: #9B2C2C;
+}
+
+.tipo-badge {
+    background-color: #EBF8FF;
+    color: #2B6CB0;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-block;
+}

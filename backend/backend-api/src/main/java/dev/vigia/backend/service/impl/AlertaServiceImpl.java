@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
@@ -20,6 +21,7 @@ import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.service.AlertaService;
 import lombok.RequiredArgsConstructor;
 
@@ -31,6 +33,57 @@ public class AlertaServiceImpl implements AlertaService {
         private final UsuarioRepository usuarioRepository;
         private final EstablecimientoRepository establecimientoRepository;
         private final IntervencionRepository intervencionRepository;
+
+        @Override
+        public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
+                        String severidad, EstadoAlerta estado) {
+                // 1. Validar que el usuario existe
+                usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                // 2. Verificar que el usuario pertenece al establecimiento
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento indicado o no está activo.");
+                }
+
+                DisparadorAlerta disparadorEnum = null;
+                if (tipo != null && !tipo.isBlank()) {
+                        String t = tipo.trim().toLowerCase();
+                        if (t.equals("reproductivo"))
+                                disparadorEnum = DisparadorAlerta.CELO;
+                        else if (t.equals("sanitario"))
+                                disparadorEnum = DisparadorAlerta.SALUD;
+                        else if (t.equals("geoespacial"))
+                                disparadorEnum = DisparadorAlerta.ABIGEATO;
+                }
+
+                dev.vigia.backend.model.SeveridadAlerta severidadEnum = null;
+                if (severidad != null && !severidad.isBlank()) {
+                        String s = severidad.trim().toUpperCase();
+                        if (s.equals("ALTA"))
+                                severidadEnum = SeveridadAlerta.ALTA;
+                        else if (s.equals("MEDIA"))
+                                severidadEnum = SeveridadAlerta.MEDIA;
+                        else if (s.equals("BAJA"))
+                                severidadEnum = SeveridadAlerta.BAJA;
+                }
+
+                // 3. Consultar las alertas del establecimiento aplicando filtros
+                List<Alerta> alertas = alertaRepository.findByFiltros(establecimientoId, estado, disparadorEnum,
+                                severidadEnum);
+
+                // 4. Mapear a DTO
+                return alertas.stream()
+                                .map(this::toResponse)
+                                .collect(Collectors.toList());
+        }
 
         @Override
         public List<AlertaResponse> listarAlertasCelo(
@@ -146,13 +199,15 @@ public class AlertaServiceImpl implements AlertaService {
                         ventanaOptima = horas + " horas";
                 }
 
-                List<dev.vigia.backend.dto.EstadoReproductivoResponse> ultimosEstados = alerta.getAnimal().getEstadosReproductivos().stream()
+                List<EstadoReproductivoResponse> ultimosEstados = alerta.getAnimal()
+                                .getEstadosReproductivos().stream()
                                 .limit(5)
                                 .map(e -> {
                                         String registradoPor = null;
                                         if (e.getUsuarioRegistrador() != null) {
                                                 registradoPor = e.getUsuarioRegistrador().getNombre();
-                                                if (e.getUsuarioRegistrador().getApellido() != null && !e.getUsuarioRegistrador().getApellido().isEmpty()) {
+                                                if (e.getUsuarioRegistrador().getApellido() != null
+                                                                && !e.getUsuarioRegistrador().getApellido().isEmpty()) {
                                                         registradoPor += " " + e.getUsuarioRegistrador().getApellido();
                                                 }
                                                 if (registradoPor == null || registradoPor.isBlank()) {
@@ -175,7 +230,8 @@ public class AlertaServiceImpl implements AlertaService {
                 String usuarioAccionStr = null;
                 if (alerta.getUsuarioConfirmacion() != null) {
                         usuarioAccionStr = alerta.getUsuarioConfirmacion().getNombre();
-                        if (alerta.getUsuarioConfirmacion().getApellido() != null && !alerta.getUsuarioConfirmacion().getApellido().isEmpty()) {
+                        if (alerta.getUsuarioConfirmacion().getApellido() != null
+                                        && !alerta.getUsuarioConfirmacion().getApellido().isEmpty()) {
                                 usuarioAccionStr += " " + alerta.getUsuarioConfirmacion().getApellido();
                         }
                         if (usuarioAccionStr == null || usuarioAccionStr.isBlank()) {
@@ -203,7 +259,8 @@ public class AlertaServiceImpl implements AlertaService {
         private AlertaResponse toResponse(Alerta alerta) {
                 return AlertaResponse.builder()
                                 .id(alerta.getId())
-                                .tipo(alerta.getTipo())
+                                .tipo(alerta.getDisparador() != null ? alerta.getDisparador().name() : alerta.getTipo())
+                                .severidad(alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null)
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
                                 .estado(alerta.getEstado())
@@ -241,7 +298,7 @@ public class AlertaServiceImpl implements AlertaService {
                         alerta.setTsConfirmacion(LocalDateTime.now());
                         alerta.setUsuarioConfirmacion(usuario);
                         alerta.setEstado(nuevoEstado);
-                        
+
                         if (nuevoEstado == EstadoAlerta.DESCARTADA && notas != null && !notas.trim().isEmpty()) {
                                 alerta.setMotivoDescarte(notas.trim());
                         }
@@ -255,10 +312,11 @@ public class AlertaServiceImpl implements AlertaService {
                         intervencion.setAlerta(actualizado);
                         intervencion.setAnimal(actualizado.getAnimal());
                         intervencion.setInterventor(usuario);
-                        
-                        String descripcion = (notas != null && !notas.trim().isEmpty()) ? notas.trim() : "Inseminación confirmada";
+
+                        String descripcion = (notas != null && !notas.trim().isEmpty()) ? notas.trim()
+                                        : "Inseminación confirmada";
                         intervencion.setDescripcion(descripcion);
-                        
+
                         intervencion.setFechaHora(LocalDateTime.now());
                         intervencionRepository.save(intervencion);
                 }

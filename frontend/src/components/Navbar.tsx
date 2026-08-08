@@ -126,7 +126,7 @@ function NavScroll() {
                                 <Nav.Link as={Link} to="/alertas" className="mx-2 fw-semibold">Alertas</Nav.Link>
                                 <Nav.Link as={Link} to="/cargas" className="mx-2 fw-semibold">Cargas</Nav.Link>
                                 <Nav.Link as={Link} to="/invitaciones" className="mx-2 fw-semibold">Invitaciones</Nav.Link>
-                                <Nav.Link as={Link} to="/" className="mx-2 fw-semibold">Mapa</Nav.Link>
+                                <Nav.Link as={Link} to="/mapa" className="mx-2 fw-semibold">Mapa</Nav.Link>
                             </>
                         )}
 

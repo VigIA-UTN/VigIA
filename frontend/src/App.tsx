@@ -13,6 +13,7 @@ import { useAuthStore } from './store/authStore';
 import EmpleadosPage from './pages/EmpleadosPage';
 import AnimalesPage from './pages/AnimalesPage';
 import AnimalDetailPage from './pages/AnimalDetailPage';
+import AlertasPage from './pages/AlertasPage';
 
 function InvitacionesRouter() {
   const rol = useAuthStore(state => state.rol);
@@ -30,13 +31,15 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/aceptar-invitacion" element={<AcceptInvitationPage />} />
         <Route
-          path="/"
+          path="/mapa"
           element={
             <ProtectedRoute>
               <MapPage />
             </ProtectedRoute>
           }
         />
+        {/* TODO: A futuro este / será el Dashboard */}
+        <Route path="/" element={<Navigate to="/mapa" replace />} />
         <Route
           path="/establecimientos"
           element={
@@ -82,6 +85,14 @@ function App() {
           element={
             <ProtectedRoute roles={['PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
               <AnimalDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/alertas"
+          element={
+            <ProtectedRoute roles={['PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
+              <AlertasPage />
             </ProtectedRoute>
           }
         />

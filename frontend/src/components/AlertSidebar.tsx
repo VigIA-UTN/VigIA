@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Form from 'react-bootstrap/Form';
-import { getAlertasCelo, type AlertaResponse } from '../api/alertaApi';
+import { getAlertas, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from './AlertDetailSidebar';
@@ -21,6 +21,10 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
   const [viewedIds, setViewedIds] = useState<Set<number>>(new Set());
   const [prevExternalAlert, setPrevExternalAlert] = useState<AlertaResponse | null>(null);
 
+  // Filters state
+  const [filtroTipo, setFiltroTipo] = useState<string | null>(null);
+  const [filtroSeveridad, setFiltroSeveridad] = useState<string>('');
+
   // Ref to track the highest received ID for Last-Event-ID recovery
   const maxAlertaIdRef = useRef<number>(0);
 
@@ -30,7 +34,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
     const fetchAlertas = async () => {
       setLoading(true);
       try {
-        const data = await getAlertasCelo(selectedId);
+        const data = await getAlertas(selectedId, undefined, undefined, 'PENDIENTE');
         if (isMounted) {
           setAlertas(data);
           if (data.length > 0) {
@@ -66,6 +70,9 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
       if (newAlerta.id > maxAlertaIdRef.current) {
         maxAlertaIdRef.current = newAlerta.id;
       }
+
+      // Solo guardamos si es PENDIENTE (o si queremos dejarla en la lista, pero para la sidebar solo sumamos pendientes)
+      if (newAlerta.estado !== 'PENDIENTE') return;
 
       // Evitamos duplicados si el backend manda perdidas que justo entraron en la request inicial
       setAlertas((prev) => {
@@ -107,6 +114,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
       animalId: Math.floor(Math.random() * 100) + 1,
       tipo: 'CELO',
       estado: 'PENDIENTE',
+      severidad: 'ALTA',
       tsGeneracion: new Date().toISOString(),
     };
     setAlertas((prev) => [nuevaAlerta, ...prev]);
@@ -125,6 +133,22 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
       setSelectedAlerta(externalAlert);
     }
   }
+
+  // Derived filtered alerts
+  const alertasFiltradas = alertas.filter(a => {
+    if (filtroTipo && a.tipo !== filtroTipo) return false;
+    if (filtroSeveridad && a.severidad !== filtroSeveridad) return false;
+    return true;
+  }).sort((a, b) => {
+    // Ordenar por severidad descendente
+    const sevValue = (sev: string | undefined) => {
+      if (sev === 'ALTA') return 3;
+      if (sev === 'MEDIA') return 2;
+      if (sev === 'BAJA') return 1;
+      return 0;
+    };
+    return sevValue(b.severidad) - sevValue(a.severidad);
+  });
 
   return (
     <>
@@ -167,39 +191,59 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
         <div className="d-flex gap-2 mb-3">
           <button
             className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
-            style={{ backgroundColor: '#13D4FB', color: '#1E3A5F', border: '2px solid #1E3A5F' }}
+            style={{ 
+              backgroundColor: filtroTipo === 'CELO' ? '#13D4FB' : 'transparent', 
+              color: '#1E3A5F', 
+              border: '2px solid #1E3A5F' 
+            }}
+            onClick={() => setFiltroTipo(prev => prev === 'CELO' ? null : 'CELO')}
           >
             <i className="bi bi-search"></i> Celo
           </button>
           <button
             className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
-            style={{ backgroundColor: 'transparent', color: '#1E3A5F', border: '2px solid #1E3A5F' }}
+            style={{ 
+              backgroundColor: filtroTipo === 'SALUD' ? '#13D4FB' : 'transparent', 
+              color: '#1E3A5F', 
+              border: '2px solid #1E3A5F' 
+            }}
+            onClick={() => setFiltroTipo(prev => prev === 'SALUD' ? null : 'SALUD')}
           >
             <i className="bi bi-plus-circle"></i> Salud
           </button>
           <button
             className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
-            style={{ backgroundColor: 'transparent', color: '#1E3A5F', border: '2px solid #1E3A5F' }}
+            style={{ 
+              backgroundColor: filtroTipo === 'ABIGEATO' ? '#13D4FB' : 'transparent', 
+              color: '#1E3A5F', 
+              border: '2px solid #1E3A5F' 
+            }}
+            onClick={() => setFiltroTipo(prev => prev === 'ABIGEATO' ? null : 'ABIGEATO')}
           >
             <i className="bi bi-globe-americas"></i> Posición
           </button>
         </div>
 
-        <Form.Select className="mb-4 rounded-pill" style={{ borderWidth: '2px' }}>
-          <option>Filtrar por Severidad</option>
-          <option value="alta">Alta</option>
-          <option value="media">Media</option>
-          <option value="baja">Baja</option>
+        <Form.Select 
+          className="mb-4 rounded-pill" 
+          style={{ borderWidth: '2px' }}
+          value={filtroSeveridad}
+          onChange={(e) => setFiltroSeveridad(e.target.value)}
+        >
+          <option value="">Filtrar por Severidad (Todas)</option>
+          <option value="ALTA">Alta</option>
+          <option value="MEDIA">Media</option>
+          <option value="BAJA">Baja</option>
         </Form.Select>
 
         <div className="flex-grow-1 overflow-auto pe-2 d-flex flex-column gap-3 custom-scrollbar">
           {loading && <div className="text-center text-muted mt-4">Cargando alertas...</div>}
 
-          {!loading && alertas.length === 0 && (
+          {!loading && alertasFiltradas.length === 0 && (
             <div className="text-center text-muted mt-4">No hay alertas registradas.</div>
           )}
 
-          {!loading && alertas.map((alerta) => {
+          {!loading && alertasFiltradas.map((alerta) => {
             const isPendiente = alerta.estado === 'PENDIENTE';
             const isResolved = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
             const isClickable = true;

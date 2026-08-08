@@ -13,6 +13,7 @@ import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.model.SeveridadAlerta;
 
 @Repository
 public interface AlertaRepository extends JpaRepository<Alerta, Long> {
@@ -87,4 +88,26 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
 
        @Query("SELECT a, CASE WHEN a.severidad = 'ALTA' THEN 1 WHEN a.severidad = 'MEDIA' THEN 2 ELSE 3 END as cardinalidad FROM Alerta a WHERE a.animal.id = :animalId AND a.estado = 'PENDIENTE' ORDER BY cardinalidad ASC")
        List<Alerta> alertasAnimalActivas(@Param("animalId") Long animalId);
+
+       /**
+        * Lista las alertas de un establecimiento concreto aplicando filtros
+        * opcionales.
+        * Ordena por severidad descendente (ALTA, MEDIA, BAJA) y luego por fecha.
+        */
+       @Query("SELECT a FROM Alerta a " +
+                     "WHERE a.animal.establecimiento.id = :establecimientoId " +
+                     "AND (:estado IS NULL OR a.estado = :estado) " +
+                     "AND (:disparador IS NULL OR a.disparador = :disparador) " +
+                     "AND (:severidad IS NULL OR a.severidad = :severidad) " +
+                     "ORDER BY " +
+                     "  CASE WHEN a.severidad = 'ALTA' THEN 1 " +
+                     "       WHEN a.severidad = 'MEDIA' THEN 2 " +
+                     "       WHEN a.severidad = 'BAJA' THEN 3 " +
+                     "       ELSE 4 END ASC, " +
+                     "  a.tsGeneracion DESC")
+       List<Alerta> findByFiltros(
+                     @Param("establecimientoId") Long establecimientoId,
+                     @Param("estado") EstadoAlerta estado,
+                     @Param("disparador") DisparadorAlerta disparador,
+                     @Param("severidad") SeveridadAlerta severidad);
 }

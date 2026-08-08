@@ -32,6 +32,41 @@ public class AlertaController {
     private final SseAlertaPublisher sseAlertaPublisher;
 
     /**
+     * GET /api/v1/alertas?establecimientoId={id}&tipo={tipo}&severidad={severidad}&estado={estado}
+     * <p>
+     * Obtiene las alertas de un establecimiento. Permite filtrar opcionalmente
+     * por tipo (reproductivo, sanitario, geoespacial), severidad (alta, media, baja) y estado.
+     * Si no se envían filtros, devuelve todas las alertas.
+     * Ordena por defecto por severidad descendente.
+     *
+     * @param establecimientoId ID del establecimiento
+     * @param tipo              (opcional) reproductivo, sanitario, geoespacial
+     * @param severidad         (opcional) ALTA, MEDIA, BAJA
+     * @param estado            (opcional) PENDIENTE, CONFIRMADA, DESCARTADA
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de alertas filtradas, 400 si el usuario no existe, 403 si no
+     *         pertenece
+     */
+    @GetMapping
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarTodasAlertas(
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            @RequestParam(name = "tipo", required = false) String tipo,
+            @RequestParam(name = "severidad", required = false) String severidad,
+            @RequestParam(name = "estado", required = false) EstadoAlerta estado,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<AlertaResponse> response = alertaService.listarAlertas(email, establecimientoId, tipo, severidad, estado);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
      * GET /api/v1/alertas/resumen?establecimientoId={id}
      * <p>
      * Devuelve el conteo de alertas activas agrupadas por tipo.

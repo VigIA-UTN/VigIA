@@ -10,6 +10,21 @@ export interface AlertaResponse {
   gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';//no entiendo de donde se saca
 }
 
+export async function getAlertas(
+  establecimientoId: number,
+  tipo?: string,
+  severidad?: string,
+  estado?: string
+): Promise<AlertaResponse[]> {
+  const params = new URLSearchParams();
+  params.append('establecimientoId', establecimientoId.toString());
+  if (tipo) params.append('tipo', tipo);
+  if (severidad) params.append('severidad', severidad);
+  if (estado) params.append('estado', estado);
+  const response = await axiosClient.get<AlertaResponse[]>(`/alertas?${params.toString()}`);
+  return response.data;
+}
+
 export async function getAlertasCelo(establecimientoId: number, estado?: string): Promise<AlertaResponse[]> {
   const url = estado
     ? `/alertas/celo?establecimientoId=${establecimientoId}&estado=${estado}`
