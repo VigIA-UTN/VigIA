@@ -19,6 +19,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
 
   const [selectedAlerta, setSelectedAlerta] = useState<AlertaResponse | null>(null);
   const [viewedIds, setViewedIds] = useState<Set<number>>(new Set());
+  const [prevExternalAlert, setPrevExternalAlert] = useState<AlertaResponse | null>(null);
 
   // Ref to track the highest received ID for Last-Event-ID recovery
   const maxAlertaIdRef = useRef<number>(0);
@@ -118,11 +119,12 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
     }, 280); // Ligeramente menor a 300ms para evitar parpadeos
   };
 
-  useEffect(() => {
+  if (externalAlert !== prevExternalAlert) {
+    setPrevExternalAlert(externalAlert);
     if (externalAlert) {
       setSelectedAlerta(externalAlert);
     }
-  }, [externalAlert]);
+  }
 
   return (
     <>

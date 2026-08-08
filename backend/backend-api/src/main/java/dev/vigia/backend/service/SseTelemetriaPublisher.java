@@ -16,11 +16,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @RequiredArgsConstructor
 public class SseTelemetriaPublisher {
 
-    // Map: establecimientoId -> list of active SseEmitters
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     public SseEmitter registrarClienteSse(Long establecimientoId) {
-        // Timeout of 30 minutes. Spring Boot will keep the connection open.
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
 
         CopyOnWriteArrayList<SseEmitter> list = emitters.computeIfAbsent(establecimientoId,
@@ -64,6 +62,7 @@ public class SseTelemetriaPublisher {
         }
     }
 
+    @SuppressWarnings("null")
     private void sendToEmitter(SseEmitter emitter, TelemetriaEventDTO telemetriaEvent) throws IOException {
         emitter.send(SseEmitter.event()
                 .id(telemetriaEvent.getAnimalId().toString())

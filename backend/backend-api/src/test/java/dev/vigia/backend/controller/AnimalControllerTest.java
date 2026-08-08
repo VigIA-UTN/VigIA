@@ -5,19 +5,23 @@ import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AuthRequest;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
+import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
+import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
 import jakarta.persistence.EntityManager;
@@ -34,6 +38,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.mock.web.MockMultipartFile;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,6 +80,10 @@ class AnimalControllerTest {
         @Autowired
         private EstadoReproductivoRepository estadoReproductivoRepository;
         @Autowired
+        private CaravanaRepository caravanaRepository;
+        @Autowired
+        private TelemetriaRepository telemetriaRepository;
+        @Autowired
         private EntityManager entityManager;
 
         private Long establecimientoId;
@@ -89,8 +98,10 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void setUp() throws Exception {
                 // Orden correcto de borrado (hijos primero)
+                telemetriaRepository.deleteAll();
                 estadoReproductivoRepository.deleteAll();
                 animalRepository.deleteAll();
+                caravanaRepository.deleteAll();
                 rodeoLoteRepository.deleteAll();
                 invitacionRepository.deleteAll();
                 establecimientoRepository.deleteAll();
@@ -969,6 +980,96 @@ class AnimalControllerTest {
                                 .file(file)
                                 .param("establecimientoId", establecimientoId.toString())
                                 .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        // =========================================================================
+        // GET /api/v1/animales/mapa
+        // =========================================================================
+
+        @Test
+        @DisplayName("GET /api/v1/animales/mapa - Listado exitoso y validacion de sin_datos_recientes")
+        @SuppressWarnings("null")
+        void getPosicionesMapa_success() throws Exception {
+                // Configurar animal sin posición
+                Long animal1Id = crearAnimal("Vaca Sin Pos", establecimientoId, rodeoLoteId);
+
+                // Configurar animal con posición antigua (sin_datos_recientes = true)
+                Long animal2Id = crearAnimal("Vaca Antigua", establecimientoId, rodeoLoteId);
+                Animal animal2 = animalRepository.findById(animal2Id).orElseThrow();
+                Caravana caravana2 = new Caravana();
+                caravana2.setCodigo("C-ANTIGUA");
+                caravana2.setActivo(true);
+                caravana2 = caravanaRepository.save(caravana2);
+                animal2.setCaravana(caravana2);
+                animalRepository.save(animal2);
+                
+                Telemetria t2 = new Telemetria();
+                t2.setCaravana(caravana2);
+                t2.setFechaHora(LocalDateTime.now().minusMinutes(20));
+                t2.setLatitud(-34.5);
+                t2.setLongitud(-58.5);
+                telemetriaRepository.save(t2);
+
+                // Configurar animal con posición reciente (sin_datos_recientes = false)
+                Long animal3Id = crearAnimal("Vaca Reciente", establecimientoId, rodeoLoteId);
+                Animal animal3 = animalRepository.findById(animal3Id).orElseThrow();
+                Caravana caravana3 = new Caravana();
+                caravana3.setCodigo("C-RECIENTE");
+                caravana3.setActivo(true);
+                caravana3 = caravanaRepository.save(caravana3);
+                animal3.setCaravana(caravana3);
+                animalRepository.save(animal3);
+                
+                Telemetria t3 = new Telemetria();
+                t3.setCaravana(caravana3);
+                t3.setFechaHora(LocalDateTime.now().minusMinutes(5));
+                t3.setLatitud(-34.1);
+                t3.setLongitud(-58.1);
+                telemetriaRepository.save(t3);
+
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(3))
+                                .andExpect(jsonPath("$[?(@.id == " + animal1Id + ")].sinDatosRecientes").value(true))
+                                .andExpect(jsonPath("$[?(@.id == " + animal2Id + ")].sinDatosRecientes").value(true))
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].sinDatosRecientes").value(false));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/mapa - Aislamiento por establecimiento")
+        @SuppressWarnings("null")
+        void getPosicionesMapa_isolation() throws Exception {
+                // Crear otro establecimiento con su rodeo
+                Establecimiento est2 = new Establecimiento();
+                est2.setNombre("Estancia Aislada");
+                est2.setActivo(true);
+                est2.setFechaAlta(LocalDate.now());
+                est2.setEmpleados(new ArrayList<>()); // sin empleados
+                est2 = establecimientoRepository.save(est2);
+                
+                RodeoLote rodeo2 = new RodeoLote(est2);
+                rodeo2.setNombre("Rodeo 2");
+                rodeo2 = rodeoLoteRepository.save(rodeo2);
+                
+                Animal animalEst2 = new Animal(est2, rodeo2);
+                animalEst2.setAlias("Vaca Est 2");
+                animalEst2.setEstadoActual(EstadoAnimal.ACTIVO);
+                animalRepository.save(animalEst2);
+
+                // El productor consulta su establecimiento (id 1) y no ve el del est2
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[?(@.id == " + animalEst2.getId() + ")]").isEmpty());
+                                
+                // El productor intenta consultar mapa del est2 directamente
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", est2.getId().toString())
+                                .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isForbidden());
         }
 }
