@@ -11,6 +11,7 @@ import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.RodeoLote;
+import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
@@ -216,6 +217,95 @@ class AlertaControllerTest {
                 .param("estado", "CONFIRMADA"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("CONFIRMADA"));
+    }
+
+    @Test
+    @DisplayName("H0011: Filtros de alertas (tipo, severidad, combinados, vacío, ordenamiento predeterminado y sin filtros)")
+    @SuppressWarnings("null")
+    void getAlertas_filtros() throws Exception {
+        // Limpiamos la alerta creada en setUp() para armar un set específico
+        alertaRepository.deleteAll();
+
+        Animal animal = animalRepository.findAll().get(0);
+
+        // 1. Alerta PENDIENTE, CELO, ALTA (urgencia mayor)
+        Alerta a1 = new Alerta();
+        a1.setAnimal(animal);
+        a1.setDisparador(DisparadorAlerta.CELO);
+        a1.setEstado(EstadoAlerta.PENDIENTE);
+        a1.setSeveridad(SeveridadAlerta.ALTA);
+        a1.setTsGeneracion(LocalDateTime.now().minusHours(1));
+        a1.setValorUmbral(1.0);
+        alertaRepository.save(a1);
+
+        // 2. Alerta PENDIENTE, SALUD, MEDIA
+        Alerta a2 = new Alerta();
+        a2.setAnimal(animal);
+        a2.setDisparador(DisparadorAlerta.SALUD);
+        a2.setEstado(EstadoAlerta.PENDIENTE);
+        a2.setSeveridad(SeveridadAlerta.MEDIA);
+        a2.setTsGeneracion(LocalDateTime.now().minusHours(2));
+        a2.setValorUmbral(1.0);
+        alertaRepository.save(a2);
+
+        // 3. Alerta PENDIENTE, ABIGEATO, BAJA
+        Alerta a3 = new Alerta();
+        a3.setAnimal(animal);
+        a3.setDisparador(DisparadorAlerta.ABIGEATO);
+        a3.setEstado(EstadoAlerta.PENDIENTE);
+        a3.setSeveridad(SeveridadAlerta.BAJA);
+        a3.setTsGeneracion(LocalDateTime.now().minusHours(3));
+        a3.setValorUmbral(1.0);
+        alertaRepository.save(a3);
+
+        // Test 1: Sin filtros, trae las 3 alertas activas y ordenadas por severidad descendente por defecto
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                // Por defecto ordena severidad DESC: ALTA (1), MEDIA (2), BAJA (3)
+                .andExpect(jsonPath("$[0].severidad").value("ALTA"))
+                .andExpect(jsonPath("$[1].severidad").value("MEDIA"))
+                .andExpect(jsonPath("$[2].severidad").value("BAJA"));
+
+        // Test 2: Filtro por tipo (REPRODUCTIVO -> CELO)
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString())
+                .param("tipo", "REPRODUCTIVO"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].tipo").value("CELO"));
+
+        // Test 3: Filtro por severidad (MEDIA)
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString())
+                .param("severidad", "MEDIA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].severidad").value("MEDIA"));
+
+        // Test 4: Filtros combinados (SANITARIO + MEDIA)
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString())
+                .param("tipo", "SANITARIO")
+                .param("severidad", "MEDIA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].tipo").value("SALUD"))
+                .andExpect(jsonPath("$[0].severidad").value("MEDIA"));
+
+        // Test 5: Resultado vacío (REPRODUCTIVO + BAJA)
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString())
+                .param("tipo", "REPRODUCTIVO")
+                .param("severidad", "BAJA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     // =========================================================================
