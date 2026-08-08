@@ -86,7 +86,7 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      "GROUP BY a.disparador")
        List<Object[]> countAlertasActivasPorDisparador(@Param("establecimientoId") Long establecimientoId);
 
-       @Query("SELECT a, CASE WHEN a.severidad = 'ALTA' THEN 1 WHEN a.severidad = 'MEDIA' THEN 2 ELSE 3 END as cardinalidad FROM Alerta a WHERE a.animal.id = :animalId AND a.estado = 'PENDIENTE' ORDER BY cardinalidad ASC")
+       @Query("SELECT a FROM Alerta a WHERE a.animal.id = :animalId AND a.estado = 'PENDIENTE' ORDER BY CASE WHEN a.severidad = 'ALTA' THEN 1 WHEN a.severidad = 'MEDIA' THEN 2 ELSE 3 END ASC")
        List<Alerta> alertasAnimalActivas(@Param("animalId") Long animalId);
 
        /**
