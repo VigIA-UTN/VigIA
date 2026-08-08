@@ -26,6 +26,7 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
         const data = await getAnimalById(animalMapa.id);
         if (isMounted) setAnimalDetail(data);
       } catch (err) {
+        console.error(err);
         if (isMounted) setError('Error al cargar la información del animal.');
       } finally {
         if (isMounted) setLoading(false);
