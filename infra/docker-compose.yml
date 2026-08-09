@@ -91,17 +91,6 @@ services:
       - ../ml-geo/app:/app/app
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload" ]
 
-  simulador:
-    build: ../simulador
-    container_name: vigia-simulador
-    environment:
-      - API_URL=http://backend-worker:8081/api/v1/ingesta/uplink
-      - NUM_ANIMALES=5
-      - INTERVALO_SEGUNDOS=5
-    depends_on:
-      backend-worker:
-        condition: service_healthy
-
   mail:
     image: axllent/mailpit
     container_name: vigia-mail

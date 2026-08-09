@@ -128,13 +128,15 @@ export default function MapPage() {
 
     let isMounted = true;
     const token = useAuthStore.getState().token;
-    let sseUrl = `http://localhost:8080/api/v1/animales/mapa/stream?establecimientoId=${selectedId}`;
+    
+    // Telemetry SSE
+    let sseUrlTelemetria = `http://localhost:8080/api/v1/animales/mapa/stream?establecimientoId=${selectedId}`;
     if (token) {
-      sseUrl += `&token=${token}`;
+      sseUrlTelemetria += `&token=${token}`;
     }
-    const eventSource = new EventSource(sseUrl);
+    const eventSourceTelemetria = new EventSource(sseUrlTelemetria);
 
-    eventSource.onmessage = (event) => {
+    eventSourceTelemetria.onmessage = (event) => {
       if (!isMounted) return;
       try {
         const telemetriaEvent = JSON.parse(event.data);
@@ -145,7 +147,8 @@ export default function MapPage() {
                 ...animal,
                 latitud: telemetriaEvent.latitud,
                 longitud: telemetriaEvent.longitud,
-                tsUltimaPosicion: telemetriaEvent.fechaHora
+                tsUltimaPosicion: telemetriaEvent.fechaHora,
+                sinDatosRecientes: false // Se actualiza el indicador al llegar nueva data
               };
             }
             return animal;
@@ -156,14 +159,59 @@ export default function MapPage() {
       }
     };
 
-    eventSource.onerror = (error) => {
+    eventSourceTelemetria.onerror = (error) => {
       console.error('SSE Error de telemetría', error);
-      eventSource.close();
+      eventSourceTelemetria.close();
+    };
+
+    // Alertas SSE
+    let sseUrlAlertas = `http://localhost:8080/api/v1/alertas/stream?establecimientoId=${selectedId}`;
+    if (token) {
+      sseUrlAlertas += `&token=${token}`;
+    }
+    const eventSourceAlertas = new EventSource(sseUrlAlertas);
+
+    eventSourceAlertas.onmessage = async (event) => {
+      if (!isMounted) return;
+      try {
+        const newAlerta = JSON.parse(event.data) as AlertaResponse;
+        
+        // Actualizar el array de alertas del animal
+        setAnimales(prevAnimales => {
+          return prevAnimales.map(animal => {
+            if (animal.id === newAlerta.animalId) {
+              if (animal.alertasAnimal.some(a => a.id === newAlerta.id)) {
+                return animal;
+              }
+              return {
+                ...animal,
+                alertasAnimal: [newAlerta, ...animal.alertasAnimal]
+              };
+            }
+            return animal;
+          });
+        });
+
+        // Si la alerta es PENDIENTE, actualizamos el resumen
+        if (newAlerta.estado === 'PENDIENTE') {
+          const resumenData = await getResumenAlertas(selectedId);
+          if (isMounted) setResumenAlertas(resumenData);
+        }
+
+      } catch (error) {
+        console.error('Error parseando evento SSE de alertas', error);
+      }
+    };
+
+    eventSourceAlertas.onerror = (error) => {
+      console.error('SSE Error de alertas', error);
+      // eventSourceAlertas.close(); // No lo cerramos acá porque EventSource reintenta automáticamente
     };
 
     return () => {
       isMounted = false;
-      eventSource.close();
+      eventSourceTelemetria.close();
+      eventSourceAlertas.close();
     };
   }, [selectedId]);
 

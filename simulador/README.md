@@ -16,8 +16,19 @@ Las variables de entorno principales son:
 
 ## Ejecución
 
-Lo ideal es correrlo a través de Docker, junto con el resto de la infraestructura:
+El simulador se ejecuta localmente usando un entorno virtual de Python:
+
 ```bash
-cd ../infra
-docker-compose up -d simulador
+# 1. Crear el entorno virtual
+py -m venv .venv
+
+# 2. Activar el entorno virtual (PowerShell)
+.\.venv\Scripts\activate
+# En Linux/Mac: source .venv/bin/activate
+
+# 3. Instalar dependencias
+pip install -r requirements.txt
+
+# 4. Ejecutar el simulador
+py simulador.py
 ```

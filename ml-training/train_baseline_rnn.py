@@ -1,14 +1,15 @@
 """
-train_baseline_rnn.py (v2)
+train_baseline_rnn.py (v3)
 ============================
 Entrena una RNN (LSTM) baseline sobre el dataset generado por
-generate_dataset.py v2, para detectar celo a partir de ventanas de 24hs.
+generate_dataset.py v3, para detectar celo a partir de ventanas de 24hs.
 
-Cambios respecto a versiones anteriores:
-- Se eliminaron las variables `accel_x`, `y`, `z`, `pitch_deg` e `is_monta`.
-- Ahora el modelo se entrena EXCLUSIVAMENTE con 2 features: `vibstate` (0-9)
-  y `distancia_recorrida` (metros), que son los únicos datos de movimiento
-  que el collar Lansitec transmite por LoRaWAN según su Protocol Spec.
+Cambios respecto a v2:
+- Se renombró la feature `vibstate` a `moveState`, que es el nombre real del
+  campo que transmite el collar según el protocolo de ingesta usado por el
+  resto del sistema (simulador, backend-worker, ml-celo). El rango sigue
+  siendo 0-9. El modelo sigue entrenándose EXCLUSIVAMENTE con 2 features:
+  `moveState` (0-9) y `distancia_recorrida` (metros).
 - Los pesos, la normalización y las métricas de cada corrida se guardan en
   una carpeta versionada bajo --models-dir (default "models/").
 
@@ -27,9 +28,6 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.metrics import classification_report, confusion_matrix
-
-
-
 
 
 def group_split(X, y, groups, test_size=0.2, val_size=0.2, seed=42):
@@ -74,7 +72,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--run-name", type=str, default=None,
-                         help="Nombre opcional para identificar la corrida (ej. 'v2-pitch-monta')")
+                         help="Nombre opcional para identificar la corrida (ej. 'v3-movestate')")
     args = parser.parse_args()
 
     d = Path(args.dataset_dir)
@@ -95,15 +93,18 @@ def main():
         if len(group) != 288:
             continue  # Descartar días incompletos
 
-        vibstate = group["vibstate"].to_numpy(dtype=np.float32)
+        move_state = group["moveState"].to_numpy(dtype=np.float32)
 
         lat = group["latitud"].to_numpy()
         lon = group["longitud"].to_numpy()
+        # Mismo factor de escala que en generate_dataset.py y en ml-celo/main.py:
+        # convierte la distancia euclídea en grados a una magnitud comparable
+        # a metros. Debe coincidir siempre entre entrenamiento e inferencia.
         dist_eucl = np.sqrt(np.diff(lat) ** 2 + np.diff(lon) ** 2) * 100000
         dist_arr = np.concatenate([[0], dist_eucl]).astype(np.float32)
 
-        # vibstate(1) + distancia(1) = 2 features
-        features = np.column_stack([vibstate, dist_arr])
+        # moveState(1) + distancia(1) = 2 features
+        features = np.column_stack([move_state, dist_arr])
 
         label = int(group["is_celo"].any())
 
@@ -116,8 +117,6 @@ def main():
     groups = np.array(groups_list)
 
     print(f"Dataset reconstruido: X shape {X.shape}, y shape {y.shape}")
-
-
 
     print("\n--- INSTRUCCIONES DE SPLIT DE DATOS ---")
     print("Se utiliza GroupShuffleSplit agrupando por caravana_id, para que")
@@ -134,10 +133,6 @@ def main():
     print(f"Datos de Prueba: {len(X_test)} días/ventanas")
 
     # Normalizacion con estadisticas SOLO de train.
-    # NOTA: is_monta es binaria (0/1); normalizarla con z-score no es
-    # incorrecto (el modelo igual aprende), pero si prefieren mantenerla
-    # binaria interpretable, se puede excluir del z-score y concatenarla
-    # sin normalizar. Se deja normalizada por simplicidad/consistencia.
     mean = X_train.mean(axis=(0, 1), keepdims=True)
     std = X_train.std(axis=(0, 1), keepdims=True) + 1e-8
     X_train = (X_train - mean) / std
@@ -195,7 +190,7 @@ def main():
         "n_train": len(X_train),
         "n_val": len(X_val),
         "n_test": len(X_test),
-        "feature_order": ["vibstate", "distancia_recorrida"],
+        "feature_order": ["moveState", "distancia_recorrida"],
         "input_shape": list(X_train.shape[1:]),
         "test_classification_report": report,
         "test_confusion_matrix": cm.tolist(),

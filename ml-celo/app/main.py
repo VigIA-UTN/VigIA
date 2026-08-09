@@ -2,6 +2,14 @@
 Microservicio de Detección de Celo
 Evalúa el aumento sostenido de actividad motora para diagnosticar
 el inicio de un evento reproductivo (Documento de Arquitectura, sección 3.1).
+
+Features del modelo (deben coincidir EXACTAMENTE con train_baseline_rnn.py):
+  1. moveState (0-9): 0-1 = reposo/rumia, 2-6 = pastoreo/caminata normal,
+     7-9 = alta actividad (corrida, monta, inquietud por celo).
+  2. distancia_recorrida (metros): distancia euclídea entre dos puntos GPS
+     consecutivos, escalada por *100000 para pasar de grados a una magnitud
+     comparable a metros (ver generate_dataset.py). Este factor debe
+     aplicarse siempre para que coincida con la escala usada en entrenamiento.
 """
 
 # pyrefly: ignore [missing-import]
@@ -27,6 +35,9 @@ app = FastAPI(title="VigIA - Microservicio de Detección de Celo")
 model = None
 norm_stats = None
 
+# Debe coincidir con la escala usada en generate_dataset.py / train_baseline_rnn.py
+DIST_SCALE_FACTOR = 100000
+
 @app.on_event("startup")
 def load_ml_model():
     global model, norm_stats
@@ -37,7 +48,7 @@ def load_ml_model():
     models_dir = Path(__file__).parent / "models"
     model_path = models_dir / "modelo_celo_lstm.keras"
     norm_path = models_dir / "normalizacion.json"
-    
+
     if model_path.exists() and norm_path.exists():
         model = tf.keras.models.load_model(model_path)
         with open(norm_path, "r") as f:
@@ -47,7 +58,7 @@ def load_ml_model():
         print(f"ADVERTENCIA: No se encontró el modelo en {models_dir}. Ejecute el script de entrenamiento primero.")
 
 class PuntoTelemetria(BaseModel):
-    moveState: int
+    moveState: int  # 0-9, según protocolo real del collar Lansitec
     latitud: float
     longitud: float
 
@@ -68,14 +79,14 @@ async def predict(request: Request, response: Response, serie: List[PuntoTelemet
     correlation_id = request.headers.get("X-Correlation-ID", "unknown")
     print(f"[{correlation_id}] Request recibida para predicción de celo con {len(serie)} puntos.")
     response.headers["X-Correlation-ID"] = correlation_id
-    
+
     try:
         if model is None:
             raise ValueError("El modelo de machine learning no está cargado.")
-            
+
         if not serie:
             raise ValueError("La serie de telemetría está vacía.")
-            
+
         features = []
         for i in range(len(serie)):
             ms = serie[i].moveState
@@ -84,25 +95,29 @@ async def predict(request: Request, response: Response, serie: List[PuntoTelemet
             else:
                 lat1, lon1 = serie[i-1].latitud, serie[i-1].longitud
                 lat2, lon2 = serie[i].latitud, serie[i].longitud
-                dist = math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2)
+                # Misma escala que en generate_dataset.py / train_baseline_rnn.py:
+                # sin este factor, la distancia queda ~100000 veces más chica
+                # que lo que el modelo aprendió y se pierde toda la señal de
+                # movimiento al normalizar.
+                dist = math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2) * DIST_SCALE_FACTOR
             features.append([float(ms), float(dist)])
-            
+
         X_input = np.array([features])
-        
+
         if norm_stats is not None:
             mean = np.array(norm_stats["mean"])
             std = np.array(norm_stats["std"])
             # Evitar división por cero
             std = np.where(std == 0, 1e-7, std)
             X_input = (X_input - mean) / std
-            
+
         y_pred_prob = model.predict(X_input, verbose=0)
         prob = float(y_pred_prob[0][0])
         evento = prob > 0.5
         ventana = 12 if evento else 0
-        
+
         print(f"[{correlation_id}] Inferencia exitosa: celo={evento}, confianza={prob:.4f}")
-        
+
         return PrediccionCeloResponse(
             evento_celo=evento,
             confianza_modelo=prob,

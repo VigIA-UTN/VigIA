@@ -1,15 +1,19 @@
 """
-generate_dataset.py (v2)
+generate_dataset.py (v3)
 =========================
 Generador sintético y reproducible del dataset de telemetría para VigIA,
 basado en estudios de comportamiento bovino y dinámica del rodeo en pastoreo.
 
-Cambios respecto a v1 y v2:
-- Se eliminó la generación de acelerometría cruda (`accel_x`, `y`, `z`) y `pitch_deg` para alinearlo
-  estrictamente con el Protocol Spec del collar Lansitec (Payload Tipo 0x2 Heartbeat).
-- Ahora el simulador genera `vibstate` (0-9), donde 0 es reposo/rumia, 2-6 es pastoreo/caminata,
-  y 7-9 es alta actividad (corrida, monta, inquietud por celo).
+Cambios respecto a v2:
+- Se renombró `vibstate` a `moveState`, que es el nombre real del campo que
+  transmite el collar según el protocolo de ingesta usado por el resto del
+  sistema (backend-worker, simulador, ml-celo). El rango se mantiene 0-9:
+  0-1 = reposo/rumia, 2-6 = pastoreo/caminata normal, 7-9 = alta actividad
+  (corrida, monta, inquietud por celo).
 - Se mantiene el GPS (`latitud`, `longitud`) para el cálculo de distancias.
+
+Cambios respecto a v1:
+- Se eliminó la generación de acelerometría cruda (`accel_x`, `y`, `z`) y `pitch_deg`.
 """
 
 import argparse
@@ -21,7 +25,7 @@ import pandas as pd
 SAMPLES_PER_DAY = 288  # 1 lectura cada 5 minutos (24 * 60 / 5)
 MINUTES_PER_SAMPLE = 5
 
-# El nivel de vibstate del collar Lansitec va de 0 (reposo) a 9 (alta aceleración)
+# moveState real del collar: 0 (reposo) a 9 (alta aceleración)
 
 
 def build_dataset(n_animales: int, dias: int, seed: int):
@@ -134,34 +138,35 @@ def build_dataset(n_animales: int, dias: int, seed: int):
         lon[:, t] = lon[:, t - 1] + step_lon + pull_lon
 
     # ------------------------------------------------------------------
-    # 3. Estado de Vibración (VIBSTATE)
+    # 3. Estado de Movimiento (MOVESTATE)
     # ------------------------------------------------------------------
-    print("Generando estados de vibración (VIBSTATE)...")
+    print("Generando estados de movimiento (MOVESTATE)...")
     hours_of_day = (np.arange(T) * MINUTES_PER_SAMPLE / 60.0) % 24.0
-    
+
     # Ritmo circadiano: más actividad de día (6 a 20hs)
     activity_base = np.where(
         (hours_of_day >= 6) & (hours_of_day < 20),
         rng.uniform(0.4, 0.8, (n_animales, T)),  # de día, más chances de caminar/pastar
         rng.uniform(0.0, 0.3, (n_animales, T))   # de noche, más chances de dormir
     )
-    
-    # Probabilidad de descanso (vibstate 0-1) vs actividad normal (vibstate 2-6)
+
+    # Probabilidad de descanso (moveState 0-1) vs actividad normal (moveState 2-6)
     # Baja la prob de descanso si está en celo (intensidad alta)
     is_resting = rng.random((n_animales, T)) > (activity_base + intensidad * 0.5)
-    
+
     # Asignar estados base
-    vibstate = np.where(is_resting, rng.integers(0, 2, (n_animales, T)), rng.integers(2, 7, (n_animales, T)))
-    
-    # Agregar picos de alta actividad por celo
-    # La probabilidad de un pico de vibstate alto es proporcional a la intensidad de celo al cuadrado
-    prob_high_vib = intensidad ** 2 * 0.15 # hasta 15% de los ticks en pico de celo
-    high_vib_mask = rng.random((n_animales, T)) < prob_high_vib
-    vibstate[high_vib_mask] = rng.integers(7, 10, high_vib_mask.sum())
-    
-    # Falsos positivos de alta vibración (arreo, susto) independientes del celo
-    fp_mask = rng.random((n_animales, T)) < 0.005 # 0.5%
-    vibstate[fp_mask] = rng.integers(7, 10, fp_mask.sum())
+    move_state = np.where(is_resting, rng.integers(0, 2, (n_animales, T)), rng.integers(2, 7, (n_animales, T)))
+
+    # Agregar picos de alta actividad (moveState 7-9) por celo.
+    # La probabilidad de un pico es proporcional a la intensidad de celo al
+    # cuadrado (hasta 15% de los ticks en pico de celo).
+    prob_high_move = intensidad ** 2 * 0.15
+    high_move_mask = rng.random((n_animales, T)) < prob_high_move
+    move_state[high_move_mask] = rng.integers(7, 10, high_move_mask.sum())
+
+    # Falsos positivos de alta actividad (arreo, susto) independientes del celo
+    fp_mask = rng.random((n_animales, T)) < 0.005  # 0.5%
+    move_state[fp_mask] = rng.integers(7, 10, fp_mask.sum())
 
     # ------------------------------------------------------------------
     # 4. Batería
@@ -185,7 +190,7 @@ def build_dataset(n_animales: int, dias: int, seed: int):
         "fecha_hora": fecha_hora,
         "latitud": np.round(lat.flatten(), 6),
         "longitud": np.round(lon.flatten(), 6),
-        "vibstate": vibstate.flatten(),
+        "moveState": move_state.flatten(),
         "bateria": np.round(bateria.flatten().astype(np.float32), 2),
         "intensidad_celo": np.round(intensidad.flatten(), 4),
         "is_celo": is_celo.flatten(),
@@ -196,7 +201,7 @@ def build_dataset(n_animales: int, dias: int, seed: int):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generador avanzado de telemetria bovina (VigIA) v2")
+    parser = argparse.ArgumentParser(description="Generador avanzado de telemetria bovina (VigIA) v3")
     parser.add_argument("--n-animales", type=int, default=60)
     parser.add_argument("--dias", type=int, default=60, help="Días totales a simular para todo el rodeo")
     parser.add_argument("--seed", type=int, default=42)

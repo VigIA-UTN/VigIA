@@ -29,7 +29,7 @@ Con esto, tendrás corriendo:
 - **Maildev (Mails simulados):** `http://localhost:8025`
 - **Frontend:** `http://localhost:5173`
 - **Base de Datos (PostgreSQL):** Puerto `5432`
-- **Simulador y Modelos ML:** Corriendo en background e inyectando/analizando datos automáticamente cada 30 segundos.
+- **Modelos ML:** Corriendo en background y analizando datos automáticamente cada 30 segundos.
 
 Para apagar todo cuando termines:
 
@@ -70,13 +70,23 @@ npm install
 npm run dev
 ```
 
-### 4. Levantar Simulador y Entorno de ML (Para Pruebas)
+### 4. Levantar Entorno de ML y Simulador (Para Pruebas)
 
-Para probar todo el flujo de alertas, podés prender los módulos faltantes:
+Para probar todo el flujo de alertas, primero prendé los modelos de ML mediante Docker:
 
 ```bash
 cd infra
-docker-compose up -d ml-celo ml-salud ml-geo simulador
+docker-compose up -d ml-celo ml-salud ml-geo
+```
+
+Y luego, levantá el **Simulador** localmente desde tu terminal (necesita Python):
+
+```bash
+cd simulador
+py -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+py simulador.py
 ```
 
 **Nota sobre el tiempo:** Para agilizar las pruebas locales, la frecuencia de simulación y del Batch Scheduler del backend (`backend-worker`) están configuradas a **30 segundos** (en lugar de los típicos 5 a 60 minutos de la vida real). Esto permite generar inferencias rápidamente sin tener que esperar horas.
