@@ -447,6 +447,68 @@ class AlertaControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    @DisplayName("GET /api/v1/alertas/resumen - Conteo correcto de alertas por tipo")
+    @SuppressWarnings("null")
+    void obtenerResumenAlertas_conteoCorrecto() throws Exception {
+        // En setUp ya se creó 1 alerta de CELO (Reproductivo) en estado PENDIENTE.
+        
+        Animal animal = animalRepository.findAll().get(0);
+        
+        // Agregamos 1 de salud
+        Alerta alertaSanidad = new Alerta();
+        alertaSanidad.setAnimal(animal);
+        alertaSanidad.setDisparador(DisparadorAlerta.SALUD);
+        alertaSanidad.setEstado(EstadoAlerta.PENDIENTE);
+        alertaSanidad.setSeveridad(SeveridadAlerta.ALTA);
+        alertaSanidad.setTsGeneracion(LocalDateTime.now());
+        alertaSanidad.setValorUmbral(0.0);
+        alertaSanidad.setValorDetectado(0.0);
+        alertaRepository.save(alertaSanidad);
+
+        // Agregamos otra de salud
+        Alerta alertaSanidad2 = new Alerta();
+        alertaSanidad2.setAnimal(animal);
+        alertaSanidad2.setDisparador(DisparadorAlerta.SALUD);
+        alertaSanidad2.setEstado(EstadoAlerta.PENDIENTE);
+        alertaSanidad2.setSeveridad(SeveridadAlerta.MEDIA);
+        alertaSanidad2.setTsGeneracion(LocalDateTime.now());
+        alertaSanidad2.setValorUmbral(0.0);
+        alertaSanidad2.setValorDetectado(0.0);
+        alertaRepository.save(alertaSanidad2);
+
+        // Agregamos 1 geoespacial
+        Alerta alertaGeo = new Alerta();
+        alertaGeo.setAnimal(animal);
+        alertaGeo.setDisparador(DisparadorAlerta.ABIGEATO);
+        alertaGeo.setEstado(EstadoAlerta.PENDIENTE);
+        alertaGeo.setSeveridad(SeveridadAlerta.ALTA);
+        alertaGeo.setTsGeneracion(LocalDateTime.now());
+        alertaGeo.setValorUmbral(0.0);
+        alertaGeo.setValorDetectado(0.0);
+        alertaRepository.save(alertaGeo);
+        
+        // Agregamos 1 DESCARTADA (no debería contar si el resumen es de activas)
+        Alerta alertaDescartada = new Alerta();
+        alertaDescartada.setAnimal(animal);
+        alertaDescartada.setDisparador(DisparadorAlerta.CELO);
+        alertaDescartada.setEstado(EstadoAlerta.DESCARTADA);
+        alertaDescartada.setSeveridad(SeveridadAlerta.BAJA);
+        alertaDescartada.setTsGeneracion(LocalDateTime.now());
+        alertaDescartada.setValorUmbral(0.0);
+        alertaDescartada.setValorDetectado(0.0);
+        alertaRepository.save(alertaDescartada);
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/resumen")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reproductivo").value(1))
+                .andExpect(jsonPath("$.sanitario").value(2))
+                .andExpect(jsonPath("$.geoespacial").value(1));
+    }
+
     // =========================================================================
     // Helpers
     // =========================================================================

@@ -23,6 +23,11 @@ import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
+import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.DisparadorAlerta;
+import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.service.AuthService;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
@@ -85,6 +90,8 @@ class AnimalControllerTest {
         private TelemetriaRepository telemetriaRepository;
         @Autowired
         private EntityManager entityManager;
+        @Autowired
+        private AlertaRepository alertaRepository;
 
         private Long establecimientoId;
         private Long rodeoLoteId;
@@ -98,6 +105,7 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void setUp() throws Exception {
                 // Orden correcto de borrado (hijos primero)
+                alertaRepository.deleteAll();
                 telemetriaRepository.deleteAll();
                 estadoReproductivoRepository.deleteAll();
                 animalRepository.deleteAll();
@@ -1071,5 +1079,72 @@ class AnimalControllerTest {
                                 .param("establecimientoId", est2.getId().toString())
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/mapa - Animales con y sin alertas, orden por severidad")
+        @SuppressWarnings("null")
+        void getPosicionesMapa_conAlertas() throws Exception {
+                // 1. Animal sin alertas
+                Long animal1Id = crearAnimal("Animal Sin Alertas", establecimientoId, rodeoLoteId);
+
+                // 2. Animal con una alerta
+                Long animal2Id = crearAnimal("Animal Una Alerta", establecimientoId, rodeoLoteId);
+                Animal animal2 = animalRepository.findById(animal2Id).orElseThrow();
+                Alerta alertaGeo = new Alerta();
+                alertaGeo.setAnimal(animal2);
+                alertaGeo.setDisparador(DisparadorAlerta.ABIGEATO);
+                alertaGeo.setTipo("ABIGEATO");
+                alertaGeo.setEstado(EstadoAlerta.PENDIENTE);
+                alertaGeo.setSeveridad(SeveridadAlerta.MEDIA);
+                alertaGeo.setTsGeneracion(LocalDateTime.now());
+                alertaGeo.setValorUmbral(0.0);
+                alertaGeo.setValorDetectado(0.0);
+                alertaRepository.save(alertaGeo);
+
+                // 3. Animal con múltiples alertas
+                Long animal3Id = crearAnimal("Animal Multi Alertas", establecimientoId, rodeoLoteId);
+                Animal animal3 = animalRepository.findById(animal3Id).orElseThrow();
+                
+                // Alerta Sanitaria (Severidad ALTA)
+                Alerta alertaSalud = new Alerta();
+                alertaSalud.setAnimal(animal3);
+                alertaSalud.setDisparador(DisparadorAlerta.SALUD);
+                alertaSalud.setTipo("SALUD");
+                alertaSalud.setEstado(EstadoAlerta.PENDIENTE);
+                alertaSalud.setSeveridad(SeveridadAlerta.ALTA);
+                alertaSalud.setTsGeneracion(LocalDateTime.now());
+                alertaSalud.setValorUmbral(0.0);
+                alertaSalud.setValorDetectado(0.0);
+                alertaRepository.save(alertaSalud);
+
+                // Alerta Reproductiva (Severidad BAJA)
+                Alerta alertaRepro = new Alerta();
+                alertaRepro.setAnimal(animal3);
+                alertaRepro.setDisparador(DisparadorAlerta.CELO);
+                alertaRepro.setTipo("CELO");
+                alertaRepro.setEstado(EstadoAlerta.PENDIENTE);
+                alertaRepro.setSeveridad(SeveridadAlerta.BAJA);
+                alertaRepro.setTsGeneracion(LocalDateTime.now());
+                alertaRepro.setValorUmbral(0.0);
+                alertaRepro.setValorDetectado(0.0);
+                alertaRepository.save(alertaRepro);
+
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                // Animal 1: 0 alertas
+                                .andExpect(jsonPath("$[?(@.id == " + animal1Id + ")].alertasAnimal.length()").value(0))
+                                // Animal 2: 1 alerta
+                                .andExpect(jsonPath("$[?(@.id == " + animal2Id + ")].alertasAnimal.length()").value(1))
+                                .andExpect(jsonPath("$[?(@.id == " + animal2Id + ")].alertasAnimal[0].tipo").value("ABIGEATO"))
+                                .andExpect(jsonPath("$[?(@.id == " + animal2Id + ")].alertasAnimal[0].severidad").value("MEDIA"))
+                                // Animal 3: 2 alertas, ordenadas por severidad (ALTA primero)
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal.length()").value(2))
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[0].severidad").value("ALTA"))
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[0].tipo").value("SALUD"))
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].severidad").value("BAJA"))
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].tipo").value("CELO"));
         }
 }
