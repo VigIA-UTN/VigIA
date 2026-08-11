@@ -1,0 +1,270 @@
+/* ── Dashboard Power BI Style ───────────────────────────────────── */
+
+/* La página usa el fondo claro estándar de VigIA */
+.dashboard-pbi-page {
+    padding: 40px 24px 48px;
+    background: #F4F6F9;
+    min-height: calc(100vh - 60px);
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.dashboard-pbi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.dashboard-pbi-title {
+    color: #1E3A5F;
+    font-weight: 700;
+    font-size: 1.6rem;
+    margin: 0;
+    letter-spacing: -0.02em;
+}
+
+.pbi-timestamp {
+    color: #9CA3AF;
+    font-size: 0.75rem;
+    margin: 3px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.pbi-refresh-btn {
+    background: #1E3A5F !important;
+    border: none !important;
+    color: #fff !important;
+    font-size: 0.82rem !important;
+    border-radius: 8px !important;
+    padding: 7px 16px !important;
+    transition: background 0.18s ease !important;
+}
+
+.pbi-refresh-btn:hover {
+    background: #2B5080 !important;
+}
+
+/* ── Contenedor principal: el "panelito" navy ───────────────────── */
+.pbi-widget {
+    background: #1A3558;
+    border-radius: 20px;
+    padding: 32px 32px 36px;
+    max-width: 1100px;
+    margin: 0 auto 20px;
+    box-shadow: 0 6px 32px rgba(0,0,0,0.2);
+}
+
+/* ── Fila principal (hero + alertas) ───────────────────────────── */
+.pbi-main-row {
+    display: flex;
+    gap: 14px;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+
+/* ── Hero card ──────────────────────────────────────────────────── */
+.pbi-kpi-hero {
+    background: #2B5080;
+    border-radius: 14px;
+    padding: 26px 36px;
+    min-width: 190px;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+    transition: background 0.18s;
+}
+
+.pbi-kpi-hero:hover { background: #34608F; }
+
+.pbi-kpi-hero .pbi-val {
+    font-size: 4rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    display: block;
+}
+
+.pbi-kpi-hero .pbi-lbl {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #A8C8E8;
+    margin: 0;
+}
+
+/* ── Separador vertical ─────────────────────────────────────────── */
+.pbi-divider {
+    width: 1px;
+    background: rgba(255,255,255,0.1);
+    flex-shrink: 0;
+    align-self: stretch;
+    margin: 0 2px;
+}
+
+/* ── Grupo de alertas (título + row de sub-cards) ───────────────── */
+.pbi-alertas-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1 1 280px;
+}
+
+.pbi-alertas-group-title {
+    color: #C5D8EE;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0;
+}
+
+.pbi-alertas-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Sub-card de alerta */
+.pbi-alerta-card {
+    background: #243F62;
+    border-radius: 13px;
+    padding: 18px 22px;
+    flex: 1 1 100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    transition: background 0.18s;
+}
+
+.pbi-alerta-card:hover { background: #2E4E77; }
+
+.pbi-alerta-card .pbi-val {
+    font-size: 2.6rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+    display: block;
+}
+
+.pbi-alerta-card .pbi-lbl {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #A8C8E8;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ── Dots de color ──────────────────────────────────────────────── */
+.pbi-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.pbi-dot-repro    { background: #F472B6; }
+.pbi-dot-salud    { background: #FBBF24; }
+.pbi-dot-abigeato { background: #60A5FA; }
+.pbi-dot-total    { background: #34D399; }
+
+/* ── Panel 2: KPIs de celo ──────────────────────────────────────── */
+.pbi-panel-title {
+    color: #C5D8EE;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 12px;
+}
+
+.pbi-celo-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+.pbi-kpi-card {
+    background: #243F62;
+    border-radius: 13px;
+    padding: 20px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 5px;
+    transition: background 0.18s;
+}
+
+.pbi-kpi-card:hover { background: #2E4E77; }
+
+.pbi-kpi-card .pbi-val {
+    font-size: 2.6rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+    display: block;
+}
+
+.pbi-kpi-card .pbi-lbl {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #A8C8E8;
+    margin: 0;
+}
+
+.pbi-kpi-card .pbi-sub {
+    font-size: 0.65rem;
+    color: #506882;
+    margin: 0;
+}
+
+/* ── Separador interno entre paneles ────────────────────────────── */
+.pbi-inner-sep {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 20px 0;
+}
+
+/* ── Spinner inline ─────────────────────────────────────────────── */
+.pbi-spinner-val {
+    height: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.2rem;
+}
+
+/* ── Empty state ────────────────────────────────────────────────── */
+.pbi-empty {
+    background: #1A3558;
+    border-radius: 18px;
+    padding: 40px 24px;
+    text-align: center;
+    color: #7A9CC0;
+    font-size: 0.9rem;
+    max-width: 860px;
+    margin: 0 auto;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .pbi-kpi-hero .pbi-val { font-size: 2.4rem; }
+    .pbi-kpi-card .pbi-val  { font-size: 1.6rem; }
+    .pbi-alerta-card .pbi-val { font-size: 1.6rem; }
+    .pbi-widget { padding: 18px 14px 22px; }
+}

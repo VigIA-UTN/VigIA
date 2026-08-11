@@ -14,6 +14,7 @@ import EmpleadosPage from './pages/EmpleadosPage';
 import AnimalesPage from './pages/AnimalesPage';
 import AnimalDetailPage from './pages/AnimalDetailPage';
 import AlertasPage from './pages/AlertasPage';
+import DashboardPage from './pages/DashboardPage';
 
 function InvitacionesRouter() {
   const rol = useAuthStore(state => state.rol);
@@ -38,8 +39,15 @@ function App() {
             </ProtectedRoute>
           }
         />
-        {/* TODO: A futuro este / será el Dashboard */}
-        <Route path="/" element={<Navigate to="/mapa" replace />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute roles={['PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route
           path="/establecimientos"
           element={
