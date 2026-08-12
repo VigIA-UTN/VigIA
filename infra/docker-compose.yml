@@ -28,6 +28,10 @@ services:
       - DB_USER=${POSTGRES_USER:-vigia_user}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-vigia_dev_password}
       - SPRING_RABBITMQ_HOST=rabbitmq
+      - MAIL_HOST=${MAIL_HOST:-mail}
+      - MAIL_PORT=${MAIL_PORT:-1025}
+      - MAIL_USER=${MAIL_USER:-user}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-pass}
       - TZ=America/Argentina/Buenos_Aires
     depends_on:
       - db
@@ -50,6 +54,10 @@ services:
       - ML_SALUD_URL=http://ml-salud:8002
       - ML_GEO_URL=http://ml-geo:8003
       - SPRING_RABBITMQ_HOST=rabbitmq
+      - MAIL_HOST=${MAIL_HOST:-mail}
+      - MAIL_PORT=${MAIL_PORT:-1025}
+      - MAIL_USER=${MAIL_USER:-user}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-pass}
       - TZ=America/Argentina/Buenos_Aires
     depends_on:
       - db

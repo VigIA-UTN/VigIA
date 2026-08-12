@@ -104,3 +104,45 @@ VigIA cuenta con un pipeline de CI en GitHub Actions (`.github/workflows/ci.yml`
 ### Resiliencia (Circuit Breaker)
 
 No es estrictamente obligatorio levantar los contenedores ML para correr el backend. Si el microservicio de Celo está apagado o tarda en responder, el patrón Circuit Breaker (Resilience4j) en el `backend-worker` capturará el error de forma segura, marcará la telemetría como `"INFERENCIA_PENDIENTE"` en base de datos, y permitirá que la aplicación siga funcionando sin perder datos.
+
+---
+
+## ☁️ Despliegue en Producción (Railway)
+
+Para desplegar VigIA en un entorno de producción como Railway, es necesario configurar correctamente las **Variables de Entorno** de cada servicio. Las credenciales de producción **nunca deben commitearse** en el repositorio (utilice el panel de variables de Railway).
+
+Puede usar el archivo `infra/.env.example` como referencia para conocer todas las variables requeridas.
+
+### Variables por Servicio en Railway:
+
+#### 1. Base de Datos (PostgreSQL / TimescaleDB)
+Si utiliza el plugin de PostgreSQL de Railway, este proveerá sus propias credenciales. Asegúrese de que el Backend consuma estos valores:
+- `DB_HOST`: Host interno provisto por Railway (ej. `postgres.railway.internal`).
+- `DB_PORT`: Puerto de la DB (usualmente `5432`).
+- `DB_NAME`: Nombre de la base de datos.
+- `DB_USER`: Usuario.
+- `DB_PASSWORD`: Contraseña.
+
+#### 2. Message Broker (RabbitMQ)
+- `SPRING_RABBITMQ_HOST`: Host interno del servicio RabbitMQ desplegado en Railway (ej. `rabbitmq.railway.internal`).
+- `SPRING_RABBITMQ_PORT`: `5672`
+- `SPRING_RABBITMQ_USERNAME`: Usuario configurado en RabbitMQ.
+- `SPRING_RABBITMQ_PASSWORD`: Contraseña de RabbitMQ.
+
+#### 3. Backend (API y Worker)
+- `SPRING_PROFILES_ACTIVE`: `prod` (Para activar la configuración de producción).
+- `CORS_ORIGINS`: URLs de su frontend en producción (ej. `https://vigia-frontend.up.railway.app`).
+- `TZ`: `America/Argentina/Buenos_Aires`
+
+**Microservicios de Machine Learning (Usados por el Backend Worker):**
+Asegúrese de configurar las URLs apuntando a la red interna de Railway.
+- `ML_CELO_URL`: URL interna del servicio (ej. `http://ml-celo.railway.internal:8001`)
+- `ML_SALUD_URL`: URL interna del servicio (ej. `http://ml-salud.railway.internal:8002`)
+- `ML_GEO_URL`: URL interna del servicio (ej. `http://ml-geo.railway.internal:8003`)
+
+#### 4. Servidor de Correos (SMTP)
+Para el envío de alertas reales en producción, configure un proveedor SMTP (SendGrid, AWS SES, Resend, Gmail, etc.):
+- `MAIL_HOST`: Host del proveedor (ej. `smtp.sendgrid.net`).
+- `MAIL_PORT`: Puerto SMTP (ej. `587`).
+- `MAIL_USER`: Usuario SMTP.
+- `MAIL_PASSWORD`: Contraseña o API Key SMTP.
