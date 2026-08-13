@@ -18,9 +18,9 @@ public class BatchScheduler {
     private final Job celoJob;
 
     /**
-     * Se ejecuta cada 30 segundos para procesar las telemetrías pendientes.
+     * Se ejecuta según el intervalo configurado para procesar las telemetrías pendientes.
      */
-    @Scheduled(fixedRate = 30000)
+    @Scheduled(fixedRateString = "${vigia.batch.celo-rate:60000}")
     @SuppressWarnings("null")
     public void runCeloJob() {
         try {

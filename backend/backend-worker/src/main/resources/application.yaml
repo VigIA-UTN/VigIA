@@ -34,7 +34,7 @@ spring:
       max-request-size: 5MB
 
 server:
-  port: 8081
+  port: ${PORT:8081}
 
 vigia:
   ml:
