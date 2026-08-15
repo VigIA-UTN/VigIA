@@ -91,7 +91,8 @@ export default function AlertasPage() {
         if (!selectedId) return;
         let isMounted = true;
 
-        let sseUrl = `http://localhost:8080/api/v1/alertas/stream?establecimientoId=${selectedId}`;
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+        let sseUrl = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
         if (token) {
             sseUrl += `&token=${token}`;
         }
