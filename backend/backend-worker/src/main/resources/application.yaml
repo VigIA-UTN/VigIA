@@ -8,6 +8,8 @@ spring:
     username: ${DB_USER:vigia_user}
     password: ${DB_PASSWORD:vigia_dev_password}
   batch:
+    job:
+      enabled: false
     jdbc:
       initialize-schema: always
   jpa:
