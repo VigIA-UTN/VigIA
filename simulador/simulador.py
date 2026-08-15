@@ -3,6 +3,9 @@ import time
 import random
 import requests
 from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configuración
 API_URL = os.getenv("API_URL", "http://localhost:8081/api/v1/ingesta/uplink") # Apunta al backend-worker (8081)
