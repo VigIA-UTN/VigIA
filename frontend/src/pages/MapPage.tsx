@@ -130,7 +130,8 @@ export default function MapPage() {
     const token = useAuthStore.getState().token;
     
     // Telemetry SSE
-    let sseUrlTelemetria = `http://localhost:8080/api/v1/animales/mapa/stream?establecimientoId=${selectedId}`;
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+    let sseUrlTelemetria = `${API_URL}/animales/mapa/stream?establecimientoId=${selectedId}`;
     if (token) {
       sseUrlTelemetria += `&token=${token}`;
     }
@@ -165,7 +166,7 @@ export default function MapPage() {
     };
 
     // Alertas SSE
-    let sseUrlAlertas = `http://localhost:8080/api/v1/alertas/stream?establecimientoId=${selectedId}`;
+    let sseUrlAlertas = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
     if (token) {
       sseUrlAlertas += `&token=${token}`;
     }
