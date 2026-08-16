@@ -267,4 +267,21 @@
     .pbi-kpi-card .pbi-val  { font-size: 1.6rem; }
     .pbi-alerta-card .pbi-val { font-size: 1.6rem; }
     .pbi-widget { padding: 18px 14px 22px; }
+
+    /* Centrar el hero card y ocultar el divisor en mobile */
+    .pbi-main-row {
+        flex-direction: column;
+        align-items: center;
+    }
+    .pbi-kpi-hero {
+        width: 100%;
+        align-items: center;
+    }
+    .pbi-divider {
+        display: none;
+    }
+    .pbi-alertas-group {
+        width: 100%;
+        flex: none;
+    }
 }
