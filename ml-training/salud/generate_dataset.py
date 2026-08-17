@@ -37,34 +37,54 @@ def build_dataset(n_animales: int, dias: int, seed: int):
         # 40% de los animales tendrán un evento en este periodo
         eventos = []
         if rng.random() < 0.40:
-            # Seleccionar severidad: 50% Baja, 35% Media, 15% Alta
+            # Seleccionar severidad máxima: 50% Baja, 35% Media, 15% Alta
             r = rng.random()
             if r < 0.50:
-                sev = 1
+                sev_max = 1
             elif r < 0.85:
-                sev = 2
+                sev_max = 2
             else:
-                sev = 3
+                sev_max = 3
             
-            # Duración del evento: 1 a 5 días
-            duracion_dias = rng.uniform(1, 5)
+            # Duración del evento: 2 a 6 días (para dar espacio a progresión si ocurre)
+            duracion_dias = rng.uniform(2, 6)
             duracion_ticks = int(duracion_dias * SAMPLES_PER_DAY)
             
             # Inicio del evento
             t_start = rng.integers(0, max(1, T - duracion_ticks))
             t_end = t_start + duracion_ticks
             
-            severidad[n, t_start:t_end] = sev
+            # Lógica de progresión (evolución de la enfermedad a lo largo del tiempo)
+            is_progresivo = rng.random() < 0.70 # 70% de las enfermedades son progresivas
+            t_alto = 0
             
-            if sev == 3:
-                # 50% inmovilidad severa, 50% hiperactividad (problema parto)
-                t_alto = 1 if rng.random() < 0.5 else 2
-                tipo_alto[n, t_start:t_end] = t_alto
+            if is_progresivo and sev_max > 1:
+                # Dividir el tiempo de la enfermedad en las distintas etapas progresivas (1 -> 2 -> 3)
+                etapas = sev_max 
+                ticks_por_etapa = duracion_ticks // etapas
+                
+                for i in range(etapas):
+                    sev_actual = i + 1
+                    s_idx = t_start + i * ticks_por_etapa
+                    # La última etapa llega hasta t_end para evitar huecos
+                    e_idx = t_start + (i + 1) * ticks_por_etapa if i < etapas - 1 else t_end
+                    severidad[n, s_idx:e_idx] = sev_actual
+                    
+                    if sev_actual == 3:
+                        t_alto = 1 if rng.random() < 0.5 else 2
+                        tipo_alto[n, s_idx:e_idx] = t_alto
+            else:
+                # Enfermedad repentina (mantiene severidad constante)
+                severidad[n, t_start:t_end] = sev_max
+                if sev_max == 3:
+                    t_alto = 1 if rng.random() < 0.5 else 2
+                    tipo_alto[n, t_start:t_end] = t_alto
                 
             eventos.append({
                 "start_tick": int(t_start),
                 "end_tick": int(t_end),
-                "severidad": sev,
+                "severidad_maxima": int(sev_max),
+                "progresiva": bool(is_progresivo),
                 "duracion_dias": round(duracion_dias, 2)
             })
             
