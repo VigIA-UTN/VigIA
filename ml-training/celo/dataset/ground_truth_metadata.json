@@ -1,0 +1,1257 @@
+[
+  {
+    "caravana_id": 1,
+    "ciclo_promedio_dias": 22.22,
+    "eventos_celo": [
+      {
+        "start_tick": 6181,
+        "end_tick": 6286,
+        "duracion_hs": 8.75
+      },
+      {
+        "start_tick": 12580,
+        "end_tick": 12685,
+        "duracion_hs": 8.75
+      }
+    ]
+  },
+  {
+    "caravana_id": 2,
+    "ciclo_promedio_dias": 24.76,
+    "eventos_celo": [
+      {
+        "start_tick": 7024,
+        "end_tick": 7072,
+        "duracion_hs": 4.0
+      },
+      {
+        "start_tick": 14156,
+        "end_tick": 14204,
+        "duracion_hs": 4.0
+      }
+    ]
+  },
+  {
+    "caravana_id": 3,
+    "ciclo_promedio_dias": 21.51,
+    "eventos_celo": [
+      {
+        "start_tick": 922,
+        "end_tick": 1079,
+        "duracion_hs": 13.08
+      },
+      {
+        "start_tick": 7117,
+        "end_tick": 7274,
+        "duracion_hs": 13.08
+      },
+      {
+        "start_tick": 13312,
+        "end_tick": 13469,
+        "duracion_hs": 13.08
+      }
+    ]
+  },
+  {
+    "caravana_id": 4,
+    "ciclo_promedio_dias": 17.59,
+    "eventos_celo": [
+      {
+        "start_tick": 6672,
+        "end_tick": 6915,
+        "duracion_hs": 20.25
+      },
+      {
+        "start_tick": 11738,
+        "end_tick": 11981,
+        "duracion_hs": 20.25
+      },
+      {
+        "start_tick": 16803,
+        "end_tick": 17046,
+        "duracion_hs": 20.25
+      }
+    ]
+  },
+  {
+    "caravana_id": 5,
+    "ciclo_promedio_dias": 21.26,
+    "eventos_celo": [
+      {
+        "start_tick": 3192,
+        "end_tick": 3453,
+        "duracion_hs": 21.75
+      },
+      {
+        "start_tick": 9316,
+        "end_tick": 9577,
+        "duracion_hs": 21.75
+      },
+      {
+        "start_tick": 15440,
+        "end_tick": 15701,
+        "duracion_hs": 21.75
+      }
+    ]
+  },
+  {
+    "caravana_id": 6,
+    "ciclo_promedio_dias": 17.56,
+    "eventos_celo": [
+      {
+        "start_tick": 459,
+        "end_tick": 665,
+        "duracion_hs": 17.17
+      },
+      {
+        "start_tick": 5517,
+        "end_tick": 5723,
+        "duracion_hs": 17.17
+      },
+      {
+        "start_tick": 10575,
+        "end_tick": 10781,
+        "duracion_hs": 17.17
+      },
+      {
+        "start_tick": 15633,
+        "end_tick": 15839,
+        "duracion_hs": 17.17
+      }
+    ]
+  },
+  {
+    "caravana_id": 7,
+    "ciclo_promedio_dias": 24.51,
+    "eventos_celo": [
+      {
+        "start_tick": 5458,
+        "end_tick": 5634,
+        "duracion_hs": 14.67
+      },
+      {
+        "start_tick": 12518,
+        "end_tick": 12694,
+        "duracion_hs": 14.67
+      }
+    ]
+  },
+  {
+    "caravana_id": 8,
+    "ciclo_promedio_dias": 18.28,
+    "eventos_celo": [
+      {
+        "start_tick": 6430,
+        "end_tick": 6698,
+        "duracion_hs": 22.33
+      },
+      {
+        "start_tick": 11694,
+        "end_tick": 11962,
+        "duracion_hs": 22.33
+      },
+      {
+        "start_tick": 16957,
+        "end_tick": 17225,
+        "duracion_hs": 22.33
+      }
+    ]
+  },
+  {
+    "caravana_id": 9,
+    "ciclo_promedio_dias": 19.29,
+    "eventos_celo": [
+      {
+        "start_tick": 3360,
+        "end_tick": 3514,
+        "duracion_hs": 12.83
+      },
+      {
+        "start_tick": 8914,
+        "end_tick": 9068,
+        "duracion_hs": 12.83
+      },
+      {
+        "start_tick": 14469,
+        "end_tick": 14623,
+        "duracion_hs": 12.83
+      }
+    ]
+  },
+  {
+    "caravana_id": 10,
+    "ciclo_promedio_dias": 22.46,
+    "eventos_celo": [
+      {
+        "start_tick": 4917,
+        "end_tick": 5126,
+        "duracion_hs": 17.42
+      },
+      {
+        "start_tick": 11386,
+        "end_tick": 11595,
+        "duracion_hs": 17.42
+      }
+    ]
+  },
+  {
+    "caravana_id": 11,
+    "ciclo_promedio_dias": 29.57,
+    "eventos_celo": [
+      {
+        "start_tick": 2345,
+        "end_tick": 2495,
+        "duracion_hs": 12.5
+      },
+      {
+        "start_tick": 10861,
+        "end_tick": 11011,
+        "duracion_hs": 12.5
+      }
+    ]
+  },
+  {
+    "caravana_id": 12,
+    "ciclo_promedio_dias": 17.74,
+    "eventos_celo": [
+      {
+        "start_tick": 1364,
+        "end_tick": 1588,
+        "duracion_hs": 18.67
+      },
+      {
+        "start_tick": 6474,
+        "end_tick": 6698,
+        "duracion_hs": 18.67
+      },
+      {
+        "start_tick": 11585,
+        "end_tick": 11809,
+        "duracion_hs": 18.67
+      },
+      {
+        "start_tick": 16695,
+        "end_tick": 16919,
+        "duracion_hs": 18.67
+      }
+    ]
+  },
+  {
+    "caravana_id": 13,
+    "ciclo_promedio_dias": 20.54,
+    "eventos_celo": [
+      {
+        "start_tick": 1633,
+        "end_tick": 1752,
+        "duracion_hs": 9.92
+      },
+      {
+        "start_tick": 7550,
+        "end_tick": 7669,
+        "duracion_hs": 9.92
+      },
+      {
+        "start_tick": 13467,
+        "end_tick": 13586,
+        "duracion_hs": 9.92
+      }
+    ]
+  },
+  {
+    "caravana_id": 14,
+    "ciclo_promedio_dias": 23.6,
+    "eventos_celo": [
+      {
+        "start_tick": 5995,
+        "end_tick": 6228,
+        "duracion_hs": 19.42
+      },
+      {
+        "start_tick": 12792,
+        "end_tick": 13025,
+        "duracion_hs": 19.42
+      }
+    ]
+  },
+  {
+    "caravana_id": 15,
+    "ciclo_promedio_dias": 16.32,
+    "eventos_celo": [
+      {
+        "start_tick": 5992,
+        "end_tick": 6211,
+        "duracion_hs": 18.25
+      },
+      {
+        "start_tick": 10691,
+        "end_tick": 10910,
+        "duracion_hs": 18.25
+      },
+      {
+        "start_tick": 15389,
+        "end_tick": 15608,
+        "duracion_hs": 18.25
+      }
+    ]
+  },
+  {
+    "caravana_id": 16,
+    "ciclo_promedio_dias": 21.93,
+    "eventos_celo": [
+      {
+        "start_tick": 2075,
+        "end_tick": 2263,
+        "duracion_hs": 15.67
+      },
+      {
+        "start_tick": 8391,
+        "end_tick": 8579,
+        "duracion_hs": 15.67
+      },
+      {
+        "start_tick": 14706,
+        "end_tick": 14894,
+        "duracion_hs": 15.67
+      }
+    ]
+  },
+  {
+    "caravana_id": 17,
+    "ciclo_promedio_dias": 24.49,
+    "eventos_celo": [
+      {
+        "start_tick": 1439,
+        "end_tick": 1635,
+        "duracion_hs": 16.33
+      },
+      {
+        "start_tick": 8491,
+        "end_tick": 8687,
+        "duracion_hs": 16.33
+      },
+      {
+        "start_tick": 15543,
+        "end_tick": 15739,
+        "duracion_hs": 16.33
+      }
+    ]
+  },
+  {
+    "caravana_id": 18,
+    "ciclo_promedio_dias": 21.27,
+    "eventos_celo": [
+      {
+        "start_tick": 4786,
+        "end_tick": 4986,
+        "duracion_hs": 16.67
+      },
+      {
+        "start_tick": 10912,
+        "end_tick": 11112,
+        "duracion_hs": 16.67
+      },
+      {
+        "start_tick": 17038,
+        "end_tick": 17238,
+        "duracion_hs": 16.67
+      }
+    ]
+  },
+  {
+    "caravana_id": 19,
+    "ciclo_promedio_dias": 15.17,
+    "eventos_celo": [
+      {
+        "start_tick": 3304,
+        "end_tick": 3460,
+        "duracion_hs": 13.0
+      },
+      {
+        "start_tick": 7673,
+        "end_tick": 7829,
+        "duracion_hs": 13.0
+      },
+      {
+        "start_tick": 12042,
+        "end_tick": 12198,
+        "duracion_hs": 13.0
+      },
+      {
+        "start_tick": 16412,
+        "end_tick": 16568,
+        "duracion_hs": 13.0
+      }
+    ]
+  },
+  {
+    "caravana_id": 20,
+    "ciclo_promedio_dias": 18.44,
+    "eventos_celo": [
+      {
+        "start_tick": 824,
+        "end_tick": 984,
+        "duracion_hs": 13.33
+      },
+      {
+        "start_tick": 6136,
+        "end_tick": 6296,
+        "duracion_hs": 13.33
+      },
+      {
+        "start_tick": 11448,
+        "end_tick": 11608,
+        "duracion_hs": 13.33
+      },
+      {
+        "start_tick": 16760,
+        "end_tick": 16920,
+        "duracion_hs": 13.33
+      }
+    ]
+  },
+  {
+    "caravana_id": 21,
+    "ciclo_promedio_dias": 17.54,
+    "eventos_celo": [
+      {
+        "start_tick": 4069,
+        "end_tick": 4318,
+        "duracion_hs": 20.75
+      },
+      {
+        "start_tick": 9120,
+        "end_tick": 9369,
+        "duracion_hs": 20.75
+      },
+      {
+        "start_tick": 14170,
+        "end_tick": 14419,
+        "duracion_hs": 20.75
+      }
+    ]
+  },
+  {
+    "caravana_id": 22,
+    "ciclo_promedio_dias": 19.66,
+    "eventos_celo": [
+      {
+        "start_tick": 3985,
+        "end_tick": 4176,
+        "duracion_hs": 15.92
+      },
+      {
+        "start_tick": 9647,
+        "end_tick": 9838,
+        "duracion_hs": 15.92
+      },
+      {
+        "start_tick": 15310,
+        "end_tick": 15501,
+        "duracion_hs": 15.92
+      }
+    ]
+  },
+  {
+    "caravana_id": 23,
+    "ciclo_promedio_dias": 23.84,
+    "eventos_celo": [
+      {
+        "start_tick": 221,
+        "end_tick": 458,
+        "duracion_hs": 19.75
+      },
+      {
+        "start_tick": 7089,
+        "end_tick": 7326,
+        "duracion_hs": 19.75
+      },
+      {
+        "start_tick": 13956,
+        "end_tick": 14193,
+        "duracion_hs": 19.75
+      }
+    ]
+  },
+  {
+    "caravana_id": 24,
+    "ciclo_promedio_dias": 19.15,
+    "eventos_celo": [
+      {
+        "start_tick": 2941,
+        "end_tick": 3182,
+        "duracion_hs": 20.08
+      },
+      {
+        "start_tick": 8456,
+        "end_tick": 8697,
+        "duracion_hs": 20.08
+      },
+      {
+        "start_tick": 13972,
+        "end_tick": 14213,
+        "duracion_hs": 20.08
+      }
+    ]
+  },
+  {
+    "caravana_id": 25,
+    "ciclo_promedio_dias": 15.9,
+    "eventos_celo": [
+      {
+        "start_tick": 419,
+        "end_tick": 517,
+        "duracion_hs": 8.17
+      },
+      {
+        "start_tick": 4998,
+        "end_tick": 5096,
+        "duracion_hs": 8.17
+      },
+      {
+        "start_tick": 9576,
+        "end_tick": 9674,
+        "duracion_hs": 8.17
+      },
+      {
+        "start_tick": 14155,
+        "end_tick": 14253,
+        "duracion_hs": 8.17
+      }
+    ]
+  },
+  {
+    "caravana_id": 26,
+    "ciclo_promedio_dias": 22.99,
+    "eventos_celo": [
+      {
+        "start_tick": 4765,
+        "end_tick": 4955,
+        "duracion_hs": 15.83
+      },
+      {
+        "start_tick": 11386,
+        "end_tick": 11576,
+        "duracion_hs": 15.83
+      }
+    ]
+  },
+  {
+    "caravana_id": 27,
+    "ciclo_promedio_dias": 19.29,
+    "eventos_celo": [
+      {
+        "start_tick": 4783,
+        "end_tick": 4974,
+        "duracion_hs": 15.92
+      },
+      {
+        "start_tick": 10338,
+        "end_tick": 10529,
+        "duracion_hs": 15.92
+      },
+      {
+        "start_tick": 15894,
+        "end_tick": 16085,
+        "duracion_hs": 15.92
+      }
+    ]
+  },
+  {
+    "caravana_id": 28,
+    "ciclo_promedio_dias": 19.76,
+    "eventos_celo": [
+      {
+        "start_tick": 1202,
+        "end_tick": 1414,
+        "duracion_hs": 17.67
+      },
+      {
+        "start_tick": 6893,
+        "end_tick": 7105,
+        "duracion_hs": 17.67
+      },
+      {
+        "start_tick": 12585,
+        "end_tick": 12797,
+        "duracion_hs": 17.67
+      }
+    ]
+  },
+  {
+    "caravana_id": 29,
+    "ciclo_promedio_dias": 19.55,
+    "eventos_celo": [
+      {
+        "start_tick": 5200,
+        "end_tick": 5352,
+        "duracion_hs": 12.67
+      },
+      {
+        "start_tick": 10830,
+        "end_tick": 10982,
+        "duracion_hs": 12.67
+      },
+      {
+        "start_tick": 16460,
+        "end_tick": 16612,
+        "duracion_hs": 12.67
+      }
+    ]
+  },
+  {
+    "caravana_id": 30,
+    "ciclo_promedio_dias": 22.95,
+    "eventos_celo": [
+      {
+        "start_tick": 3607,
+        "end_tick": 3753,
+        "duracion_hs": 12.17
+      },
+      {
+        "start_tick": 10216,
+        "end_tick": 10362,
+        "duracion_hs": 12.17
+      },
+      {
+        "start_tick": 16825,
+        "end_tick": 16971,
+        "duracion_hs": 12.17
+      }
+    ]
+  },
+  {
+    "caravana_id": 31,
+    "ciclo_promedio_dias": 22.92,
+    "eventos_celo": [
+      {
+        "start_tick": 3212,
+        "end_tick": 3424,
+        "duracion_hs": 17.67
+      },
+      {
+        "start_tick": 9814,
+        "end_tick": 10026,
+        "duracion_hs": 17.67
+      },
+      {
+        "start_tick": 16415,
+        "end_tick": 16627,
+        "duracion_hs": 17.67
+      }
+    ]
+  },
+  {
+    "caravana_id": 32,
+    "ciclo_promedio_dias": 20.61,
+    "eventos_celo": [
+      {
+        "start_tick": 4538,
+        "end_tick": 4687,
+        "duracion_hs": 12.42
+      },
+      {
+        "start_tick": 10472,
+        "end_tick": 10621,
+        "duracion_hs": 12.42
+      },
+      {
+        "start_tick": 16407,
+        "end_tick": 16556,
+        "duracion_hs": 12.42
+      }
+    ]
+  },
+  {
+    "caravana_id": 33,
+    "ciclo_promedio_dias": 14.25,
+    "eventos_celo": [
+      {
+        "start_tick": 849,
+        "end_tick": 924,
+        "duracion_hs": 6.25
+      },
+      {
+        "start_tick": 4953,
+        "end_tick": 5028,
+        "duracion_hs": 6.25
+      },
+      {
+        "start_tick": 9058,
+        "end_tick": 9133,
+        "duracion_hs": 6.25
+      },
+      {
+        "start_tick": 13162,
+        "end_tick": 13237,
+        "duracion_hs": 6.25
+      },
+      {
+        "start_tick": 17266,
+        "end_tick": 17280,
+        "duracion_hs": 1.17
+      }
+    ]
+  },
+  {
+    "caravana_id": 34,
+    "ciclo_promedio_dias": 17.01,
+    "eventos_celo": [
+      {
+        "start_tick": 5037,
+        "end_tick": 5245,
+        "duracion_hs": 17.33
+      },
+      {
+        "start_tick": 9937,
+        "end_tick": 10145,
+        "duracion_hs": 17.33
+      },
+      {
+        "start_tick": 14836,
+        "end_tick": 15044,
+        "duracion_hs": 17.33
+      }
+    ]
+  },
+  {
+    "caravana_id": 35,
+    "ciclo_promedio_dias": 19.49,
+    "eventos_celo": [
+      {
+        "start_tick": 5607,
+        "end_tick": 5880,
+        "duracion_hs": 22.75
+      },
+      {
+        "start_tick": 11219,
+        "end_tick": 11492,
+        "duracion_hs": 22.75
+      },
+      {
+        "start_tick": 16831,
+        "end_tick": 17104,
+        "duracion_hs": 22.75
+      }
+    ]
+  },
+  {
+    "caravana_id": 36,
+    "ciclo_promedio_dias": 23.95,
+    "eventos_celo": [
+      {
+        "start_tick": 1960,
+        "end_tick": 2072,
+        "duracion_hs": 9.33
+      },
+      {
+        "start_tick": 8857,
+        "end_tick": 8969,
+        "duracion_hs": 9.33
+      },
+      {
+        "start_tick": 15755,
+        "end_tick": 15867,
+        "duracion_hs": 9.33
+      }
+    ]
+  },
+  {
+    "caravana_id": 37,
+    "ciclo_promedio_dias": 17.2,
+    "eventos_celo": [
+      {
+        "start_tick": 3281,
+        "end_tick": 3436,
+        "duracion_hs": 12.92
+      },
+      {
+        "start_tick": 8235,
+        "end_tick": 8390,
+        "duracion_hs": 12.92
+      },
+      {
+        "start_tick": 13188,
+        "end_tick": 13343,
+        "duracion_hs": 12.92
+      }
+    ]
+  },
+  {
+    "caravana_id": 38,
+    "ciclo_promedio_dias": 14.09,
+    "eventos_celo": [
+      {
+        "start_tick": 4170,
+        "end_tick": 4381,
+        "duracion_hs": 17.58
+      },
+      {
+        "start_tick": 8228,
+        "end_tick": 8439,
+        "duracion_hs": 17.58
+      },
+      {
+        "start_tick": 12286,
+        "end_tick": 12497,
+        "duracion_hs": 17.58
+      },
+      {
+        "start_tick": 16344,
+        "end_tick": 16555,
+        "duracion_hs": 17.58
+      }
+    ]
+  },
+  {
+    "caravana_id": 39,
+    "ciclo_promedio_dias": 18.62,
+    "eventos_celo": [
+      {
+        "start_tick": 5461,
+        "end_tick": 5536,
+        "duracion_hs": 6.25
+      },
+      {
+        "start_tick": 10824,
+        "end_tick": 10899,
+        "duracion_hs": 6.25
+      },
+      {
+        "start_tick": 16188,
+        "end_tick": 16263,
+        "duracion_hs": 6.25
+      }
+    ]
+  },
+  {
+    "caravana_id": 40,
+    "ciclo_promedio_dias": 18.88,
+    "eventos_celo": [
+      {
+        "start_tick": 4516,
+        "end_tick": 4712,
+        "duracion_hs": 16.33
+      },
+      {
+        "start_tick": 9954,
+        "end_tick": 10150,
+        "duracion_hs": 16.33
+      },
+      {
+        "start_tick": 15392,
+        "end_tick": 15588,
+        "duracion_hs": 16.33
+      }
+    ]
+  },
+  {
+    "caravana_id": 41,
+    "ciclo_promedio_dias": 27.41,
+    "eventos_celo": [
+      {
+        "start_tick": 607,
+        "end_tick": 769,
+        "duracion_hs": 13.5
+      },
+      {
+        "start_tick": 8501,
+        "end_tick": 8663,
+        "duracion_hs": 13.5
+      },
+      {
+        "start_tick": 16394,
+        "end_tick": 16556,
+        "duracion_hs": 13.5
+      }
+    ]
+  },
+  {
+    "caravana_id": 42,
+    "ciclo_promedio_dias": 21.72,
+    "eventos_celo": [
+      {
+        "start_tick": 3556,
+        "end_tick": 3751,
+        "duracion_hs": 16.25
+      },
+      {
+        "start_tick": 9811,
+        "end_tick": 10006,
+        "duracion_hs": 16.25
+      },
+      {
+        "start_tick": 16065,
+        "end_tick": 16260,
+        "duracion_hs": 16.25
+      }
+    ]
+  },
+  {
+    "caravana_id": 43,
+    "ciclo_promedio_dias": 24.34,
+    "eventos_celo": [
+      {
+        "start_tick": 744,
+        "end_tick": 949,
+        "duracion_hs": 17.08
+      },
+      {
+        "start_tick": 7754,
+        "end_tick": 7959,
+        "duracion_hs": 17.08
+      },
+      {
+        "start_tick": 14764,
+        "end_tick": 14969,
+        "duracion_hs": 17.08
+      }
+    ]
+  },
+  {
+    "caravana_id": 44,
+    "ciclo_promedio_dias": 16.24,
+    "eventos_celo": [
+      {
+        "start_tick": 6660,
+        "end_tick": 6793,
+        "duracion_hs": 11.08
+      },
+      {
+        "start_tick": 11339,
+        "end_tick": 11472,
+        "duracion_hs": 11.08
+      },
+      {
+        "start_tick": 16017,
+        "end_tick": 16150,
+        "duracion_hs": 11.08
+      }
+    ]
+  },
+  {
+    "caravana_id": 45,
+    "ciclo_promedio_dias": 19.44,
+    "eventos_celo": [
+      {
+        "start_tick": 4254,
+        "end_tick": 4334,
+        "duracion_hs": 6.67
+      },
+      {
+        "start_tick": 9853,
+        "end_tick": 9933,
+        "duracion_hs": 6.67
+      },
+      {
+        "start_tick": 15452,
+        "end_tick": 15532,
+        "duracion_hs": 6.67
+      }
+    ]
+  },
+  {
+    "caravana_id": 46,
+    "ciclo_promedio_dias": 20.11,
+    "eventos_celo": [
+      {
+        "start_tick": 3472,
+        "end_tick": 3546,
+        "duracion_hs": 6.17
+      },
+      {
+        "start_tick": 9264,
+        "end_tick": 9338,
+        "duracion_hs": 6.17
+      },
+      {
+        "start_tick": 15056,
+        "end_tick": 15130,
+        "duracion_hs": 6.17
+      }
+    ]
+  },
+  {
+    "caravana_id": 47,
+    "ciclo_promedio_dias": 22.25,
+    "eventos_celo": [
+      {
+        "start_tick": 3503,
+        "end_tick": 3743,
+        "duracion_hs": 20.0
+      },
+      {
+        "start_tick": 9913,
+        "end_tick": 10153,
+        "duracion_hs": 20.0
+      },
+      {
+        "start_tick": 16322,
+        "end_tick": 16562,
+        "duracion_hs": 20.0
+      }
+    ]
+  },
+  {
+    "caravana_id": 48,
+    "ciclo_promedio_dias": 32.66,
+    "eventos_celo": [
+      {
+        "start_tick": 4116,
+        "end_tick": 4325,
+        "duracion_hs": 17.42
+      },
+      {
+        "start_tick": 13521,
+        "end_tick": 13730,
+        "duracion_hs": 17.42
+      }
+    ]
+  },
+  {
+    "caravana_id": 49,
+    "ciclo_promedio_dias": 12.47,
+    "eventos_celo": [
+      {
+        "start_tick": 2387,
+        "end_tick": 2586,
+        "duracion_hs": 16.58
+      },
+      {
+        "start_tick": 5979,
+        "end_tick": 6178,
+        "duracion_hs": 16.58
+      },
+      {
+        "start_tick": 9571,
+        "end_tick": 9770,
+        "duracion_hs": 16.58
+      },
+      {
+        "start_tick": 13162,
+        "end_tick": 13361,
+        "duracion_hs": 16.58
+      },
+      {
+        "start_tick": 16754,
+        "end_tick": 16953,
+        "duracion_hs": 16.58
+      }
+    ]
+  },
+  {
+    "caravana_id": 50,
+    "ciclo_promedio_dias": 19.34,
+    "eventos_celo": [
+      {
+        "start_tick": 155,
+        "end_tick": 290,
+        "duracion_hs": 11.25
+      },
+      {
+        "start_tick": 5725,
+        "end_tick": 5860,
+        "duracion_hs": 11.25
+      },
+      {
+        "start_tick": 11294,
+        "end_tick": 11429,
+        "duracion_hs": 11.25
+      },
+      {
+        "start_tick": 16864,
+        "end_tick": 16999,
+        "duracion_hs": 11.25
+      }
+    ]
+  },
+  {
+    "caravana_id": 51,
+    "ciclo_promedio_dias": 25.26,
+    "eventos_celo": [
+      {
+        "start_tick": 1009,
+        "end_tick": 1200,
+        "duracion_hs": 15.92
+      },
+      {
+        "start_tick": 8285,
+        "end_tick": 8476,
+        "duracion_hs": 15.92
+      },
+      {
+        "start_tick": 15561,
+        "end_tick": 15752,
+        "duracion_hs": 15.92
+      }
+    ]
+  },
+  {
+    "caravana_id": 52,
+    "ciclo_promedio_dias": 16.86,
+    "eventos_celo": [
+      {
+        "start_tick": 4840,
+        "end_tick": 4899,
+        "duracion_hs": 4.92
+      },
+      {
+        "start_tick": 9695,
+        "end_tick": 9754,
+        "duracion_hs": 4.92
+      },
+      {
+        "start_tick": 14549,
+        "end_tick": 14608,
+        "duracion_hs": 4.92
+      }
+    ]
+  },
+  {
+    "caravana_id": 53,
+    "ciclo_promedio_dias": 20.78,
+    "eventos_celo": [
+      {
+        "start_tick": 5534,
+        "end_tick": 5841,
+        "duracion_hs": 25.58
+      },
+      {
+        "start_tick": 11520,
+        "end_tick": 11827,
+        "duracion_hs": 25.58
+      }
+    ]
+  },
+  {
+    "caravana_id": 54,
+    "ciclo_promedio_dias": 24.93,
+    "eventos_celo": [
+      {
+        "start_tick": 1657,
+        "end_tick": 1801,
+        "duracion_hs": 12.0
+      },
+      {
+        "start_tick": 8837,
+        "end_tick": 8981,
+        "duracion_hs": 12.0
+      },
+      {
+        "start_tick": 16017,
+        "end_tick": 16161,
+        "duracion_hs": 12.0
+      }
+    ]
+  },
+  {
+    "caravana_id": 55,
+    "ciclo_promedio_dias": 17.14,
+    "eventos_celo": [
+      {
+        "start_tick": 2670,
+        "end_tick": 2797,
+        "duracion_hs": 10.58
+      },
+      {
+        "start_tick": 7606,
+        "end_tick": 7733,
+        "duracion_hs": 10.58
+      },
+      {
+        "start_tick": 12543,
+        "end_tick": 12670,
+        "duracion_hs": 10.58
+      }
+    ]
+  },
+  {
+    "caravana_id": 56,
+    "ciclo_promedio_dias": 17.71,
+    "eventos_celo": [
+      {
+        "start_tick": 2283,
+        "end_tick": 2523,
+        "duracion_hs": 20.0
+      },
+      {
+        "start_tick": 7385,
+        "end_tick": 7625,
+        "duracion_hs": 20.0
+      },
+      {
+        "start_tick": 12486,
+        "end_tick": 12726,
+        "duracion_hs": 20.0
+      }
+    ]
+  },
+  {
+    "caravana_id": 57,
+    "ciclo_promedio_dias": 24.73,
+    "eventos_celo": [
+      {
+        "start_tick": 3708,
+        "end_tick": 3915,
+        "duracion_hs": 17.25
+      },
+      {
+        "start_tick": 10829,
+        "end_tick": 11036,
+        "duracion_hs": 17.25
+      }
+    ]
+  },
+  {
+    "caravana_id": 58,
+    "ciclo_promedio_dias": 20.84,
+    "eventos_celo": [
+      {
+        "start_tick": 1185,
+        "end_tick": 1317,
+        "duracion_hs": 11.0
+      },
+      {
+        "start_tick": 7186,
+        "end_tick": 7318,
+        "duracion_hs": 11.0
+      },
+      {
+        "start_tick": 13187,
+        "end_tick": 13319,
+        "duracion_hs": 11.0
+      }
+    ]
+  },
+  {
+    "caravana_id": 59,
+    "ciclo_promedio_dias": 19.18,
+    "eventos_celo": [
+      {
+        "start_tick": 7145,
+        "end_tick": 7236,
+        "duracion_hs": 7.58
+      },
+      {
+        "start_tick": 12668,
+        "end_tick": 12759,
+        "duracion_hs": 7.58
+      }
+    ]
+  },
+  {
+    "caravana_id": 60,
+    "ciclo_promedio_dias": 21.69,
+    "eventos_celo": [
+      {
+        "start_tick": 6413,
+        "end_tick": 6706,
+        "duracion_hs": 24.42
+      },
+      {
+        "start_tick": 12660,
+        "end_tick": 12953,
+        "duracion_hs": 24.42
+      }
+    ]
+  }
+]
