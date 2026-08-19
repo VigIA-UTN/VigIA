@@ -1,15 +1,7 @@
 """
 Microservicio de Detección de Celo
 Evalúa el aumento sostenido de actividad motora para diagnosticar
-el inicio de un evento reproductivo (Documento de Arquitectura, sección 3.1).
-
-Features del modelo (deben coincidir EXACTAMENTE con train_baseline_rnn.py):
-  1. moveState (0-9): 0-1 = reposo/rumia, 2-6 = pastoreo/caminata normal,
-     7-9 = alta actividad (corrida, monta, inquietud por celo).
-  2. distancia_recorrida (metros): distancia euclídea entre dos puntos GPS
-     consecutivos, escalada por *100000 para pasar de grados a una magnitud
-     comparable a metros (ver generate_dataset.py). Este factor debe
-     aplicarse siempre para que coincida con la escala usada en entrenamiento.
+el inicio de un evento reproductivo 
 """
 
 # pyrefly: ignore [missing-import]
