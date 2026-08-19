@@ -3,6 +3,17 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   application:
     name: backend
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:422492479676-4g5t9nkp7fe5p7na244dfr4mjtmabm38.apps.googleusercontent.com}
+            client-secret: ${GOOGLE_CLIENT_SECRET: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}
+            scope:
+              - email
+              - profile
+              - openid
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vigia}
     username: ${DB_USER:vigia_user}
@@ -65,4 +76,9 @@ resilience4j:
     instances:
       celoML:
         timeoutDuration: 2000ms
+
+app:
+  oauth2:
+    redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/oauth2/callback}
+
 

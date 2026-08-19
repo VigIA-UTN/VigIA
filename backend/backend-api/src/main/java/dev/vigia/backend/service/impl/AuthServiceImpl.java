@@ -40,11 +40,12 @@ public class AuthServiceImpl implements AuthService {
 
     public ValidateCodeResponse validateCode(ValidateCodeRequest request) {
         Invitacion invitacion = validateAndGetInvitacion(request.getToken(), request.getEmail());
-        
+
         return ValidateCodeResponse.builder()
                 .email(invitacion.getEmailDestino())
                 .rol(invitacion.getRol() != null ? invitacion.getRol().name() : null)
-                .establecimiento(invitacion.getEstablecimiento() != null ? invitacion.getEstablecimiento().getNombre() : null)
+                .establecimiento(
+                        invitacion.getEstablecimiento() != null ? invitacion.getEstablecimiento().getNombre() : null)
                 .build();
     }
 
@@ -87,6 +88,45 @@ public class AuthServiceImpl implements AuthService {
         return AuthResponse.builder()
                 .token(token)
                 .email(savedUser.getEmail())
+                .rol(roleStr)
+                .build();
+    }
+
+    @Override
+    public AuthResponse processOAuth2User(String email, String nombre, String apellido, String provider) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("El email es requerido para la autenticación OAuth2.");
+        }
+
+        String cleanEmail = email.toLowerCase().trim();
+        String providerName = (provider != null && !provider.isBlank()) ? provider.toUpperCase() : "GOOGLE";
+
+        Usuario usuario = usuarioRepository.findByEmail(cleanEmail).orElseGet(() -> {
+            Usuario newUser = new Usuario();
+            newUser.setEmail(cleanEmail);
+            newUser.setNombre(nombre != null && !nombre.isBlank() ? nombre : cleanEmail.split("@")[0]);
+            newUser.setApellido(apellido != null ? apellido : "");
+            newUser.setRol(dev.vigia.backend.model.Rol.PENDIENTE);
+            newUser.setActivo(true);
+            newUser.setFechaAlta(LocalDate.now());
+            newUser.setProveedorAuth(providerName);
+            return usuarioRepository.save(newUser);
+        });
+
+        if (usuario.getProveedorAuth() == null || usuario.getProveedorAuth().isBlank()) {
+            usuario.setProveedorAuth(providerName);
+            usuarioRepository.save(usuario);
+        }
+
+        resetFailedLogin(cleanEmail);
+
+        var userDetails = userDetailsService.loadUserByUsername(usuario.getEmail());
+        String token = jwtUtil.generateToken(userDetails);
+        String roleStr = usuario.getRol() != null ? usuario.getRol().name() : "";
+
+        return AuthResponse.builder()
+                .token(token)
+                .email(usuario.getEmail())
                 .rol(roleStr)
                 .build();
     }

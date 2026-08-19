@@ -8,6 +8,7 @@ import InvitacionesEmpleadosPage from './pages/InvitacionesEmpleadosPage';
 import InvitacionesPendientesPage from './pages/InvitacionesPendientesPage';
 import RegisterPage from './pages/RegisterPage';
 import AcceptInvitationPage from './pages/AcceptInvitationPage';
+import OAuth2CallbackPage from './pages/OAuth2CallbackPage';
 import UsuariosAdminPage from './pages/UsuariosAdminPage';
 import { useAuthStore } from './store/authStore';
 import EmpleadosPage from './pages/EmpleadosPage';
@@ -20,7 +21,7 @@ function InvitacionesRouter() {
   const rol = useAuthStore(state => state.rol);
   if (rol === 'ADMINISTRADOR') return <InvitacionesPage />;
   if (rol === 'PRODUCTOR') return <InvitacionesEmpleadosPage />;
-  if (rol === 'VETERINARIO' || rol === 'CAMPERO') return <InvitacionesPendientesPage />;
+  if (rol === 'VETERINARIO' || rol === 'CAMPERO' || rol === 'PENDIENTE') return <InvitacionesPendientesPage />;
   return <Navigate to="/" replace />;
 }
 
@@ -31,6 +32,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/aceptar-invitacion" element={<AcceptInvitationPage />} />
+        <Route path="/oauth2/callback" element={<OAuth2CallbackPage />} />
         <Route
           path="/mapa"
           element={
@@ -59,7 +61,7 @@ function App() {
         <Route
           path="/invitaciones"
           element={
-            <ProtectedRoute roles={['ADMINISTRADOR', 'PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
+            <ProtectedRoute roles={['ADMINISTRADOR', 'PRODUCTOR', 'VETERINARIO', 'CAMPERO', 'PENDIENTE']}>
               <InvitacionesRouter />
             </ProtectedRoute>
           }
