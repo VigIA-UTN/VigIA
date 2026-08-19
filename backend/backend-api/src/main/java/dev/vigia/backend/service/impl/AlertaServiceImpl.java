@@ -1,5 +1,6 @@
 package dev.vigia.backend.service.impl;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -11,6 +12,7 @@ import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
+import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
@@ -332,5 +334,74 @@ public class AlertaServiceImpl implements AlertaService {
                  */
 
                 return this.toResponse(actualizado);
+        }
+
+        @Override
+        public VentanaInseminacionResponse obtenerVentanaInseminacion(
+                        String emailUsuario, Long alertaId) {
+
+                // 1. Validar que el usuario existe
+                usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                // 2. Cargar la alerta
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
+
+                // 3. Verificar que el usuario pertenece al establecimiento de la alerta
+                Long establecimientoId = alerta.getAnimal().getEstablecimiento().getId();
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento indicado o no está activo.");
+                }
+
+                // 4. Verificar que la alerta tiene ventana de inseminación configurada
+                if (alerta.getVentanaInicioIns() == null || alerta.getVentanaFinIns() == null) {
+                        throw new IllegalArgumentException(
+                                        "La alerta no tiene ventana de inseminación configurada.");
+                }
+
+                LocalDateTime inicio = alerta.getVentanaInicioIns();
+                LocalDateTime fin    = alerta.getVentanaFinIns();
+                LocalDateTime ahora  = LocalDateTime.now();
+
+                // Duración total de la ventana en segundos
+                long duracionTotalSegundos = Duration.between(inicio, fin).toSeconds();
+
+                if (ahora.isAfter(fin)) {
+                        // Ventana vencida
+                        return VentanaInseminacionResponse.builder()
+                                        .alertaId(alertaId)
+                                        .tiempoRestanteSegundos(0L)
+                                        .porcentajeTranscurrido(100.0)
+                                        .proximaAVencer(false)
+                                        .estado("VENCIDA")
+                                        .build();
+                }
+
+                // Ventana activa
+                long transcurridoSegundos  = Duration.between(inicio, ahora).toSeconds();
+                long restanteSegundos      = Duration.between(ahora, fin).toSeconds();
+
+                double porcentaje = duracionTotalSegundos > 0
+                                ? Math.min(100.0, (transcurridoSegundos * 100.0) / duracionTotalSegundos)
+                                : 0.0;
+
+                // proximaAVencer: true si quedan menos de 2 horas (7200 segundos)
+                boolean proximaAVencer = restanteSegundos < 7_200L;
+
+                return VentanaInseminacionResponse.builder()
+                                .alertaId(alertaId)
+                                .tiempoRestanteSegundos(restanteSegundos)
+                                .porcentajeTranscurrido(porcentaje)
+                                .proximaAVencer(proximaAVencer)
+                                .estado("ACTIVA")
+                                .build();
         }
 }

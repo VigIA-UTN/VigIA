@@ -5,6 +5,7 @@ import java.util.List;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.EstadoAlerta;
 
 public interface AlertaService {
@@ -58,4 +59,26 @@ public interface AlertaService {
     AlertaDetalleResponse obtenerDetalleAlerta(String emailUsuario, Long establecimientoId, Long alertaId);
 
     AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId, EstadoAlerta nuevoEstado, String notas);
+
+    /**
+     * Retorna el estado actual de la ventana óptima de inseminación para
+     * una alerta de celo.
+     *
+     * <p>La ventana es de 6 a 24 horas desde la detección del celo
+     * ({@code ventanaInicioIns} – {@code ventanaFinIns}). Devuelve:
+     * <ul>
+     *   <li>{@code tiempoRestanteSegundos}: segundos restantes (0 si venció)</li>
+     *   <li>{@code porcentajeTranscurrido}: % de la ventana transcurrida (0–100)</li>
+     *   <li>{@code proximaAVencer}: {@code true} cuando quedan menos de 2 horas</li>
+     *   <li>{@code estado}: {@code ACTIVA} o {@code VENCIDA}</li>
+     * </ul>
+     *
+     * @param emailUsuario      email del usuario autenticado (extraído del JWT)
+     * @param alertaId          ID de la alerta de celo
+     * @return DTO con el estado de la ventana
+     * @throws AccessDeniedException    si el usuario no pertenece al establecimiento
+     * @throws IllegalArgumentException si el usuario o la alerta no existen, o la
+     *                                  alerta no tiene ventana de inseminación configurada
+     */
+    VentanaInseminacionResponse obtenerVentanaInseminacion(String emailUsuario, Long alertaId);
 }

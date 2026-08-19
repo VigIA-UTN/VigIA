@@ -99,7 +99,7 @@ def main():
 
     print("Inyectando historial anómalo para VIGIA-ARG-001 (simulando celo previo)...")
     estado_001 = animales["VIGIA-ARG-001"]
-    for i in range(10, 0, -1): # Reducido a 10 para que arranque más rápido en esta prueba local
+    for i in range(10, 0, -1):
         past_time = datetime.now(timezone.utc) - timedelta(seconds=i*INTERVALO_SEGUNDOS)
         speed_mult = random.uniform(SPEED_MULT_CELO_MIN, SPEED_MULT_CELO_MAX)
         estado_001["lat"] += random.uniform(-1.0, 1.0) * SPEED_BASE_DEG_POR_INTERVALO * speed_mult
@@ -119,6 +119,7 @@ def main():
         except:
             pass
     print("Historial inyectado exitosamente.")
+
 
     while True:
         inicio_ciclo = time.time()
