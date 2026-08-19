@@ -1,16 +1,19 @@
 package dev.vigia.backend.service.impl;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
+import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
@@ -332,5 +335,87 @@ public class AlertaServiceImpl implements AlertaService {
                  */
 
                 return this.toResponse(actualizado);
+        }
+
+        @Override
+        @SuppressWarnings("null")
+        @Transactional(readOnly = true)
+        public VentanaInseminacionResponse obtenerEstadoVentanaInseminacion(String emailUsuario, Long establecimientoId,
+                        Long alertaId) {
+                usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento indicado o no está activo.");
+                }
+
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
+
+                if (alerta.getAnimal() == null || alerta.getAnimal().getEstablecimiento() == null ||
+                                !alerta.getAnimal().getEstablecimiento().getId().equals(establecimientoId)) {
+                        throw new AccessDeniedException("La alerta no pertenece al establecimiento indicado.");
+                }
+
+                if (alerta.getDisparador() != DisparadorAlerta.CELO) {
+                        throw new IllegalArgumentException("La alerta no es de tipo CELO.");
+                }
+
+                LocalDateTime now = LocalDateTime.now();
+                LocalDateTime inicio = alerta.getVentanaInicioIns();
+                LocalDateTime fin = alerta.getVentanaFinIns();
+
+                if (inicio == null || fin == null) {
+                        inicio = alerta.getTsGeneracion().plusHours(6);
+                        fin = alerta.getTsGeneracion().plusHours(24);
+                }
+
+                long tiempoRestanteSegundos = 0;
+                double porcentajeTranscurrido = 0.0;
+                boolean proximaAVencer = false;
+                String estado;
+
+                if (now.isAfter(fin) || now.isEqual(fin)) {
+                        estado = "VENCIDA";
+                        tiempoRestanteSegundos = 0;
+                        porcentajeTranscurrido = 100.0;
+                        proximaAVencer = false;
+                } else if (now.isBefore(inicio)) {
+                        estado = "FUTURA";
+                        tiempoRestanteSegundos = Duration.between(now, fin).getSeconds();
+                        porcentajeTranscurrido = 0.0;
+                        proximaAVencer = false;
+                } else {
+                        estado = "ACTIVA";
+                        tiempoRestanteSegundos = Duration.between(now, fin).getSeconds();
+
+                        long duracionTotal = Duration.between(inicio, fin).getSeconds();
+                        long duracionTranscurrida = Duration.between(inicio, now).getSeconds();
+
+                        porcentajeTranscurrido = ((double) duracionTranscurrida / duracionTotal) * 100.0;
+
+                        if (porcentajeTranscurrido > 100.0)
+                                porcentajeTranscurrido = 100.0;
+                        if (porcentajeTranscurrido < 0.0)
+                                porcentajeTranscurrido = 0.0;
+
+                        if (tiempoRestanteSegundos <= 7200) {
+                                proximaAVencer = true;
+                        }
+                }
+
+                return VentanaInseminacionResponse.builder()
+                                .tiempoRestanteSegundos(tiempoRestanteSegundos)
+                                .porcentajeTranscurrido(porcentajeTranscurrido)
+                                .proximaAVencer(proximaAVencer)
+                                .estado(estado)
+                                .build();
         }
 }

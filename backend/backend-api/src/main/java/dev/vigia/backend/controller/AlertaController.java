@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.service.AlertaService;
 import dev.vigia.backend.service.SseAlertaPublisher;
@@ -32,10 +33,12 @@ public class AlertaController {
     private final SseAlertaPublisher sseAlertaPublisher;
 
     /**
-     * GET /api/v1/alertas?establecimientoId={id}&tipo={tipo}&severidad={severidad}&estado={estado}
+     * GET
+     * /api/v1/alertas?establecimientoId={id}&tipo={tipo}&severidad={severidad}&estado={estado}
      * <p>
      * Obtiene las alertas de un establecimiento. Permite filtrar opcionalmente
-     * por tipo (reproductivo, sanitario, geoespacial), severidad (alta, media, baja) y estado.
+     * por tipo (reproductivo, sanitario, geoespacial), severidad (alta, media,
+     * baja) y estado.
      * Si no se envían filtros, devuelve todas las alertas.
      * Ordena por defecto por severidad descendente.
      *
@@ -44,7 +47,8 @@ public class AlertaController {
      * @param severidad         (opcional) ALTA, MEDIA, BAJA
      * @param estado            (opcional) PENDIENTE, CONFIRMADA, DESCARTADA
      * @param authentication    contexto de seguridad inyectado por Spring Security
-     * @return 200 con la lista de alertas filtradas, 400 si el usuario no existe, 403 si no
+     * @return 200 con la lista de alertas filtradas, 400 si el usuario no existe,
+     *         403 si no
      *         pertenece
      */
     @GetMapping
@@ -57,7 +61,8 @@ public class AlertaController {
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            List<AlertaResponse> response = alertaService.listarAlertas(email, establecimientoId, tipo, severidad, estado);
+            List<AlertaResponse> response = alertaService.listarAlertas(email, establecimientoId, tipo, severidad,
+                    estado);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
@@ -140,6 +145,27 @@ public class AlertaController {
         try {
             String email = authentication.getName();
             AlertaDetalleResponse response = alertaService.obtenerDetalleAlerta(email, establecimientoId, alertaId);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Alerta no encontrada.".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/ventana-inseminacion")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> obtenerEstadoVentanaInseminacion(
+            @PathVariable("id") Long alertaId,
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            VentanaInseminacionResponse response = alertaService.obtenerEstadoVentanaInseminacion(email,
+                    establecimientoId, alertaId);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
