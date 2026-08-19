@@ -4,5 +4,6 @@ public enum EstadoAlerta {
     PENDIENTE,
     DESCARTADA,
     CONFIRMADA,
-    VENCIDA
+    VENCIDA,
+    ARCHIVADA
 }
