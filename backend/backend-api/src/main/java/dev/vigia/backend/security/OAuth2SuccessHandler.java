@@ -28,6 +28,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     @Value("${app.oauth2.redirect-uri:http://localhost:5173/oauth2/callback}")
     private String redirectUri;
 
+    @SuppressWarnings("null")
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
             Authentication authentication) throws IOException, ServletException {

@@ -17,9 +17,10 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
     @Value("${app.oauth2.redirect-uri:http://localhost:5173/oauth2/callback}")
     private String redirectUri;
 
+    @SuppressWarnings("null")
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
-                                        AuthenticationException exception) throws IOException, ServletException {
+            AuthenticationException exception) throws IOException, ServletException {
         String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
                 .queryParam("error", exception.getLocalizedMessage())
                 .build().toUriString();

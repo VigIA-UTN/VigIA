@@ -11,7 +11,8 @@ public class RootRedirectController {
     @Value("${app.oauth2.redirect-uri:http://localhost:5173/oauth2/callback}")
     private String redirectUri;
 
-    @GetMapping({"/", "/login", "/login/**"})
+    @SuppressWarnings("null")
+    @GetMapping({ "/", "/login", "/login/**" })
     public RedirectView redirectToFrontend() {
         String frontendUrl = redirectUri.replaceAll("/oauth2/callback/?$", "/login");
         return new RedirectView(frontendUrl);

@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from typing import List
 import json
 import math
+import os
 # pyrefly: ignore [missing-import]
 import numpy as np
 from pathlib import Path
@@ -30,6 +31,14 @@ norm_stats = None
 # Debe coincidir con la escala usada en generate_dataset.py / train_baseline_rnn.py
 DIST_SCALE_FACTOR = 100000
 
+# Umbral de decisión sobre la probabilidad del modelo (P(celo) > CELO_THRESHOLD).
+# Se saca a config en lugar de hardcodear 0.5 porque, con class_weight balanceado,
+# el umbral que maximiza F1 sobre la curva Precision-Recall NO es 0.5 (ver
+# run_summary.json de la corrida elegida en ml-training/celo/models/.../run_summary.json,
+# campo "best_threshold_f1"). Default 0.5 es un fallback conservador si no se
+# configura nada; en producción se espera CELO_THRESHOLD seteado explícitamente.
+CELO_THRESHOLD = float(os.getenv("CELO_THRESHOLD", "0.5"))
+
 @app.on_event("startup")
 def load_ml_model():
     global model, norm_stats
@@ -45,7 +54,8 @@ def load_ml_model():
         model = tf.keras.models.load_model(model_path)
         with open(norm_path, "r") as f:
             norm_stats = json.load(f)
-        print("Modelo y estadísticas de normalización cargados correctamente.")
+        print(f"Modelo y estadísticas de normalización cargados correctamente. "
+              f"Umbral de decisión (CELO_THRESHOLD) = {CELO_THRESHOLD}")
     else:
         print(f"ADVERTENCIA: No se encontró el modelo en {models_dir}. Ejecute el script de entrenamiento primero.")
 
@@ -105,7 +115,7 @@ async def predict(request: Request, response: Response, serie: List[PuntoTelemet
 
         y_pred_prob = model.predict(X_input, verbose=0)
         prob = float(y_pred_prob[0][0])
-        evento = prob > 0.5
+        evento = prob > CELO_THRESHOLD
         ventana = 12 if evento else 0
 
         print(f"[{correlation_id}] Inferencia exitosa: celo={evento}, confianza={prob:.4f}")
