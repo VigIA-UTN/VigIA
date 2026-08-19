@@ -77,6 +77,8 @@ services:
     container_name: vigia-ml-celo
     ports:
       - "${ML_CELO_PORT:-8001}:8001"
+    environment:
+      - CELO_THRESHOLD=${CELO_THRESHOLD:-0.5}
     volumes:
       - ../ml-celo/app:/app/app
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload" ]
