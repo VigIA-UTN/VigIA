@@ -5,6 +5,7 @@ import java.util.List;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.EstadoAlerta;
 
 public interface AlertaService {
@@ -18,7 +19,8 @@ public interface AlertaService {
      * Retorna alertas de un establecimiento opcionalmente filtradas por tipo,
      * severidad y estado. Ordenadas por severidad descendente.
      */
-    List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo, String severidad, EstadoAlerta estado);
+    List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo, String severidad,
+            EstadoAlerta estado);
 
     /**
      * Retorna las alertas de celo del establecimiento seleccionado por el usuario
@@ -58,4 +60,16 @@ public interface AlertaService {
     AlertaDetalleResponse obtenerDetalleAlerta(String emailUsuario, Long establecimientoId, Long alertaId);
 
     AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId, EstadoAlerta nuevoEstado, String notas);
+
+    /**
+     * Retorna el estado actual de la ventana de inseminación para una alerta de
+     * celo.
+     *
+     * @param emailUsuario      email del usuario autenticado
+     * @param establecimientoId ID del establecimiento actualmente seleccionado
+     * @param alertaId          ID de la alerta a consultar
+     * @return DTO con el estado de la ventana de inseminación
+     */
+    VentanaInseminacionResponse obtenerEstadoVentanaInseminacion(String emailUsuario, Long establecimientoId,
+            Long alertaId);
 }

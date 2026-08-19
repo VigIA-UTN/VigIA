@@ -56,8 +56,10 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
         }
 
         Animal animal = telemetriaList.get(0).getCaravana().getAnimal();
-        if (animal != null && alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(animal, DisparadorAlerta.CELO, java.time.LocalDateTime.now().minusHours(24))) {
-            log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente (últimas 24hs).", animal.getId());
+        if (animal != null && alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(animal,
+                DisparadorAlerta.CELO, java.time.LocalDateTime.now().minusHours(24))) {
+            log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente (últimas 24hs).",
+                    animal.getId());
             List<Telemetria> pendientes = telemetriaList.stream()
                     .filter(t -> t.getEstadoInferencia() == EstadoInferencia.PENDIENTE)
                     .collect(Collectors.toList());
@@ -99,10 +101,9 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
             alerta.setEstado(EstadoAlerta.PENDIENTE);
             alerta.setConfianzaModelo(response.getConfianzaModelo());
             alerta.setVentanaOptimaHoras(response.getVentanaOptimaHoras());
-            
-            // TODO: REVISAR con el equipo si esta es la formula final para las ventanas
-            alerta.setVentanaInicioIns(alerta.getTsGeneracion());
-            alerta.setVentanaFinIns(alerta.getTsGeneracion().plusHours(response.getVentanaOptimaHoras()));
+
+            alerta.setVentanaInicioIns(alerta.getTsGeneracion().plusHours(6));
+            alerta.setVentanaFinIns(alerta.getTsGeneracion().plusHours(24));
 
             alerta = alertaRepository.save(alerta);
 
