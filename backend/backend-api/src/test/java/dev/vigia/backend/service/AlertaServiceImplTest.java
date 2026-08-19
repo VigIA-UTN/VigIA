@@ -18,6 +18,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -195,7 +196,8 @@ public class AlertaServiceImplTest {
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
 
                 // Act
-                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas");
+                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
+                                "Notas");
 
                 // Assert
                 assertNotNull(result);
@@ -215,7 +217,8 @@ public class AlertaServiceImplTest {
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
 
                 // Act
-                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.DESCARTADA, "Notas");
+                AlertaResponse result = alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.DESCARTADA,
+                                "Notas");
 
                 // Assert
                 assertNotNull(result);
@@ -231,7 +234,8 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
+                                                "Notas"));
                 assertEquals("Usuario no encontrado.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
@@ -245,7 +249,8 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
+                                                "Notas"));
                 assertEquals("Alerta no encontrada.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
@@ -261,7 +266,8 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 assertThrows(AccessDeniedException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
+                                                "Notas"));
                 verify(alertaRepository, never()).save(any());
         }
 
@@ -278,7 +284,8 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
+                                                "Notas"));
                 assertEquals("Estado inválido para la actualización.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
@@ -296,8 +303,111 @@ public class AlertaServiceImplTest {
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, "Notas"));
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
+                                                "Notas"));
                 assertEquals("Estado inválido para la actualización.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
+        }
+
+        // --- Tests para obtenerEstadoVentanaInseminacion ---
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerEstadoVentanaInseminacion_Success_Futura() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+
+                // La ventana empieza en 2 horas
+                mockAlerta.setVentanaInicioIns(LocalDateTime.now().plusHours(2));
+                mockAlerta.setVentanaFinIns(LocalDateTime.now().plusHours(20));
+                when(alertaRepository.findById(ALERTA_ID))
+                                .thenReturn(Optional.of(mockAlerta));
+
+                // Act
+                VentanaInseminacionResponse result = alertaService.obtenerEstadoVentanaInseminacion(EMAIL,
+                                ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals("FUTURA", result.getEstado());
+                assertEquals(0.0, result.getPorcentajeTranscurrido());
+                assertFalse(result.getProximaAVencer());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerEstadoVentanaInseminacion_Success_Activa() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+
+                // La ventana empezó hace 2 horas y termina en 10 horas (total 12)
+                mockAlerta.setVentanaInicioIns(LocalDateTime.now().minusHours(2));
+                mockAlerta.setVentanaFinIns(LocalDateTime.now().plusHours(10));
+                when(alertaRepository.findById(ALERTA_ID))
+                                .thenReturn(Optional.of(mockAlerta));
+
+                // Act
+                VentanaInseminacionResponse result = alertaService.obtenerEstadoVentanaInseminacion(EMAIL,
+                                ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals("ACTIVA", result.getEstado());
+                assertFalse(result.getProximaAVencer());
+                assertTrue(result.getPorcentajeTranscurrido() > 0.0 && result.getPorcentajeTranscurrido() < 100.0);
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerEstadoVentanaInseminacion_Success_ProximaAVencer() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+
+                // La ventana termina en 1 hora (< 2 horas)
+                mockAlerta.setVentanaInicioIns(LocalDateTime.now().minusHours(10));
+                mockAlerta.setVentanaFinIns(LocalDateTime.now().plusHours(1));
+                when(alertaRepository.findById(ALERTA_ID))
+                                .thenReturn(Optional.of(mockAlerta));
+
+                // Act
+                VentanaInseminacionResponse result = alertaService
+                                .obtenerEstadoVentanaInseminacion(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals("ACTIVA", result.getEstado());
+                assertTrue(result.getProximaAVencer());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerEstadoVentanaInseminacion_Success_Vencida() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+
+                // La ventana terminó hace 2 horas
+                mockAlerta.setVentanaInicioIns(LocalDateTime.now().minusHours(20));
+                mockAlerta.setVentanaFinIns(LocalDateTime.now().minusHours(2));
+                when(alertaRepository.findById(ALERTA_ID))
+                                .thenReturn(Optional.of(mockAlerta));
+
+                // Act
+                VentanaInseminacionResponse result = alertaService
+                                .obtenerEstadoVentanaInseminacion(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals("VENCIDA", result.getEstado());
+                assertEquals(100.0, result.getPorcentajeTranscurrido());
+                assertEquals(0L, result.getTiempoRestanteSegundos());
+                assertFalse(result.getProximaAVencer());
         }
 }
