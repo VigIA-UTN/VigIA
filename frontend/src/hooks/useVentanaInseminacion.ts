@@ -26,6 +26,7 @@ export interface UseVentanaInseminacionResult {
 
 export function useVentanaInseminacion(
   alertaId: number | null | undefined,
+  establecimientoId: number | null | undefined,
   /** Omitir el hook si la alerta no es de celo o no tiene ventana */
   enabled: boolean = true,
 ): UseVentanaInseminacionResult {
@@ -81,10 +82,10 @@ export function useVentanaInseminacion(
   }, [clearTicker]);
 
   const fetchVentana = useCallback(async () => {
-    if (!alertaId || !enabled) return;
+    if (!alertaId || !establecimientoId || !enabled) return;
 
     try {
-      const data = await getVentanaInseminacion(alertaId);
+      const data = await getVentanaInseminacion(alertaId, establecimientoId);
       if (!isMountedRef.current) return;
       setVentana(data);
       setError(null);
@@ -105,11 +106,11 @@ export function useVentanaInseminacion(
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
-  }, [alertaId, enabled, startTicker, clearTicker]);
+  }, [alertaId, establecimientoId, enabled, startTicker, clearTicker]);
 
   useEffect(() => {
     isMountedRef.current = true;
-    if (!alertaId || !enabled) {
+    if (!alertaId || !establecimientoId || !enabled) {
       return;
     }
 
@@ -123,7 +124,7 @@ export function useVentanaInseminacion(
       clearInterval(pollId);
       clearTicker();
     };
-  }, [alertaId, enabled, fetchVentana, clearTicker]);
+  }, [alertaId, establecimientoId, enabled, fetchVentana, clearTicker]);
 
   return { ventana, segundosRestantes, loading, error };
 }

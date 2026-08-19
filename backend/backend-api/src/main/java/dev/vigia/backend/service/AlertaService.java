@@ -19,7 +19,8 @@ public interface AlertaService {
      * Retorna alertas de un establecimiento opcionalmente filtradas por tipo,
      * severidad y estado. Ordenadas por severidad descendente.
      */
-    List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo, String severidad, EstadoAlerta estado);
+    List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo, String severidad,
+            EstadoAlerta estado);
 
     /**
      * Retorna las alertas de celo del establecimiento seleccionado por el usuario
@@ -70,15 +71,17 @@ public interface AlertaService {
      *   <li>{@code tiempoRestanteSegundos}: segundos restantes (0 si venció)</li>
      *   <li>{@code porcentajeTranscurrido}: % de la ventana transcurrida (0–100)</li>
      *   <li>{@code proximaAVencer}: {@code true} cuando quedan menos de 2 horas</li>
-     *   <li>{@code estado}: {@code ACTIVA} o {@code VENCIDA}</li>
+     *   <li>{@code estado}: {@code ACTIVA}, {@code FUTURA} o {@code VENCIDA}</li>
      * </ul>
      *
      * @param emailUsuario      email del usuario autenticado (extraído del JWT)
+     * @param establecimientoId ID del establecimiento actualmente seleccionado
      * @param alertaId          ID de la alerta de celo
      * @return DTO con el estado de la ventana
      * @throws AccessDeniedException    si el usuario no pertenece al establecimiento
      * @throws IllegalArgumentException si el usuario o la alerta no existen, o la
-     *                                  alerta no tiene ventana de inseminación configurada
+     *                                  alerta no pertenece al establecimiento indicado
      */
-    VentanaInseminacionResponse obtenerVentanaInseminacion(String emailUsuario, Long alertaId);
+    VentanaInseminacionResponse obtenerEstadoVentanaInseminacion(String emailUsuario, Long establecimientoId,
+            Long alertaId);
 }

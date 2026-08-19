@@ -4,16 +4,6 @@ generate_dataset.py (v3)
 Generador sintético y reproducible del dataset de telemetría para VigIA,
 basado en estudios de comportamiento bovino y dinámica del rodeo en pastoreo.
 
-Cambios respecto a v2:
-- Se renombró `vibstate` a `moveState`, que es el nombre real del campo que
-  transmite el collar según el protocolo de ingesta usado por el resto del
-  sistema (backend-worker, simulador, ml-celo). El rango se mantiene 0-9:
-  0-1 = reposo/rumia, 2-6 = pastoreo/caminata normal, 7-9 = alta actividad
-  (corrida, monta, inquietud por celo).
-- Se mantiene el GPS (`latitud`, `longitud`) para el cálculo de distancias.
-
-Cambios respecto a v1:
-- Se eliminó la generación de acelerometría cruda (`accel_x`, `y`, `z`) y `pitch_deg`.
 """
 
 import argparse

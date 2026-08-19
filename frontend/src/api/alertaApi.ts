@@ -106,14 +106,19 @@ export async function getResumenAlertas(establecimientoId: number): Promise<Aler
 
 /** Respuesta del endpoint GET /api/v1/alertas/{id}/ventana */
 export interface VentanaInseminacionResponse {
-  alertaId: number;
   tiempoRestanteSegundos: number;
   porcentajeTranscurrido: number;
   proximaAVencer: boolean;
-  estado: 'ACTIVA' | 'VENCIDA';
+  estado: 'ACTIVA' | 'FUTURA' | 'VENCIDA';
 }
 
-export async function getVentanaInseminacion(alertaId: number): Promise<VentanaInseminacionResponse> {
-  const response = await axiosClient.get<VentanaInseminacionResponse>(`/alertas/${alertaId}/ventana`);
+export async function getVentanaInseminacion(
+  alertaId: number,
+  establecimientoId: number,
+): Promise<VentanaInseminacionResponse> {
+  const response = await axiosClient.get<VentanaInseminacionResponse>(
+    `/alertas/${alertaId}/ventana`,
+    { params: { establecimientoId } },
+  );
   return response.data;
 }

@@ -21,7 +21,7 @@ def mock_dependencies():
     """
     with patch("app.main.model") as mock_model, \
          patch("app.main.norm_stats", {"mean": [[1.0, 0.0]], "std": [[1.0, 1.0]]}):
-        
+
         # Simula la predicción del modelo
         def predict_mock(X, verbose=0):
             # X_input está estandarizado: (X - mean) / std
@@ -33,7 +33,7 @@ def mock_dependencies():
             else:
                 # Baja actividad -> probabilidad de celo <= 0.5
                 return np.array([[0.20]])
-            
+
         mock_model.predict.side_effect = predict_mock
         yield mock_model
 
@@ -49,7 +49,7 @@ def test_predict_evento_celo_true(mock_dependencies):
         {"moveState": 10, "latitud": -34.001, "longitud": -59.001}
     ]
     response = client.post("/api/internal/ml/celo/predict", json=payload)
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["evento_celo"] is True
@@ -63,7 +63,7 @@ def test_predict_evento_celo_false(mock_dependencies):
         {"moveState": 1, "latitud": -34.0, "longitud": -59.0}
     ]
     response = client.post("/api/internal/ml/celo/predict", json=payload)
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["evento_celo"] is False
@@ -76,7 +76,7 @@ def test_predict_invalid_payload():
         {"latitud": -34.0, "longitud": -59.0}
     ]
     response = client.post("/api/internal/ml/celo/predict", json=payload)
-    
+
     # 422 Unprocessable Entity provisto por FastAPI
     assert response.status_code == 422
     data = response.json()
@@ -88,11 +88,11 @@ def test_predict_empty_payload(mock_dependencies):
     # Payload vacío -> debe retornar error interno según lógica en main.py
     payload = []
     response = client.post("/api/internal/ml/celo/predict", json=payload)
-    
+
     # El código devuelve 503 ante errores no manejados/ValueErrors
     assert response.status_code == 503
     data = response.json()
-    
+
     # Formato de error estándar verificado
     assert data["error"] == "Internal Server Error"
     assert "La serie de telemetría está vacía" in data["mensaje"]

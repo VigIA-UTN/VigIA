@@ -33,10 +33,12 @@ public class AlertaController {
     private final SseAlertaPublisher sseAlertaPublisher;
 
     /**
-     * GET /api/v1/alertas?establecimientoId={id}&tipo={tipo}&severidad={severidad}&estado={estado}
+     * GET
+     * /api/v1/alertas?establecimientoId={id}&tipo={tipo}&severidad={severidad}&estado={estado}
      * <p>
      * Obtiene las alertas de un establecimiento. Permite filtrar opcionalmente
-     * por tipo (reproductivo, sanitario, geoespacial), severidad (alta, media, baja) y estado.
+     * por tipo (reproductivo, sanitario, geoespacial), severidad (alta, media,
+     * baja) y estado.
      * Si no se envían filtros, devuelve todas las alertas.
      * Ordena por defecto por severidad descendente.
      *
@@ -45,7 +47,8 @@ public class AlertaController {
      * @param severidad         (opcional) ALTA, MEDIA, BAJA
      * @param estado            (opcional) PENDIENTE, CONFIRMADA, DESCARTADA
      * @param authentication    contexto de seguridad inyectado por Spring Security
-     * @return 200 con la lista de alertas filtradas, 400 si el usuario no existe, 403 si no
+     * @return 200 con la lista de alertas filtradas, 400 si el usuario no existe,
+     *         403 si no
      *         pertenece
      */
     @GetMapping
@@ -58,7 +61,8 @@ public class AlertaController {
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            List<AlertaResponse> response = alertaService.listarAlertas(email, establecimientoId, tipo, severidad, estado);
+            List<AlertaResponse> response = alertaService.listarAlertas(email, establecimientoId, tipo, severidad,
+                    estado);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
@@ -152,6 +156,27 @@ public class AlertaController {
         }
     }
 
+    @GetMapping("/{id}/ventana-inseminacion")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> obtenerEstadoVentanaInseminacion(
+            @PathVariable("id") Long alertaId,
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            VentanaInseminacionResponse response = alertaService.obtenerEstadoVentanaInseminacion(email,
+                    establecimientoId, alertaId);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Alerta no encontrada.".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PutMapping("/estado/{id}")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> actualizarEstadoAlerta(
@@ -190,22 +215,25 @@ public class AlertaController {
      *   <li>{@code tiempo_restante_segundos}: segundos hasta el fin (0 si venció)</li>
      *   <li>{@code porcentaje_transcurrido}: % transcurrido (0–100)</li>
      *   <li>{@code proxima_a_vencer}: {@code true} cuando quedan &lt; 2 horas</li>
-     *   <li>{@code estado}: {@code ACTIVA} o {@code VENCIDA}</li>
+     *   <li>{@code estado}: {@code ACTIVA}, {@code FUTURA} o {@code VENCIDA}</li>
      * </ul>
      *
-     * @param alertaId       ID de la alerta
-     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @param establecimientoId ID del establecimiento actualmente seleccionado
+     * @param alertaId          ID de la alerta
+     * @param authentication    contexto de seguridad inyectado por Spring Security
      * @return 200 con el estado de la ventana, 403 si acceso denegado,
-     *         404 si la alerta no existe, 400 si la alerta no tiene ventana configurada
+     *         404 si la alerta no existe, 400 si la alerta no pertenece al establecimiento
      */
     @GetMapping("/{id}/ventana")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> obtenerVentanaInseminacion(
             @PathVariable("id") Long alertaId,
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            VentanaInseminacionResponse response = alertaService.obtenerVentanaInseminacion(email, alertaId);
+            VentanaInseminacionResponse response = alertaService.obtenerEstadoVentanaInseminacion(email,
+                    establecimientoId, alertaId);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());

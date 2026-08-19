@@ -1,0 +1,90 @@
+{
+  "run_id": "20260817_201927_seed42",
+  "timestamp": "20260817_201927",
+  "seed": 42,
+  "epochs_configuradas": 30,
+  "epochs_reales": 9,
+  "batch_size": 32,
+  "n_train": 7680,
+  "n_val": 1920,
+  "n_test": 2400,
+  "feature_order": [
+    "moveState",
+    "distancia_recorrida"
+  ],
+  "input_shape": [
+    288,
+    2
+  ],
+  "test_classification_report": {
+    "Normal (0)": {
+      "precision": 0.9919559695173582,
+      "recall": 0.9944821731748726,
+      "f1-score": 0.993217465027554,
+      "support": 2356.0
+    },
+    "Baja (1)": {
+      "precision": 0.5517241379310345,
+      "recall": 0.5,
+      "f1-score": 0.5245901639344263,
+      "support": 32.0
+    },
+    "Media (2)": {
+      "precision": 0.6,
+      "recall": 0.42857142857142855,
+      "f1-score": 0.5,
+      "support": 7.0
+    },
+    "Alta (3)": {
+      "precision": 0.75,
+      "recall": 0.6,
+      "f1-score": 0.6666666666666666,
+      "support": 5.0
+    },
+    "accuracy": 0.9854166666666667,
+    "macro avg": {
+      "precision": 0.7234200268620982,
+      "recall": 0.6307634004365753,
+      "f1-score": 0.6711185739071617,
+      "support": 2400.0
+    },
+    "weighted avg": {
+      "precision": 0.984438931915287,
+      "recall": 0.9854166666666667,
+      "f1-score": 0.9848502359100635,
+      "support": 2400.0
+    }
+  },
+  "test_confusion_matrix": [
+    [
+      2343,
+      11,
+      2,
+      0
+    ],
+    [
+      16,
+      16,
+      0,
+      0
+    ],
+    [
+      2,
+      1,
+      3,
+      1
+    ],
+    [
+      1,
+      1,
+      0,
+      3
+    ]
+  ],
+  "class_weights": {
+    "0": 0.25396825396825395,
+    "1": 25.945945945945947,
+    "2": 80.0,
+    "3": 87.27272727272727
+  }
+}

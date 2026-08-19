@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
@@ -337,19 +338,13 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         @Override
-        public VentanaInseminacionResponse obtenerVentanaInseminacion(
-                        String emailUsuario, Long alertaId) {
-
-                // 1. Validar que el usuario existe
+        @SuppressWarnings("null")
+        @Transactional(readOnly = true)
+        public VentanaInseminacionResponse obtenerEstadoVentanaInseminacion(String emailUsuario, Long establecimientoId,
+                        Long alertaId) {
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Cargar la alerta
-                Alerta alerta = alertaRepository.findById(alertaId)
-                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
-
-                // 3. Verificar que el usuario pertenece al establecimiento de la alerta
-                Long establecimientoId = alerta.getAnimal().getEstablecimiento().getId();
                 List<Establecimiento> establecimientos = establecimientoRepository
                                 .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
@@ -361,47 +356,66 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                // 4. Verificar que la alerta tiene ventana de inseminación configurada
-                if (alerta.getVentanaInicioIns() == null || alerta.getVentanaFinIns() == null) {
-                        throw new IllegalArgumentException(
-                                        "La alerta no tiene ventana de inseminación configurada.");
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
+
+                if (alerta.getAnimal() == null || alerta.getAnimal().getEstablecimiento() == null ||
+                                !alerta.getAnimal().getEstablecimiento().getId().equals(establecimientoId)) {
+                        throw new AccessDeniedException("La alerta no pertenece al establecimiento indicado.");
                 }
 
+                if (alerta.getDisparador() != DisparadorAlerta.CELO) {
+                        throw new IllegalArgumentException("La alerta no es de tipo CELO.");
+                }
+
+                LocalDateTime now = LocalDateTime.now();
                 LocalDateTime inicio = alerta.getVentanaInicioIns();
-                LocalDateTime fin    = alerta.getVentanaFinIns();
-                LocalDateTime ahora  = LocalDateTime.now();
+                LocalDateTime fin = alerta.getVentanaFinIns();
 
-                // Duración total de la ventana en segundos
-                long duracionTotalSegundos = Duration.between(inicio, fin).toSeconds();
-
-                if (ahora.isAfter(fin)) {
-                        // Ventana vencida
-                        return VentanaInseminacionResponse.builder()
-                                        .alertaId(alertaId)
-                                        .tiempoRestanteSegundos(0L)
-                                        .porcentajeTranscurrido(100.0)
-                                        .proximaAVencer(false)
-                                        .estado("VENCIDA")
-                                        .build();
+                if (inicio == null || fin == null) {
+                        inicio = alerta.getTsGeneracion().plusHours(6);
+                        fin = alerta.getTsGeneracion().plusHours(24);
                 }
 
-                // Ventana activa
-                long transcurridoSegundos  = Duration.between(inicio, ahora).toSeconds();
-                long restanteSegundos      = Duration.between(ahora, fin).toSeconds();
+                long tiempoRestanteSegundos = 0;
+                double porcentajeTranscurrido = 0.0;
+                boolean proximaAVencer = false;
+                String estado;
 
-                double porcentaje = duracionTotalSegundos > 0
-                                ? Math.min(100.0, (transcurridoSegundos * 100.0) / duracionTotalSegundos)
-                                : 0.0;
+                if (now.isAfter(fin) || now.isEqual(fin)) {
+                        estado = "VENCIDA";
+                        tiempoRestanteSegundos = 0;
+                        porcentajeTranscurrido = 100.0;
+                        proximaAVencer = false;
+                } else if (now.isBefore(inicio)) {
+                        estado = "FUTURA";
+                        tiempoRestanteSegundos = Duration.between(now, fin).getSeconds();
+                        porcentajeTranscurrido = 0.0;
+                        proximaAVencer = false;
+                } else {
+                        estado = "ACTIVA";
+                        tiempoRestanteSegundos = Duration.between(now, fin).getSeconds();
 
-                // proximaAVencer: true si quedan menos de 2 horas (7200 segundos)
-                boolean proximaAVencer = restanteSegundos < 7_200L;
+                        long duracionTotal = Duration.between(inicio, fin).getSeconds();
+                        long duracionTranscurrida = Duration.between(inicio, now).getSeconds();
+
+                        porcentajeTranscurrido = ((double) duracionTranscurrida / duracionTotal) * 100.0;
+
+                        if (porcentajeTranscurrido > 100.0)
+                                porcentajeTranscurrido = 100.0;
+                        if (porcentajeTranscurrido < 0.0)
+                                porcentajeTranscurrido = 0.0;
+
+                        if (tiempoRestanteSegundos <= 7200) {
+                                proximaAVencer = true;
+                        }
+                }
 
                 return VentanaInseminacionResponse.builder()
-                                .alertaId(alertaId)
-                                .tiempoRestanteSegundos(restanteSegundos)
-                                .porcentajeTranscurrido(porcentaje)
+                                .tiempoRestanteSegundos(tiempoRestanteSegundos)
+                                .porcentajeTranscurrido(porcentajeTranscurrido)
                                 .proximaAVencer(proximaAVencer)
-                                .estado("ACTIVA")
+                                .estado(estado)
                                 .build();
         }
 }

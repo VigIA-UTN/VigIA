@@ -34,6 +34,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const isCelo = tipoNorm === 'celo' || tipoNorm === 'reproductivo' || tipoNorm.includes('celo');
   const { ventana, segundosRestantes, loading: loadingVentana } = useVentanaInseminacion(
     isCelo ? alerta.id : null,
+    selectedId ?? null,
     isCelo,
   );
 

@@ -110,4 +110,13 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("estado") EstadoAlerta estado,
                      @Param("disparador") DisparadorAlerta disparador,
                      @Param("severidad") SeveridadAlerta severidad);
+
+       /**
+        * Obtiene las alertas de celo pendientes cuya ventana de inseminación ya finalizó.
+        */
+       @Query("SELECT a FROM Alerta a " +
+              "WHERE a.estado = dev.vigia.backend.model.EstadoAlerta.PENDIENTE " +
+              "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
+              "AND a.ventanaFinIns < :now")
+       List<Alerta> findAlertasCeloPendientesVencidas(@Param("now") LocalDateTime now);
 }

@@ -84,4 +84,25 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Email o contraseña incorrectos");
         }
     }
+
+    @PostMapping("/oauth2/google")
+    public ResponseEntity<?> oauth2Google(@RequestBody dev.vigia.backend.dto.OAuth2Request request) {
+        try {
+            String provider = request.getProvider() != null ? request.getProvider() : "GOOGLE";
+            AuthResponse response = authService.processOAuth2User(request.getEmail(), request.getNombre(), request.getApellido(), provider);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/oauth2")
+    public ResponseEntity<?> oauth2Login(@RequestBody dev.vigia.backend.dto.OAuth2Request request) {
+        try {
+            AuthResponse response = authService.processOAuth2User(request.getEmail(), request.getNombre(), request.getApellido(), request.getProvider());
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }
