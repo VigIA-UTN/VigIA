@@ -1,0 +1,56 @@
+{
+  "run_id": "20260801_115050_seed42",
+  "timestamp": "20260801_115050",
+  "seed": 42,
+  "epochs_configuradas": 30,
+  "epochs_reales": 15,
+  "batch_size": 32,
+  "n_train": 2280,
+  "n_val": 600,
+  "n_test": 720,
+  "feature_order": [
+    "vibstate",
+    "distancia_recorrida"
+  ],
+  "input_shape": [
+    288,
+    2
+  ],
+  "test_classification_report": {
+    "no_celo": {
+      "precision": 0.9923780487804879,
+      "recall": 0.9819004524886877,
+      "f1-score": 0.9871114480667172,
+      "support": 663.0
+    },
+    "celo": {
+      "precision": 0.8125,
+      "recall": 0.9122807017543859,
+      "f1-score": 0.859504132231405,
+      "support": 57.0
+    },
+    "accuracy": 0.9763888888888889,
+    "macro avg": {
+      "precision": 0.9024390243902439,
+      "recall": 0.9470905771215368,
+      "f1-score": 0.9233077901490612,
+      "support": 720.0
+    },
+    "weighted avg": {
+      "precision": 0.9781377032520325,
+      "recall": 0.9763888888888889,
+      "f1-score": 0.977009202229755,
+      "support": 720.0
+    }
+  },
+  "test_confusion_matrix": [
+    [
+      651,
+      12
+    ],
+    [
+      5,
+      52
+    ]
+  ]
+}
