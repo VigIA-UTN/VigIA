@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getVentanaInseminacion } from '../api/alertaApi';
-import type { VentanaInseminacionResponse } from '../api/alertaApi';
+import type { VentanaInseminacionResponse, AlertaResponse } from '../api/alertaApi';
+import { useAuthStore } from '../store/authStore';
 
 /**
  * Hook que consulta el endpoint GET /api/v1/alertas/{id}/ventana
- * y lo refresca con polling cada POLL_INTERVAL_MS.
+ * y se actualiza de forma reactiva al recibir eventos SSE sobre la alerta.
  *
  * Mientras la ventana esta ACTIVA, ademas corre un ticker de 1 segundo
  * que decrementa tiempoRestanteSegundos localmente para que el countdown
@@ -14,7 +15,8 @@ import type { VentanaInseminacionResponse } from '../api/alertaApi';
  * puede reaccionar al cambio de estado.
  */
 
-const POLL_INTERVAL_MS = 30_000; // refresca desde el backend cada 30 s
+// Cuando la ventana pasa a VENCIDA el ticker se detiene y el componente
+// puede reaccionar al cambio de estado.
 
 export interface UseVentanaInseminacionResult {
   ventana: VentanaInseminacionResponse | null;
@@ -35,6 +37,7 @@ export function useVentanaInseminacion(
   // Si alertaId o enabled no estan definidos, no hay nada que cargar
   const [loading, setLoading] = useState<boolean>(!!alertaId && enabled);
   const [error, setError] = useState<string | null>(null);
+  const { token } = useAuthStore();
 
   // Refs para evitar closures obsoletas
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -117,14 +120,36 @@ export function useVentanaInseminacion(
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchVentana();
 
-    const pollId = setInterval(fetchVentana, POLL_INTERVAL_MS);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+    let sseUrl = `${API_URL}/alertas/stream?establecimientoId=${establecimientoId}`;
+    if (token) {
+      sseUrl += `&token=${token}`;
+    }
+
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onmessage = (event) => {
+      if (!isMountedRef.current) return;
+      try {
+        const updatedAlerta = JSON.parse(event.data) as AlertaResponse;
+        if (updatedAlerta.id === alertaId) {
+          fetchVentana();
+        }
+      } catch (err) {
+        console.error('Error parseando SSE en useVentanaInseminacion', err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      // EventSource tries to reconnect automatically
+    };
 
     return () => {
       isMountedRef.current = false;
-      clearInterval(pollId);
+      eventSource.close();
       clearTicker();
     };
-  }, [alertaId, establecimientoId, enabled, fetchVentana, clearTicker]);
+  }, [alertaId, establecimientoId, enabled, fetchVentana, clearTicker, token]);
 
   return { ventana, segundosRestantes, loading, error };
 }

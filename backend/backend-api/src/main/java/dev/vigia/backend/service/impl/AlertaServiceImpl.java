@@ -27,6 +27,9 @@ import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.service.AlertaService;
 import lombok.RequiredArgsConstructor;
+import dev.vigia.backend.config.RabbitMQConfig;
+import dev.vigia.backend.dto.ml.AlertaEventDTO;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +39,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final UsuarioRepository usuarioRepository;
         private final EstablecimientoRepository establecimientoRepository;
         private final IntervencionRepository intervencionRepository;
+        private final RabbitTemplate rabbitTemplate;
 
         @Override
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
@@ -333,6 +337,12 @@ public class AlertaServiceImpl implements AlertaService {
                  * ventanaOptima = horas + " horas";
                  * }
                  */
+
+                // Publicar evento para SSE
+                AlertaEventDTO eventDTO = AlertaEventDTO.builder()
+                                .id(actualizado.getId())
+                                .build();
+                rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
 
                 return this.toResponse(actualizado);
         }

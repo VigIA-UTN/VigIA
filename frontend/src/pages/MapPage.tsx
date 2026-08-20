@@ -182,7 +182,10 @@ export default function MapPage() {
           return prevAnimales.map(animal => {
             if (animal.id === newAlerta.animalId) {
               if (animal.alertasAnimal.some(a => a.id === newAlerta.id)) {
-                return animal;
+                return {
+                  ...animal,
+                  alertasAnimal: animal.alertasAnimal.map(a => a.id === newAlerta.id ? newAlerta : a)
+                };
               }
               return {
                 ...animal,
