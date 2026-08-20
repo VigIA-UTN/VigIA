@@ -13,7 +13,7 @@ Fase 1 del plan de revisión del paper VigIA (dictamen de Oscar):
    de precisión/recall/F1/PR-AUC para la clase celo.
 
 Uso:
-    python3 train_multiseed.py --dataset-dir dataset --models-dir models_v4
+    python3 train_multiseed.py --dataset-dir dataset --models-dir models
 """
 
 import argparse
@@ -34,6 +34,9 @@ from sklearn.metrics import (
     auc,
     f1_score,
 )
+from sklearn.preprocessing import StandardScaler
+# pyrefly: ignore [missing-import]
+import joblib
 
 
 def set_all_seeds(seed: int):
@@ -125,7 +128,7 @@ def best_threshold_from_pr(y_true, y_proba):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-dir", type=str, default="dataset")
-    parser.add_argument("--models-dir", type=str, default="models_v4")
+    parser.add_argument("--models-dir", type=str, default="models")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--split-seed", type=int, default=42,
@@ -150,11 +153,18 @@ def main():
     print(f"Positivos (celo) en test: {int(y_test.sum())}/{len(y_test)} "
           f"({100*y_test.sum()/len(y_test):.1f}%)")
 
-    mean = X_train_raw.mean(axis=(0, 1), keepdims=True)
-    std = X_train_raw.std(axis=(0, 1), keepdims=True) + 1e-8
-    X_train = (X_train_raw - mean) / std
-    X_val = (X_val_raw - mean) / std
-    X_test = (X_test_raw - mean) / std
+    # Normalizacion (mismo esquema que ml-training/salud/train_rnn.py: un
+    # StandardScaler de scikit-learn, exportado con joblib en vez de un
+    # normalizacion.json hecho a mano)
+    scaler = StandardScaler()
+
+    # El scaler espera 2D, así que aplanamos las secuencias para fitear
+    X_train_flat = X_train_raw.reshape(-1, X_train_raw.shape[-1])
+    scaler.fit(X_train_flat)
+
+    X_train = scaler.transform(X_train_flat).reshape(X_train_raw.shape)
+    X_val = scaler.transform(X_val_raw.reshape(-1, X_val_raw.shape[-1])).reshape(X_val_raw.shape)
+    X_test = scaler.transform(X_test_raw.reshape(-1, X_test_raw.shape[-1])).reshape(X_test_raw.shape)
 
     # class_weight='balanced' equivalente manual: n/(2*n_clase)
     n = len(y_train)
@@ -169,14 +179,12 @@ def main():
     group_dir = models_dir / run_group_id
     group_dir.mkdir(parents=True, exist_ok=True)
 
-    # mean/std son los MISMOS para las 5 corridas (misma partición/split_seed),
-    # así que se guardan una sola vez a nivel de grupo. También se copian dentro
+    # El scaler es el MISMO para las 5 corridas (misma partición/split_seed),
+    # así que se guarda una sola vez a nivel de grupo. También se copia dentro
     # de cada run_dir/init<seed>/ para que ese directorio quede autocontenido
-    # (modelo + normalización juntos), listo para copiar tal cual a
-    # ml-celo/app/models/ sin tener que ir a buscar el normalizacion.json a otro lado.
-    normalizacion = {"mean": mean.tolist(), "std": std.tolist()}
-    with open(group_dir / "normalizacion.json", "w") as f:
-        json.dump(normalizacion, f)
+    # (modelo + scaler juntos), listo para copiar tal cual a
+    # ml-celo/app/models/ sin tener que ir a buscar el scaler a otro lado.
+    joblib.dump(scaler, group_dir / "scaler_celo.joblib")
 
     per_run_metrics = []
 
@@ -219,8 +227,7 @@ def main():
         run_dir = group_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         model.save(run_dir / "modelo_celo_lstm.keras")
-        with open(run_dir / "normalizacion.json", "w") as f:
-            json.dump(normalizacion, f)
+        joblib.dump(scaler, run_dir / "scaler_celo.joblib")
 
         run_summary = {
             "run_id": run_id,
