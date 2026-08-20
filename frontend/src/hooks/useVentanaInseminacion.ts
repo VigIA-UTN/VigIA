@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getVentanaInseminacion } from '../api/alertaApi';
+import { getVentanaInseminacion, archivarAlertaPorVencimiento } from '../api/alertaApi';
 import type { VentanaInseminacionResponse, AlertaResponse } from '../api/alertaApi';
 import { useAuthStore } from '../store/authStore';
 
@@ -52,9 +52,15 @@ export function useVentanaInseminacion(
   }, []);
 
   // Inicia el ticker que decrementa segundos cada segundo
-  const startTicker = useCallback((initialSeconds: number) => {
+  const startTicker = useCallback((initialSeconds: number, initialPct: number) => {
     clearTicker();
     if (initialSeconds <= 0) return;
+
+    // Calculamos la duración total real de la ventana para que el porcentaje progrese correctamente
+    let duracionTotal = initialSeconds;
+    if (initialPct >= 0 && initialPct < 100) {
+      duracionTotal = initialSeconds / (1 - (initialPct / 100));
+    }
 
     let remaining = initialSeconds;
     tickerRef.current = setInterval(() => {
@@ -67,12 +73,19 @@ export function useVentanaInseminacion(
           prev ? { ...prev, tiempoRestanteSegundos: 0, estado: 'VENCIDA', proximaAVencer: false, porcentajeTranscurrido: 100 } : prev,
         );
         setSegundosRestantes(0);
+
+        // Disparar archivado automático on-demand en el backend si tenemos el id
+        if (alertaId && establecimientoId) {
+          archivarAlertaPorVencimiento(alertaId, establecimientoId).catch(err => {
+            console.error('Error al archivar alerta por vencimiento:', err);
+          });
+        }
       } else {
         setSegundosRestantes(remaining);
-        // Actualiza porcentaje localmente: usa initialSeconds como duracion total de referencia
+        // Actualiza porcentaje localmente usando la duracionTotal estimada
         setVentana(prev => {
           if (!prev || prev.estado === 'VENCIDA') return prev;
-          const pct = Math.min(100, initialSeconds > 0 ? ((initialSeconds - remaining) / initialSeconds) * 100 : 0);
+          const pct = Math.min(100, Math.max(0, 100 - (remaining / duracionTotal) * 100));
           return {
             ...prev,
             tiempoRestanteSegundos: remaining,
@@ -82,7 +95,7 @@ export function useVentanaInseminacion(
         });
       }
     }, 1_000);
-  }, [clearTicker]);
+  }, [clearTicker, alertaId, establecimientoId]);
 
   const fetchVentana = useCallback(async () => {
     if (!alertaId || !establecimientoId || !enabled) return;
@@ -95,7 +108,7 @@ export function useVentanaInseminacion(
 
       if (data.estado === 'ACTIVA') {
         setSegundosRestantes(data.tiempoRestanteSegundos);
-        startTicker(data.tiempoRestanteSegundos);
+        startTicker(data.tiempoRestanteSegundos, data.porcentajeTranscurrido);
       } else {
         clearTicker();
         setSegundosRestantes(0);

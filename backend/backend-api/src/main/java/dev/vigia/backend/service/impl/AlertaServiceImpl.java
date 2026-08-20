@@ -348,6 +348,53 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public AlertaResponse archivarAlertaPorVencimiento(String emailUsuario, Long establecimientoId, Long alertaId) {
+                usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento indicado o no está activo.");
+                }
+
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
+
+                if (alerta.getAnimal() == null || alerta.getAnimal().getEstablecimiento() == null ||
+                                !alerta.getAnimal().getEstablecimiento().getId().equals(establecimientoId)) {
+                        throw new AccessDeniedException("La alerta no pertenece al establecimiento indicado.");
+                }
+
+                if (alerta.getEstado() != EstadoAlerta.PENDIENTE) {
+                        throw new IllegalArgumentException("La alerta ya no está PENDIENTE.");
+                }
+
+                alerta.setEstado(EstadoAlerta.ARCHIVADA);
+                alerta.setMotivoDescarte("oportunidad_no_aprovechada");
+                alerta.setTsConfirmacion(LocalDateTime.now());
+                Alerta actualizado = alertaRepository.save(alerta);
+
+                AlertaEventDTO eventDTO = AlertaEventDTO.builder()
+                                .id(actualizado.getId())
+                                .animalId(actualizado.getAnimal().getId())
+                                .estado(actualizado.getEstado())
+                                .tipo(actualizado.getTipo())
+                                .tsGeneracion(actualizado.getTsGeneracion())
+                                .build();
+                rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "alerta.update", eventDTO);
+
+                return this.toResponse(actualizado);
+        }
+
+        @Override
         @SuppressWarnings("null")
         @Transactional(readOnly = true)
         public VentanaInseminacionResponse obtenerEstadoVentanaInseminacion(String emailUsuario, Long establecimientoId,

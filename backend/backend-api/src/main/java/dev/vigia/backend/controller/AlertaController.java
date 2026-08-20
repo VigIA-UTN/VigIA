@@ -177,6 +177,23 @@ public class AlertaController {
         }
     }
 
+    @PutMapping("/{id}/archivar")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> archivarAlertaPorVencimiento(
+            @PathVariable("id") Long alertaId,
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            AlertaResponse response = alertaService.archivarAlertaPorVencimiento(email, establecimientoId, alertaId);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PutMapping("/estado/{id}")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> actualizarEstadoAlerta(
