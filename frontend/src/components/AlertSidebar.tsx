@@ -73,14 +73,18 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
         maxAlertaIdRef.current = newAlerta.id;
       }
 
-      // Solo guardamos si es PENDIENTE (o si queremos dejarla en la lista, pero para la sidebar solo sumamos pendientes)
-      if (newAlerta.estado !== 'PENDIENTE') return;
-
-      // Evitamos duplicados si el backend manda perdidas que justo entraron en la request inicial
+      // Si la alerta ya existe, la actualizamos
       setAlertas((prev) => {
-        if (prev.some(a => a.id === newAlerta.id)) return prev;
+        if (prev.some(a => a.id === newAlerta.id)) {
+          return prev.map(a => a.id === newAlerta.id ? newAlerta : a);
+        }
+        // Solo guardamos si es PENDIENTE (al menos como alerta nueva)
+        if (newAlerta.estado !== 'PENDIENTE') return prev;
         return [newAlerta, ...prev];
       });
+
+      // Si la alerta actualizada es la que estamos viendo en detalle, actualizamos el estado
+      setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? newAlerta : prev));
     };
 
     eventSource.onerror = (error) => {

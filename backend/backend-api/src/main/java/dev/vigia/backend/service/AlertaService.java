@@ -62,6 +62,11 @@ public interface AlertaService {
     AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId, EstadoAlerta nuevoEstado, String notas);
 
     /**
+     * Archiva una alerta de celo porque su ventana de inseminación ha vencido.
+     */
+    AlertaResponse archivarAlertaPorVencimiento(String emailUsuario, Long establecimientoId, Long alertaId);
+
+    /**
      * Retorna el estado actual de la ventana óptima de inseminación para
      * una alerta de celo.
      *

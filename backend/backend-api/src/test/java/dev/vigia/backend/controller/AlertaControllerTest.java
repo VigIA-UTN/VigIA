@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -51,7 +51,7 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 class AlertaControllerTest {
 
     @MockBean
-    private ConnectionFactory connectionFactory;
+    private RabbitTemplate rabbitTemplate;
 
     @Autowired
     private MockMvc mockMvc;

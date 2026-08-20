@@ -111,13 +111,14 @@ export default function AlertasPage() {
                 maxAlertaIdRef.current = newAlerta.id;
             }
 
-            // Only add if it matches the current filters (or at least if it's new, we assume it's PENDIENTE)
+            // Actualizar si ya existe, o agregar si es nueva y cumple filtros
             setAlertas((prev) => {
-                if (prev.some((a) => a.id === newAlerta.id)) return prev;
-                // If we are filtering by something specific and this new alert doesn't match, we might skip it
+                if (prev.some((a) => a.id === newAlerta.id)) {
+                    return prev.map(a => a.id === newAlerta.id ? newAlerta : a);
+                }
+                // Si estamos filtrando y la alerta nueva no matchea, la ignoramos
                 if (filtroEstado && newAlerta.estado !== filtroEstado) return prev;
                 if (filtroTipo && newAlerta.tipo !== filtroTipo) return prev;
-                // Backend no siempre manda severidad en el SSE (a veces es calculada), pero si la manda y no matchea el filtro
                 if (filtroSeveridad && newAlerta.severidad !== filtroSeveridad) return prev;
                 
                 return [newAlerta, ...prev];
