@@ -1,8 +1,11 @@
+# pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import sys
 import os
+# pyrefly: ignore [missing-import]
 import numpy as np
 
 # Añadir el directorio app al PYTHONPATH
@@ -16,16 +19,26 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def mock_dependencies():
     """
-    Mockea el modelo y las estadísticas de normalización para evitar
-    necesitar TensorFlow y el modelo real durante los tests.
+    Mockea el modelo y el scaler de normalización para evitar necesitar
+    TensorFlow y el modelo real durante los tests.
     """
+    mock_scaler = MagicMock()
+
+    # Simula StandardScaler.transform: mismo comportamiento que el scaler
+    # real usado en train_multiseed.py, con mean=[0,0] y std=[1,1] (no-op),
+    # para que los tests sigan razonando en términos de moveState "crudo".
+    def transform_mock(X_flat):
+        return X_flat
+
+    mock_scaler.transform.side_effect = transform_mock
+
     with patch("app.main.model") as mock_model, \
-         patch("app.main.norm_stats", {"mean": [[1.0, 0.0]], "std": [[1.0, 1.0]]}):
+         patch("app.main.scaler", mock_scaler):
 
         # Simula la predicción del modelo
         def predict_mock(X, verbose=0):
-            # X_input está estandarizado: (X - mean) / std
-            # X[0][0][0] corresponde al moveState estandarizado del primer punto
+            # X_input pasó por scaler.transform (no-op en el mock).
+            # X[0][0][0] corresponde al moveState del primer punto.
             val = X[0][0][0]
             if val > 5.0:
                 # Alta actividad -> probabilidad de celo > 0.5

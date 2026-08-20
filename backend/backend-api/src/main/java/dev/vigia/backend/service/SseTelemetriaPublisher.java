@@ -56,7 +56,7 @@ public class SseTelemetriaPublisher {
             try {
                 sendToEmitter(emitter, telemetriaEvent);
             } catch (Exception e) {
-                log.error("Error enviando telemetria por SSE a un cliente, removiendo emitter.", e);
+                log.debug("Cliente SSE desconectado o error de red ({}). Removiendo emitter.", e.getMessage());
                 list.remove(emitter);
             }
         }

@@ -62,13 +62,25 @@ public interface AlertaService {
     AlertaResponse actualizarEstadoAlerta(String emailUsuario, Long alertaId, EstadoAlerta nuevoEstado, String notas);
 
     /**
-     * Retorna el estado actual de la ventana de inseminación para una alerta de
-     * celo.
+     * Retorna el estado actual de la ventana óptima de inseminación para
+     * una alerta de celo.
      *
-     * @param emailUsuario      email del usuario autenticado
+     * <p>La ventana es de 6 a 24 horas desde la detección del celo
+     * ({@code ventanaInicioIns} – {@code ventanaFinIns}). Devuelve:
+     * <ul>
+     *   <li>{@code tiempoRestanteSegundos}: segundos restantes (0 si venció)</li>
+     *   <li>{@code porcentajeTranscurrido}: % de la ventana transcurrida (0–100)</li>
+     *   <li>{@code proximaAVencer}: {@code true} cuando quedan menos de 2 horas</li>
+     *   <li>{@code estado}: {@code ACTIVA}, {@code FUTURA} o {@code VENCIDA}</li>
+     * </ul>
+     *
+     * @param emailUsuario      email del usuario autenticado (extraído del JWT)
      * @param establecimientoId ID del establecimiento actualmente seleccionado
-     * @param alertaId          ID de la alerta a consultar
-     * @return DTO con el estado de la ventana de inseminación
+     * @param alertaId          ID de la alerta de celo
+     * @return DTO con el estado de la ventana
+     * @throws AccessDeniedException    si el usuario no pertenece al establecimiento
+     * @throws IllegalArgumentException si el usuario o la alerta no existen, o la
+     *                                  alerta no pertenece al establecimiento indicado
      */
     VentanaInseminacionResponse obtenerEstadoVentanaInseminacion(String emailUsuario, Long establecimientoId,
             Long alertaId);

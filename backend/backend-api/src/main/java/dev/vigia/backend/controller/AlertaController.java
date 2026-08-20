@@ -203,4 +203,45 @@ public class AlertaController {
 
         return sseAlertaPublisher.registrarClienteSse(establecimientoId, lastEventId);
     }
+
+    /**
+     * GET /api/v1/alertas/{id}/ventana
+     * <p>
+     * Devuelve el estado actual de la ventana óptima de inseminación para una
+     * alerta de celo. La ventana va de 6 a 24 horas desde la detección del celo.
+     *
+     * <p>Respuesta:
+     * <ul>
+     *   <li>{@code tiempo_restante_segundos}: segundos hasta el fin (0 si venció)</li>
+     *   <li>{@code porcentaje_transcurrido}: % transcurrido (0–100)</li>
+     *   <li>{@code proxima_a_vencer}: {@code true} cuando quedan &lt; 2 horas</li>
+     *   <li>{@code estado}: {@code ACTIVA}, {@code FUTURA} o {@code VENCIDA}</li>
+     * </ul>
+     *
+     * @param establecimientoId ID del establecimiento actualmente seleccionado
+     * @param alertaId          ID de la alerta
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con el estado de la ventana, 403 si acceso denegado,
+     *         404 si la alerta no existe, 400 si la alerta no pertenece al establecimiento
+     */
+    @GetMapping("/{id}/ventana")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> obtenerVentanaInseminacion(
+            @PathVariable("id") Long alertaId,
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            VentanaInseminacionResponse response = alertaService.obtenerEstadoVentanaInseminacion(email,
+                    establecimientoId, alertaId);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Alerta no encontrada.".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

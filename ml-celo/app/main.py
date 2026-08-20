@@ -11,43 +11,54 @@ from fastapi.responses import JSONResponse
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 from typing import List
-import json
 import math
+import os
 # pyrefly: ignore [missing-import]
 import numpy as np
+# pyrefly: ignore [missing-import]
+import joblib
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 try:
     import tensorflow as tf
 except ImportError:
     tf = None
 
-app = FastAPI(title="VigIA - Microservicio de Detección de Celo")
-
 model = None
-norm_stats = None
+scaler = None
 
 # Debe coincidir con la escala usada en generate_dataset.py / train_baseline_rnn.py
 DIST_SCALE_FACTOR = 100000
 
-@app.on_event("startup")
-def load_ml_model():
-    global model, norm_stats
+# Umbral de decisión sobre la probabilidad del modelo (P(celo) > CELO_THRESHOLD).
+# Se saca a config en lugar de hardcodear 0.5 porque, con class_weight balanceado,
+# el umbral que maximiza F1 sobre la curva Precision-Recall NO es 0.5 (ver
+# run_summary.json de la corrida elegida en ml-training/celo/models/.../run_summary.json,
+# campo "best_threshold_f1"). Default 0.5 es un fallback conservador si no se
+# configura nada; en producción se espera CELO_THRESHOLD seteado explícitamente.
+CELO_THRESHOLD = float(os.getenv("CELO_THRESHOLD", "0.5"))
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model, scaler
     if tf is None:
         print("ADVERTENCIA: tensorflow no está instalado. No se podrá cargar el modelo.")
-        return
-
-    models_dir = Path(__file__).parent / "models"
-    model_path = models_dir / "modelo_celo_lstm.keras"
-    norm_path = models_dir / "normalizacion.json"
-
-    if model_path.exists() and norm_path.exists():
-        model = tf.keras.models.load_model(model_path)
-        with open(norm_path, "r") as f:
-            norm_stats = json.load(f)
-        print("Modelo y estadísticas de normalización cargados correctamente.")
     else:
-        print(f"ADVERTENCIA: No se encontró el modelo en {models_dir}. Ejecute el script de entrenamiento primero.")
+        models_dir = Path(__file__).parent / "models"
+        model_path = models_dir / "modelo_celo_lstm.keras"
+        scaler_path = models_dir / "scaler_celo.joblib"
+
+        if model_path.exists() and scaler_path.exists():
+            model = tf.keras.models.load_model(model_path)
+            scaler = joblib.load(scaler_path)
+            print(f"Modelo y scaler de normalización cargados correctamente. "
+                  f"Umbral de decisión (CELO_THRESHOLD) = {CELO_THRESHOLD}")
+        else:
+            print(f"ADVERTENCIA: No se encontró el modelo en {models_dir}. Ejecute el script de entrenamiento primero.")
+    yield
+
+app = FastAPI(title="VigIA - Microservicio de Detección de Celo", lifespan=lifespan)
 
 class PuntoTelemetria(BaseModel):
     moveState: int  # 0-9, según protocolo real del collar Lansitec
@@ -96,16 +107,14 @@ async def predict(request: Request, response: Response, serie: List[PuntoTelemet
 
         X_input = np.array([features])
 
-        if norm_stats is not None:
-            mean = np.array(norm_stats["mean"])
-            std = np.array(norm_stats["std"])
-            # Evitar división por cero
-            std = np.where(std == 0, 1e-7, std)
-            X_input = (X_input - mean) / std
+        if scaler is not None:
+            X_input = scaler.transform(
+                X_input.reshape(-1, X_input.shape[-1])
+            ).reshape(X_input.shape)
 
         y_pred_prob = model.predict(X_input, verbose=0)
         prob = float(y_pred_prob[0][0])
-        evento = prob > 0.5
+        evento = prob > CELO_THRESHOLD
         ventana = 12 if evento else 0
 
         print(f"[{correlation_id}] Inferencia exitosa: celo={evento}, confianza={prob:.4f}")

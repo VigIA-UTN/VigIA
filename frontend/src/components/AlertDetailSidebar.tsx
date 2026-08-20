@@ -3,6 +3,7 @@ import type { AlertaResponse, AlertaDetalleResponse } from '../api/alertaApi';
 import { updateAlertaEstado, getAlertaDetalle } from '../api/alertaApi';
 import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { useVentanaInseminacion, formatCountdown } from '../hooks/useVentanaInseminacion';
 
 interface AlertDetailSidebarProps {
   alerta: AlertaResponse;
@@ -25,6 +26,17 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const { rol } = useAuthStore();
   const { selectedId } = useEstablecimientoStore();
   const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR';
+
+  // Ventana optima de inseminacion con countdown en tiempo real.
+  // El backend puede devolver 'CELO', 'Celo Detectado' o 'reproductivo'
+  // segun venga del listado general o del endpoint especifico de celo.
+  const tipoNorm = (alerta.tipo ?? '').toLowerCase();
+  const isCelo = tipoNorm === 'celo' || tipoNorm === 'reproductivo' || tipoNorm.includes('celo');
+  const { ventana, segundosRestantes, loading: loadingVentana } = useVentanaInseminacion(
+    isCelo ? alerta.id : null,
+    selectedId ?? null,
+    isCelo,
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -194,7 +206,9 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                 <i className="bi bi-clock"></i> Ventana de inseminación
               </h6>
-              <div className="card border-0 shadow-sm rounded-4">
+
+              {/* Barra de horarios inicio-fin */}
+              <div className="card border-0 shadow-sm rounded-4 mb-3">
                 <div className="card-body d-flex justify-content-between align-items-center">
                   <div className="text-center">
                     <h4 className="m-0 fw-bold">{formatHour(windowStart)}</h4>
@@ -203,7 +217,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                   
                   <div className="flex-grow-1 mx-3 position-relative d-flex align-items-center justify-content-start">
                     <div style={{ height: '4px', width: '100%', backgroundColor: '#E0E0E0', position: 'absolute' }}></div>
-                    <div style={{ height: '8px', left: `${startPerc}%`, width: `${endPerc - startPerc}%`, backgroundColor: '#E05252', position: 'absolute', borderRadius: '4px' }}></div>
+                    <div style={{ height: '8px', left: `${startPerc}%`, width: `${endPerc - startPerc}%`, backgroundColor: ventana?.estado === 'VENCIDA' ? '#9E9E9E' : ventana?.proximaAVencer ? '#FF6B35' : '#E05252', position: 'absolute', borderRadius: '4px', transition: 'background-color 0.5s ease' }}></div>
                     <div style={{ position: 'absolute', left: `${startPerc}%`, height: '16px', width: '2px', backgroundColor: '#333' }}></div>
                     <div style={{ position: 'absolute', left: `${endPerc}%`, height: '16px', width: '2px', backgroundColor: '#333' }}></div>
                   </div>
@@ -214,6 +228,88 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                   </div>
                 </div>
               </div>
+
+              {/* Countdown en tiempo real */}
+              {isCelo && (
+                <div
+                  className="card border-0 shadow-sm rounded-4"
+                  style={{
+                    background: ventana?.estado === 'VENCIDA'
+                      ? 'linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%)'
+                      : ventana?.proximaAVencer
+                        ? 'linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)'
+                        : 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
+                    border: ventana?.estado === 'VENCIDA'
+                      ? '1px solid #BDBDBD'
+                      : ventana?.proximaAVencer
+                        ? '1px solid #FF6B35'
+                        : '1px solid #4CAF50',
+                    transition: 'background 0.6s ease, border-color 0.6s ease',
+                  }}
+                >
+                  <div className="card-body py-3 px-4">
+                    {loadingVentana && !ventana ? (
+                      <div className="d-flex align-items-center gap-2 text-muted">
+                        <div className="spinner-border spinner-border-sm" role="status"><span className="visually-hidden">Cargando...</span></div>
+                        <small>Calculando tiempo restante...</small>
+                      </div>
+                    ) : ventana?.estado === 'VENCIDA' ? (
+                      <div className="d-flex align-items-center gap-3">
+                        <i className="bi bi-clock-history fs-3" style={{ color: '#9E9E9E' }}></i>
+                        <div>
+                          <div className="fw-bold" style={{ color: '#616161', fontSize: '1rem' }}>Ventana vencida</div>
+                          <small style={{ color: '#9E9E9E' }}>La oportunidad de inseminación ha expirado</small>
+                        </div>
+                      </div>
+                    ) : ventana ? (
+                      <div className="d-flex align-items-center justify-content-between">
+                        <div className="d-flex align-items-center gap-3">
+                          {ventana.proximaAVencer ? (
+                            <i className="bi bi-exclamation-triangle-fill fs-3 urgency-pulse" style={{ color: '#FF6B35' }}></i>
+                          ) : (
+                            <i className="bi bi-hourglass-split fs-3" style={{ color: '#4CAF50' }}></i>
+                          )}
+                          <div>
+                            <div
+                              className="fw-bold font-monospace"
+                              style={{
+                                fontSize: '1.5rem',
+                                color: ventana.proximaAVencer ? '#E64A19' : '#2E7D32',
+                                letterSpacing: '0.05em',
+                                transition: 'color 0.5s ease',
+                              }}
+                            >
+                              {formatCountdown(segundosRestantes)}
+                            </div>
+                            <small style={{ color: ventana.proximaAVencer ? '#BF360C' : '#388E3C' }}>
+                              {ventana.proximaAVencer ? '\u26a0\ufe0f Menos de 2 horas — actuar con urgencia' : 'Tiempo restante en ventana óptima'}
+                            </small>
+                          </div>
+                        </div>
+                        {/* Barra de progreso */}
+                        <div className="text-end" style={{ minWidth: '80px' }}>
+                          <div
+                            className="rounded-pill"
+                            style={{ height: '6px', backgroundColor: '#E0E0E0', overflow: 'hidden', marginBottom: '4px' }}
+                          >
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${Math.min(100, ventana.porcentajeTranscurrido)}%`,
+                                backgroundColor: ventana.proximaAVencer ? '#FF6B35' : '#4CAF50',
+                                transition: 'width 1s linear, background-color 0.5s ease',
+                              }}
+                            />
+                          </div>
+                          <small style={{ color: '#757575', fontSize: '0.72rem' }}>
+                            {Math.round(ventana.porcentajeTranscurrido)}% transcurrido
+                          </small>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Recomendacion */}
@@ -351,6 +447,13 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
         @keyframes slideOutRight {
           from { opacity: 1; transform: translateX(0); }
           to   { opacity: 0; transform: translateX(20px); }
+        }
+        @keyframes urgencyPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.6; transform: scale(1.15); }
+        }
+        .urgency-pulse {
+          animation: urgencyPulse 1.2s ease-in-out infinite;
         }
         /* Custom Scrollbar */
         .custom-scrollbar::-webkit-scrollbar {

@@ -364,3 +364,48 @@ body,
 .login-link:hover {
   color: #94C11E;
 }
+
+/* ── Separador y SSO ── */
+.login-divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: #9aabb8;
+  font-size: 14px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.login-divider span {
+  padding: 0 12px;
+}
+
+.login-sso-btn {
+  width: 392px;
+  max-width: 100%;
+  height: 48px;
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background-color 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+}
+
+.login-sso-btn:hover {
+  background-color: #f9fafb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}

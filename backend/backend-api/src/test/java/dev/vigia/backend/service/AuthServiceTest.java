@@ -185,4 +185,58 @@ class AuthServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("El email es requerido para el registro con código");
     }
+
+    @Test
+    @DisplayName("Debe autoregistrar usuario nuevo vía OAuth2 con rol PENDIENTE y generar JWT")
+    @SuppressWarnings("null")
+    void processOAuth2User_AutoRegister_Success() {
+        when(usuarioRepository.findByEmail("nuevo@google.com")).thenReturn(Optional.empty());
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocation -> {
+            Usuario u = invocation.getArgument(0);
+            u.setId(10L);
+            return u;
+        });
+
+        org.springframework.security.core.userdetails.User userDetails =
+                new org.springframework.security.core.userdetails.User("nuevo@google.com", "", true, true, true, true,
+                        java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PENDIENTE")));
+        when(userDetailsService.loadUserByUsername("nuevo@google.com")).thenReturn(userDetails);
+        when(jwtUtil.generateToken(userDetails)).thenReturn("jwt-token-oauth-nuevo");
+
+        dev.vigia.backend.dto.AuthResponse response = authService.processOAuth2User("nuevo@google.com", "Juan", "Pérez", "GOOGLE");
+
+        assertThat(response).isNotNull();
+        assertThat(response.getToken()).isEqualTo("jwt-token-oauth-nuevo");
+        assertThat(response.getEmail()).isEqualTo("nuevo@google.com");
+        assertThat(response.getRol()).isEqualTo("PENDIENTE");
+
+        verify(usuarioRepository, times(1)).save(any(Usuario.class));
+    }
+
+    @Test
+    @DisplayName("Debe reconocer usuario existente vía OAuth2 manteniendo su rol asignado")
+    void processOAuth2User_ExistingUser_RecognizesRole() {
+        Usuario usuarioExistente = new Usuario();
+        usuarioExistente.setId(5L);
+        usuarioExistente.setEmail("existente@google.com");
+        usuarioExistente.setNombre("Carlos");
+        usuarioExistente.setApellido("Gómez");
+        usuarioExistente.setRol(Rol.PRODUCTOR);
+        usuarioExistente.setActivo(true);
+
+        when(usuarioRepository.findByEmail("existente@google.com")).thenReturn(Optional.of(usuarioExistente));
+
+        org.springframework.security.core.userdetails.User userDetails =
+                new org.springframework.security.core.userdetails.User("existente@google.com", "", true, true, true, true,
+                        java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PRODUCTOR")));
+        when(userDetailsService.loadUserByUsername("existente@google.com")).thenReturn(userDetails);
+        when(jwtUtil.generateToken(userDetails)).thenReturn("jwt-token-oauth-existente");
+
+        dev.vigia.backend.dto.AuthResponse response = authService.processOAuth2User("existente@google.com", "Carlos", "Gómez", "GOOGLE");
+
+        assertThat(response).isNotNull();
+        assertThat(response.getToken()).isEqualTo("jwt-token-oauth-existente");
+        assertThat(response.getEmail()).isEqualTo("existente@google.com");
+        assertThat(response.getRol()).isEqualTo("PRODUCTOR");
+    }
 }

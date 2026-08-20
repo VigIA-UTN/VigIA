@@ -29,11 +29,6 @@ Thumbs.db
 .env.*
 !.env.example
 
-# Datasets
-ml-training/dataset/*.npy
-ml-training/dataset/*.csv
-ml-training/dataset/*.parquet
-ml-training/dataset/*.json
-
 # Modelos entrenados (historial)
-ml-training/models/
+ml-training/celo/models
+ml-training/salud/models
