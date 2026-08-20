@@ -61,6 +61,16 @@ export async function updateAlertaEstado(
   return response.data;
 }
 
+export async function archivarAlertaPorVencimiento(
+  alertaId: number,
+  establecimientoId: number
+): Promise<AlertaResponse> {
+  const response = await axiosClient.put<AlertaResponse>(
+    `/alertas/${alertaId}/archivar?establecimientoId=${establecimientoId}`
+  );
+  return response.data;
+}
+
 export interface AlertaDetalleResponse {
   id: number;
   animalId: number;

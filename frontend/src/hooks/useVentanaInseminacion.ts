@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getVentanaInseminacion } from '../api/alertaApi';
-import type { VentanaInseminacionResponse } from '../api/alertaApi';
+import { getVentanaInseminacion, archivarAlertaPorVencimiento } from '../api/alertaApi';
+import type { VentanaInseminacionResponse, AlertaResponse } from '../api/alertaApi';
+import { useAuthStore } from '../store/authStore';
 
 /**
  * Hook que consulta el endpoint GET /api/v1/alertas/{id}/ventana
- * y lo refresca con polling cada POLL_INTERVAL_MS.
+ * y se actualiza de forma reactiva al recibir eventos SSE sobre la alerta.
  *
  * Mientras la ventana esta ACTIVA, ademas corre un ticker de 1 segundo
  * que decrementa tiempoRestanteSegundos localmente para que el countdown
@@ -14,7 +15,8 @@ import type { VentanaInseminacionResponse } from '../api/alertaApi';
  * puede reaccionar al cambio de estado.
  */
 
-const POLL_INTERVAL_MS = 30_000; // refresca desde el backend cada 30 s
+// Cuando la ventana pasa a VENCIDA el ticker se detiene y el componente
+// puede reaccionar al cambio de estado.
 
 export interface UseVentanaInseminacionResult {
   ventana: VentanaInseminacionResponse | null;
@@ -35,6 +37,7 @@ export function useVentanaInseminacion(
   // Si alertaId o enabled no estan definidos, no hay nada que cargar
   const [loading, setLoading] = useState<boolean>(!!alertaId && enabled);
   const [error, setError] = useState<string | null>(null);
+  const { token } = useAuthStore();
 
   // Refs para evitar closures obsoletas
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -49,9 +52,15 @@ export function useVentanaInseminacion(
   }, []);
 
   // Inicia el ticker que decrementa segundos cada segundo
-  const startTicker = useCallback((initialSeconds: number) => {
+  const startTicker = useCallback((initialSeconds: number, initialPct: number) => {
     clearTicker();
     if (initialSeconds <= 0) return;
+
+    // Calculamos la duración total real de la ventana para que el porcentaje progrese correctamente
+    let duracionTotal = initialSeconds;
+    if (initialPct >= 0 && initialPct < 100) {
+      duracionTotal = initialSeconds / (1 - (initialPct / 100));
+    }
 
     let remaining = initialSeconds;
     tickerRef.current = setInterval(() => {
@@ -64,12 +73,19 @@ export function useVentanaInseminacion(
           prev ? { ...prev, tiempoRestanteSegundos: 0, estado: 'VENCIDA', proximaAVencer: false, porcentajeTranscurrido: 100 } : prev,
         );
         setSegundosRestantes(0);
+
+        // Disparar archivado automático on-demand en el backend si tenemos el id
+        if (alertaId && establecimientoId) {
+          archivarAlertaPorVencimiento(alertaId, establecimientoId).catch(err => {
+            console.error('Error al archivar alerta por vencimiento:', err);
+          });
+        }
       } else {
         setSegundosRestantes(remaining);
-        // Actualiza porcentaje localmente: usa initialSeconds como duracion total de referencia
+        // Actualiza porcentaje localmente usando la duracionTotal estimada
         setVentana(prev => {
           if (!prev || prev.estado === 'VENCIDA') return prev;
-          const pct = Math.min(100, initialSeconds > 0 ? ((initialSeconds - remaining) / initialSeconds) * 100 : 0);
+          const pct = Math.min(100, Math.max(0, 100 - (remaining / duracionTotal) * 100));
           return {
             ...prev,
             tiempoRestanteSegundos: remaining,
@@ -79,7 +95,7 @@ export function useVentanaInseminacion(
         });
       }
     }, 1_000);
-  }, [clearTicker]);
+  }, [clearTicker, alertaId, establecimientoId]);
 
   const fetchVentana = useCallback(async () => {
     if (!alertaId || !establecimientoId || !enabled) return;
@@ -92,7 +108,7 @@ export function useVentanaInseminacion(
 
       if (data.estado === 'ACTIVA') {
         setSegundosRestantes(data.tiempoRestanteSegundos);
-        startTicker(data.tiempoRestanteSegundos);
+        startTicker(data.tiempoRestanteSegundos, data.porcentajeTranscurrido);
       } else {
         clearTicker();
         setSegundosRestantes(0);
@@ -117,14 +133,36 @@ export function useVentanaInseminacion(
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchVentana();
 
-    const pollId = setInterval(fetchVentana, POLL_INTERVAL_MS);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+    let sseUrl = `${API_URL}/alertas/stream?establecimientoId=${establecimientoId}`;
+    if (token) {
+      sseUrl += `&token=${token}`;
+    }
+
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onmessage = (event) => {
+      if (!isMountedRef.current) return;
+      try {
+        const updatedAlerta = JSON.parse(event.data) as AlertaResponse;
+        if (updatedAlerta.id === alertaId) {
+          fetchVentana();
+        }
+      } catch (err) {
+        console.error('Error parseando SSE en useVentanaInseminacion', err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      // EventSource tries to reconnect automatically
+    };
 
     return () => {
       isMountedRef.current = false;
-      clearInterval(pollId);
+      eventSource.close();
       clearTicker();
     };
-  }, [alertaId, establecimientoId, enabled, fetchVentana, clearTicker]);
+  }, [alertaId, establecimientoId, enabled, fetchVentana, clearTicker, token]);
 
   return { ventana, segundosRestantes, loading, error };
 }
