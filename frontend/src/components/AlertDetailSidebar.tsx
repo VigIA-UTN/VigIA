@@ -236,14 +236,18 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                   style={{
                     background: ventana?.estado === 'VENCIDA'
                       ? 'linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%)'
-                      : ventana?.proximaAVencer
-                        ? 'linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)'
-                        : 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
+                      : ventana?.estado === 'FUTURA'
+                        ? 'linear-gradient(135deg, #E1F5FE 0%, #B3E5FC 100%)'
+                        : ventana?.proximaAVencer
+                          ? 'linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)'
+                          : 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
                     border: ventana?.estado === 'VENCIDA'
                       ? '1px solid #BDBDBD'
-                      : ventana?.proximaAVencer
-                        ? '1px solid #FF6B35'
-                        : '1px solid #4CAF50',
+                      : ventana?.estado === 'FUTURA'
+                        ? '1px solid #0288D1'
+                        : ventana?.proximaAVencer
+                          ? '1px solid #FF6B35'
+                          : '1px solid #4CAF50',
                     transition: 'background 0.6s ease, border-color 0.6s ease',
                   }}
                 >
@@ -252,6 +256,25 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                       <div className="d-flex align-items-center gap-2 text-muted">
                         <div className="spinner-border spinner-border-sm" role="status"><span className="visually-hidden">Cargando...</span></div>
                         <small>Calculando tiempo restante...</small>
+                      </div>
+                    ) : ventana?.estado === 'FUTURA' ? (
+                      <div className="d-flex align-items-center justify-content-between">
+                        <div className="d-flex align-items-center gap-3">
+                          <i className="bi bi-clock-history fs-3" style={{ color: '#0288D1' }}></i>
+                          <div>
+                            <div
+                              className="fw-bold font-monospace"
+                              style={{
+                                fontSize: '1.5rem',
+                                color: '#0277BD',
+                                letterSpacing: '0.05em',
+                              }}
+                            >
+                              {formatCountdown(segundosRestantes)}
+                            </div>
+                            <small style={{ color: '#0288D1' }}>Tiempo hasta inicio de ventana óptima</small>
+                          </div>
+                        </div>
                       </div>
                     ) : ventana?.estado === 'VENCIDA' ? (
                       <div className="d-flex align-items-center gap-3">

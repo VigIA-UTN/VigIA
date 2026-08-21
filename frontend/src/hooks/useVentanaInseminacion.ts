@@ -52,13 +52,19 @@ export function useVentanaInseminacion(
   }, []);
 
   // Inicia el ticker que decrementa segundos cada segundo
-  const startTicker = useCallback((initialSeconds: number, initialPct: number) => {
+  const startTicker = useCallback((initialSeconds: number, initialPct: number, estado: 'ACTIVA' | 'FUTURA') => {
     clearTicker();
-    if (initialSeconds <= 0) return;
+    if (initialSeconds <= 0) {
+      if (estado === 'FUTURA') {
+         // Si FUTURA llegó a 0, significa que ahora es ACTIVA. Refrescamos.
+         setVentana(prev => prev ? { ...prev, estado: 'ACTIVA', tiempoRestanteSegundos: 64800, porcentajeTranscurrido: 0 } : prev);
+      }
+      return;
+    }
 
     // Calculamos la duración total real de la ventana para que el porcentaje progrese correctamente
     let duracionTotal = initialSeconds;
-    if (initialPct >= 0 && initialPct < 100) {
+    if (estado === 'ACTIVA' && initialPct >= 0 && initialPct < 100) {
       duracionTotal = initialSeconds / (1 - (initialPct / 100));
     }
 
@@ -68,31 +74,42 @@ export function useVentanaInseminacion(
       if (!isMountedRef.current) return;
       if (remaining <= 0) {
         clearTicker();
-        // Fuerza el estado local a VENCIDA antes del siguiente poll
-        setVentana(prev =>
-          prev ? { ...prev, tiempoRestanteSegundos: 0, estado: 'VENCIDA', proximaAVencer: false, porcentajeTranscurrido: 100 } : prev,
-        );
-        setSegundosRestantes(0);
+        if (estado === 'FUTURA') {
+          // La ventana futura acaba de comenzar (ahora es ACTIVA)
+          // Refrescamos desde el backend o cambiamos estado manual
+          setVentana(prev => prev ? { ...prev, estado: 'ACTIVA', tiempoRestanteSegundos: 64800, porcentajeTranscurrido: 0 } : prev);
+          // Reiniciamos con startTicker pero no lo tenemos directamente sin causar bucles,
+          // asi que idealmente disparamos fetchVentana(), pero no lo tenemos en dependencias acá.
+          // El próximo poll lo arreglará.
+        } else {
+          // Fuerza el estado local a VENCIDA antes del siguiente poll
+          setVentana(prev =>
+            prev ? { ...prev, tiempoRestanteSegundos: 0, estado: 'VENCIDA', proximaAVencer: false, porcentajeTranscurrido: 100 } : prev,
+          );
+          setSegundosRestantes(0);
 
-        // Disparar archivado automático on-demand en el backend si tenemos el id
-        if (alertaId && establecimientoId) {
-          archivarAlertaPorVencimiento(alertaId, establecimientoId).catch(err => {
-            console.error('Error al archivar alerta por vencimiento:', err);
-          });
+          // Disparar archivado automático on-demand en el backend si tenemos el id
+          if (alertaId && establecimientoId) {
+            archivarAlertaPorVencimiento(alertaId, establecimientoId).catch(err => {
+              console.error('Error al archivar alerta por vencimiento:', err);
+            });
+          }
         }
       } else {
         setSegundosRestantes(remaining);
-        // Actualiza porcentaje localmente usando la duracionTotal estimada
-        setVentana(prev => {
-          if (!prev || prev.estado === 'VENCIDA') return prev;
-          const pct = Math.min(100, Math.max(0, 100 - (remaining / duracionTotal) * 100));
-          return {
-            ...prev,
-            tiempoRestanteSegundos: remaining,
-            porcentajeTranscurrido: pct,
-            proximaAVencer: remaining < 7_200,
-          };
-        });
+        if (estado === 'ACTIVA') {
+          // Actualiza porcentaje localmente usando la duracionTotal estimada
+          setVentana(prev => {
+            if (!prev || prev.estado === 'VENCIDA') return prev;
+            const pct = Math.min(100, Math.max(0, 100 - (remaining / duracionTotal) * 100));
+            return {
+              ...prev,
+              tiempoRestanteSegundos: remaining,
+              porcentajeTranscurrido: pct,
+              proximaAVencer: remaining < 7_200,
+            };
+          });
+        }
       }
     }, 1_000);
   }, [clearTicker, alertaId, establecimientoId]);
@@ -108,7 +125,13 @@ export function useVentanaInseminacion(
 
       if (data.estado === 'ACTIVA') {
         setSegundosRestantes(data.tiempoRestanteSegundos);
-        startTicker(data.tiempoRestanteSegundos, data.porcentajeTranscurrido);
+        startTicker(data.tiempoRestanteSegundos, data.porcentajeTranscurrido, 'ACTIVA');
+      } else if (data.estado === 'FUTURA') {
+        // En el backend, tiempoRestanteSegundos es el tiempo hasta el FIN.
+        // Asumiendo que la ventana es de 18 horas (64800s), calculamos el tiempo hasta el INICIO:
+        const tiempoRestanteInicio = Math.max(0, data.tiempoRestanteSegundos - 64800);
+        setSegundosRestantes(tiempoRestanteInicio);
+        startTicker(tiempoRestanteInicio, 0, 'FUTURA');
       } else {
         clearTicker();
         setSegundosRestantes(0);
