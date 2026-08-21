@@ -3,7 +3,10 @@ package dev.vigia.backend.service;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.repository.AnimalRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -22,6 +25,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class SseAlertaPublisher {
 
     private final AlertaRepository alertaRepository;
+
+    private final AnimalRepository animalRepository;
 
     // Map: establecimientoId -> list of active SseEmitters
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
@@ -64,7 +69,10 @@ public class SseAlertaPublisher {
                         establecimientoId);
                 for (Alerta alerta : perdidas) {
                     try {
-                        sendToEmitter(emitter, alerta);
+                        sendToEmitter(emitter, alerta.getId(), alerta.getAnimal().getId(), alerta.getTipo(),
+                                alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null,
+                                alerta.getEstado(),
+                                alerta.getTsGeneracion());
                     } catch (Exception e) {
                         log.error("Fallo enviando alerta perdida, cancelando el resto. {}", e.getMessage());
                         list.remove(emitter);
@@ -86,15 +94,20 @@ public class SseAlertaPublisher {
     public void handleAlertaEvent(AlertaEventDTO alertaEvent) {
         log.info("Recibida alerta desde RabbitMQ para SSE (Alerta ID: {})", alertaEvent.getId());
 
-        // Find the Alerta to get the establecimientoId
-        Optional<Alerta> alertaOpt = alertaRepository.findById(alertaEvent.getId());
-        if (alertaOpt.isEmpty()) {
-            log.warn("La alerta con ID {} no fue encontrada en la BD, se ignora el evento", alertaEvent.getId());
+        if (alertaEvent.getAnimalId() == null) {
+            log.warn("El evento de alerta ID {} no tiene animal asociado.", alertaEvent.getId());
             return;
         }
 
-        Alerta alerta = alertaOpt.get();
-        Long establecimientoId = alerta.getAnimal().getEstablecimiento().getId();
+        // Buscamos el Animal para obtener el establecimientoId. 
+        // No buscamos la Alerta porque podria no estar commiteada aun en la BD del worker!
+        Optional<Animal> animalOpt = animalRepository.findById(alertaEvent.getAnimalId());
+        if (animalOpt.isEmpty() || animalOpt.get().getEstablecimiento() == null) {
+            log.warn("El animal con ID {} no fue encontrado o no tiene establecimiento.", alertaEvent.getAnimalId());
+            return;
+        }
+
+        Long establecimientoId = animalOpt.get().getEstablecimiento().getId();
 
         CopyOnWriteArrayList<SseEmitter> list = emitters.get(establecimientoId);
         if (list == null || list.isEmpty()) {
@@ -104,12 +117,15 @@ public class SseAlertaPublisher {
             return;
         }
 
-        log.info("Enviando evento de alerta ID {} a {} clientes del establecimiento {}", alerta.getId(), list.size(),
+        log.info("Enviando evento de alerta ID {} a {} clientes del establecimiento {}", alertaEvent.getId(), list.size(),
                 establecimientoId);
 
         for (SseEmitter emitter : list) {
             try {
-                sendToEmitter(emitter, alerta);
+                sendToEmitter(emitter, alertaEvent.getId(), alertaEvent.getAnimalId(), alertaEvent.getTipo(),
+                        alertaEvent.getSeveridad() != null ? alertaEvent.getSeveridad().name() : null,
+                        alertaEvent.getEstado(),
+                        alertaEvent.getTsGeneracion());
             } catch (Exception e) {
                 log.error("Error enviando alerta por SSE a un cliente, removiendo emitter.", e);
                 list.remove(emitter);
@@ -118,25 +134,21 @@ public class SseAlertaPublisher {
     }
 
     /**
-     * Enviar missed alerts
+     * Enviar evento construido
      */
-
     @SuppressWarnings("null")
-    private void sendToEmitter(SseEmitter emitter, Alerta alerta) throws IOException {
-        // Enviar el DTO que el frontend espera (AlertaResponse)
-        // Para simplificar, armamos el DTO manualmente similar a como hace el
-        // AlertaMapper
+    private void sendToEmitter(SseEmitter emitter, Long id, Long animalId, String tipo, String severidad, EstadoAlerta estado, java.time.LocalDateTime tsGeneracion) throws IOException {
         AlertaResponse response = AlertaResponse.builder()
-                .id(alerta.getId())
-                .animalId(alerta.getAnimal().getId())
-                .tipo(alerta.getTipo())
-                .severidad(alerta.getSeveridad().name())
-                .estado(alerta.getEstado())
-                .tsGeneracion(alerta.getTsGeneracion())
+                .id(id)
+                .animalId(animalId)
+                .tipo(tipo)
+                .severidad(severidad)
+                .estado(estado)
+                .tsGeneracion(tsGeneracion)
                 .build();
 
         emitter.send(SseEmitter.event()
-                .id(String.valueOf(alerta.getId())) // Set Last-Event-ID for the client
+                .id(String.valueOf(id))
                 .data(response));
     }
 }

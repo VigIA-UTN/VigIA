@@ -111,7 +111,8 @@ CREATE TABLE telemetria (
     move_state INT,
     nivel_rumia DOUBLE PRECISION,
     bateria DOUBLE PRECISION,
-    estado_inferencia VARCHAR(50) DEFAULT 'PENDIENTE'
+    estado_inferencia_celo VARCHAR(50) DEFAULT 'PENDIENTE',
+    estado_inferencia_salud VARCHAR(50) DEFAULT 'PENDIENTE'
 );
 
 CREATE TABLE intervenciones (

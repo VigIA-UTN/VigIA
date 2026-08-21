@@ -61,9 +61,9 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
             log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente (últimas 24hs).",
                     animal.getId());
             List<Telemetria> pendientes = telemetriaList.stream()
-                    .filter(t -> t.getEstadoInferencia() == EstadoInferencia.PENDIENTE)
+                    .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
                     .collect(Collectors.toList());
-            pendientes.forEach(t -> t.setEstadoInferencia(EstadoInferencia.COMPLETADO));
+            pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO));
             telemetriaRepository.saveAll(pendientes);
             return;
         }
@@ -82,9 +82,9 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
         log.info("Respuesta de microservicio de celo recibida: {}", response);
 
         List<Telemetria> pendientes = telemetriaList.stream()
-                .filter(t -> t.getEstadoInferencia() == EstadoInferencia.PENDIENTE)
+                .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
                 .collect(Collectors.toList());
-        pendientes.forEach(t -> t.setEstadoInferencia(EstadoInferencia.COMPLETADO));
+        pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO));
         telemetriaRepository.saveAll(pendientes);
 
         if (response != null && response.isEventoCelo()) {
@@ -130,7 +130,7 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
         log.error(
                 "Fallo al comunicarse con el microservicio ML de celo (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
                 correlationId, t.getMessage());
-        telemetriaList.forEach(telemetria -> telemetria.setEstadoInferencia(EstadoInferencia.INFERENCIA_PENDIENTE));
+        telemetriaList.forEach(telemetria -> telemetria.setEstadoInferenciaCelo(EstadoInferencia.INFERENCIA_PENDIENTE));
         telemetriaRepository.saveAll(telemetriaList);
     }
 

@@ -159,7 +159,33 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         }
 
         Map<String, Object> perfil = deserializarPerfil(perfilReferencia.getPerfilJson());
-        List<PuntoTelemetriaDTO> serie = telemetriaList.stream()
+
+        // ml-salud exige que la ventana a evaluar tenga EXACTAMENTE
+        // SAMPLES_PER_DAY (288) puntos -- 24hs a 5 min, ver
+        // features_salud.py::compute_features. telemetriaList son TODAS
+        // las lecturas de las ultimas 24hs (SaludBatchConfig), que pueden
+        // ser mas de 288 si el dispositivo/simulador mando con mas
+        // frecuencia que cada 5 min, o menos si todavia no se completo un
+        // dia entero. Antes se mandaba telemetriaList tal cual, y
+        // /predict fallaba con 503 apenas el conteo se corria de 288 (algo
+        // que pasa solo, ya que el loop en vivo sigue sumando puntos por
+        // encima de los del historial). Nos quedamos con los 288 mas
+        // recientes (telemetriaList viene ordenada ascendente por
+        // fechaHora) y si todavia no hay 288, se reintenta en el proximo
+        // ciclo en vez de mandar una ventana invalida.
+        final int SAMPLES_PER_DAY = 288;
+        if (telemetriaList.size() < SAMPLES_PER_DAY) {
+            log.info(
+                    "Animal {} todavia no tiene una ventana completa de 24hs para evaluar ({} de {} puntos); se reintenta en el proximo ciclo.",
+                    animal.getId(), telemetriaList.size(), SAMPLES_PER_DAY);
+            marcarCompletados(telemetriaList);
+            return;
+        }
+        List<Telemetria> ventanaEvaluar = telemetriaList.size() > SAMPLES_PER_DAY
+                ? telemetriaList.subList(telemetriaList.size() - SAMPLES_PER_DAY, telemetriaList.size())
+                : telemetriaList;
+
+        List<PuntoTelemetriaDTO> serie = ventanaEvaluar.stream()
                 .map(t -> PuntoTelemetriaDTO.builder()
                         .moveState(t.getMoveState())
                         .latitud(t.getLatitud())
@@ -314,10 +340,13 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
     }
 
     private void marcarCompletados(List<Telemetria> telemetriaList) {
+        // Toca estadoInferenciaSalud (propio de este pipeline), no
+        // estadoInferenciaCelo (propio de celo) -- ver comentario en
+        // Telemetria.java sobre por que estan separados.
         List<Telemetria> pendientes = telemetriaList.stream()
-                .filter(t -> t.getEstadoInferencia() == EstadoInferencia.PENDIENTE)
+                .filter(t -> t.getEstadoInferenciaSalud() == EstadoInferencia.PENDIENTE)
                 .collect(Collectors.toList());
-        pendientes.forEach(t -> t.setEstadoInferencia(EstadoInferencia.COMPLETADO));
+        pendientes.forEach(t -> t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO));
         telemetriaRepository.saveAll(pendientes);
     }
 
@@ -325,7 +354,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         log.error(
                 "Fallo al comunicarse con el microservicio ML de salud (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
                 correlationId, t.getMessage());
-        telemetriaList.forEach(telemetria -> telemetria.setEstadoInferencia(EstadoInferencia.INFERENCIA_PENDIENTE));
+        telemetriaList.forEach(telemetria -> telemetria.setEstadoInferenciaSalud(EstadoInferencia.INFERENCIA_PENDIENTE));
         telemetriaRepository.saveAll(telemetriaList);
     }
 }

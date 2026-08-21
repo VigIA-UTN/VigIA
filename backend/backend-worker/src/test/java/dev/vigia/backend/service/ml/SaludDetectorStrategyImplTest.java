@@ -52,7 +52,7 @@ class SaludDetectorStrategyImplTest {
 
         Telemetria t = new Telemetria();
         t.setCaravana(caravana);
-        t.setEstadoInferencia(EstadoInferencia.PENDIENTE);
+        t.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
         t.setMoveState(3);
         t.setLatitud(-34.0);
         t.setLongitud(-60.0);
@@ -64,13 +64,13 @@ class SaludDetectorStrategyImplTest {
     @SuppressWarnings("null")
     void testFallbackProcess() {
         Telemetria t1 = new Telemetria();
-        t1.setEstadoInferencia(EstadoInferencia.PENDIENTE);
+        t1.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
 
         List<Telemetria> lista = Arrays.asList(t1);
 
         saludDetectorStrategy.fallbackProcess(lista, "12345", new RuntimeException("Timeout"));
 
-        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferencia());
+        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferenciaSalud());
         verify(telemetriaRepository).saveAll(anyList());
     }
 
@@ -90,7 +90,7 @@ class SaludDetectorStrategyImplTest {
 
         saludDetectorStrategy.process(lista, "corr-calib-1");
 
-        assertEquals(EstadoInferencia.COMPLETADO, t.getEstadoInferencia());
+        assertEquals(EstadoInferencia.COMPLETADO, t.getEstadoInferenciaSalud());
         verify(telemetriaRepository).saveAll(anyList());
         verify(alertaRepository, never()).save(any());
         verify(perfilReferenciaRepository, never()).save(any());
@@ -108,6 +108,6 @@ class SaludDetectorStrategyImplTest {
 
         saludDetectorStrategy.process(lista, "corr-sin-alta");
 
-        assertEquals(EstadoInferencia.COMPLETADO, t.getEstadoInferencia());
+        assertEquals(EstadoInferencia.COMPLETADO, t.getEstadoInferenciaSalud());
     }
 }

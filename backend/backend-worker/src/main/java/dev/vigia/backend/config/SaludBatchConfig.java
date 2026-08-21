@@ -70,8 +70,12 @@ public class SaludBatchConfig {
     public ItemProcessor<Caravana, Caravana> saludProcessor() {
         return caravana -> {
             LocalDateTime hace24h = LocalDateTime.now().minusHours(24);
+            // Usa el flag de "pendiente" propio de salud (estado_inferencia_salud),
+            // no el de celo: comparten Telemetria pero cada pipeline necesita
+            // saber por su cuenta que telemetria ya miro, si no el job que
+            // corra primero en el ciclo (celo) se "come" el pendiente del otro.
             List<Telemetria> telemetriaPendiente = telemetriaRepository
-                    .findByCaravanaAndEstadoInferenciaAndFechaHoraAfter(
+                    .findByCaravanaAndEstadoInferenciaSaludAndFechaHoraAfter(
                             caravana, EstadoInferencia.PENDIENTE, hace24h);
 
             if (!telemetriaPendiente.isEmpty()) {

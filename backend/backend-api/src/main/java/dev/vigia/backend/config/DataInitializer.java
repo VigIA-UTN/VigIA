@@ -116,15 +116,7 @@ public class DataInitializer implements CommandLineRunner {
         vaca2.setAlias("Margarita");
         vaca2.setEstadoActual(EstadoAnimal.ACTIVO);
         vaca2.setFechaNacimiento(LocalDate.of(2021, 5, 10));
-        // VigIA-ARG-002 (Margarita) se backdatea a propósito: el detector de
-        // salud (RF03, ver SaludDetectorStrategyImpl) exige >= vigia.salud.calibracion-dias
-        // (7 por defecto) desde fecha_alta antes de generar CUALQUIER prediccion,
-        // sin importar la telemetria que llegue. Como este DataInitializer resetea
-        // fecha_alta a hoy en cada arranque (dev), sin este ajuste ninguna alerta de
-        // salud podria dispararse hasta 7 dias reales despues de correr el seed.
-        // Se usa esta vaca como "caso de enfermedad" de prueba end-to-end junto con
-        // el patron de inmovilidad que inyecta simulador.py.
-        vaca2.setFechaAlta(LocalDate.now().minusDays(10));
+        vaca2.setFechaAlta(LocalDate.now().minusDays(7));
 
         Caravana caravana2 = new Caravana();
         caravana2.setCodigo("VIGIA-ARG-002");
@@ -184,7 +176,8 @@ public class DataInitializer implements CommandLineRunner {
         telemetriaStale.setBateria(45.0);
         telemetriaStale.setNivelRumia(50.0);
         telemetriaStale.setMoveState(1);
-        telemetriaStale.setEstadoInferencia(EstadoInferencia.COMPLETADO);
+        telemetriaStale.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+        telemetriaStale.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
         telemetriaRepository.save(telemetriaStale);
 
         log.info("[DataInitializer] ✅ Animales de prueba generados.");

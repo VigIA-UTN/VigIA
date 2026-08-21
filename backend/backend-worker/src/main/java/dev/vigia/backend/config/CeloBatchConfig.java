@@ -61,7 +61,7 @@ public class CeloBatchConfig {
         return caravana -> {
             LocalDateTime hace24h = LocalDateTime.now().minusHours(24);
             List<Telemetria> telemetriaPendiente = telemetriaRepository
-                    .findByCaravanaAndEstadoInferenciaAndFechaHoraAfter(
+                    .findByCaravanaAndEstadoInferenciaCeloAndFechaHoraAfter(
                             caravana, EstadoInferencia.PENDIENTE, hace24h);
 
             if (!telemetriaPendiente.isEmpty()) {
