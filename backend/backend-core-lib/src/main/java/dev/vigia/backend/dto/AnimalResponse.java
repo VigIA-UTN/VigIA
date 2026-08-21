@@ -20,8 +20,10 @@ public class AnimalResponse {
     private String rodeoLoteNombre;
     private Long establecimientoId;
     private LocalDate fechaAlta;
-    // Estado reproductivo (último registro)
     private TipoReproductivo estadoReproductivo;
     private LocalDate fechaUltimoParto;
     private LocalDate fechaUltimaInseminacion;
+
+    private Boolean enCalibracion;
+    private Integer diasRestantesCalibracion;
 }

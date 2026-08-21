@@ -283,7 +283,13 @@ export default function AnimalDetailPage() {
         <div className="vigia-page-container animal-detail-container">
             <Container>
                 <div className="vigia-page-header mb-4 flex-wrap gap-3">
-                    <h2 className="vigia-page-title text-break pe-3 mb-0">Ficha del Animal: {animal.alias || animal.idCaravanaOficial || `#${animal.id}`}</h2>
+                    <h2 className="vigia-page-title text-break pe-3 mb-0">Ficha del Animal: {animal.alias || animal.idCaravanaOficial || `#${animal.id}`}
+                        {animal.enCalibracion && (
+                            <Badge bg="info" className="ms-3 align-middle" style={{ fontSize: '0.9rem' }}>
+                                <i className="bi bi-clock-history me-1" /> Calibración en proceso ({animal.diasRestantesCalibracion} días)
+                            </Badge>
+                        )}
+                    </h2>
                     <div className="d-flex align-items-center gap-2 flex-shrink-0">
                         {rol === 'PRODUCTOR' && !isEditing && (
                             <Button className="btn-vigia-primary px-4" onClick={() => setIsEditing(true)}>

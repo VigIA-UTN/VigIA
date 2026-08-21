@@ -17,11 +17,11 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
 
     List<Animal> findByRodeoLoteId(Long rodeoLoteId);
 
-    @EntityGraph(attributePaths = { "rodeoLote", "estadosReproductivos" })
+    @EntityGraph(attributePaths = { "rodeoLote", "estadosReproductivos", "caravana" })
     List<Animal> findByEstablecimientoIdInAndEstadoActualNot(
             List<Long> establecimientoIds, EstadoAnimal estadoActual);
 
-    @EntityGraph(attributePaths = { "rodeoLote", "estadosReproductivos" })
+    @EntityGraph(attributePaths = { "rodeoLote", "estadosReproductivos", "caravana" })
     List<Animal> findByEstadoActualNot(EstadoAnimal estadoActual);
 
     Optional<Animal> findByIdCaravanaOficial(String idCaravanaOficial);

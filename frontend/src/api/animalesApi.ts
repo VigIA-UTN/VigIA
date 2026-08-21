@@ -17,6 +17,8 @@ export interface AnimalResponse {
   estadoReproductivo?: string | null;
   fechaUltimoParto?: string | null;
   fechaUltimaInseminacion?: string | null;
+  enCalibracion?: boolean;
+  diasRestantesCalibracion?: number;
 }
 
 export interface CargaMasivaResponse {

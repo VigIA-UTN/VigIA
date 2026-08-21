@@ -122,15 +122,21 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
             return;
         }
 
-        LocalDate fechaAlta = animal.getFechaAlta();
-        if (fechaAlta == null) {
+        LocalDate fechaBase = animal.getFechaAlta();
+        if (fechaBase == null) {
             log.warn("Animal {} sin fecha de alta, no se puede calcular su ventana de calibración (RF03).",
                     animal.getId());
             marcarCompletados(telemetriaList);
             return;
         }
 
-        LocalDateTime finCalibracionInicial = fechaAlta.atStartOfDay().plusDays(calibracionDias);
+        if (animal.getCaravana() != null && animal.getCaravana().getFechaAsignacion() != null) {
+            if (animal.getCaravana().getFechaAsignacion().isAfter(fechaBase)) {
+                fechaBase = animal.getCaravana().getFechaAsignacion();
+            }
+        }
+
+        LocalDateTime finCalibracionInicial = fechaBase.atStartOfDay().plusDays(calibracionDias);
         if (ahora.isBefore(finCalibracionInicial)) {
             log.info("Animal {} todavía en período de calibración (RF03, termina {}). No se generan predicciones.",
                     animal.getId(), finCalibracionInicial);
@@ -144,7 +150,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
 
         PerfilReferencia perfilReferencia;
         if (necesitaPerfilNuevo) {
-            perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana, fechaAlta, ahora,
+            perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana, fechaBase, ahora,
                     correlationId);
             if (perfilReferencia == null) {
                 // Todavía no hay suficiente telemetría para armar una
@@ -211,7 +217,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
 
     @SuppressWarnings("null")
     private PerfilReferencia calcularYPersistirPerfil(Animal animal, Optional<PerfilReferencia> perfilExistente,
-            Caravana caravana, LocalDate fechaAlta, LocalDateTime ahora, String correlationId) {
+            Caravana caravana, LocalDate fechaBase, LocalDateTime ahora, String correlationId) {
         boolean esPrimerCalculo = perfilExistente.isEmpty();
 
         LocalDateTime desde;
@@ -219,7 +225,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         if (esPrimerCalculo) {
             // Primera calibración: los 7 días originales desde el alta
             // del animal (RF03).
-            desde = fechaAlta.atStartOfDay();
+            desde = fechaBase.atStartOfDay();
             hasta = desde.plusDays(calibracionDias);
         } else {
             // Recalibración periódica: los últimos N días "recientes",
