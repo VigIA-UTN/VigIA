@@ -28,7 +28,8 @@ public class Animal {
     @JoinColumn(name = "caravana_id")
     private Caravana caravana;
 
-    // ToDO: PERFIL REFERENCIA
+    @OneToOne(mappedBy = "animal", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private PerfilReferencia perfilReferencia;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rodeo_lote_id")

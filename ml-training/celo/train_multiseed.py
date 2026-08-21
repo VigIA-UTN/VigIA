@@ -1,7 +1,7 @@
 """
 train_multiseed.py
 ====================
-Fase 1 del plan de revisión del paper VigIA (dictamen de Oscar):
+Fase 1 del plan de revisión del paper VigIA:
 
 1. Manejo del desbalance de clases: class_weight='balanced' + PR-AUC +
    umbral óptimo elegido sobre la curva Precision-Recall (en vez de 0.5
@@ -40,7 +40,7 @@ import joblib
 
 
 def set_all_seeds(seed: int):
-    """Fija random, np.random y tf.random.set_seed (Punto 2 del dictamen)."""
+    """Fija random, np.random y tf.random.set_seed."""
     random.seed(seed)
     np.random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)

@@ -15,6 +15,7 @@ import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.data.RepositoryItemReader;
 import org.springframework.batch.item.data.builder.RepositoryItemReaderBuilder;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
@@ -36,7 +37,7 @@ public class CeloBatchConfig {
 
     public CeloBatchConfig(JobRepository jobRepository, PlatformTransactionManager transactionManager,
             CaravanaRepository caravanaRepository, TelemetriaRepository telemetriaRepository,
-            DetectorStrategy celoDetectorStrategy) {
+            @Qualifier("celoDetectorStrategyImpl") DetectorStrategy celoDetectorStrategy) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.caravanaRepository = caravanaRepository;
@@ -60,7 +61,7 @@ public class CeloBatchConfig {
         return caravana -> {
             LocalDateTime hace24h = LocalDateTime.now().minusHours(24);
             List<Telemetria> telemetriaPendiente = telemetriaRepository
-                    .findByCaravanaAndEstadoInferenciaAndFechaHoraAfter(
+                    .findByCaravanaAndEstadoInferenciaCeloAndFechaHoraAfter(
                             caravana, EstadoInferencia.PENDIENTE, hace24h);
 
             if (!telemetriaPendiente.isEmpty()) {

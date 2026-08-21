@@ -2,9 +2,25 @@
 generate_dataset.py (Salud)
 =========================
 Generador sintético y reproducible del dataset de telemetría para VigIA,
-orientado a la detección de problemas de salud.
+orientado a la detección de DESVÍOS SANITARIOS por perfil individual.
 
-Severidades:
+A diferencia del modelo de celo (evento puntual, comparado contra la
+población general), el modelo de salud compara a cada animal contra SU
+PROPIA línea base, construida durante un período de calibración de 7 días
+(requisito de negocio RF03). Por eso el simulador reproduce dos cosas que
+el diseño anterior (basado en clasificación poblacional) no necesitaba:
+
+1. Un período de calibración inicial (CALIB_DIAS = 7) por animal, en el
+   que se asume al animal sano (no se generan eventos de enfermedad ahí).
+   Esto refleja la asunción de negocio de RF03: el perfil de referencia se
+   arma en base a una ventana en la que no hay evidencia de enfermedad.
+2. Variabilidad INDIVIDUAL de comportamiento base (cada animal tiene su
+   propio nivel de actividad "normal", no solo el mismo patrón circadiano
+   poblacional). Sin esto, un enfoque de "desvío respecto al propio
+   perfil" sería equivalente a comparar contra la población, y no tendría
+   sentido usar un perfil individual en primer lugar.
+
+Severidades (igual que antes):
 0: Normal
 1: Bajo (ej. cojera leve, inicio de enfermedad)
 2: Medio (ej. cojera clínica, enfermedad moderada)
@@ -14,30 +30,46 @@ Severidades:
 import argparse
 import json
 from pathlib import Path
+# pyrefly: ignore [missing-import]
 import numpy as np
 import pandas as pd
 
 SAMPLES_PER_DAY = 288  # 1 lectura cada 5 minutos
 MINUTES_PER_SAMPLE = 5
+CALIB_DIAS = 7  # RF03: período de calibración de referencia individual
+CALIB_TICKS = CALIB_DIAS * SAMPLES_PER_DAY
 
-def build_dataset(n_animales: int, dias: int, seed: int):
+
+def build_dataset(n_animales: int, dias_evaluacion: int, seed: int):
     rng = np.random.default_rng(seed)
-    T = dias * SAMPLES_PER_DAY
+    dias_totales = CALIB_DIAS + dias_evaluacion
+    T = dias_totales * SAMPLES_PER_DAY
 
-    print(f"Simulando {n_animales} animales por {dias} días ({T} intervalos de 5 mins)...")
+    print(f"Simulando {n_animales} animales por {dias_totales} días "
+          f"({CALIB_DIAS} de calibración + {dias_evaluacion} de evaluación), "
+          f"{T} intervalos de 5 mins...")
+
+    # ------------------------------------------------------------------
+    # Personalidad individual: cada animal tiene su propio nivel de
+    # actividad "normal", independiente de los demás. Esto es lo que
+    # justifica comparar contra un perfil PROPIO en vez de contra la
+    # población: sin esta variabilidad, el perfil individual coincidiría
+    # con el perfil poblacional.
+    # ------------------------------------------------------------------
+    activity_offset = np.clip(rng.normal(0.0, 0.10, n_animales), -0.25, 0.25)
+    rest_bias = np.clip(rng.normal(0.0, 0.08, n_animales), -0.2, 0.2)
 
     # Matrices base
     severidad = np.zeros((n_animales, T), dtype=int)
-    tipo_alto = np.zeros((n_animales, T), dtype=int) # 0: N/A, 1: Inmovilidad, 2: Hiperactividad (parto)
+    tipo_alto = np.zeros((n_animales, T), dtype=int)  # 0: N/A, 1: Inmovilidad, 2: Hiperactividad (parto)
 
     metadata_list = []
 
-    # Generar eventos de enfermedad (desbalance: mayoría de días normales)
+    # Generar eventos de enfermedad SOLO después del período de calibración
+    # (mismo desbalance que antes: mayoría de días normales)
     for n in range(n_animales):
-        # 40% de los animales tendrán un evento en este periodo
         eventos = []
         if rng.random() < 0.40:
-            # Seleccionar severidad máxima: 50% Baja, 35% Media, 15% Alta
             r = rng.random()
             if r < 0.50:
                 sev_max = 1
@@ -45,41 +77,40 @@ def build_dataset(n_animales: int, dias: int, seed: int):
                 sev_max = 2
             else:
                 sev_max = 3
-            
-            # Duración del evento: 2 a 6 días (para dar espacio a progresión si ocurre)
+
             duracion_dias = rng.uniform(2, 6)
             duracion_ticks = int(duracion_dias * SAMPLES_PER_DAY)
-            
-            # Inicio del evento
-            t_start = rng.integers(0, max(1, T - duracion_ticks))
+
+            # El evento solo puede empezar DESPUÉS de la calibración
+            ventana_disponible = T - CALIB_TICKS - duracion_ticks
+            if ventana_disponible <= 0:
+                metadata_list.append({"caravana_id": n + 1, "eventos_salud": []})
+                continue
+            t_start = CALIB_TICKS + rng.integers(0, max(1, ventana_disponible))
             t_end = t_start + duracion_ticks
-            
-            # Lógica de progresión (evolución de la enfermedad a lo largo del tiempo)
-            is_progresivo = rng.random() < 0.70 # 70% de las enfermedades son progresivas
+
+            is_progresivo = rng.random() < 0.70
             t_alto = 0
-            
+
             if is_progresivo and sev_max > 1:
-                # Dividir el tiempo de la enfermedad en las distintas etapas progresivas (1 -> 2 -> 3)
-                etapas = sev_max 
+                etapas = sev_max
                 ticks_por_etapa = duracion_ticks // etapas
-                
+
                 for i in range(etapas):
                     sev_actual = i + 1
                     s_idx = t_start + i * ticks_por_etapa
-                    # La última etapa llega hasta t_end para evitar huecos
                     e_idx = t_start + (i + 1) * ticks_por_etapa if i < etapas - 1 else t_end
                     severidad[n, s_idx:e_idx] = sev_actual
-                    
+
                     if sev_actual == 3:
                         t_alto = 1 if rng.random() < 0.5 else 2
                         tipo_alto[n, s_idx:e_idx] = t_alto
             else:
-                # Enfermedad repentina (mantiene severidad constante)
                 severidad[n, t_start:t_end] = sev_max
                 if sev_max == 3:
                     t_alto = 1 if rng.random() < 0.5 else 2
                     tipo_alto[n, t_start:t_end] = t_alto
-                
+
             eventos.append({
                 "start_tick": int(t_start),
                 "end_tick": int(t_end),
@@ -87,7 +118,7 @@ def build_dataset(n_animales: int, dias: int, seed: int):
                 "progresiva": bool(is_progresivo),
                 "duracion_dias": round(duracion_dias, 2)
             })
-            
+
         metadata_list.append({
             "caravana_id": n + 1,
             "eventos_salud": eventos
@@ -111,37 +142,32 @@ def build_dataset(n_animales: int, dias: int, seed: int):
 
         sev = severidad[:, t - 1]
         t_alto = tipo_alto[:, t - 1]
-        
-        # Modificadores por defecto (Normal)
-        speed_mult = np.ones(n_animales)
+
+        # Modificadores por defecto (Normal) + personalidad individual
+        speed_mult = np.ones(n_animales) * (1.0 + activity_offset)
         turn_std = np.full(n_animales, TURN_STD_BASE)
-        
-        # Aplicar reglas por severidad
-        # Bajo (1): 80% velocidad
+
         mask_bajo = (sev == 1)
-        speed_mult[mask_bajo] = 0.8
-        
-        # Medio (2): 40% velocidad
+        speed_mult[mask_bajo] = 0.8 * (1.0 + activity_offset[mask_bajo])
+
         mask_medio = (sev == 2)
-        speed_mult[mask_medio] = 0.4
-        
-        # Alto (3) - Tipo 1 (Inmovilidad): 10% velocidad
+        speed_mult[mask_medio] = 0.4 * (1.0 + activity_offset[mask_medio])
+
         mask_alto_1 = (sev == 3) & (t_alto == 1)
         speed_mult[mask_alto_1] = 0.1
-        
-        # Alto (3) - Tipo 2 (Hiperactividad): 250% velocidad, rumbo muy errático
+
         mask_alto_2 = (sev == 3) & (t_alto == 2)
         speed_mult[mask_alto_2] = 2.5
         turn_std[mask_alto_2] = TURN_STD_BASE * 3
 
-        # Actualizar rumbo con persistencia
+        speed_mult = np.clip(speed_mult, 0.05, None)
+
         heading = heading + rng.normal(0, 1, n_animales) * turn_std
         speed = SPEED_BASE * speed_mult
 
         step_lat = speed * np.cos(heading)
         step_lon = speed * np.sin(heading)
 
-        # Fuerza de cohesión hacia el centro del rodeo
         pull_lat = (center_lat - lat[:, t - 1]) * 0.008
         pull_lon = (center_lon - lon[:, t - 1]) * 0.008
 
@@ -152,31 +178,28 @@ def build_dataset(n_animales: int, dias: int, seed: int):
     print("Generando estados de movimiento (MOVESTATE)...")
     hours_of_day = (np.arange(T) * MINUTES_PER_SAMPLE / 60.0) % 24.0
 
-    # Ritmo circadiano: más actividad de día (6 a 20hs)
     activity_base = np.where(
         (hours_of_day >= 6) & (hours_of_day < 20),
         rng.uniform(0.4, 0.8, (n_animales, T)),
         rng.uniform(0.0, 0.3, (n_animales, T))
     )
 
-    # Modificar activity_base según severidad (afecta la probabilidad de descanso)
-    # Valores de activity_base más altos = más probabilidad de movimiento (moveState > 1)
-    # Restar a activity_base aumenta el descanso.
+    # Personalidad individual: desplaza el nivel de actividad "normal" de
+    # cada animal de forma consistente en el tiempo.
+    activity_base = activity_base + activity_offset[:, None] - rest_bias[:, None]
+
     activity_base[severidad == 1] -= 0.15
     activity_base[severidad == 2] -= 0.40
-    activity_base[(severidad == 3) & (tipo_alto == 1)] -= 0.80 # Casi todo el tiempo reposo
-    activity_base[(severidad == 3) & (tipo_alto == 2)] += 0.80 # Casi nunca reposo
+    activity_base[(severidad == 3) & (tipo_alto == 1)] -= 0.80
+    activity_base[(severidad == 3) & (tipo_alto == 2)] += 0.80
 
     activity_base = np.clip(activity_base, 0.0, 1.0)
 
-    # Probabilidad de descanso (moveState 0-1) vs actividad normal (moveState 2-6)
     is_resting = rng.random((n_animales, T)) > activity_base
-
     move_state = np.where(is_resting, rng.integers(0, 2, (n_animales, T)), rng.integers(2, 7, (n_animales, T)))
 
-    # Alta actividad (moveState 7-9) inducida por hiperactividad (Alto tipo 2)
     mask_hiper = (severidad == 3) & (tipo_alto == 2)
-    prob_high_move = np.where(mask_hiper, 0.6, 0.005) # 60% chance de alta actividad si es hiperactivo, 0.5% por defecto
+    prob_high_move = np.where(mask_hiper, 0.6, 0.005)
     high_move_mask = rng.random((n_animales, T)) < prob_high_move
     move_state[high_move_mask] = rng.integers(7, 10, high_move_mask.sum())
 
@@ -198,21 +221,26 @@ def build_dataset(n_animales: int, dias: int, seed: int):
         "longitud": np.round(lon.flatten(), 6),
         "moveState": move_state.flatten(),
         "bateria": np.round(bateria.flatten().astype(np.float32), 2),
-        "severidad": severidad.flatten()
+        "severidad": severidad.flatten(),
+        # tick relativo al inicio de la serie del animal: permite
+        # separar limpiamente calibración (< CALIB_TICKS) de evaluación
+        # sin recalcular fechas.
+        "tick": np.tile(np.arange(T), n_animales),
     })
 
     return df, metadata_list
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generador sintético VigIA - Salud")
-    parser.add_argument("--n-animales", type=int, default=100)
-    parser.add_argument("--dias", type=int, default=120)
+    parser = argparse.ArgumentParser(description="Generador sintético VigIA - Salud (perfil individual)")
+    parser.add_argument("--n-animales", type=int, default=120)
+    parser.add_argument("--dias-evaluacion", type=int, default=90,
+                         help="Días de evaluación POST-calibración por animal (además de los 7 de calibración fijos por RF03)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--out-dir", type=str, default="dataset")
     args = parser.parse_args()
 
-    df, metadata = build_dataset(args.n_animales, args.dias, args.seed)
+    df, metadata = build_dataset(args.n_animales, args.dias_evaluacion, args.seed)
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -221,11 +249,20 @@ def main():
     df.to_parquet(out_dir / "telemetria.parquet", index=False)
 
     with open(out_dir / "ground_truth_metadata.json", "w") as f:
-        json.dump(metadata, f, indent=2, ensure_ascii=False)
+        json.dump({
+            "calib_dias": CALIB_DIAS,
+            "calib_ticks": CALIB_TICKS,
+            "samples_per_day": SAMPLES_PER_DAY,
+            "animales": metadata,
+        }, f, indent=2, ensure_ascii=False)
 
     print("¡Generación completada con éxito!")
-    print("Distribución de severidad (en ticks):")
+    print(f"Días de calibración por animal (RF03): {CALIB_DIAS}")
+    print("Distribución de severidad (en ticks, incluye calibración -siempre 0-):")
     print(df['severidad'].value_counts())
+    print("Distribución de severidad SOLO en período de evaluación:")
+    print(df.loc[df['tick'] >= CALIB_TICKS, 'severidad'].value_counts())
+
 
 if __name__ == "__main__":
     main()

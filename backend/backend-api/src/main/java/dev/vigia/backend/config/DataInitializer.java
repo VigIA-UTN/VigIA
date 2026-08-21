@@ -116,6 +116,7 @@ public class DataInitializer implements CommandLineRunner {
         vaca2.setAlias("Margarita");
         vaca2.setEstadoActual(EstadoAnimal.ACTIVO);
         vaca2.setFechaNacimiento(LocalDate.of(2021, 5, 10));
+        vaca2.setFechaAlta(LocalDate.now().minusDays(7));
 
         Caravana caravana2 = new Caravana();
         caravana2.setCodigo("VIGIA-ARG-002");
@@ -175,7 +176,8 @@ public class DataInitializer implements CommandLineRunner {
         telemetriaStale.setBateria(45.0);
         telemetriaStale.setNivelRumia(50.0);
         telemetriaStale.setMoveState(1);
-        telemetriaStale.setEstadoInferencia(EstadoInferencia.COMPLETADO);
+        telemetriaStale.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+        telemetriaStale.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
         telemetriaRepository.save(telemetriaStale);
 
         log.info("[DataInitializer] ✅ Animales de prueba generados.");

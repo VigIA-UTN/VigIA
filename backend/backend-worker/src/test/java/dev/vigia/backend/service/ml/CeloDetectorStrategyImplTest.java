@@ -16,8 +16,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
-@SpringBootTest
-
+@SpringBootTest(properties = {"spring.batch.job.enabled=false"})
 class CeloDetectorStrategyImplTest {
 
     @MockBean
@@ -39,13 +38,13 @@ class CeloDetectorStrategyImplTest {
     @SuppressWarnings("null")
     void testFallbackProcess() {
         Telemetria t1 = new Telemetria();
-        t1.setEstadoInferencia(EstadoInferencia.PENDIENTE);
+        t1.setEstadoInferenciaCelo(EstadoInferencia.PENDIENTE);
 
         List<Telemetria> lista = Arrays.asList(t1);
 
         celoDetectorStrategy.fallbackProcess(lista, "12345", new RuntimeException("Timeout"));
 
-        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferencia());
+        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferenciaCelo());
         verify(telemetriaRepository).saveAll(anyList());
     }
 }
