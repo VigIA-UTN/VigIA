@@ -32,6 +32,7 @@ jwt:
 vigia:
   ml:
     celo-url: http://localhost:8001
+    salud-url: http://localhost:8002
 
 resilience4j:
   circuitbreaker:
@@ -41,12 +42,22 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+      saludML:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
   retry:
     instances:
       celoML:
+        maxAttempts: 2
+        waitDuration: 500ms
+      saludML:
         maxAttempts: 2
         waitDuration: 500ms
   timelimiter:
     instances:
       celoML:
         timeoutDuration: 2000ms
+      saludML:
+        timeoutDuration: 4000ms

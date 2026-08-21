@@ -11,7 +11,14 @@ import java.util.Optional;
 
 public interface TelemetriaRepository extends JpaRepository<Telemetria, Long> {
     List<Telemetria> findByEstadoInferencia(EstadoInferencia estadoInferencia);
-    List<Telemetria> findByCaravanaAndEstadoInferenciaAndFechaHoraAfter(Caravana caravana, EstadoInferencia estadoInferencia, LocalDateTime fechaHora);
+
+    List<Telemetria> findByCaravanaAndEstadoInferenciaAndFechaHoraAfter(Caravana caravana,
+            EstadoInferencia estadoInferencia, LocalDateTime fechaHora);
+
     List<Telemetria> findByCaravanaAndFechaHoraAfterOrderByFechaHoraAsc(Caravana caravana, LocalDateTime fechaHora);
+
     Optional<Telemetria> findFirstByCaravanaOrderByFechaHoraDesc(Caravana caravana);
+
+    List<Telemetria> findByCaravanaAndFechaHoraBetweenOrderByFechaHoraAsc(
+            Caravana caravana, LocalDateTime desde, LocalDateTime hasta);
 }

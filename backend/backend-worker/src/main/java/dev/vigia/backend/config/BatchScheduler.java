@@ -16,10 +16,8 @@ public class BatchScheduler {
 
     private final JobLauncher jobLauncher;
     private final Job celoJob;
+    private final Job saludJob;
 
-    /**
-     * Se ejecuta según el intervalo configurado para procesar las telemetrías pendientes.
-     */
     @Scheduled(fixedRateString = "${vigia.batch.celo-rate:60000}")
     @SuppressWarnings("null")
     public void runCeloJob() {
@@ -32,6 +30,21 @@ public class BatchScheduler {
             jobLauncher.run(celoJob, parameters);
         } catch (Exception e) {
             log.error("Error al ejecutar el Job de Celo: {}", e.getMessage(), e);
+        }
+    }
+
+    @Scheduled(fixedRateString = "${vigia.batch.salud-rate:60000}")
+    @SuppressWarnings("null")
+    public void runSaludJob() {
+        try {
+            log.info("Iniciando ejecución programada del Job de Salud");
+            JobParameters parameters = new JobParametersBuilder()
+                    .addLong("time", System.currentTimeMillis())
+                    .toJobParameters();
+
+            jobLauncher.run(saludJob, parameters);
+        } catch (Exception e) {
+            log.error("Error al ejecutar el Job de Salud: {}", e.getMessage(), e);
         }
     }
 }

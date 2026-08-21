@@ -98,8 +98,8 @@ CREATE TABLE alertas (
     ventana_inicio_ins TIMESTAMP,
     ventana_fin_ins TIMESTAMP,
     accion_recomendada VARCHAR(255),
-    confianza_modelo DOUBLE PRECISION, -- TODO: REVISAR
-    ventana_optima_horas INT -- TODO: REVISAR
+    confianza_modelo DOUBLE PRECISION,
+    ventana_optima_horas INT
 );
 
 CREATE TABLE telemetria (
@@ -121,4 +121,11 @@ CREATE TABLE intervenciones (
     interventor_id BIGINT NOT NULL REFERENCES usuarios(id),
     descripcion VARCHAR(1000) NOT NULL,
     fecha_hora TIMESTAMP NOT NULL
+);
+
+CREATE TABLE perfiles_referencia (
+    id BIGSERIAL PRIMARY KEY,
+    animal_id BIGINT NOT NULL UNIQUE REFERENCES animales(id),
+    perfil_json TEXT NOT NULL,
+    fecha_calculo TIMESTAMP NOT NULL
 );

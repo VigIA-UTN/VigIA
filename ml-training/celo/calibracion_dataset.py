@@ -4,8 +4,7 @@ calibracion_dataset.py
 Compara el simulador de VigIA (generate_dataset.py) contra el dataset
 público de comportamiento bovino a campo abierto de Chile
 (Morales-Vargas et al. 2025, db-cow-walking), para documentar con
-rigor estadístico la sub-sección "Calibración empírica del simulador"
-pedida en el dictamen de Oscar.
+rigor estadístico la sub-sección "Calibración empírica del simulador".
 
 Dos comparaciones, con el nivel de rigor que los datos disponibles
 realmente permiten (el dataset público NO trae GPS/velocidad ni un
