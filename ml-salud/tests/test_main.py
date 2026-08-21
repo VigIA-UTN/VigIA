@@ -5,6 +5,7 @@ import numpy as np
 
 from app.main import app
 import app.main as main_app
+from app.features_salud import compute_baseline, FEATURE_VERSION
 
 client = TestClient(app)
 
@@ -25,9 +26,6 @@ def mock_dependencies():
 
 
 def _punto(i, moveState):
-    # Pequeña variación de lat/lon para que la serie no sea perfectamente
-    # constante (std=0 es válido igual gracias al epsilon en features_salud,
-    # pero así se ejercita el cálculo real de distancias).
     return {
         "moveState": moveState,
         "latitud": -34.0 + (i % 12) * 0.00001,
@@ -44,18 +42,60 @@ def generate_serie_payload(moveState=3):
     return [_punto(i, moveState) for i in range(SAMPLES_PER_DAY)]
 
 
+def generate_perfil(moveState=3):
+    """Perfil ya calculado, tal como lo devolvería /perfil -- así los
+    tests de /predict no dependen de /perfil para armar su fixture."""
+    calib = generate_calib_payload(moveState=moveState)
+    move_state = [p["moveState"] for p in calib]
+    lat = [p["latitud"] for p in calib]
+    lon = [p["longitud"] for p in calib]
+    return compute_baseline(move_state, lat, lon)
+
+
 def generate_payload(moveState=3):
     return {
         "serie": generate_serie_payload(moveState),
-        "perfil_calibracion": generate_calib_payload(moveState=moveState),
+        "perfil": generate_perfil(moveState),
     }
 
 
 def test_health():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "ml-salud"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["service"] == "ml-salud"
+    assert data["feature_version"] == FEATURE_VERSION
 
+
+# ---------------------------------------------------------------------
+# /api/internal/ml/salud/perfil
+# ---------------------------------------------------------------------
+
+def test_perfil_ok():
+    payload = {"calibracion": generate_calib_payload()}
+    response = client.post("/api/internal/ml/salud/perfil", json=payload,
+                            headers={"X-Correlation-ID": "perfil-123"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "perfil" in data
+    assert data["perfil"]["n_dias_calibracion"] == CALIB_DIAS
+    assert data["perfil"]["feature_version"] == FEATURE_VERSION
+    assert response.headers["X-Correlation-ID"] == "perfil-123"
+
+
+def test_perfil_calibracion_insuficiente():
+    payload = {"calibracion": generate_calib_payload(n_dias=3)}
+    response = client.post("/api/internal/ml/salud/perfil", json=payload)
+    assert response.status_code == 422
+    data = response.json()
+    assert data["error"] == "Calibracion Insuficiente"
+    assert data["calib_dias_minimo"] == CALIB_DIAS
+
+
+# ---------------------------------------------------------------------
+# /api/internal/ml/salud/predict
+# ---------------------------------------------------------------------
 
 def test_predict_normal():
     main_app.model.predict_proba.return_value = np.array([[0.8, 0.1, 0.05, 0.05]])
@@ -105,28 +145,30 @@ def test_predict_alta():
     assert "Problema severo" in data["posible_causa"]
 
 
-def test_calibracion_insuficiente():
-    """RF03: menos de 7 días de calibración debe rechazarse con 422, no
-    con un 200 silencioso ni con un 503 genérico."""
-    payload = {
-        "serie": generate_serie_payload(),
-        "perfil_calibracion": generate_calib_payload(n_dias=3),
-    }
+def test_predict_perfil_vacio():
+    """Si el backend no manda perfil (o manda uno vacío), no hay forma
+    de predecir -- debe fallar, no inferir con datos incompletos."""
+    payload = {"serie": generate_serie_payload(), "perfil": {}}
     response = client.post("/api/internal/ml/salud/predict", json=payload)
-    assert response.status_code == 422
-    data = response.json()
-    assert data["error"] == "Calibracion Insuficiente"
-    assert data["calib_dias_minimo"] == CALIB_DIAS
+    assert response.status_code == 503
+
+
+def test_predict_perfil_malformado():
+    """Un perfil sin las claves esperadas (ej. de una versión vieja de
+    /perfil) no debe romper el proceso silenciosamente -- 503 explícito."""
+    payload = {"serie": generate_serie_payload(), "perfil": {"algo_que_no_es": 1}}
+    response = client.post("/api/internal/ml/salud/predict", json=payload)
+    assert response.status_code == 503
 
 
 def test_serie_incompleta():
     """La ventana a evaluar debe tener exactamente 288 puntos (24hs)."""
     payload = {
         "serie": generate_serie_payload()[:100],
-        "perfil_calibracion": generate_calib_payload(),
+        "perfil": generate_perfil(),
     }
     response = client.post("/api/internal/ml/salud/predict", json=payload)
-    assert response.status_code == 503  # falla de precondición no distinguida de una falla interna
+    assert response.status_code == 503
 
 
 def test_invalid_payload():

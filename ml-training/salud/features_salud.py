@@ -37,12 +37,28 @@ un período de calibración de exactamente CALIB_DIAS_MINIMO = 7 días. Se
 exige un mínimo de CALIB_DIAS_MINIMO * SAMPLES_PER_DAY puntos de
 calibración; con menos, no hay perfil de referencia válido y no
 corresponde predecir (ver ErrorCalibracionInsuficiente en main.py).
+
+Persistencia del perfil (decisión de costo/arquitectura): compute_baseline()
+se invoca UNA sola vez por parte de main.py (endpoint /perfil), y el
+backend persiste el resultado en vez de reenviar la telemetría cruda de
+calibración en cada predicción -- reenviar y recalcular ~2000 puntos en
+cada llamada de un batch que puede correr cada pocos segundos es
+desperdicio de red y de CPU sin ningún beneficio de precisión (la función
+es determinística: mismos puntos de entrada, mismo resultado siempre).
+FEATURE_VERSION se incluye en el perfil devuelto como metadato informativo
+para poder diagnosticar manualmente si un perfil persistido quedó
+calculado con una versión vieja de esta lógica; no hay chequeo de versión
+automático en /predict en esta iteración -- el mecanismo real para que un
+perfil no quede desactualizado para siempre es la recalibración periódica
+que corresponde implementar en el backend (ver RECALIBRACION_DIAS en
+SaludDetectorStrategyImpl), no una validación estricta acá.
 """
+
+FEATURE_VERSION = "v1"
 
 import math
 from typing import List, Sequence, Tuple
 
-# pyrefly: ignore [missing-import]
 import numpy as np
 
 SAMPLES_PER_DAY = 288  # 1 lectura cada 5 minutos
@@ -150,6 +166,7 @@ def compute_baseline(calib_move_state: Sequence[float], calib_lat: Sequence[floa
     baseline["quarter_distancia_mean"] = quarters_dist.mean(axis=0).tolist()
     baseline["quarter_distancia_std"] = quarters_dist.std(axis=0).tolist()
     baseline["n_dias_calibracion"] = len(dias)
+    baseline["feature_version"] = FEATURE_VERSION
     return baseline
 
 

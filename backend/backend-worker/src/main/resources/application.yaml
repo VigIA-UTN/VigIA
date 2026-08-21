@@ -43,6 +43,11 @@ vigia:
     celo-url: ${ML_CELO_URL:http://localhost:8001}
     salud-url: ${ML_SALUD_URL:http://localhost:8002}
     geo-url: ${ML_GEO_URL:http://localhost:8003}
+  batch:
+    salud-rate: ${VIGIA_BATCH_SALUD_RATE:60000}
+  salud:
+    calibracion-dias: ${VIGIA_SALUD_CALIBRACION_DIAS:7}
+    recalibracion-dias: ${VIGIA_SALUD_RECALIBRACION_DIAS:30}
 
 cors:
   allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
@@ -55,13 +60,26 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+      saludML:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
   retry:
     instances:
       celoML:
+        maxAttempts: 2
+        waitDuration: 500ms
+      saludML:
         maxAttempts: 2
         waitDuration: 500ms
   timelimiter:
     instances:
       celoML:
         timeoutDuration: 2000ms
+      # saludML puede hacer DOS llamadas HTTP en un mismo ciclo (perfil
+      # + predict) cuando toca calcular/recalibrar el perfil, así que se
+      # le da más margen que a celoML (que siempre hace una sola).
+      saludML:
+        timeoutDuration: 4000ms
 

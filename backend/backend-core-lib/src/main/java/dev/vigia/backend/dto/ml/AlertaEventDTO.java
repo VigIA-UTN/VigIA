@@ -25,6 +25,6 @@ public class AlertaEventDTO {
     private Double valorDetectado;
     private EstadoAlerta estado;
     private String accionRecomendada;
-    private Float confianzaModelo; // TODO: REVISAR
-    private Integer ventanaOptimaHoras; // TODO: REVISAR
+    private Float confianzaModelo;
+    private Integer ventanaOptimaHoras;
 }
