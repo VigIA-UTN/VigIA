@@ -25,7 +25,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-@SpringBootTest
+@SpringBootTest(properties = {"spring.batch.job.enabled=false"})
 class SaludDetectorStrategyImplTest {
 
     @MockBean

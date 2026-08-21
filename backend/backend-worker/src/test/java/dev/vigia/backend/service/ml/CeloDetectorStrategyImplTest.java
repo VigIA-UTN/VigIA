@@ -16,8 +16,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
-@SpringBootTest
-
+@SpringBootTest(properties = {"spring.batch.job.enabled=false"})
 class CeloDetectorStrategyImplTest {
 
     @MockBean
