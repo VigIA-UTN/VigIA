@@ -1,46 +1,64 @@
 """
 Microservicio de Detección de Desvíos Sanitarios
-Evalúa la telemetría de las últimas 24 horas para diagnosticar la severidad de un problema de salud.
+=================================================
+Reconstruido para trabajar por PERFIL INDIVIDUAL: a diferencia del modelo
+de celo (evento puntual, comparado contra la población general), este
+microservicio compara la ventana de telemetría a evaluar contra la línea
+base propia de CADA animal, construida sobre un período de calibración de
+7 días (requisito de negocio RF03; ver features_salud.py).
+
+El modelo es un clasificador híbrido: las features de desvío (z-scores
+respecto al perfil de calibración) se calculan con lógica determinística
+en features_salud.py, y sobre esas features se entrena un
+RandomForestClassifier (ver ml-training/salud/train_model.py). No se usa
+una red neuronal: para esta tarea el ensamble de árboles es
+sustancialmente más reproducible entre corridas (ver justificación
+detallada en train_model.py) y no requiere TensorFlow en este servicio.
+
+Nota sobre el campo `perfil_referencia` de la versión anterior de este
+microservicio: se eliminó por completo (no se documenta como "pendiente")
+porque asumía datos de rumia que el dispositivo IoT de VigIA no emite.
+Fue reemplazado por `perfil_calibracion`, que sí es telemetría real
+(moveState + GPS) del propio animal.
 """
 
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, Request, Response
+# pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 from typing import List, Optional
-import math
+# pyrefly: ignore [missing-import]
 import numpy as np
 from pathlib import Path
+# pyrefly: ignore [missing-import]
 import joblib
 
-try:
-    import tensorflow as tf
-except ImportError:
-    tf = None
+from .features_salud import (
+    compute_baseline,
+    compute_features,
+    ErrorCalibracionInsuficiente,
+    CALIB_DIAS_MINIMO,
+    SAMPLES_PER_DAY,
+)
 
 app = FastAPI(title="VigIA - Microservicio de Detección de Desvíos Sanitarios")
 
 model = None
-scaler = None
 
-DIST_SCALE_FACTOR = 100000
 
 @app.on_event("startup")
 def load_ml_model():
-    global model, scaler
-    if tf is None:
-        print("ADVERTENCIA: tensorflow no está instalado. No se podrá cargar el modelo.")
-        return
-
+    global model
     models_dir = Path(__file__).parent / "models"
-    model_path = models_dir / "modelo_salud_lstm.keras"
-    scaler_path = models_dir / "scaler_salud.joblib"
+    model_path = models_dir / "modelo_salud_rf.joblib"
 
-    if model_path.exists() and scaler_path.exists():
-        model = tf.keras.models.load_model(model_path)
-        scaler = joblib.load(scaler_path)
-        print("Modelo y scaler cargados correctamente.")
+    if model_path.exists():
+        model = joblib.load(model_path)
+        print("Modelo (RandomForest) cargado correctamente.")
     else:
-        print(f"ADVERTENCIA: No se encontró el modelo o scaler en {models_dir}.")
+        print(f"ADVERTENCIA: No se encontró el modelo en {model_path}.")
 
 
 class PuntoTelemetria(BaseModel):
@@ -48,9 +66,11 @@ class PuntoTelemetria(BaseModel):
     latitud: float
     longitud: float
 
+
 class PredictRequest(BaseModel):
     serie: List[PuntoTelemetria]
-    perfil_referencia: Optional[dict] = None
+    perfil_calibracion: List[PuntoTelemetria]
+
 
 class PrediccionSaludResponse(BaseModel):
     desvio_detectado: bool
@@ -68,50 +88,54 @@ def get_posible_causa(severidad: int) -> Optional[str]:
     }
     return causas.get(severidad, "Desconocida")
 
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "ml-salud"}
 
+
 @app.post("/api/internal/ml/salud/predict", response_model=PrediccionSaludResponse)
 async def predict(request: Request, response: Response, body: PredictRequest):
     """
-    Request: serie temporal de la telemetría del animal de las últimas 24 horas y perfil de referencia.
+    Request:
+      - serie: ventana de 24hs (288 puntos, 1 cada 5 min) a evaluar.
+      - perfil_calibracion: telemetría cruda de los últimos >= 7 días
+        (RF03) del MISMO animal, usada para construir su línea base
+        individual. El backend es responsable de no llamar a este
+        endpoint para un animal que todavía no completó su período de
+        calibración.
     """
     correlation_id = request.headers.get("X-Correlation-ID", "unknown")
-    print(f"[{correlation_id}] Request recibida para predicción de salud con {len(body.serie)} puntos.")
+    print(f"[{correlation_id}] Request recibida: serie={len(body.serie)} puntos, "
+          f"perfil_calibracion={len(body.perfil_calibracion)} puntos.")
     response.headers["X-Correlation-ID"] = correlation_id
 
     try:
-        if model is None or scaler is None:
+        if model is None:
             raise ValueError("El modelo de machine learning no está cargado.")
 
         if not body.serie:
-            raise ValueError("La serie de telemetría está vacía.")
+            raise ValueError("La serie a evaluar está vacía.")
 
-        features = []
-        for i in range(len(body.serie)):
-            ms = body.serie[i].moveState
-            if i == 0:
-                dist = 0.0
-            else:
-                lat1, lon1 = body.serie[i-1].latitud, body.serie[i-1].longitud
-                lat2, lon2 = body.serie[i].latitud, body.serie[i].longitud
-                dist = math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2) * DIST_SCALE_FACTOR
-            features.append([float(ms), float(dist)])
+        move_state = [p.moveState for p in body.serie]
+        lat = [p.latitud for p in body.serie]
+        lon = [p.longitud for p in body.serie]
 
-        X_input = np.array([features])
+        calib_move_state = [p.moveState for p in body.perfil_calibracion]
+        calib_lat = [p.latitud for p in body.perfil_calibracion]
+        calib_lon = [p.longitud for p in body.perfil_calibracion]
 
-        # El scaler espera un array 2D, aplanamos, transformamos y volvemos a la forma original
-        X_input_flat = X_input.reshape(-1, X_input.shape[-1])
-        X_scaled_flat = scaler.transform(X_input_flat)
-        X_input = X_scaled_flat.reshape(X_input.shape)
+        baseline = compute_baseline(calib_move_state, calib_lat, calib_lon)
+        features = compute_features(move_state, lat, lon, baseline)
 
-        y_pred_prob = model.predict(X_input, verbose=0)
-        prob_array = y_pred_prob[0]
-        
-        severidad = int(np.argmax(prob_array))
-        confianza = float(prob_array[severidad])
-        
+        X = np.array([features])
+        proba = model.predict_proba(X)[0]
+        clases = model.classes_
+
+        idx_max = int(np.argmax(proba))
+        severidad = int(clases[idx_max])
+        confianza = float(proba[idx_max])
+
         desvio = severidad > 0
         causa = get_posible_causa(severidad)
 
@@ -122,6 +146,22 @@ async def predict(request: Request, response: Response, body: PredictRequest):
             severidad=severidad,
             posible_causa=causa,
             confianza_modelo=confianza
+        )
+    except ErrorCalibracionInsuficiente as e:
+        # Error de negocio (RF03), no una falla del servicio: el backend
+        # no debería haber llamado a este endpoint todavía para este
+        # animal. Se distingue con 422 del 503 de fallas internas.
+        print(f"[{correlation_id}] Calibración insuficiente: {str(e)}")
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "Calibracion Insuficiente",
+                "mensaje": str(e),
+                "calib_dias_minimo": CALIB_DIAS_MINIMO,
+                "samples_per_day": SAMPLES_PER_DAY,
+                "trace_id": correlation_id
+            },
+            headers={"X-Correlation-ID": correlation_id}
         )
     except Exception as e:
         print(f"[{correlation_id}] Error durante la inferencia: {str(e)}")
