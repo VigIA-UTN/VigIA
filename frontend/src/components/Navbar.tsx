@@ -137,6 +137,12 @@ function NavScroll() {
                                 <i className="bi bi-envelope me-2" />Invitaciones
                             </button>
                         </>
+                    ) : rol === 'PENDIENTE' ? (
+                        <>
+                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/invitaciones')}>
+                                <i className="bi bi-envelope me-2" />Invitaciones
+                            </button>
+                        </>
                     ) : (
                         <>
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/dashboard')}>
@@ -218,6 +224,9 @@ function NavScroll() {
                                     <Nav.Link as={Link} to="/establecimientos" className="mx-2 fw-semibold">Establecimientos</Nav.Link>
                                     <Nav.Link as={Link} to="/usuarios" className="mx-2 fw-semibold">Usuarios</Nav.Link>
                                 </>
+                            ) : rol === 'PENDIENTE' ? (
+                                <>
+                                </>
                             ) : (
                                 <>
                                     <Nav.Link as={Link} to="/establecimientos" className="mx-2 fw-semibold">Establecimientos</Nav.Link>
@@ -227,7 +236,7 @@ function NavScroll() {
                             )}
                         </Nav>
 
-                        <Navbar.Brand as={Link} to={getDashboardRoute()} className="mx-0 d-none d-lg-block p-0 align-self-start" style={{ zIndex: 10 }}>
+                        <Navbar.Brand as={Link} to={rol === 'PENDIENTE' ? '/invitaciones' : getDashboardRoute()} className="mx-0 d-none d-lg-block p-0 align-self-start" style={{ zIndex: 10 }}>
                             <div className="brand-trapezoid">
                                 <img src={logoImg} alt="VigIA" className="navbar-logo" />
                             </div>
@@ -235,6 +244,10 @@ function NavScroll() {
 
                         <Nav className="ms-auto align-items-center flex-grow-1 justify-content-lg-start ps-lg-4 mb-3 mb-lg-0" style={{ flexBasis: 0 }}>
                             {isAdmin ? (
+                                <>
+                                    <Nav.Link as={Link} to="/invitaciones" className="mx-2 fw-semibold">Invitaciones</Nav.Link>
+                                </>
+                            ) : rol === 'PENDIENTE' ? (
                                 <>
                                     <Nav.Link as={Link} to="/invitaciones" className="mx-2 fw-semibold">Invitaciones</Nav.Link>
                                 </>
