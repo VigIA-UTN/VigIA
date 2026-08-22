@@ -324,7 +324,7 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/animales/crear - Sin autenticación recibe 403")
+        @DisplayName("POST /api/v1/animales/crear - Sin autenticación recibe 401")
         @SuppressWarnings("null")
         void cargarAnimal_sinAuth_forbidden() throws Exception {
                 AnimalRequest req = new AnimalRequest();
@@ -338,7 +338,7 @@ class AnimalControllerTest {
                 mockMvc.perform(post("/api/v1/animales")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(req)))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isUnauthorized());
         }
 
         @Test
@@ -625,10 +625,10 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/animales - Sin autenticación recibe 403")
+        @DisplayName("GET /api/v1/animales - Sin autenticación recibe 401")
         void listarAnimales_sinAuth_forbidden() throws Exception {
                 mockMvc.perform(get("/api/v1/animales"))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isUnauthorized());
         }
 
         // =========================================================================
@@ -669,10 +669,10 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/animales/{id} - Sin autenticación recibe 403")
+        @DisplayName("GET /api/v1/animales/{id} - Sin autenticación recibe 401")
         void getAnimalById_sinAuth_forbidden() throws Exception {
                 mockMvc.perform(get("/api/v1/animales/1"))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isUnauthorized());
         }
 
         // =========================================================================

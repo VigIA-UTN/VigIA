@@ -133,10 +133,10 @@ class AuthControllerTest {
     // ─── Criterio 2: Token validado en endpoints protegidos ──────────────────
 
     @Test
-    @DisplayName("Endpoint protegido sin token → responde 403")
+    @DisplayName("Endpoint protegido sin token → responde 401")
     void protectedEndpoint_withoutToken_returns403() throws Exception {
         mockMvc.perform(get("/api/test-protegido"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

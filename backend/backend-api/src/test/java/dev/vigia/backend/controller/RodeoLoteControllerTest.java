@@ -184,7 +184,7 @@ class RodeoLoteControllerTest {
                 mockMvc.perform(post("/api/v1/rodeo-lotes")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isUnauthorized());
         }
 
         @Test
@@ -303,10 +303,10 @@ class RodeoLoteControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/rodeo-lotes - Sin autenticación recibe 403")
+        @DisplayName("GET /api/v1/rodeo-lotes - Sin autenticación recibe 401")
         void getAllRodeoLotes_sinAutenticacion_forbidden() throws Exception {
                 mockMvc.perform(get("/api/v1/rodeo-lotes"))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isUnauthorized());
         }
 
         @Test
