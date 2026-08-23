@@ -13,6 +13,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 function NavScroll() {
     const { rol, logout } = useAuthStore();
     const isAdmin = rol === 'ADMINISTRADOR';
+    const isProductor = rol === 'PRODUCTOR';
     const navigate = useNavigate();
 
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -154,16 +155,17 @@ function NavScroll() {
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/animales')}>
                                 <i className="bi bi-heart-pulse me-2" />Animales
                             </button>
-                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/empleados')}>
-                                <i className="bi bi-person-badge me-2" />Empleados
-                            </button>
+                            {isProductor && (
+                                <>
+                                    <button className="mobile-drawer-link" onClick={() => handleNavLink('/empleados')}>
+                                        <i className="bi bi-person-badge me-2" />Empleados
+                                    </button>
+                                    <button className="mobile-drawer-link" onClick={() => handleNavLink('/establecimientos')}>
+                                        <i className="bi bi-building me-2" />Establecimientos
+                                    </button>
+                                </>
+                            )}
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/alertas')}>
-                                <i className="bi bi-bell me-2" />Alertas
-                            </button>
-                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/establecimientos')}>
-                                <i className="bi bi-building me-2" />Establecimientos
-                            </button>
-                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/invitaciones')}>
                                 <i className="bi bi-envelope me-2" />Invitaciones
                             </button>
                         </>
@@ -229,8 +231,12 @@ function NavScroll() {
                                 </>
                             ) : (
                                 <>
-                                    <Nav.Link as={Link} to="/establecimientos" className="mx-2 fw-semibold">Establecimientos</Nav.Link>
-                                    <Nav.Link as={Link} to="/empleados" className="mx-2 fw-semibold">Empleados</Nav.Link>
+                                    {isProductor && (
+                                        <>
+                                            <Nav.Link as={Link} to="/establecimientos" className="mx-2 fw-semibold">Establecimientos</Nav.Link>
+                                            <Nav.Link as={Link} to="/empleados" className="mx-2 fw-semibold">Empleados</Nav.Link>
+                                        </>
+                                    )}
                                     <Nav.Link as={Link} to="/animales" className="mx-2 fw-semibold">Animales</Nav.Link>
                                 </>
                             )}
