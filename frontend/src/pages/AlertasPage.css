@@ -53,11 +53,24 @@
 }
 
 .tipo-badge {
-    background-color: #EBF8FF;
-    color: #2B6CB0;
     padding: 6px 12px;
     border-radius: 20px;
     font-size: 0.85rem;
     font-weight: 600;
     display: inline-block;
+}
+
+.tipo-celo {
+    background-color: #FEEBC8;
+    color: #C05621;
+}
+
+.tipo-salud {
+    background-color: #EBF8FF;
+    color: #2B6CB0;
+}
+
+.tipo-abigeato {
+    background-color: #E9D8FD;
+    color: #6B46C1;
 }
