@@ -10,7 +10,7 @@ import logoImg from '../assets/logo.png';
 import loginImage from '../assets/login_image.jpg';
 import './LoginPage.css';
 
-const backendBaseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1').replace(/\/api\/v1\/?$/, '');
+const backendBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api\/v1\/?$/, '');
 const googleOAuthUrl = `${backendBaseUrl}/oauth2/authorization/google`;
 
 const schema = z.object({
@@ -26,7 +26,7 @@ export default function LoginPage() {
   const login = useAuthStore((s) => s.login);
 
   const ssoPendiente = searchParams.get('sso_pendiente') === '1';
-  const ssoError = searchParams.get('sso_error') === '1';
+  const ssoError = searchParams.get('sso_error');
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,7 +104,7 @@ export default function LoginPage() {
         {ssoError && (
           <div className="login-alert alert-error" role="alert">
             <span>⚠️</span>
-            <span>Hubo un problema al iniciar sesión con Google. Intentá de nuevo.</span>
+            <span>{ssoError === '1' ? 'Hubo un problema al iniciar sesión con Google. Intentá de nuevo.' : ssoError}</span>
           </div>
         )}
 

@@ -59,7 +59,7 @@ public class SecurityConfig {
                                 .exceptionHandling(exceptions -> exceptions
                                                 .authenticationEntryPoint(
                                                                 new org.springframework.security.web.authentication.HttpStatusEntryPoint(
-                                                                                org.springframework.http.HttpStatus.FORBIDDEN)))
+                                                                                org.springframework.http.HttpStatus.UNAUTHORIZED)))
                                 .oauth2Login(oauth2 -> oauth2
                                                 .successHandler(oAuth2SuccessHandler)
                                                 .failureHandler(oAuth2FailureHandler))

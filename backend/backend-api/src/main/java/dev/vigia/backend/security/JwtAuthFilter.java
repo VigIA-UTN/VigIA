@@ -48,7 +48,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
         try {
             userEmail = jwtUtil.extractUsername(jwt);
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (userEmail != null) {
+                // JWT siempre toma precedencia sobre cualquier sesión existente.
+                // Esto evita que una sesión de OAuth2 anterior interfiera con la
+                // autenticación JWT en requests posteriores.
                 UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(userEmail);
                 if (jwtUtil.validateToken(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(

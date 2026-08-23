@@ -3,10 +3,12 @@ package dev.vigia.backend.service.impl;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
@@ -60,6 +62,9 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstadoReproductivoRepository estadoReproductivoRepository;
         private final IntervencionRepository intervencionRepository;
         private final TelemetriaRepository telemetriaRepository;
+
+        @Value("${vigia.salud.calibracion-dias:7}")
+        private int calibracionDias;
 
         private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
@@ -235,12 +240,52 @@ public class AnimalServiceImpl implements AnimalService {
                 return animales.stream().map(this::mapToResponse).toList();
         }
 
+        private void calcularCalibracion(Animal animal, AnimalResponse.AnimalResponseBuilder builder) {
+                LocalDate fechaBase = animal.getFechaAlta();
+                if (fechaBase != null) {
+                        if (animal.getCaravana() != null && animal.getCaravana().getFechaAsignacion() != null) {
+                                if (animal.getCaravana().getFechaAsignacion().isAfter(fechaBase)) {
+                                        fechaBase = animal.getCaravana().getFechaAsignacion();
+                                }
+                        }
+                        LocalDate finCalibracion = fechaBase.plusDays(calibracionDias);
+                        LocalDate hoy = LocalDate.now();
+                        if (!hoy.isAfter(finCalibracion)) {
+                                builder.enCalibracion(true);
+                                builder.diasRestantesCalibracion((int) ChronoUnit.DAYS.between(hoy, finCalibracion));
+                        } else {
+                                builder.enCalibracion(false);
+                                builder.diasRestantesCalibracion(0);
+                        }
+                }
+        }
+
+        private void calcularCalibracionMapa(Animal animal, AnimalMapaResponse.AnimalMapaResponseBuilder builder) {
+                LocalDate fechaBase = animal.getFechaAlta();
+                if (fechaBase != null) {
+                        if (animal.getCaravana() != null && animal.getCaravana().getFechaAsignacion() != null) {
+                                if (animal.getCaravana().getFechaAsignacion().isAfter(fechaBase)) {
+                                        fechaBase = animal.getCaravana().getFechaAsignacion();
+                                }
+                        }
+                        LocalDate finCalibracion = fechaBase.plusDays(calibracionDias);
+                        LocalDate hoy = LocalDate.now();
+                        if (!hoy.isAfter(finCalibracion)) {
+                                builder.enCalibracion(true);
+                                builder.diasRestantesCalibracion((int) ChronoUnit.DAYS.between(hoy, finCalibracion));
+                        } else {
+                                builder.enCalibracion(false);
+                                builder.diasRestantesCalibracion(0);
+                        }
+                }
+        }
+
         private AnimalResponse mapToResponse(Animal animal) {
                 EstadoReproductivo ultimoEstado = animal.getEstadosReproductivos().stream()
                                 .findFirst()
                                 .orElse(null);
 
-                return AnimalResponse.builder()
+                AnimalResponse.AnimalResponseBuilder builder = AnimalResponse.builder()
                                 .id(animal.getId())
                                 .idCaravanaOficial(animal.getIdCaravanaOficial())
                                 .alias(animal.getAlias())
@@ -258,8 +303,10 @@ public class AnimalServiceImpl implements AnimalService {
                                 .estadoReproductivo(ultimoEstado != null ? ultimoEstado.getEstado() : null)
                                 .fechaUltimoParto(ultimoEstado != null ? ultimoEstado.getFechaUltParto() : null)
                                 .fechaUltimaInseminacion(
-                                                ultimoEstado != null ? ultimoEstado.getFechaUltInseminacion() : null)
-                                .build();
+                                                ultimoEstado != null ? ultimoEstado.getFechaUltInseminacion() : null);
+
+                calcularCalibracion(animal, builder);
+                return builder.build();
         }
 
         @Override
@@ -358,6 +405,7 @@ public class AnimalServiceImpl implements AnimalService {
                         AnimalMapaResponse.AnimalMapaResponseBuilder builder = AnimalMapaResponse.builder()
                                         .id(animal.getId())
                                         .identificador(animal.getIdCaravanaOficial());
+                        calcularCalibracionMapa(animal, builder);
 
                         if (animal.getCaravana() != null) {
                                 Optional<Telemetria> ultimaPos = telemetriaRepository

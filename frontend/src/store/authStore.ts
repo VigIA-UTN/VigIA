@@ -19,13 +19,14 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      token: (() => { try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; } })(),
+      token: null,
       email: null,
       rol: null,
-      isAuthenticated: (() => { try { return !!sessionStorage.getItem(TOKEN_KEY); } catch { return false; } })(),
+      isAuthenticated: false,
       lastActivity: Date.now(),
 
       login: (token, email, rol) => {
+        // Guardar en sessionStorage como respaldo
         try { sessionStorage.setItem(TOKEN_KEY, token); } catch { /* ignore */ }
         set({ token, email, rol, isAuthenticated: true, lastActivity: Date.now() });
       },
@@ -46,18 +47,15 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'vigia-auth',
+      // Ahora el token también se persiste en localStorage para que
+      // el axiosClient siempre lo tenga disponible tras recargar la página.
       partialize: (state) => ({
+        token: state.token,
         email: state.email,
         rol: state.rol,
+        isAuthenticated: state.isAuthenticated,
         lastActivity: state.lastActivity,
       }),
-      onRehydrateStorage: () => (_state, error) => {
-        if (!error) {
-          let token = null;
-          try { token = sessionStorage.getItem(TOKEN_KEY); } catch { /* ignore */ }
-          useAuthStore.setState({ token, isAuthenticated: !!token });
-        }
-      },
     }
   )
 );

@@ -25,6 +25,14 @@ function InvitacionesRouter() {
   return <Navigate to="/" replace />;
 }
 
+function RootRouter() {
+  const rol = useAuthStore(state => state.rol);
+  if (rol === 'ADMINISTRADOR') return <Navigate to="/establecimientos" replace />;
+  if (rol === 'PENDIENTE') return <Navigate to="/invitaciones" replace />;
+  if (!rol) return <Navigate to="/login" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -49,7 +57,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<RootRouter />} />
         <Route
           path="/establecimientos"
           element={

@@ -32,6 +32,9 @@ services:
       - MAIL_PORT=${MAIL_PORT:-1025}
       - MAIL_USER=${MAIL_USER:-user}
       - MAIL_PASSWORD=${MAIL_PASSWORD:-pass}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - OAUTH2_REDIRECT_URI=${OAUTH2_REDIRECT_URI:-http://localhost:5173/oauth2/callback}
       - TZ=America/Argentina/Buenos_Aires
     depends_on:
       - db
@@ -58,6 +61,7 @@ services:
       - MAIL_PORT=${MAIL_PORT:-1025}
       - MAIL_USER=${MAIL_USER:-user}
       - MAIL_PASSWORD=${MAIL_PASSWORD:-pass}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       - TZ=America/Argentina/Buenos_Aires
     depends_on:
       - db

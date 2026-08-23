@@ -16,4 +16,6 @@ public class AnimalMapaResponse {
     private LocalDateTime tsUltimaPosicion;
     private boolean sinDatosRecientes;
     private List<AlertaResponse> alertasAnimal;
+    private Boolean enCalibracion;
+    private Integer diasRestantesCalibracion;
 }

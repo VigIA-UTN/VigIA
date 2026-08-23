@@ -323,12 +323,12 @@ class AlertaControllerTest {
     }
 
     @Test
-    @DisplayName("Sin token → 403 Forbidden")
+    @DisplayName("Sin token → 401 Unauthorized")
     @SuppressWarnings("null")
     void actualizarAlerta_sinToken_returns403() throws Exception {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .param("estado", "CONFIRMADA"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     // =========================================================================

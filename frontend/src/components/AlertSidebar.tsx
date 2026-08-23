@@ -52,7 +52,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
 
     // Setup SSE connection
     const token = useAuthStore.getState().token;
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+    const API_URL = import.meta.env.VITE_API_URL as string;
     let sseUrl = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
     if (token) {
       sseUrl += `&token=${token}`;

@@ -25,7 +25,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         this.authService = authService;
     }
 
-    @Value("${app.oauth2.redirect-uri:http://localhost:5173/oauth2/callback}")
+    @Value("${app.oauth2.redirect-uri}")
     private String redirectUri;
 
     @SuppressWarnings("null")
@@ -43,15 +43,22 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             }
             String apellido = oAuth2User.getAttribute("family_name");
 
-            AuthResponse authResponse = authService.processOAuth2User(email, nombre, apellido, provider);
+            try {
+                AuthResponse authResponse = authService.processOAuth2User(email, nombre, apellido, provider);
 
-            String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
-                    .queryParam("token", authResponse.getToken())
-                    .queryParam("email", authResponse.getEmail())
-                    .queryParam("rol", authResponse.getRol())
-                    .build().toUriString();
+                String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
+                        .queryParam("token", authResponse.getToken())
+                        .queryParam("email", authResponse.getEmail())
+                        .queryParam("rol", authResponse.getRol())
+                        .build().toUriString();
 
-            getRedirectStrategy().sendRedirect(request, response, targetUrl);
+                getRedirectStrategy().sendRedirect(request, response, targetUrl);
+            } catch (IllegalArgumentException e) {
+                String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
+                        .queryParam("error", e.getMessage())
+                        .build().toUriString();
+                getRedirectStrategy().sendRedirect(request, response, targetUrl);
+            }
         } else {
             super.onAuthenticationSuccess(request, response, authentication);
         }

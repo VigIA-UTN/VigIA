@@ -69,7 +69,8 @@ public class SseAlertaPublisher {
                         establecimientoId);
                 for (Alerta alerta : perdidas) {
                     try {
-                        sendToEmitter(emitter, alerta.getId(), alerta.getAnimal().getId(), alerta.getTipo(),
+                        sendToEmitter(emitter, alerta.getId(), alerta.getAnimal().getId(), 
+                                alerta.getDisparador() != null ? alerta.getDisparador().name() : alerta.getTipo(),
                                 alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null,
                                 alerta.getEstado(),
                                 alerta.getTsGeneracion());
@@ -122,7 +123,8 @@ public class SseAlertaPublisher {
 
         for (SseEmitter emitter : list) {
             try {
-                sendToEmitter(emitter, alertaEvent.getId(), alertaEvent.getAnimalId(), alertaEvent.getTipo(),
+                sendToEmitter(emitter, alertaEvent.getId(), alertaEvent.getAnimalId(), 
+                        alertaEvent.getDisparador() != null ? alertaEvent.getDisparador().name() : alertaEvent.getTipo(),
                         alertaEvent.getSeveridad() != null ? alertaEvent.getSeveridad().name() : null,
                         alertaEvent.getEstado(),
                         alertaEvent.getTsGeneracion());

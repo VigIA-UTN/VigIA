@@ -8,7 +8,7 @@ import org.springframework.web.servlet.view.RedirectView;
 @Controller
 public class RootRedirectController {
 
-    @Value("${app.oauth2.redirect-uri:http://localhost:5173/oauth2/callback}")
+    @Value("${app.oauth2.redirect-uri}")
     private String redirectUri;
 
     @SuppressWarnings("null")

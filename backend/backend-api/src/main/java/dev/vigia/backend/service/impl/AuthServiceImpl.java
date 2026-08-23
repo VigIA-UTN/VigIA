@@ -19,9 +19,11 @@ import dev.vigia.backend.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -49,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    @Transactional
     public AuthResponse register(RegisterRequest request) {
         Invitacion invitacion = validateAndGetInvitacion(request.getToken(), request.getEmail());
         String emailToUse = invitacion.getEmailDestino();
@@ -93,6 +96,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public AuthResponse processOAuth2User(String email, String nombre, String apellido, String provider) {
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("El email es requerido para la autenticación OAuth2.");
@@ -102,15 +106,35 @@ public class AuthServiceImpl implements AuthService {
         String providerName = (provider != null && !provider.isBlank()) ? provider.toUpperCase() : "GOOGLE";
 
         Usuario usuario = usuarioRepository.findByEmail(cleanEmail).orElseGet(() -> {
+            List<Invitacion> invitaciones = invitacionRepository
+                    .findByEmailDestinoAndEstadoInvitacionOrderByFechaCreacionDesc(cleanEmail,
+                            EstadoInvitacion.PENDIENTE);
+            if (invitaciones.isEmpty()) {
+                throw new IllegalArgumentException("No se puede registrar mediante SSO sin una invitación previa.");
+            }
+            Invitacion invitacion = invitaciones.get(0);
+
             Usuario newUser = new Usuario();
             newUser.setEmail(cleanEmail);
             newUser.setNombre(nombre != null && !nombre.isBlank() ? nombre : cleanEmail.split("@")[0]);
             newUser.setApellido(apellido != null ? apellido : "");
-            newUser.setRol(dev.vigia.backend.model.Rol.PENDIENTE);
+            newUser.setRol(invitacion.getRol());
             newUser.setActivo(true);
             newUser.setFechaAlta(LocalDate.now());
             newUser.setProveedorAuth(providerName);
-            return usuarioRepository.save(newUser);
+            Usuario savedUser = usuarioRepository.save(newUser);
+
+            if (invitacion.getEstablecimiento() != null) {
+                var establecimiento = invitacion.getEstablecimiento();
+                Empleado vinculo = new Empleado(establecimiento, savedUser);
+                establecimiento.getEmpleados().add(vinculo);
+                establecimientoRepository.save(establecimiento);
+            }
+
+            invitacion.setEstadoInvitacion(EstadoInvitacion.USADA);
+            invitacionRepository.save(invitacion);
+
+            return savedUser;
         });
 
         if (usuario.getProveedorAuth() == null || usuario.getProveedorAuth().isBlank()) {
