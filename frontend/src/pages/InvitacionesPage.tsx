@@ -251,7 +251,7 @@ export default function InvitacionesPage() {
       {/* Modal Nueva Invitación */}
       <Modal show={showModal} onHide={handleCloseModal} centered dialogClassName="modal-productor">
         <Modal.Header closeButton>
-          <Modal.Title>Nuevo Productor</Modal.Title>
+          <Modal.Title>Invitar Productor</Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSubmit(onSubmit)}>
           <Modal.Body>
@@ -300,7 +300,7 @@ export default function InvitacionesPage() {
           </Modal.Body>
           <Modal.Footer>
             <button type="submit" className="btn-generar" disabled={submitting}>
-              {submitting ? <Spinner size="sm" animation="border" /> : 'Generar Invitación'}
+              {submitting ? <Spinner size="sm" animation="border" /> : 'Invitar'}
             </button>
           </Modal.Footer>
         </Form>

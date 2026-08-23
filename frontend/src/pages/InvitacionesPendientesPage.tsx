@@ -6,6 +6,8 @@ import {
   type InvitacionResponse 
 } from '../api/invitacionesApi';
 import { useAuthStore } from '../store/authStore';
+import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { getEstablecimientos } from '../api/establecimientosApi';
 import './InvitacionesPendientesPage.css';
 
 export default function InvitacionesPendientesPage() {
@@ -40,7 +42,9 @@ export default function InvitacionesPendientesPage() {
         useAuthStore.getState().logout();
         window.location.href = '/login';
       } else {
-        fetchInvitaciones();
+        await fetchInvitaciones();
+        const ests = await getEstablecimientos();
+        useEstablecimientoStore.getState().setEstablecimientos(ests);
       }
     } catch (err) {
       const data = (err as { response?: { data?: { message?: string } | string } }).response?.data;

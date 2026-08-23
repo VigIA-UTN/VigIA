@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/invitaciones")
@@ -23,26 +24,32 @@ public class InvitacionController {
 
     @PostMapping("/productor")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<InvitacionResponse> generarInvitacionProductor(
+    public ResponseEntity<?> generarInvitacionProductor(
             @Valid @RequestBody InvitacionProductorRequest request,
             Authentication authentication) {
 
-        String emailAdmin = authentication.getName();
-        InvitacionResponse response = invitacionService.generarInvitacionProductor(request, emailAdmin);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        try {
+            String emailAdmin = authentication.getName();
+            InvitacionResponse response = invitacionService.generarInvitacionProductor(request, emailAdmin);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping("/empleado")
     @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<InvitacionResponse> generarInvitacionEmpleado(
+    public ResponseEntity<?> generarInvitacionEmpleado(
             @Valid @RequestBody InvitacionEmpleadoRequest request,
             Authentication authentication) {
 
-        String emailProductor = authentication.getName();
-        InvitacionResponse response = invitacionService.generarInvitacionEmpleado(request, emailProductor);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        try {
+            String emailProductor = authentication.getName();
+            InvitacionResponse response = invitacionService.generarInvitacionEmpleado(request, emailProductor);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
+        }
     }
     @GetMapping("/productor")
     @PreAuthorize("hasRole('ADMINISTRADOR')")

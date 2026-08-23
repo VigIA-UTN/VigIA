@@ -286,7 +286,7 @@ export default function AnimalDetailPage() {
                     <h2 className="vigia-page-title text-break pe-3 mb-0">Ficha del Animal: {animal.alias || animal.idCaravanaOficial || `#${animal.id}`}
                         {animal.enCalibracion && (
                             <Badge bg="info" className="ms-3 align-middle" style={{ fontSize: '0.9rem' }}>
-                                <i className="bi bi-clock-history me-1" /> Calibración en proceso ({animal.diasRestantesCalibracion} días)
+                                <i className="bi bi-clock-history me-1" /> Calibración en proceso ({animal.diasRestantesCalibracion === 0 ? 'finaliza hoy' : `${animal.diasRestantesCalibracion} días`})
                             </Badge>
                         )}
                     </h2>
@@ -325,6 +325,21 @@ export default function AnimalDetailPage() {
                 </div>
 
                 {formError && <Alert variant="danger">{formError}</Alert>}
+
+                {animal.enCalibracion && (
+                    <Alert variant="info" className="d-flex align-items-center shadow-sm mb-4" style={{ borderLeft: '5px solid #0dcaf0' }}>
+                        <i className="bi bi-info-circle-fill fs-3 me-3 text-info"></i>
+                        <div>
+                            <h5 className="alert-heading mb-1" style={{ fontSize: '1.1rem' }}>Período de calibración en proceso</h5>
+                            <p className="mb-0">
+                                {animal.diasRestantesCalibracion === 0 
+                                    ? <>La calibración <strong>finaliza hoy</strong>.</> 
+                                    : <>Faltan <strong>{animal.diasRestantesCalibracion} días</strong> para finalizar.</>
+                                } Durante esta etapa el collar está recolectando datos base del comportamiento del animal, por lo tanto <strong>no se generarán alertas sanitarias</strong> temporariamente.
+                            </p>
+                        </div>
+                    </Alert>
+                )}
 
                 <Card className="shadow-sm border-0 animal-card mb-4">
                     <Card.Body className="p-4 p-md-5">

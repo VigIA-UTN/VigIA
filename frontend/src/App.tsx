@@ -33,12 +33,18 @@ function RootRouter() {
   return <Navigate to="/dashboard" replace />;
 }
 
+function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  if (isAuthenticated) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+        <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
         <Route path="/aceptar-invitacion" element={<AcceptInvitationPage />} />
         <Route path="/oauth2/callback" element={<OAuth2CallbackPage />} />
         <Route

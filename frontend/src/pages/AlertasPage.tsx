@@ -280,11 +280,12 @@ export default function AlertasPage() {
                                         sortedAlertas.map((a) => {
                                             // Fallback gravedad to severidad mapping just in case backend still sends gravedad
                                             const sev = a.severidad ?? (a.gravedad as 'ALTA' | 'MEDIA' | 'BAJA') ?? (a.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
+                                            const tipoLower = (a.tipo || 'CELO').toLowerCase();
                                             
                                             return (
                                                 <tr key={a.id}>
                                                     <td className="fw-medium">#{a.animalId}</td>
-                                                    <td><span className="tipo-badge">{a.tipo || 'CELO'}</span></td>
+                                                    <td><span className={`tipo-badge tipo-${tipoLower}`}>{a.tipo || 'CELO'}</span></td>
                                                     <td className="text-center">
                                                         <span className={`severidad-badge ${getSeveridadClass(sev)}`}>
                                                             {sev}

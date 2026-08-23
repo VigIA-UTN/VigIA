@@ -171,11 +171,12 @@ class InvitacionControllerTest {
         request.setEmail("nuevo_productor@test.com");
         request.setEstablecimientoId(999L); // ID inexistente
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mockMvc.perform(post("/api/v1/invitaciones/productor")
+        mockMvc.perform(post("/api/v1/invitaciones/productor")
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))))
-                .hasCauseInstanceOf(IllegalArgumentException.class);
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
@@ -249,12 +250,12 @@ class InvitacionControllerTest {
         request.setEstablecimientoId(est2.getId());
         request.setRol(Rol.VETERINARIO);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mockMvc.perform(post("/api/v1/invitaciones/empleado")
+        mockMvc.perform(post("/api/v1/invitaciones/empleado")
                 .header("Authorization", "Bearer " + userToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))))
-                .hasCauseInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("El productor no pertenece a este establecimiento");
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("El productor no pertenece a este establecimiento")));
     }
 
     @Test
@@ -266,12 +267,12 @@ class InvitacionControllerTest {
         request.setEstablecimientoId(establecimientoId);
         request.setRol(Rol.ADMINISTRADOR);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mockMvc.perform(post("/api/v1/invitaciones/empleado")
+        mockMvc.perform(post("/api/v1/invitaciones/empleado")
                 .header("Authorization", "Bearer " + userToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))))
-                .hasCauseInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("El rol especificado no es válido");
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("El rol especificado no es válido")));
     }
 
     @Test
