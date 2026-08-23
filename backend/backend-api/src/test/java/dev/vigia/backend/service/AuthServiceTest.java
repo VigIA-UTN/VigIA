@@ -1,5 +1,6 @@
 package dev.vigia.backend.service;
 
+import dev.vigia.backend.dto.AuthResponse;
 import dev.vigia.backend.dto.ValidateCodeRequest;
 import dev.vigia.backend.dto.ValidateCodeResponse;
 import dev.vigia.backend.model.*;
@@ -16,9 +17,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -128,7 +132,7 @@ class AuthServiceTest {
         invitacionProductor.setTipoInvitacion(TipoInvitacion.PRODUCTOR);
         invitacionProductor.setEstadoInvitacion(EstadoInvitacion.PENDIENTE);
         invitacionProductor.setFechaExpiracion(LocalDateTime.now().plusDays(1));
-        
+
         when(invitacionRepository.findByToken("valid-token-prod")).thenReturn(Optional.of(invitacionProductor));
 
         ValidateCodeRequest req = new ValidateCodeRequest();
@@ -152,7 +156,7 @@ class AuthServiceTest {
         invitacionProductor.setTipoInvitacion(TipoInvitacion.PRODUCTOR);
         invitacionProductor.setEstadoInvitacion(EstadoInvitacion.PENDIENTE);
         invitacionProductor.setFechaExpiracion(LocalDateTime.now().plusDays(1));
-        
+
         when(invitacionRepository.findByToken("valid-token-prod")).thenReturn(Optional.of(invitacionProductor));
 
         ValidateCodeRequest req = new ValidateCodeRequest();
@@ -174,7 +178,7 @@ class AuthServiceTest {
         invitacionProductor.setTipoInvitacion(TipoInvitacion.PRODUCTOR);
         invitacionProductor.setEstadoInvitacion(EstadoInvitacion.PENDIENTE);
         invitacionProductor.setFechaExpiracion(LocalDateTime.now().plusDays(1));
-        
+
         when(invitacionRepository.findByToken("valid-token-prod")).thenReturn(Optional.of(invitacionProductor));
 
         ValidateCodeRequest req = new ValidateCodeRequest();
@@ -187,30 +191,55 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("Debe autoregistrar usuario nuevo vía OAuth2 con rol PENDIENTE y generar JWT")
+    @DisplayName("Debe autoregistrar usuario nuevo vía OAuth2 usando la invitación pendiente y generar JWT")
     @SuppressWarnings("null")
     void processOAuth2User_AutoRegister_Success() {
         when(usuarioRepository.findByEmail("nuevo@google.com")).thenReturn(Optional.empty());
+
+        Invitacion invitacion = new Invitacion();
+        invitacion.setEmailDestino("nuevo@google.com");
+        invitacion.setRol(Rol.CAMPERO);
+        invitacion.setEstadoInvitacion(EstadoInvitacion.PENDIENTE);
+
+        when(invitacionRepository.findByEmailDestinoAndEstadoInvitacionOrderByFechaCreacionDesc("nuevo@google.com",
+                EstadoInvitacion.PENDIENTE))
+                .thenReturn(Collections.singletonList(invitacion));
+
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocation -> {
             Usuario u = invocation.getArgument(0);
             u.setId(10L);
             return u;
         });
 
-        org.springframework.security.core.userdetails.User userDetails =
-                new org.springframework.security.core.userdetails.User("nuevo@google.com", "", true, true, true, true,
-                        java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PENDIENTE")));
+        User userDetails = new User("nuevo@google.com", "", true, true, true, true,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_CAMPERO")));
         when(userDetailsService.loadUserByUsername("nuevo@google.com")).thenReturn(userDetails);
         when(jwtUtil.generateToken(userDetails)).thenReturn("jwt-token-oauth-nuevo");
 
-        dev.vigia.backend.dto.AuthResponse response = authService.processOAuth2User("nuevo@google.com", "Juan", "Pérez", "GOOGLE");
+        AuthResponse response = authService.processOAuth2User("nuevo@google.com", "Juan", "Pérez",
+                "GOOGLE");
 
         assertThat(response).isNotNull();
         assertThat(response.getToken()).isEqualTo("jwt-token-oauth-nuevo");
         assertThat(response.getEmail()).isEqualTo("nuevo@google.com");
-        assertThat(response.getRol()).isEqualTo("PENDIENTE");
+        assertThat(response.getRol()).isEqualTo("CAMPERO");
 
         verify(usuarioRepository, times(1)).save(any(Usuario.class));
+        verify(invitacionRepository, times(1)).save(invitacion);
+        assertThat(invitacion.getEstadoInvitacion()).isEqualTo(EstadoInvitacion.USADA);
+    }
+
+    @Test
+    @DisplayName("Debe rechazar autoregistro vía OAuth2 si no hay invitación pendiente")
+    void processOAuth2User_AutoRegister_NoInvitation_ThrowsException() {
+        when(usuarioRepository.findByEmail("noinvitado@google.com")).thenReturn(Optional.empty());
+        when(invitacionRepository.findByEmailDestinoAndEstadoInvitacionOrderByFechaCreacionDesc("noinvitado@google.com",
+                EstadoInvitacion.PENDIENTE))
+                .thenReturn(Collections.emptyList());
+
+        assertThatThrownBy(() -> authService.processOAuth2User("noinvitado@google.com", "Juan", "Pérez", "GOOGLE"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No se puede registrar mediante SSO sin una invitación previa.");
     }
 
     @Test
@@ -226,13 +255,13 @@ class AuthServiceTest {
 
         when(usuarioRepository.findByEmail("existente@google.com")).thenReturn(Optional.of(usuarioExistente));
 
-        org.springframework.security.core.userdetails.User userDetails =
-                new org.springframework.security.core.userdetails.User("existente@google.com", "", true, true, true, true,
-                        java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PRODUCTOR")));
+        User userDetails = new User("existente@google.com", "", true, true, true, true,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_PRODUCTOR")));
         when(userDetailsService.loadUserByUsername("existente@google.com")).thenReturn(userDetails);
         when(jwtUtil.generateToken(userDetails)).thenReturn("jwt-token-oauth-existente");
 
-        dev.vigia.backend.dto.AuthResponse response = authService.processOAuth2User("existente@google.com", "Carlos", "Gómez", "GOOGLE");
+        AuthResponse response = authService.processOAuth2User("existente@google.com", "Carlos",
+                "Gómez", "GOOGLE");
 
         assertThat(response).isNotNull();
         assertThat(response.getToken()).isEqualTo("jwt-token-oauth-existente");

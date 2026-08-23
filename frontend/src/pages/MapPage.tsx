@@ -130,7 +130,7 @@ export default function MapPage() {
     const token = useAuthStore.getState().token;
     
     // Telemetry SSE
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+    const API_URL = import.meta.env.VITE_API_URL as string;
     let sseUrlTelemetria = `${API_URL}/animales/mapa/stream?establecimientoId=${selectedId}`;
     if (token) {
       sseUrlTelemetria += `&token=${token}`;

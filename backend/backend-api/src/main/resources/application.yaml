@@ -15,7 +15,7 @@ spring:
               - profile
               - openid
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vigia}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:vigia}
     username: ${DB_USER:vigia_user}
     password: ${DB_PASSWORD:vigia_dev_password}
   batch:
@@ -31,7 +31,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   mail:
-    host: ${MAIL_HOST:localhost}
+    host: ${MAIL_HOST}
     port: ${MAIL_PORT:1025}
     username: ${MAIL_USER:user}
     password: ${MAIL_PASSWORD:pass}
@@ -52,12 +52,12 @@ server:
 
 vigia:
   ml:
-    celo-url: ${ML_CELO_URL:http://localhost:8001}
-    salud-url: ${ML_SALUD_URL:http://localhost:8002}
-    geo-url: ${ML_GEO_URL:http://localhost:8003}
+    celo-url: ${ML_CELO_URL}
+    salud-url: ${ML_SALUD_URL}
+    geo-url: ${ML_GEO_URL}
 
 cors:
-  allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
+  allowed-origins: ${CORS_ORIGINS}
 
 resilience4j:
   circuitbreaker:
@@ -78,7 +78,6 @@ resilience4j:
         timeoutDuration: 2000ms
 
 app:
+  frontend-url: ${FRONTEND_URL}
   oauth2:
-    redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/oauth2/callback}
-
-
+    redirect-uri: ${OAUTH2_REDIRECT_URI}

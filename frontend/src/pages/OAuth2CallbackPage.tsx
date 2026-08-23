@@ -14,7 +14,7 @@ export default function OAuth2CallbackPage() {
     const error = searchParams.get('error');
 
     if (error) {
-      navigate('/login?sso_error=1', { replace: true });
+      navigate(`/login?sso_error=${encodeURIComponent(error)}`, { replace: true });
       return;
     }
 
