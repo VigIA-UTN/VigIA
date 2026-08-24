@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Button, Spinner, Alert, Card, Row, Col, Form, Modal, Badge } from 'react-bootstrap';
 import {
@@ -19,6 +19,7 @@ import { getRodeoLotes, type RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { useAuthStore } from '../store/authStore';
 import './AnimalDetailPage.css';
 import './AnimalesPage.css';
+import ActividadTab from './ActividadTab';
 
 const TIPOS_REPRODUCTIVOS: TipoReproductivo[] = ['VACIA', 'GESTANTE', 'CELO', 'ANESTRO'];
 
@@ -83,6 +84,9 @@ export default function AnimalDetailPage() {
     const [submittingEstado, setSubmittingEstado] = useState(false);
     const [estadoFormError, setEstadoFormError] = useState<string | null>(null);
     const [estadoSuccess, setEstadoSuccess] = useState<string | null>(null);
+
+    // Tab state — 'actividad' is the default
+    const [activeTab, setActiveTab] = useState<'actividad' | 'ficha'>('actividad');
 
     const fetchHistorial = async (animalId: number) => {
         setLoadingHistorial(true);
@@ -283,7 +287,8 @@ export default function AnimalDetailPage() {
         <div className="vigia-page-container animal-detail-container">
             <Container>
                 <div className="vigia-page-header mb-4 flex-wrap gap-3">
-                    <h2 className="vigia-page-title text-break pe-3 mb-0">Ficha del Animal: {animal.alias || animal.idCaravanaOficial || `#${animal.id}`}
+                    <h2 className="vigia-page-title text-break pe-3 mb-0">
+                        {animal.alias || animal.idCaravanaOficial || `#${animal.id}`}
                         {animal.enCalibracion && (
                             <Badge bg="info" className="ms-3 align-middle" style={{ fontSize: '0.9rem' }}>
                                 <i className="bi bi-clock-history me-1" /> Calibración en proceso ({animal.diasRestantesCalibracion === 0 ? 'finaliza hoy' : `${animal.diasRestantesCalibracion} días`})
@@ -292,7 +297,11 @@ export default function AnimalDetailPage() {
                     </h2>
                     <div className="d-flex align-items-center gap-2 flex-shrink-0">
                         {rol === 'PRODUCTOR' && !isEditing && (
-                            <Button className="btn-vigia-primary px-4" onClick={() => setIsEditing(true)}>
+                            <Button
+                                className="btn-vigia-primary px-4"
+                                onClick={() => setIsEditing(true)}
+                                style={{ visibility: activeTab === 'ficha' ? 'visible' : 'hidden' }}
+                            >
                                 <i className="bi bi-pencil me-2" /> Editar
                             </Button>
                         )}
@@ -324,6 +333,22 @@ export default function AnimalDetailPage() {
                     </div>
                 </div>
 
+                {/* ── Tab bar ── */}
+                <div className="animal-tabs-bar">
+                    <button
+                        className={`animal-tab-btn${activeTab === 'actividad' ? ' active' : ''}`}
+                        onClick={() => { setActiveTab('actividad'); setIsEditing(false); }}
+                    >
+                        Actividad
+                    </button>
+                    <button
+                        className={`animal-tab-btn${activeTab === 'ficha' ? ' active' : ''}`}
+                        onClick={() => setActiveTab('ficha')}
+                    >
+                        Ficha
+                    </button>
+                </div>
+
                 {formError && <Alert variant="danger">{formError}</Alert>}
 
                 {animal.enCalibracion && (
@@ -332,8 +357,8 @@ export default function AnimalDetailPage() {
                         <div>
                             <h5 className="alert-heading mb-1" style={{ fontSize: '1.1rem' }}>Período de calibración en proceso</h5>
                             <p className="mb-0">
-                                {animal.diasRestantesCalibracion === 0 
-                                    ? <>La calibración <strong>finaliza hoy</strong>.</> 
+                                {animal.diasRestantesCalibracion === 0
+                                    ? <>La calibración <strong>finaliza hoy</strong>.</>
                                     : <>Faltan <strong>{animal.diasRestantesCalibracion} días</strong> para finalizar.</>
                                 } Durante esta etapa el collar está recolectando datos base del comportamiento del animal, por lo tanto <strong>no se generarán alertas sanitarias</strong> temporariamente.
                             </p>
@@ -341,190 +366,202 @@ export default function AnimalDetailPage() {
                     </Alert>
                 )}
 
-                <Card className="shadow-sm border-0 animal-card mb-4">
-                    <Card.Body className="p-4 p-md-5">
-                        {isEditing ? (
-                            <Form>
-                                <h4 className="section-title mb-4">Información General</h4>
-                                <Row className="g-4">
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label className="fw-bold">Identificador Oficial</Form.Label>
-                                            <Form.Control name="idCaravanaOficial" value={form.idCaravanaOficial ?? ''} onChange={handleChange} />
-                                        </Form.Group>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label className="fw-bold">Nombre/Alias</Form.Label>
-                                            <Form.Control name="alias" value={form.alias ?? ''} onChange={handleChange} />
-                                        </Form.Group>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label className="fw-bold">Fecha de Nacimiento</Form.Label>
-                                            <Form.Control type="date" name="fechaNacimiento" value={form.fechaNacimiento ?? ''} onChange={handleChange} />
-                                        </Form.Group>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label className="fw-bold">Raza</Form.Label>
-                                            <Form.Control name="raza" value={form.raza ?? ''} onChange={handleChange} />
-                                        </Form.Group>
-                                    </Col>
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label className="fw-bold">Establecimiento</Form.Label>
-                                            <Form.Control plaintext readOnly value={`#${animal.establecimientoId}`} />
-                                        </Form.Group>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label className="fw-bold">Rodeo/Lote</Form.Label>
-                                            <Form.Select name="rodeoLoteId" value={form.rodeoLoteId ?? ''} onChange={handleChange}>
-                                                <option value="">Sin rodeo</option>
-                                                {rodeoLotes.filter(l => l.establecimientoId === animal.establecimientoId).map(l => (
-                                                    <option key={l.id} value={l.id}>{l.nombre}</option>
-                                                ))}
-                                            </Form.Select>
-                                        </Form.Group>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label className="fw-bold">Estado Actual</Form.Label>
-                                            <div>
-                                                <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>
-                                                    {animal.estadoActual}
-                                                </span>
-                                            </div>
-                                        </Form.Group>
-                                        <ul className="list-unstyled detail-list mt-4">
-                                            <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
-                                        </ul>
-                                    </Col>
-                                </Row>
-                            </Form>
-                        ) : (
-                            <>
-                                <h4 className="section-title mb-4">Información General</h4>
-                                <Row className="g-4">
-                                    <Col md={6}>
-                                        <ul className="list-unstyled detail-list">
-                                            <li><strong>Identificador Oficial:</strong> {animal.idCaravanaOficial || '—'}</li>
-                                            <li><strong>Nombre/Alias:</strong> {animal.alias || '—'}</li>
-                                            <li><strong>Fecha de Nacimiento:</strong> {formatFechaLocal(animal.fechaNacimiento)}</li>
-                                            <li><strong>Raza:</strong> {animal.raza || '—'}</li>
-                                        </ul>
-                                    </Col>
-                                    <Col md={6}>
-                                        <ul className="list-unstyled detail-list">
-                                            <li><strong>Establecimiento:</strong> #{animal.establecimientoId}</li>
-                                            <li><strong>Rodeo/Lote:</strong> {animal.rodeoLoteNombre || (animal.rodeoLoteId ? `#${String(animal.rodeoLoteId).padStart(2, '0')}` : '—')}</li>
-                                            <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
-                                            <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
-                                        </ul>
-                                    </Col>
-                                </Row>
-                            </>
-                        )}
-                    </Card.Body>
-                </Card>
+                {/* ── Tab: Actividad ── */}
+                {activeTab === 'actividad' && (
+                    <div key="actividad" className="tab-content-animated">
+                        <ActividadTab animalId={animal.id} />
+                    </div>
+                )}
 
-                {/* ── Sección Historial Reproductivo ── */}
-                <Card className="shadow-sm border-0 animal-card">
-                    <Card.Body>
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                            <h4 className="section-title mb-0">Historial Reproductivo</h4>
-                            {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
-                                <Button className="btn-vigia-success btn-sm px-3" onClick={openNuevoEstadoModal}>
-                                    <i className="bi bi-plus-lg me-1" /> Registrar estado
-                                </Button>
-                            )}
-                        </div>
+                {/* ── Tab: Ficha ── */}
+                {activeTab === 'ficha' && (<div key="ficha" className="tab-content-animated">
 
-                        {loadingHistorial ? (
-                            <div className="text-center py-3">
-                                <Spinner animation="border" size="sm" style={{ color: '#1E3A5F' }} />
-                            </div>
-                        ) : historial.length === 0 ? (
-                            <p className="text-muted text-center py-3">Sin registros reproductivos aún.</p>
-                        ) : (
-                            <div className="table-responsive">
-                                <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
-                                    <thead>
-                                        <tr>
-                                            <th>Estado</th>
-                                            <th>Último Parto</th>
-                                            <th>Última Inseminación</th>
-                                            <th>Origen</th>
-                                            <th>Registrado por</th>
-                                            <th>Fecha Registro</th>
-                                            {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && <th className="text-center">Acciones</th>}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {historial.map((h, idx) => (
-                                            <tr key={h.id} className={idx === 0 ? 'fw-semibold' : ''}>
-                                                <td>{estadoReproductivoBadge(h.estado)}</td>
-                                                <td>{formatFechaLocal(h.fechaUltimoParto)}</td>
-                                                <td>{formatFechaLocal(h.fechaUltimaInseminacion)}</td>
-                                                <td>
-                                                    <span className={`badge ${h.origen === 'MANUAL' ? 'bg-primary' : h.origen === 'CARGA_MASIVA' ? 'bg-warning text-dark' : 'bg-info'}`}>
-                                                        {h.origen || '—'}
+                    <Card className="shadow-sm border-0 animal-card mb-4">
+                        <Card.Body className="p-4 p-md-5">
+                            {isEditing ? (
+                                <Form>
+                                    <h4 className="section-title mb-4">Información General</h4>
+                                    <Row className="g-4">
+                                        <Col md={6}>
+                                            <Form.Group className="mb-3">
+                                                <Form.Label className="fw-bold">Identificador Oficial</Form.Label>
+                                                <Form.Control name="idCaravanaOficial" value={form.idCaravanaOficial ?? ''} onChange={handleChange} />
+                                            </Form.Group>
+                                            <Form.Group className="mb-3">
+                                                <Form.Label className="fw-bold">Nombre/Alias</Form.Label>
+                                                <Form.Control name="alias" value={form.alias ?? ''} onChange={handleChange} />
+                                            </Form.Group>
+                                            <Form.Group className="mb-3">
+                                                <Form.Label className="fw-bold">Fecha de Nacimiento</Form.Label>
+                                                <Form.Control type="date" name="fechaNacimiento" value={form.fechaNacimiento ?? ''} onChange={handleChange} />
+                                            </Form.Group>
+                                            <Form.Group className="mb-3">
+                                                <Form.Label className="fw-bold">Raza</Form.Label>
+                                                <Form.Control name="raza" value={form.raza ?? ''} onChange={handleChange} />
+                                            </Form.Group>
+                                        </Col>
+                                        <Col md={6}>
+                                            <Form.Group className="mb-3">
+                                                <Form.Label className="fw-bold">Establecimiento</Form.Label>
+                                                <Form.Control plaintext readOnly value={`#${animal.establecimientoId}`} />
+                                            </Form.Group>
+                                            <Form.Group className="mb-3">
+                                                <Form.Label className="fw-bold">Rodeo/Lote</Form.Label>
+                                                <Form.Select name="rodeoLoteId" value={form.rodeoLoteId ?? ''} onChange={handleChange}>
+                                                    <option value="">Sin rodeo</option>
+                                                    {rodeoLotes.filter(l => l.establecimientoId === animal.establecimientoId).map(l => (
+                                                        <option key={l.id} value={l.id}>{l.nombre}</option>
+                                                    ))}
+                                                </Form.Select>
+                                            </Form.Group>
+                                            <Form.Group className="mb-3">
+                                                <Form.Label className="fw-bold">Estado Actual</Form.Label>
+                                                <div>
+                                                    <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>
+                                                        {animal.estadoActual}
                                                     </span>
-                                                </td>
-                                                <td>{h.registradoPor || '—'}</td>
-                                                <td>{formatDateTime(h.fechaRegistro)}</td>
-                                                {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
-                                                    <td className="text-center">
-                                                        {idx === 0 && (
-                                                            <Button
-                                                                variant="outline-primary"
-                                                                size="sm"
-                                                                onClick={() => openEditarEstadoModal(h)}
-                                                            >
-                                                                <i className="bi bi-pencil" /> Editar
-                                                            </Button>
-                                                        )}
+                                                </div>
+                                            </Form.Group>
+                                            <ul className="list-unstyled detail-list mt-4">
+                                                <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
+                                            </ul>
+                                        </Col>
+                                    </Row>
+                                </Form>
+                            ) : (
+                                <>
+                                    <h4 className="section-title mb-4">Información General</h4>
+                                    <Row className="g-4">
+                                        <Col md={6}>
+                                            <ul className="list-unstyled detail-list">
+                                                <li><strong>Identificador Oficial:</strong> {animal.idCaravanaOficial || '—'}</li>
+                                                <li><strong>Nombre/Alias:</strong> {animal.alias || '—'}</li>
+                                                <li><strong>Fecha de Nacimiento:</strong> {formatFechaLocal(animal.fechaNacimiento)}</li>
+                                                <li><strong>Raza:</strong> {animal.raza || '—'}</li>
+                                            </ul>
+                                        </Col>
+                                        <Col md={6}>
+                                            <ul className="list-unstyled detail-list">
+                                                <li><strong>Establecimiento:</strong> #{animal.establecimientoId}</li>
+                                                <li><strong>Rodeo/Lote:</strong> {animal.rodeoLoteNombre || (animal.rodeoLoteId ? `#${String(animal.rodeoLoteId).padStart(2, '0')}` : '—')}</li>
+                                                <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
+                                                <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
+                                            </ul>
+                                        </Col>
+                                    </Row>
+                                </>
+                            )}
+                        </Card.Body>
+                    </Card>
+
+                    {/* ── Sección Historial Reproductivo ── */}
+                    <Card className="shadow-sm border-0 animal-card">
+                        <Card.Body>
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h4 className="section-title mb-0">Historial Reproductivo</h4>
+                                {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
+                                    <Button className="btn-vigia-success btn-sm px-3" onClick={openNuevoEstadoModal}>
+                                        <i className="bi bi-plus-lg me-1" /> Registrar estado
+                                    </Button>
+                                )}
+                            </div>
+
+                            {loadingHistorial ? (
+                                <div className="text-center py-3">
+                                    <Spinner animation="border" size="sm" style={{ color: '#1E3A5F' }} />
+                                </div>
+                            ) : historial.length === 0 ? (
+                                <p className="text-muted text-center py-3">Sin registros reproductivos aún.</p>
+                            ) : (
+                                <div className="table-responsive">
+                                    <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
+                                        <thead>
+                                            <tr>
+                                                <th>Estado</th>
+                                                <th>Último Parto</th>
+                                                <th>Última Inseminación</th>
+                                                <th>Origen</th>
+                                                <th>Registrado por</th>
+                                                <th>Fecha Registro</th>
+                                                {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && <th className="text-center">Acciones</th>}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {historial.map((h, idx) => (
+                                                <tr key={h.id} className={idx === 0 ? 'fw-semibold' : ''}>
+                                                    <td>{estadoReproductivoBadge(h.estado)}</td>
+                                                    <td>{formatFechaLocal(h.fechaUltimoParto)}</td>
+                                                    <td>{formatFechaLocal(h.fechaUltimaInseminacion)}</td>
+                                                    <td>
+                                                        <span className={`badge ${h.origen === 'MANUAL' ? 'bg-primary' : h.origen === 'CARGA_MASIVA' ? 'bg-warning text-dark' : 'bg-info'}`}>
+                                                            {h.origen || '—'}
+                                                        </span>
                                                     </td>
-                                                )}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </Card.Body>
-                </Card>
+                                                    <td>{h.registradoPor || '—'}</td>
+                                                    <td>{formatDateTime(h.fechaRegistro)}</td>
+                                                    {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
+                                                        <td className="text-center">
+                                                            {idx === 0 && (
+                                                                <Button
+                                                                    variant="outline-primary"
+                                                                    size="sm"
+                                                                    onClick={() => openEditarEstadoModal(h)}
+                                                                >
+                                                                    <i className="bi bi-pencil" /> Editar
+                                                                </Button>
+                                                            )}
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </Card.Body>
+                    </Card>
 
-                {/* ── Sección Intervenciones ── */}
-                <Card className="shadow-sm border-0 animal-card mt-4">
-                    <Card.Body>
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                            <h4 className="section-title mb-0">Intervenciones</h4>
-                        </div>
+                    {/* ── Sección Intervenciones ── */}
+                    <Card className="shadow-sm border-0 animal-card mt-4">
+                        <Card.Body>
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h4 className="section-title mb-0">Intervenciones</h4>
+                            </div>
 
-                        {loadingIntervenciones ? (
-                            <div className="text-center py-3">
-                                <Spinner animation="border" size="sm" style={{ color: '#1E3A5F' }} />
-                            </div>
-                        ) : intervenciones.length === 0 ? (
-                            <p className="text-muted text-center py-3">No hay intervenciones registradas para este animal.</p>
-                        ) : (
-                            <div className="table-responsive">
-                                <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
-                                    <thead>
-                                        <tr>
-                                            <th>Fecha y Hora</th>
-                                            <th>ID Alerta</th>
-                                            <th>Interventor</th>
-                                            <th>Descripción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {intervenciones.map((intv) => (
-                                            <tr key={intv.id}>
-                                                <td>{formatDateTime(intv.fechaHora)}</td>
-                                                <td>{intv.alertaId ? `#${intv.alertaId}` : '—'}</td>
-                                                <td>{intv.interventor || '—'}</td>
-                                                <td>{intv.descripcion}</td>
+                            {loadingIntervenciones ? (
+                                <div className="text-center py-3">
+                                    <Spinner animation="border" size="sm" style={{ color: '#1E3A5F' }} />
+                                </div>
+                            ) : intervenciones.length === 0 ? (
+                                <p className="text-muted text-center py-3">No hay intervenciones registradas para este animal.</p>
+                            ) : (
+                                <div className="table-responsive">
+                                    <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
+                                        <thead>
+                                            <tr>
+                                                <th>Fecha y Hora</th>
+                                                <th>ID Alerta</th>
+                                                <th>Interventor</th>
+                                                <th>Descripción</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </Card.Body>
-                </Card>
+                                        </thead>
+                                        <tbody>
+                                            {intervenciones.map((intv) => (
+                                                <tr key={intv.id}>
+                                                    <td>{formatDateTime(intv.fechaHora)}</td>
+                                                    <td>{intv.alertaId ? `#${intv.alertaId}` : '—'}</td>
+                                                    <td>{intv.interventor || '—'}</td>
+                                                    <td>{intv.descripcion}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </Card.Body>
+                    </Card>
+
+                </div>)}
             </Container>
 
             {/* ── Modal Registrar / Editar Estado Reproductivo ── */}
