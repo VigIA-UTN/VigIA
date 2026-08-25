@@ -4,8 +4,11 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AnimalMapaResponse;
+import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.CargaMasivaResult;
@@ -771,5 +775,92 @@ public class AnimalServiceImpl implements AnimalService {
                                 .estado(alerta.getEstado())
                                 .severidad(alerta.getSeveridad().name())
                                 .build();
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public List<AnimalMetricaResponse> getMetricasAnimal(Long animalId, String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimiento = animal.getEstablecimiento();
+
+                boolean tieneAcceso = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo());
+
+                if (!tieneAcceso) {
+                        throw new AccessDeniedException(
+                                        "No tiene acceso a los datos de este animal.");
+                }
+
+                List<AnimalMetricaResponse> result = new java.util.ArrayList<>();
+                LocalDate hoy = LocalDate.now();
+                LocalDate hace7Dias = hoy.minusDays(6);
+
+                if (animal.getCaravana() == null) {
+                        for (int i = 0; i < 7; i++) {
+                                result.add(AnimalMetricaResponse.builder()
+                                                .fecha(hace7Dias.plusDays(i))
+                                                .sinDatos(true)
+                                                .build());
+                        }
+                        return result;
+                }
+
+                LocalDateTime desde = hace7Dias.atStartOfDay();
+                LocalDateTime hasta = hoy.atTime(23, 59, 59);
+
+                List<Telemetria> telemetrias = telemetriaRepository
+                                .findByCaravanaAndFechaHoraBetweenOrderByFechaHoraAsc(animal.getCaravana(), desde,
+                                                hasta);
+
+                Map<LocalDate, List<Telemetria>> agrupadoPorDia = telemetrias.stream()
+                                .collect(Collectors.groupingBy(t -> t.getFechaHora().toLocalDate()));
+
+                for (int i = 0; i < 7; i++) {
+                        LocalDate fecha = hace7Dias.plusDays(i);
+                        List<Telemetria> telemetriasDia = agrupadoPorDia.getOrDefault(fecha,
+                                        Collections.emptyList());
+
+                        if (telemetriasDia.isEmpty()) {
+                                result.add(AnimalMetricaResponse.builder()
+                                                .fecha(fecha)
+                                                .sinDatos(true)
+                                                .build());
+                        } else {
+                                OptionalDouble optActividad = telemetriasDia.stream()
+                                                .filter(t -> t.getMoveState() != null)
+                                                .mapToDouble(Telemetria::getMoveState)
+                                                .average();
+                                Double avgActividad = optActividad.isPresent() ? optActividad.getAsDouble() : null;
+
+                                OptionalDouble optLat = telemetriasDia.stream()
+                                                .filter(t -> t.getLatitud() != null)
+                                                .mapToDouble(Telemetria::getLatitud)
+                                                .average();
+                                Double avgLat = optLat.isPresent() ? optLat.getAsDouble() : null;
+
+                                OptionalDouble optLon = telemetriasDia.stream()
+                                                .filter(t -> t.getLongitud() != null)
+                                                .mapToDouble(Telemetria::getLongitud)
+                                                .average();
+                                Double avgLon = optLon.isPresent() ? optLon.getAsDouble() : null;
+
+                                boolean sinDatos = (avgActividad == null && avgLat == null && avgLon == null);
+
+                                result.add(AnimalMetricaResponse.builder()
+                                                .fecha(fecha)
+                                                .actividadMotora(avgActividad)
+                                                .latitud(avgLat)
+                                                .longitud(avgLon)
+                                                .sinDatos(sinDatos)
+                                                .build());
+                        }
+                }
+                return result;
         }
 }

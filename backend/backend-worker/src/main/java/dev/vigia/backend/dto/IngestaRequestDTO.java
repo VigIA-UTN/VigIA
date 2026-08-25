@@ -14,7 +14,6 @@ public class IngestaRequestDTO {
         private Double latitud;
         private Double longitud;
         private Integer moveState;
-        private Double nivelRumia;
         private Double bateria;
     }
 }

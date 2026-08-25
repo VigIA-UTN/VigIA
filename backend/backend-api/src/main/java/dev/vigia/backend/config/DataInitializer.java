@@ -174,7 +174,6 @@ public class DataInitializer implements CommandLineRunner {
         telemetriaStale.setLatitud(-34.943317);
         telemetriaStale.setLongitud(-59.225728);
         telemetriaStale.setBateria(45.0);
-        telemetriaStale.setNivelRumia(50.0);
         telemetriaStale.setMoveState(1);
         telemetriaStale.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
         telemetriaStale.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
