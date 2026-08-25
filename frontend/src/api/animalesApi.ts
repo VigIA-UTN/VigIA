@@ -183,3 +183,16 @@ export async function getIntervenciones(animalId: number): Promise<IntervencionR
   const response = await axiosClient.get<IntervencionResponse[]>(`/animales/${animalId}/intervenciones`);
   return response.data;
 }
+
+export interface AnimalMetricaResponse {
+  fecha: string;
+  actividadMotora: number | null;
+  latitud: number | null;
+  longitud: number | null;
+  sinDatos: boolean;
+}
+
+export async function getMetricasAnimal(animalId: number): Promise<AnimalMetricaResponse[]> {
+  const response = await axiosClient.get<AnimalMetricaResponse[]>(`/animales/${animalId}/metricas`);
+  return response.data;
+}

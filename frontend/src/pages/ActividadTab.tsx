@@ -1,11 +1,12 @@
 import * as L from 'leaflet';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
-    AreaChart, Area, BarChart, Bar,
+    BarChart, Bar,
     XAxis, YAxis, CartesianGrid, Tooltip,
-    ResponsiveContainer, Cell, ReferenceLine,
+    ResponsiveContainer, Cell
 } from 'recharts';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { getMetricasAnimal, type AnimalMetricaResponse } from '../api/animalesApi';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 
@@ -14,55 +15,8 @@ type HeatLatLngTuple = [number, number, number?];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createHeatLayer = (points: HeatLatLngTuple[], opts: object) => (L as any).heatLayer(points, opts);
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function getDayLabels(): { label: string; date: string }[] {
-    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-    const result = [];
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        result.push({ label: days[d.getDay()], date: `${dd}/${mm}` });
-    }
-    return result;
-}
-
-function seededRand(seed: number, min: number, max: number): number {
-    const x = Math.sin(seed) * 10000;
-    return min + (x - Math.floor(x)) * (max - min);
-}
-
-// ─── Mock data generators ────────────────────────────────────────────────────
-
-function generateRumiaData(animalId: number) {
-    const dayLabels = getDayLabels();
-    return dayLabels.map(({ label, date }, i) => {
-        const hasData = i !== 2; // día 3 sin datos (D-4)
-        return {
-            label,
-            date,
-            value: hasData ? Math.round(seededRand(animalId + i * 7, 200, 480)) : null,
-            noData: !hasData,
-        };
-    });
-}
-
-function generateActividadData(animalId: number) {
-    const dayLabels = getDayLabels();
-    return dayLabels.map(({ label, date }, i) => {
-        const hasData = i !== 5; // día 6 sin datos (ayer)
-        return {
-            label,
-            date,
-            value: hasData ? Math.round(seededRand(animalId + i * 13, 3000, 12000)) : null,
-            noData: !hasData,
-        };
-    });
-}
-
 // ─── Custom Tooltip ──────────────────────────────────────────────────────────
+
 
 interface TooltipProps {
     active?: boolean;
@@ -129,36 +83,8 @@ function MapInvalidator() {
     return null;
 }
 
-// ─── Mock heatmap coordinates ─────────────────────────────────────────────────
-
-function generateHeatPoints(animalId: number): HeatLatLngTuple[] {
-    // Centro: Pampa argentina (La Pampa ~-36.6, -64.3)
-    const baseLat = -36.62;
-    const baseLng = -64.29;
-    const points: HeatLatLngTuple[] = [];
-
-    // Cluster principal (zona de pastoreo habitual)
-    for (let i = 0; i < 60; i++) {
-        const lat = baseLat + seededRand(animalId + i, -0.002, 0.002);
-        const lng = baseLng + seededRand(animalId + i + 100, -0.003, 0.003);
-        points.push([lat, lng, seededRand(animalId + i + 200, 0.5, 1.0)]);
-    }
-    // Cluster secundario (bebedero/sombra)
-    for (let i = 0; i < 25; i++) {
-        const lat = baseLat + 0.004 + seededRand(animalId + i + 300, -0.001, 0.001);
-        const lng = baseLng + 0.005 + seededRand(animalId + i + 400, -0.001, 0.001);
-        points.push([lat, lng, seededRand(animalId + i + 500, 0.3, 0.8)]);
-    }
-    // Puntos dispersos de tránsito
-    for (let i = 0; i < 15; i++) {
-        const lat = baseLat + seededRand(animalId + i + 600, -0.005, 0.005);
-        const lng = baseLng + seededRand(animalId + i + 700, -0.005, 0.005);
-        points.push([lat, lng, seededRand(animalId + i + 800, 0.05, 0.25)]);
-    }
-    return points;
-}
-
 // ─── Section wrapper ──────────────────────────────────────────────────────────
+
 
 function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
     return (
@@ -195,68 +121,72 @@ interface ActividadTabProps {
 }
 
 export default function ActividadTab({ animalId }: ActividadTabProps) {
-    const rumiaData = useMemo(() => generateRumiaData(animalId), [animalId]);
-    const actividadData = useMemo(() => generateActividadData(animalId), [animalId]);
-    const heatPoints = useMemo(() => generateHeatPoints(animalId), [animalId]);
+    const [metricas, setMetricas] = useState<AnimalMetricaResponse[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // Center of the mock heatmap data
-    const mapCenter: [number, number] = [-36.622, -64.292];
+    useEffect(() => {
+        let mounted = true;
+        const fetchMetricas = async () => {
+            try {
+                setLoading(true);
+                const data = await getMetricasAnimal(animalId);
+                if (mounted) setMetricas(data);
+            } catch (err) {
+                console.error("Error al cargar historial de actividad:", err);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        };
+        fetchMetricas();
+        return () => { mounted = false; };
+    }, [animalId]);
+
+    const actividadData = useMemo(() => {
+        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        return metricas.map(m => {
+            const dateObj = new Date(m.fecha + 'T00:00:00'); 
+            const label = days[dateObj.getDay()];
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            return {
+                label,
+                date: `${dd}/${mm}`,
+                value: m.sinDatos ? null : (m.actividadMotora ? Math.round(m.actividadMotora) : 0),
+                noData: m.sinDatos,
+            };
+        });
+    }, [metricas]);
+
+    const heatPoints = useMemo(() => {
+        const points: HeatLatLngTuple[] = [];
+        metricas.forEach(m => {
+            if (!m.sinDatos && m.latitud != null && m.longitud != null) {
+                points.push([m.latitud, m.longitud, 0.8]);
+            }
+        });
+        return points;
+    }, [metricas]);
+
+    const mapCenter: [number, number] = useMemo(() => {
+        if (heatPoints.length > 0) {
+            const avgLat = heatPoints.reduce((sum, p) => sum + p[0], 0) / heatPoints.length;
+            const avgLng = heatPoints.reduce((sum, p) => sum + p[1], 0) / heatPoints.length;
+            return [avgLat, avgLng];
+        }
+        return [-36.622, -64.292];
+    }, [heatPoints]);
+
+    if (loading) {
+        return (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#718096' }}>
+                Cargando historial de actividad...
+            </div>
+        );
+    }
 
     return (
         <div style={{ paddingTop: '1rem' }}>
-            {/* ── Gráfico 1: Rumia ── */}
-            <ChartCard
-                title="Rumia"
-                subtitle="Minutos de rumia registrados por día · últimos 7 días"
-            >
-                <div style={{ marginBottom: '0.5rem' }}>
-                    <LegendDot color="#66C6EB" label="Minutos de rumia" />
-                    <LegendDot color="#E2E8F0" label="Sin datos" />
-                </div>
-                <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={rumiaData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                        <defs>
-                            <linearGradient id="rumiaGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#66C6EB" stopOpacity={0.25} />
-                                <stop offset="95%" stopColor="#66C6EB" stopOpacity={0} />
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#F0F4F8" />
-                        <XAxis
-                            dataKey="label"
-                            tick={{ fontSize: 12, fill: '#718096' }}
-                            axisLine={false}
-                            tickLine={false}
-                        />
-                        <YAxis
-                            tick={{ fontSize: 11, fill: '#A0AEC0' }}
-                            axisLine={false}
-                            tickLine={false}
-                            domain={[0, 600]}
-                        />
-                        <Tooltip content={<CustomTooltip unit="min" />} />
-                        <ReferenceLine y={350} stroke="#66C6EB" strokeDasharray="4 4" strokeOpacity={0.4} label={{ value: 'Ref.', fontSize: 10, fill: '#A0AEC0' }} />
-                        <Area
-                            type="monotone"
-                            dataKey="value"
-                            stroke="#66C6EB"
-                            strokeWidth={2.5}
-                            fill="url(#rumiaGrad)"
-                            dot={(props) => {
-                                const { cx, cy, payload } = props as { cx: number; cy: number; payload: { noData: boolean; value: number | null } };
-                                if (payload.noData || payload.value === null) {
-                                    return <circle key={`dot-${cx}`} cx={cx} cy={cy ?? 100} r={5} fill="#E2E8F0" stroke="#CBD5E0" strokeWidth={1.5} />;
-                                }
-                                return <circle key={`dot-${cx}`} cx={cx} cy={cy} r={4} fill="#66C6EB" stroke="#fff" strokeWidth={2} />;
-                            }}
-                            activeDot={{ r: 6, fill: '#66C6EB', stroke: '#fff', strokeWidth: 2 }}
-                            connectNulls={false}
-                        />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </ChartCard>
-
-            {/* ── Gráfico 2: Actividad Motora ── */}
+            {/* ── Gráfico 1: Actividad Motora ── */}
             <ChartCard
                 title="Actividad Motora"
                 subtitle="Impulsos de movimiento registrados por día · últimos 7 días - Aca un moveState promedio diario"
@@ -294,7 +224,7 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                 </ResponsiveContainer>
             </ChartCard>
 
-            {/* ── Gráfico 3: Mapa de Calor de Posición ── */}
+            {/* ── Gráfico 2: Mapa de Calor de Posición ── */}
             <ChartCard
                 title="Mapa de Calor — Posición"
                 subtitle="Zonas por las que más tiempo estuvo el animal · últimos 7 días"
