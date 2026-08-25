@@ -16,6 +16,7 @@ import AnimalesPage from './pages/AnimalesPage';
 import AnimalDetailPage from './pages/AnimalDetailPage';
 import AlertasPage from './pages/AlertasPage';
 import DashboardPage from './pages/DashboardPage';
+import PerfilPage from './pages/PerfilPage';
 
 function InvitacionesRouter() {
   const rol = useAuthStore(state => state.rol);
@@ -117,6 +118,14 @@ function App() {
           element={
             <ProtectedRoute roles={['PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
               <AlertasPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/perfil"
+          element={
+            <ProtectedRoute roles={['ADMINISTRADOR', 'PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
+              <PerfilPage />
             </ProtectedRoute>
           }
         />

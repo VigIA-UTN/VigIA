@@ -19,4 +19,5 @@ public class UsuarioResponse {
     private boolean activo;
     private String establecimiento;
     private Long establecimientoId;
+    private String proveedorAuth;
 }

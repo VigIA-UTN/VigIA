@@ -9,6 +9,7 @@ export interface UsuarioResponse {
   activo: boolean;
   establecimiento?: string;
   establecimientoId?: number;
+  proveedorAuth?: string;
 }
 
 export async function getTodosUsuarios(): Promise<UsuarioResponse[]> {
@@ -28,4 +29,18 @@ export async function getEmpleados(establecimientoId?: number): Promise<UsuarioR
 
 export async function removerEmpleado(id: number, establecimientoId: number): Promise<void> {
   await axiosClient.delete(`/usuarios/empleados/${establecimientoId}/${id}`);
+}
+
+export async function getMiPerfil(): Promise<UsuarioResponse> {
+  const response = await axiosClient.get<UsuarioResponse>('/usuarios/me');
+  return response.data;
+}
+
+export async function updateMiPerfil(data: { nombre: string; apellido: string }): Promise<UsuarioResponse> {
+  const response = await axiosClient.put<UsuarioResponse>('/usuarios/me', data);
+  return response.data;
+}
+
+export async function cambiarPassword(data: { passwordActual: string; nuevaPassword: string }): Promise<void> {
+  await axiosClient.put('/usuarios/me/password', data);
 }

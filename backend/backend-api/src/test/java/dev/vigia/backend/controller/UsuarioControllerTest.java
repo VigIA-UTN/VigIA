@@ -6,6 +6,8 @@ import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.model.Empleado;
+import dev.vigia.backend.dto.CambiarPasswordRequest;
+import dev.vigia.backend.dto.UpdatePerfilRequest;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import java.time.LocalDate;
@@ -46,7 +49,7 @@ class UsuarioControllerTest {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
-    
+
     @Autowired
     private RodeoLoteRepository rodeoLoteRepository;
 
@@ -238,14 +241,15 @@ class UsuarioControllerTest {
         final Long estId = est.getId();
         final Long empId = empleado.getId();
 
-        // Verificar en BD que el vínculo fue desactivado (requiere sesión abierta para la colección lazy)
+        // Verificar en BD que el vínculo fue desactivado (requiere sesión abierta para
+        // la colección lazy)
         Boolean isStillActive = new TransactionTemplate(transactionManager).execute(status -> {
             Establecimiento updatedEst = establecimientoRepository.findById(estId).orElseThrow();
             return updatedEst.getEmpleados().stream()
                     .anyMatch(v -> v.getUsuario().getId().equals(empId) && v.isActivo());
         });
         assertThat(isStillActive).isFalse();
-        
+
         Usuario user = usuarioRepository.findById(empleado.getId()).orElseThrow();
         assertThat(user.isActivo()).isTrue();
     }
@@ -271,7 +275,7 @@ class UsuarioControllerTest {
         Empleado vinculoEmp = new Empleado(est, empleado);
         est.setEmpleados(new ArrayList<>(List.of(vinculoEmp)));
         establecimientoRepository.save(est);
-        
+
         Establecimiento estProd = new Establecimiento();
         estProd.setNombre("Estancia Prod");
         estProd.setLatitud(-34.0);
@@ -284,6 +288,67 @@ class UsuarioControllerTest {
 
         mockMvc.perform(delete("/api/v1/usuarios/empleados/" + estProd.getId() + "/" + empleado.getId())
                 .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/usuarios/me - Retorna el perfil del usuario autenticado")
+    void getMiPerfil_success() throws Exception {
+        mockMvc.perform(get("/api/v1/usuarios/me")
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nombre").value("Juan"))
+                .andExpect(jsonPath("$.email").value("productor@vigia.dev"))
+                .andExpect(jsonPath("$.rol").value("PRODUCTOR"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/usuarios/me - Actualiza datos personales (nombre, apellido)")
+    @SuppressWarnings("null")
+    void updateMiPerfil_success() throws Exception {
+        UpdatePerfilRequest request = new UpdatePerfilRequest();
+        request.setNombre("Juan Modificado");
+        request.setApellido("Perez");
+
+        mockMvc.perform(put("/api/v1/usuarios/me")
+                .header("Authorization", "Bearer " + productorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nombre").value("Juan Modificado"))
+                .andExpect(jsonPath("$.apellido").value("Perez"));
+
+        Usuario user = usuarioRepository.findById(productorId).orElseThrow();
+        assertThat(user.getNombre()).isEqualTo("Juan Modificado");
+        assertThat(user.getApellido()).isEqualTo("Perez");
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/usuarios/me/password - Cambia la password con la contraseña actual correcta")
+    @SuppressWarnings("null")
+    void cambiarPassword_success() throws Exception {
+        CambiarPasswordRequest request = new CambiarPasswordRequest("prod123", "NuevaPass123!");
+
+        mockMvc.perform(put("/api/v1/usuarios/me/password")
+                .header("Authorization", "Bearer " + productorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        Usuario user = usuarioRepository.findById(productorId).orElseThrow();
+        assertThat(passwordEncoder.matches("NuevaPass123!", user.getPasswordHash())).isTrue();
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/usuarios/me/password - Falla al cambiar la password si la actual es incorrecta")
+    @SuppressWarnings("null")
+    void cambiarPassword_wrongCurrentPassword_badRequest() throws Exception {
+        CambiarPasswordRequest request = new CambiarPasswordRequest("claveIncorrecta", "NuevaPass123!");
+
+        mockMvc.perform(put("/api/v1/usuarios/me/password")
+                .header("Authorization", "Bearer " + productorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 }

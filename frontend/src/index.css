@@ -281,4 +281,15 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+/* Botón Salir en la Navbar */
+.btn-salir-navbar {
+    transition: background-color 0.2s ease, border-color 0.2s ease !important;
+}
+
+.btn-salir-navbar:hover {
+    background-color: rgba(220, 53, 69, 0.35) !important;
+    border-color: rgba(220, 53, 69, 0.5) !important;
+    color: #fff !important;
 }
