@@ -1147,4 +1147,125 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].severidad").value("BAJA"))
                                 .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].tipo").value("CELO"));
         }
+        // =========================================================================
+        // GET /api/v1/animales/{id}/metricas
+        // =========================================================================
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/metricas - Historial completo (7 días con datos)")
+        @SuppressWarnings("null")
+        void getMetricasAnimal_historialCompleto() throws Exception {
+                Long animalId = crearAnimal("Vaca Metricas Completa", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                
+                Caravana caravana = new Caravana();
+                caravana.setCodigo("CAR-MET-001");
+                caravana.setFechaAsignacion(LocalDate.now().minusDays(10));
+                caravana.setFechaAlta(LocalDate.now().minusDays(10));
+                caravanaRepository.save(caravana);
+                
+                animal.setCaravana(caravana);
+                animalRepository.save(animal);
+                
+                LocalDate hoy = LocalDate.now();
+                for (int i = 0; i < 7; i++) {
+                        Telemetria t = new Telemetria();
+                        t.setCaravana(caravana);
+                        t.setFechaHora(hoy.minusDays(i).atTime(12, 0));
+                        t.setLatitud(-34.0 + i);
+                        t.setLongitud(-58.0 - i);
+                        t.setMoveState(100 + i * 10);
+                        telemetriaRepository.save(t);
+                }
+                
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(7))
+                                .andExpect(jsonPath("$[0].sinDatos").value(false))
+                                .andExpect(jsonPath("$[6].sinDatos").value(false));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/metricas - Días sin datos")
+        @SuppressWarnings("null")
+        void getMetricasAnimal_diasSinDatos() throws Exception {
+                Long animalId = crearAnimal("Vaca Metricas Incompleta", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                
+                Caravana caravana = new Caravana();
+                caravana.setCodigo("CAR-MET-002");
+                caravana.setFechaAsignacion(LocalDate.now().minusDays(10));
+                caravana.setFechaAlta(LocalDate.now().minusDays(10));
+                caravanaRepository.save(caravana);
+                
+                animal.setCaravana(caravana);
+                animalRepository.save(animal);
+                
+                // Agregamos telemetría solo hace 1 día y hace 2 días (el resto sin datos)
+                LocalDate hoy = LocalDate.now();
+                for (int i = 1; i <= 2; i++) {
+                        Telemetria t = new Telemetria();
+                        t.setCaravana(caravana);
+                        t.setFechaHora(hoy.minusDays(i).atTime(12, 0));
+                        t.setLatitud(-34.0);
+                        t.setLongitud(-58.0);
+                        t.setMoveState(50);
+                        telemetriaRepository.save(t);
+                }
+                
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(7))
+                                // El último elemento de la lista (hoy) no debería tener datos
+                                .andExpect(jsonPath("$[6].sinDatos").value(true))
+                                // Hace 1 día debería tener datos
+                                .andExpect(jsonPath("$[5].sinDatos").value(false));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/metricas - Aislamiento por establecimiento")
+        @SuppressWarnings("null")
+        void getMetricasAnimal_aislamientoEstablecimiento() throws Exception {
+                // Crear un productor ajeno
+                Usuario otroProductor = new Usuario();
+                otroProductor.setEmail("otrop@vigia.dev");
+                otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroProductor.setNombre("Otro Productor");
+                otroProductor.setRol(Rol.PRODUCTOR);
+                otroProductor.setActivo(true);
+                otroProductor = usuarioRepository.save(otroProductor);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Metricas");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+                establecimientoRepository.save(otroEst);
+
+                String otroToken = getTokenFor("otrop@vigia.dev", "otro123");
+
+                Long animalId = crearAnimal("Toro Establecimiento Ajeno", establecimientoId, rodeoLoteId);
+
+                // Intento acceder a métricas de animalId (que es del establecimientoId) usando el otroToken (que pertenece a otroEst)
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
+                                .header("Authorization", "Bearer " + otroToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/metricas - Rechazo por rol incorrecto (Campero)")
+        @SuppressWarnings("null")
+        void getMetricasAnimal_rechazoPorRolIncorrecto() throws Exception {
+                Long animalId = crearAnimal("Vaca Rol Incorrecto", establecimientoId, rodeoLoteId);
+                
+                // Campero no tiene acceso a métricas
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
+                                .header("Authorization", "Bearer " + camperoToken))
+                                .andExpect(status().isForbidden());
+        }
 }

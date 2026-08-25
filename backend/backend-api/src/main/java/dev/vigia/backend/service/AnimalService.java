@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.AnimalMapaResponse;
+import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
@@ -44,4 +45,6 @@ public interface AnimalService {
 
         CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, Long establecimientoId, String emailProductor)
                         throws IOException;
+
+        List<AnimalMetricaResponse> getMetricasAnimal(Long animalId, String emailUsuario);
 }

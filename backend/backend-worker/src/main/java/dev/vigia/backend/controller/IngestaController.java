@@ -49,7 +49,6 @@ public class IngestaController {
         telemetria.setLatitud(request.getPayload().getLatitud());
         telemetria.setLongitud(request.getPayload().getLongitud());
         telemetria.setMoveState(request.getPayload().getMoveState());
-        telemetria.setNivelRumia(request.getPayload().getNivelRumia());
         telemetria.setBateria(request.getPayload().getBateria());
         telemetria.setEstadoInferenciaCelo(EstadoInferencia.PENDIENTE);
         telemetria.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
