@@ -81,6 +81,3 @@ app:
   frontend-url: ${FRONTEND_URL}
   oauth2:
     redirect-uri: ${OAUTH2_REDIRECT_URI}
-  sendgrid:
-    api-key: ${SENDGRID_API_KEY:}
-    from-email: ${SENDGRID_FROM_EMAIL:}
