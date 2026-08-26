@@ -9,7 +9,6 @@ import org.springframework.web.client.RestClient;
 
 import dev.vigia.backend.service.EmailService;
 
-import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -21,44 +20,31 @@ public class EmailServiceImpl implements EmailService {
     private String frontendUrl;
 
     @Value("${app.sendgrid.api-key:}")
-    private String sendgridApiKey;
-
-    @Value("${app.sendgrid.from-email:}")
-    private String sendgridFromEmail;
+    private String webhookUrl; // Reutilizamos la variable en properties para no romper el yaml, pero acá guardaremos la URL del script
 
     private final RestClient restClient = RestClient.create();
 
-    @SuppressWarnings("null")
     private void sendEmailHttp(String to, String subject, String text) {
-        if (sendgridApiKey == null || sendgridApiKey.isBlank() || sendgridFromEmail == null
-                || sendgridFromEmail.isBlank()) {
-            log.warn(
-                    "SENDGRID_API_KEY o SENDGRID_FROM_EMAIL no configurada. Simulando envío de mail a {}:\nAsunto: {}\nTexto: {}",
-                    to, subject, text);
+        if (webhookUrl == null || webhookUrl.isBlank() || !webhookUrl.startsWith("http")) {
+            log.warn("WEBHOOK_URL no configurada o inválida. Simulando envío de mail a {}:\nAsunto: {}\nTexto: {}", to, subject, text);
             return;
         }
 
         try {
-            Map<String, Object> request = Map.of(
-                    "personalizations", List.of(
-                            Map.of(
-                                    "to", List.of(Map.of("email", to)),
-                                    "subject", subject)),
-                    "from", Map.of("email", sendgridFromEmail, "name", "VigIA"),
-                    "content", List.of(
-                            Map.of(
-                                    "type", "text/plain",
-                                    "value", text)));
+            Map<String, String> request = Map.of(
+                    "to", to,
+                    "subject", subject,
+                    "text", text
+            );
 
             restClient.post()
-                    .uri("https://api.sendgrid.com/v3/mail/send")
-                    .header("Authorization", "Bearer " + sendgridApiKey)
+                    .uri(webhookUrl)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
                     .toBodilessEntity();
 
-            log.info("Email enviado a {} mediante SendGrid API", to);
+            log.info("Email enviado a {} mediante Google Apps Script", to);
         } catch (Exception e) {
             log.error("Error al enviar email HTTP a {}: {}", to, e.getMessage());
         }
