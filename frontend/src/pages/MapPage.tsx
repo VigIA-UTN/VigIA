@@ -196,11 +196,17 @@ export default function MapPage() {
           });
         });
 
-        // Si la alerta es PENDIENTE, actualizamos el resumen
-        if (newAlerta.estado === 'PENDIENTE') {
-          const resumenData = await getResumenAlertas(selectedId);
-          if (isMounted) setResumenAlertas(resumenData);
-        }
+        // Refrescamos el resumen de alertas con un pequeño retraso
+        // para dar tiempo a que la BD del worker commitee la transacción.
+        setTimeout(async () => {
+          if (!isMounted) return;
+          try {
+            const resumenData = await getResumenAlertas(selectedId);
+            if (isMounted) setResumenAlertas(resumenData);
+          } catch (e) {
+            console.error('Error refrescando resumen de alertas', e);
+          }
+        }, 1500);
 
       } catch (error) {
         console.error('Error parseando evento SSE de alertas', error);

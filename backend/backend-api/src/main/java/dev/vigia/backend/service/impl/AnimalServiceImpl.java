@@ -32,13 +32,17 @@ import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
+import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
+import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Telemetria;
+import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
@@ -479,6 +483,25 @@ public class AnimalServiceImpl implements AnimalService {
                 estado.setFechaRegistro(LocalDateTime.now());
 
                 EstadoReproductivo saved = estadoReproductivoRepository.save(estado);
+
+                // Si el estado registrado manualmente es CELO, generamos una Alerta
+                // con DisparadorAlerta.CELO para que el dashboard y el panel de alertas
+                // lo muestre igual que una detección automática del modelo ML.
+                if (request.getEstado() == TipoReproductivo.CELO) {
+                        Alerta alertaCelo = new Alerta();
+                        alertaCelo.setAnimal(animal);
+                        alertaCelo.setTipo("Celo Registrado Manualmente");
+                        alertaCelo.setSeveridad(SeveridadAlerta.ALTA);
+                        alertaCelo.setTsGeneracion(LocalDateTime.now());
+                        alertaCelo.setDisparador(DisparadorAlerta.CELO);
+                        alertaCelo.setValorUmbral(1.0);
+                        alertaCelo.setValorDetectado(1.0);
+                        alertaCelo.setEstado(EstadoAlerta.PENDIENTE);
+                        alertaCelo.setConfianzaModelo(1.0f);
+                        alertaCelo.setVentanaInicioIns(LocalDateTime.now().plusHours(6));
+                        alertaCelo.setVentanaFinIns(LocalDateTime.now().plusHours(24));
+                        alertaRepository.save(alertaCelo);
+                }
 
                 String registradoPor = productorUser.getNombre();
                 if (productorUser.getApellido() != null && !productorUser.getApellido().isEmpty()) {

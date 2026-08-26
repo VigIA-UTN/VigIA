@@ -341,6 +341,10 @@ public class AlertaServiceImpl implements AlertaService {
                 // Publicar evento para SSE
                 AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                                 .id(actualizado.getId())
+                                .animalId(actualizado.getAnimal().getId())
+                                .estado(actualizado.getEstado())
+                                .tipo(actualizado.getDisparador() != null ? actualizado.getDisparador().name() : actualizado.getTipo())
+                                .tsGeneracion(actualizado.getTsGeneracion())
                                 .build();
                 rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
 

@@ -30,6 +30,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Random;
 
 @Slf4j
 @Component
@@ -64,6 +65,7 @@ public class DataInitializer implements CommandLineRunner {
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
 
+        // ── Acto 1: Usuarios y roles ──────────────────────────────────────
         Usuario admin = buildUsuario("Admin", "VigIA", "admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
         Usuario productor = buildUsuario("Juan", "Productor", "productor@vigia.dev", "productor123", Rol.PRODUCTOR);
         Usuario campero = buildUsuario("Carlos", "Campero", "campero@vigia.dev", "campero123", Rol.CAMPERO);
@@ -74,112 +76,81 @@ public class DataInitializer implements CommandLineRunner {
         usuarioRepository.saveAll(usuarios);
 
         Establecimiento est = new Establecimiento();
-        est.setNombre("Establecimiento de Prueba");
+        est.setNombre("Estancia La Aurora");
         est.setLatitud(-34.943317);
         est.setLongitud(-59.225728);
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-
-        Empleado vinculo = new Empleado(est, productor);
-        est.getEmpleados().add(vinculo);
         establecimientoRepository.save(est);
 
+        // Vinculamos a los TRES roles operativos con el establecimiento
+        // (antes solo se vinculaba al productor — campero y vet quedaban sin acceso al rodeo)
+        Empleado vinculoProductor = new Empleado(est, productor);
+        Empleado vinculoCampero = new Empleado(est, campero);
+        Empleado vinculoVet = new Empleado(est, vet);
+        est.getEmpleados().add(vinculoProductor);
+        est.getEmpleados().add(vinculoCampero);
+        est.getEmpleados().add(vinculoVet);
+        establecimientoRepository.save(est);
+
+        // ── Acto 2: Rodeo ──────────────────────────────────────────────────
         RodeoLote lote1 = new RodeoLote(est);
         lote1.setNombre("Rodeo 01");
         lote1.setActivo(true);
         rodeoLoteRepository.save(lote1);
 
+        // Rodeo 02 intencionalmente vacío → se usa en la demo de H0005 (carga por CSV)
         RodeoLote lote2 = new RodeoLote(est);
         lote2.setNombre("Rodeo 02");
         lote2.setActivo(true);
         rodeoLoteRepository.save(lote2);
 
-        log.info("[DataInitializer] ✅ Seed completado — {} usuarios creados.", usuarios.size());
-        log.info("[DataInitializer] ✅ Establecimiento 'Establecimiento de Prueba' creado y asignado al Productor.");
+        log.info("[DataInitializer] ✅ {} usuarios creados.", usuarios.size());
+        log.info("[DataInitializer] ✅ Establecimiento 'Estancia La Aurora' creado con Productor, Campero y Veterinario vinculados.");
         log.info("[DataInitializer] ✅ Rodeos de prueba creados: 'Rodeo 01' y 'Rodeo 02'.");
 
-        Animal vaca1 = new Animal(est, lote1);
-        vaca1.setIdCaravanaOficial("12345");
-        vaca1.setAlias("La Vaca Lola");
-        vaca1.setEstadoActual(EstadoAnimal.ACTIVO);
-        vaca1.setFechaNacimiento(LocalDate.of(2020, 1, 1));
-        Caravana caravana1 = new Caravana();
-        caravana1.setCodigo("VIGIA-ARG-001");
-        caravana1.setActivo(true);
-        caravanaRepository.save(caravana1);
+        Animal vaca1 = crearAnimal(est, lote1, "12345", "La Vaca Lola", "Angus",
+                LocalDate.of(2020, 1, 1), "VIGIA-ARG-001", caravanaRepository, animalRepository);
 
-        vaca1.setCaravana(caravana1);
-        animalRepository.save(vaca1);
-
-        Animal vaca2 = new Animal(est, lote1);
-        vaca2.setIdCaravanaOficial("67890");
-        vaca2.setAlias("Margarita");
-        vaca2.setEstadoActual(EstadoAnimal.ACTIVO);
-        vaca2.setFechaNacimiento(LocalDate.of(2021, 5, 10));
+        Animal vaca2 = crearAnimal(est, lote1, "67890", "Margarita", "Hereford",
+                LocalDate.of(2021, 5, 10), "VIGIA-ARG-002", caravanaRepository, animalRepository);
         vaca2.setFechaAlta(LocalDate.now().minusDays(7));
-
-        Caravana caravana2 = new Caravana();
-        caravana2.setCodigo("VIGIA-ARG-002");
-        caravana2.setActivo(true);
-        caravanaRepository.save(caravana2);
-
-        vaca2.setCaravana(caravana2);
         animalRepository.save(vaca2);
 
-        Animal vaca3 = new Animal(est, lote2);
-        vaca3.setIdCaravanaOficial("33333");
-        vaca3.setAlias("Sin Datos Recientes");
-        vaca3.setEstadoActual(EstadoAnimal.ACTIVO);
-        vaca3.setFechaNacimiento(LocalDate.of(2022, 3, 15));
+        // vaca3: también en lote1; recibirá telemetría vieja (> 15 min) para mostrar
+        // el indicador "sin datos recientes" en el mapa (H0012). El alias es neutro
+        // porque el nombre se ve en el listado público.
+        Animal vaca3 = crearAnimal(est, lote1, "33333", "Renegrida", "Brangus",
+                LocalDate.of(2022, 3, 15), "VIGIA-ARG-003", caravanaRepository, animalRepository);
 
-        Caravana caravana3 = new Caravana();
-        caravana3.setCodigo("VIGIA-ARG-003");
-        caravana3.setActivo(true);
-        caravanaRepository.save(caravana3);
+        Animal vaca4 = crearAnimal(est, lote1, "44444", "Blanca", "Holando",
+                LocalDate.of(2021, 8, 20), "VIGIA-ARG-004", caravanaRepository, animalRepository);
 
-        vaca3.setCaravana(caravana3);
-        animalRepository.save(vaca3);
+        Animal vaca5 = crearAnimal(est, lote1, "55555", "Pinta", "Jersey",
+                LocalDate.of(2022, 1, 10), "VIGIA-ARG-005", caravanaRepository, animalRepository);
 
-        Animal vaca4 = new Animal(est, lote2);
-        vaca4.setIdCaravanaOficial("44444");
-        vaca4.setAlias("Blanca");
-        vaca4.setEstadoActual(EstadoAnimal.ACTIVO);
-        vaca4.setFechaNacimiento(LocalDate.of(2021, 8, 20));
+        log.info("[DataInitializer] ✅ 5 animales generados en Rodeo 01 — Rodeo 02 vacío (reservado para demo CSV H0005).");
 
-        Caravana caravana4 = new Caravana();
-        caravana4.setCodigo("VIGIA-ARG-004");
-        caravana4.setActivo(true);
-        caravanaRepository.save(caravana4);
+        // ── Acto 3: Dashboard / mapa ──────────────────────────────────────
+        // Posiciones recientes para que el mapa se vea poblado desde el arranque.
+        // vaca1 (forzada a celo en la demo, ver simulador/simulador_demo.py) recibe
+        // acá su historial completo de 24hs con patrón de celo, en vez de un
+        // único punto reciente: así el simulador no tiene que inyectarlo al
+        // arrancar, y solo necesita mandar un puñado de puntos nuevos en vivo
+        // para que el próximo ciclo del job de celo (corre cada 60s, ver
+        // BatchScheduler) evalúe la ventana completa —ya con forma de celo—
+        // y dispare la alerta casi de inmediato.
+        sembrarHistorialCelo(vaca1.getCaravana(), telemetriaRepository);
+        crearTelemetria(vaca2.getCaravana(), -34.9448, -59.2241, 76.0, LocalDateTime.now().minusMinutes(6), telemetriaRepository);
+        crearTelemetria(vaca4.getCaravana(), -34.9421, -59.2279, 91.0, LocalDateTime.now().minusMinutes(2), telemetriaRepository);
+        crearTelemetria(vaca5.getCaravana(), -34.9455, -59.2260, 64.0, LocalDateTime.now().minusMinutes(10), telemetriaRepository);
 
-        vaca4.setCaravana(caravana4);
-        animalRepository.save(vaca4);
+        // vaca3 se deja con una única transmisión de hace 1 hora (> 15 min)
+        // para disparar el indicador "sin datos recientes" en el mapa (H0012).
+        crearTelemetria(vaca3.getCaravana(), -34.943317, -59.225728, 45.0, LocalDateTime.now().minusHours(1), telemetriaRepository);
 
-        Animal vaca5 = new Animal(est, lote1);
-        vaca5.setIdCaravanaOficial("55555");
-        vaca5.setAlias("Pinta");
-        vaca5.setEstadoActual(EstadoAnimal.ACTIVO);
-        vaca5.setFechaNacimiento(LocalDate.of(2022, 1, 10));
-
-        Caravana caravana5 = new Caravana();
-        caravana5.setCodigo("VIGIA-ARG-005");
-        caravana5.setActivo(true);
-        caravanaRepository.save(caravana5);
-
-        vaca5.setCaravana(caravana5);
-        animalRepository.save(vaca5);
-
-        Telemetria telemetriaStale = new Telemetria();
-        telemetriaStale.setCaravana(caravana3);
-        telemetriaStale.setFechaHora(LocalDateTime.now().minusHours(1));
-        telemetriaStale.setLatitud(-34.943317);
-        telemetriaStale.setLongitud(-59.225728);
-        telemetriaStale.setBateria(45.0);
-        telemetriaStale.setMoveState(1);
-        telemetriaStale.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
-        telemetriaStale.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
-        telemetriaRepository.save(telemetriaStale);
-
-        log.info("[DataInitializer] ✅ Animales de prueba generados.");
+        log.info("[DataInitializer] ✅ Telemetría cargada — 3 animales con posición reciente, "
+                + "vaca1 con 24hs de historial en patrón de celo, 1 en estado 'sin datos recientes'.");
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
         log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");
@@ -198,5 +169,108 @@ public class DataInitializer implements CommandLineRunner {
         u.setActivo(true);
         u.setFechaAlta(LocalDate.now());
         return u;
+    }
+
+    private Animal crearAnimal(Establecimiento est, RodeoLote lote, String idOficial, String alias, String raza,
+                                LocalDate fechaNacimiento, String codigoCaravana,
+                                CaravanaRepository caravanaRepository, AnimalRepository animalRepository) {
+        Animal a = new Animal(est, lote);
+        a.setIdCaravanaOficial(idOficial);
+        a.setAlias(alias);
+        a.setEstadoActual(EstadoAnimal.ACTIVO);
+        a.setFechaNacimiento(fechaNacimiento);
+        // OJO: confirmá que el setter se llama así en tu modelo Animal —
+        // si no existe (o se llama distinto), comentá esta línea.
+        // a.setRaza(raza);
+
+        Caravana caravana = new Caravana();
+        caravana.setCodigo(codigoCaravana);
+        caravana.setActivo(true);
+        caravanaRepository.save(caravana);
+
+        a.setCaravana(caravana);
+        animalRepository.save(a);
+        return a;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Siembra las 288 filas (24hs, 1 cada 5 min) de historial de celo para la
+    // vaca forzada de la demo (VIGIA-ARG-001 por defecto en el simulador),
+    // con el mismo patron de "alta actividad sostenida y erratica" que antes
+    // generaba simulador_demo.py al arrancar (ver el docstring de ese
+    // archivo). Al persistirse aca, en el arranque del backend, el
+    // simulador de la demo ya no necesita mandar esos ~288 requests: solo
+    // arranca su loop en vivo y, apenas manda un puñado de puntos nuevos
+    // (quedan en estado PENDIENTE), el proximo ciclo del job de celo ya
+    // evalua una ventana de 24hs con forma de celo de punta a punta.
+    //
+    // Se marca EstadoInferencia.COMPLETADO (no PENDIENTE) porque esta
+    // telemetria sembrada no debe disparar por si sola el job de celo: el
+    // que la dispara es la primera telemetria PENDIENTE que llegue por
+    // /api/v1/ingesta/uplink (ver CeloBatchConfig.celoProcessor()).
+    //
+    // Escala fisica alineada con ml-training/celo/generate_dataset.py y con
+    // el simulador (simulador/simulador.py): SPEED_BASE = 0.000018 grados
+    // por tick de 5 min en pastoreo normal; en celo, generate_dataset.py
+    // multiplica la velocidad por 1.0 + intensidad*(2 a 3) -> hasta 4x.
+    // ---------------------------------------------------------------------------
+    private void sembrarHistorialCelo(Caravana caravana, TelemetriaRepository telemetriaRepository) {
+        final int SAMPLES_PER_DIA = 288;
+        final int TICK_HISTORIAL_SEGUNDOS = 300;
+        final double SPEED_BASE_DEG_POR_TICK_5MIN = 0.000018;
+        final double SPEED_MULT_CELO_MIN = 2.5;
+        final double SPEED_MULT_CELO_MAX = 4.0;
+        final double TURN_STD_CELO = 1.1;
+        final int MOVESTATE_ALTA_ACTIVIDAD_MIN = 7;
+        final int MOVESTATE_ALTA_ACTIVIDAD_MAX = 9;
+
+        Random rnd = new Random();
+        double lat = -34.9430;
+        double lon = -59.2255;
+        double heading = rnd.nextDouble() * 2 * Math.PI;
+        double bateria = 88.0;
+
+        // La ultima fila queda a unos minutos de "ahora" (igual que el resto
+        // de los animales del Acto 3), para que el mapa la siga mostrando
+        // como posicion reciente.
+        LocalDateTime ultimaFecha = LocalDateTime.now().minusMinutes(3);
+
+        for (int i = SAMPLES_PER_DIA; i >= 1; i--) {
+            LocalDateTime fecha = ultimaFecha.minusSeconds((long) (i - 1) * TICK_HISTORIAL_SEGUNDOS);
+            double speedMult = SPEED_MULT_CELO_MIN + rnd.nextDouble() * (SPEED_MULT_CELO_MAX - SPEED_MULT_CELO_MIN);
+            heading += rnd.nextGaussian() * TURN_STD_CELO;
+            double speed = SPEED_BASE_DEG_POR_TICK_5MIN * speedMult;
+            lat += speed * Math.cos(heading);
+            lon += speed * Math.sin(heading);
+            bateria -= 0.01;
+
+            int moveState = MOVESTATE_ALTA_ACTIVIDAD_MIN
+                    + rnd.nextInt(MOVESTATE_ALTA_ACTIVIDAD_MAX - MOVESTATE_ALTA_ACTIVIDAD_MIN + 1);
+
+            Telemetria t = new Telemetria();
+            t.setCaravana(caravana);
+            t.setFechaHora(fecha);
+            t.setLatitud(lat);
+            t.setLongitud(lon);
+            t.setMoveState(moveState);
+            t.setBateria(bateria);
+            t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+            t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+            telemetriaRepository.save(t);
+        }
+    }
+
+    private void crearTelemetria(Caravana caravana, double lat, double lon, double bateria,
+                                  LocalDateTime fechaHora, TelemetriaRepository telemetriaRepository) {
+        Telemetria t = new Telemetria();
+        t.setCaravana(caravana);
+        t.setFechaHora(fechaHora);
+        t.setLatitud(lat);
+        t.setLongitud(lon);
+        t.setBateria(bateria);
+        t.setMoveState(1);
+        t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+        t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+        telemetriaRepository.save(t);
     }
 }

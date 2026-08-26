@@ -177,12 +177,20 @@ function NavScroll() {
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                         {establecimientoSelector}
                     </div>
-                    <button
-                        className="btn btn-outline-danger btn-sm w-100 mt-2"
-                        onClick={() => { setDrawerOpen(false); logout(); }}
-                    >
-                        <i className="bi bi-box-arrow-right me-1" /> Cerrar sesión
-                    </button>
+                    <div className="mt-3">
+                        <button
+                            className="btn btn-outline-primary btn-sm w-100 mb-2"
+                            onClick={() => { setDrawerOpen(false); navigate('/perfil'); }}
+                        >
+                            Mi Perfil
+                        </button>
+                        <button
+                            className="btn btn-outline-danger btn-sm w-100"
+                            onClick={() => { setDrawerOpen(false); logout(); }}
+                        >
+                            Cerrar sesión
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -211,10 +219,27 @@ function NavScroll() {
                         {establecimientoSelector}
                     </div>
 
-                    {/* Botón Logout (Desktop) posicionado absoluto a la derecha */}
-                    <div className="d-none d-lg-flex align-items-center gap-2 position-absolute end-0 pe-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
-                        <button className="btn btn-outline-light btn-sm text-nowrap" onClick={logout}>
-                            <i className="bi bi-box-arrow-right me-1"></i> Cerrar sesión
+                    {/* Opciones de usuario (Desktop) posicionadas absoluto a la derecha */}
+                    <div className="d-none d-lg-flex align-items-center gap-3 position-absolute end-0 pe-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
+                        <Nav>
+                            <Nav.Link as={Link} to="/perfil" className="fw-semibold px-0">
+                                <i className="bi bi-person-circle me-1" /> Mi Perfil
+                            </Nav.Link>
+                        </Nav>
+                        <button 
+                            className="btn btn-sm d-flex align-items-center gap-1 btn-salir-navbar" 
+                            onClick={logout}
+                            style={{
+                                backgroundColor: 'rgba(255,255,255,0.12)',
+                                color: '#fff',
+                                border: '1px solid rgba(255,255,255,0.25)',
+                                borderRadius: '8px',
+                                fontSize: '0.82rem',
+                                fontWeight: 500,
+                                backdropFilter: 'blur(4px)',
+                            }}
+                        >
+                            <i className="bi bi-box-arrow-right" /> Salir
                         </button>
                     </div>
 

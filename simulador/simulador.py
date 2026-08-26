@@ -28,7 +28,9 @@ NUM_ANIMALES = int(os.getenv("NUM_ANIMALES", 5)) # 5 vacas como solicitaste
 # ~0.8-0.97. Por eso el default pasa a ser 300s.
 INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 300))  # 5 minutos, igual que el collar real / dataset de entrenamiento
 
-# Coordenadas iniciales: Establecimiento de Prueba (del DataInitializer)
+# Coordenadas iniciales: Establecimiento de Prueba (del DataInitializer), usadas
+# solo como fallback si el backend todavía no tiene ninguna fila para un
+# device_id (ver obtener_posicion_inicial()).
 LAT_INICIAL = -34.943317
 LON_INICIAL = -59.225728
 
@@ -40,7 +42,10 @@ LON_INICIAL = -59.225728
 # directamente SPEED_BASE_DEG_POR_TICK_5MIN, tal cual la usa el dataset de
 # entrenamiento. Si se baja INTERVALO_SEGUNDOS para hacer pruebas más rápidas
 # de otras partes del sistema (mapa, dashboard, etc.), tené en cuenta que la
-# detección de celo/salud deja de ser confiable (ver comentario arriba).
+# detección de celo/salud deja de ser confiable (ver comentario arriba). Para
+# una demo en vivo que sí necesita ir rápido sin perder esa confiabilidad,
+# ver simulador_demo.py (desacopla la escala de movimiento por paquete de la
+# frecuencia real de envío).
 # ---------------------------------------------------------------------------
 SPEED_BASE_DEG_POR_TICK_5MIN = 0.000018
 SPEED_BASE_DEG_POR_SEG = SPEED_BASE_DEG_POR_TICK_5MIN / 300.0
@@ -106,15 +111,72 @@ MOVESTATE_ALTA_ACTIVIDAD = (7, 9)
 FORZAR_CELO_DEVICE_ID = os.getenv("FORZAR_CELO_DEVICE_ID", "VIGIA-ARG-001")
 FORZAR_SALUD_DEVICE_ID = os.getenv("FORZAR_SALUD_DEVICE_ID", "VIGIA-ARG-002")
 
-# Estado inicial de los animales
+
+# ---------------------------------------------------------------------------
+# BUGFIX: la posición inicial de cada animal debe continuar la última
+# posición real que ya tiene en la base (ver DataInitializer.java), no un
+# punto random desconectado ni una copia hardcodeada de lo que DataInitializer
+# insertaba en algún momento del pasado. Antes cada animal arrancaba en
+# LAT_INICIAL/LON_INICIAL + offset random de hasta ±0.005° (~550m), sin
+# relación con la fila de telemetría que el DataInitializer ya insertó para
+# ese animal (ej: VIGIA-ARG-005 en -34.9455,-59.2260 hace 10 minutos).
+#
+# El job de celo arma la ventana de 24hs con TODA la telemetría de la
+# caravana ordenada por fecha —incluida esa fila sembrada por
+# DataInitializer— y ml-celo/app/main.py calcula la distancia entre puntos
+# CONSECUTIVOS de esa ventana sin normalizar por el tiempo real transcurrido
+# (ver DIST_SCALE_FACTOR en ml-celo/app/main.py). Un salto de ~500m entre la
+# fila sembrada y el primer paquete que manda el simulador se lee como un
+# desplazamiento ~100-500x mayor al de un tick normal —incluso con el
+# multiplicador de celo (hasta 4x)— y dispara una alerta de celo falsa en
+# CUALQUIER animal, sin importar cuál esté forzado. Así fue como la alerta
+# saltó en VIGIA-ARG-005 en vez de en VIGIA-ARG-001.
+#
+# Un dict hardcodeado (SEED_POSICIONES_DB) copiado a mano de
+# DataInitializer.java tenía el mismo problema un escalón más adelante:
+# quedaba desincronizado apenas alguien tocaba una de las dos fuentes, y
+# además dejó de tener sentido cuando DataInitializer empezó a sembrar 288
+# filas de historial de celo para VIGIA-ARG-001 (ver sembrarHistorialCelo())
+# en vez de una única fila — la "última posición real" de esa vaca depende
+# ahora de un random walk de 288 pasos, imposible de hardcodear a mano.
+#
+# Fix: pedirle al backend la última fila real de cada animal
+# (GET /api/v1/ingesta/ultima-posicion/{deviceId}, agregado en
+# IngestaController) y arrancar exactamente ahí, para que el primer paquete
+# en vivo sea una continuación real y no un teletransporte.
+# ---------------------------------------------------------------------------
+TIMEOUT_ULTIMA_POSICION_SEGUNDOS = 3
+
+
+def obtener_posicion_inicial(device_id):
+    base_url = API_URL.rsplit("/api/v1/", 1)[0]
+    url = f"{base_url}/api/v1/ingesta/ultima-posicion/{device_id}"
+    try:
+        resp = requests.get(url, timeout=TIMEOUT_ULTIMA_POSICION_SEGUNDOS)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data["latitud"], data["longitud"], data.get("bateria") or 100.0
+    except Exception as e:
+        print(f"AVISO: no se pudo consultar la última posición de {device_id} ({e}).")
+
+    print(f"AVISO: {device_id} no tiene posición previa conocida en el backend; "
+          f"arrancando en una posición random cerca del establecimiento.")
+    lat_ini = LAT_INICIAL + random.uniform(-0.005, 0.005)
+    lon_ini = LON_INICIAL + random.uniform(-0.005, 0.005)
+    bateria_ini = random.uniform(80.0, 100.0)
+    return lat_ini, lon_ini, bateria_ini
+
+
+# Estado inicial de los animales: se resuelve contra el backend, no
+# hardcodeado (ver obtener_posicion_inicial()).
 animales = {}
 for i in range(1, NUM_ANIMALES + 1):
     device_id = f"VIGIA-ARG-{i:03d}"
+    lat_ini, lon_ini, bateria_ini = obtener_posicion_inicial(device_id)
     animales[device_id] = {
-        # Mantener las vacas en un radio cercano al establecimiento
-        "lat": LAT_INICIAL + random.uniform(-0.005, 0.005),
-        "lon": LON_INICIAL + random.uniform(-0.005, 0.005),
-        "bateria": random.uniform(80.0, 100.0),
+        "lat": lat_ini,
+        "lon": lon_ini,
+        "bateria": bateria_ini,
         "heading": random.uniform(0, 2 * math.pi),  # rumbo inicial, para el random walk correlacionado
     }
 
@@ -182,47 +244,6 @@ def enviar(payload):
         return False
 
 
-def inyectar_historial_celo():
-    # El microservicio ml-celo espera ventanas de 24hs (SAMPLES_PER_DIA=288 en
-    # generate_dataset.py). El backend-worker (CeloBatchConfig) manda a
-    # /predict TODA la telemetría pendiente de las últimas 24hs de la
-    # caravana, así que para que la primera corrida del job de celo (corre
-    # cada 60s, ver BatchScheduler) ya tenga una ventana representativa,
-    # inyectamos 288 puntos históricos espaciados cada 5 minutos (no 10
-    # puntos sueltos como antes), igual que una jornada completa de collar
-    # real en celo.
-    SAMPLES_PER_DIA = 288
-    TICK_HISTORIAL_SEGUNDOS = 300  # 5 minutos, igual que generate_dataset.py
-
-    print(f"Inyectando {SAMPLES_PER_DIA} puntos de historial (24hs, 1 cada 5 min) "
-          f"para {FORZAR_CELO_DEVICE_ID} (simulando celo previo)...")
-    estado = animales[FORZAR_CELO_DEVICE_ID]
-    for i in range(SAMPLES_PER_DIA, 0, -1):
-        past_time = datetime.now(timezone.utc) - timedelta(seconds=i * TICK_HISTORIAL_SEGUNDOS)
-        speed_mult = random.uniform(SPEED_MULT_CELO_MIN, SPEED_MULT_CELO_MAX)
-        # Random walk correlacionado (rumbo persistente), a escala de un tick
-        # de 5 minutos (no de INTERVALO_SEGUNDOS): esta ventana histórica
-        # siempre representa "un día de collar real", independientemente de
-        # cada cuánto mande el simulador en tiempo real. El "heading" queda
-        # guardado en el estado y sigue evolucionando en el loop en vivo.
-        estado["heading"] += random.gauss(0, 1) * TURN_STD_CELO
-        speed = SPEED_BASE_DEG_POR_TICK_5MIN * speed_mult
-        estado["lat"] += speed * math.cos(estado["heading"])
-        estado["lon"] += speed * math.sin(estado["heading"])
-        payload = {
-            "device_id": FORZAR_CELO_DEVICE_ID,
-            "timestamp": past_time.replace(tzinfo=None).isoformat(),
-            "payload": {
-                "latitud": round(estado["lat"], 6),
-                "longitud": round(estado["lon"], 6),
-                "moveState": random.randint(*MOVESTATE_ALTA_ACTIVIDAD),
-                "bateria": 100.0
-            }
-        }
-        enviar(payload)
-    print("Historial de celo inyectado exitosamente.")
-
-
 def inyectar_historial_salud():
     # El modelo de salud necesita DOS ventanas de telemetría real, distintas
     # de la de celo (ver comentario grande más arriba sobre RF03):
@@ -236,6 +257,12 @@ def inyectar_historial_salud():
     #      últimos 288 puntos de la calibración se generan directamente con
     #      el patrón "enferma" (ver generar_payload), simulando que el
     #      cuadro arrancó hace ~1 día.
+    #
+    # A diferencia del historial de celo (ver el comentario de
+    # sembrarHistorialCelo() en DataInitializer.java: ese sí se movió al
+    # backend), el historial de salud sigue inyectándose acá porque la
+    # vigilancia sanitaria no forma parte del alcance cubierto por el
+    # DataInitializer todavía.
     #
     # Esto solo produce una alerta si `fecha_alta` de este animal ya tiene
     # >= calibracion-dias de antigüedad real (ver DataInitializer.java,
@@ -296,10 +323,11 @@ def main():
     print(f"Iniciando simulador para {NUM_ANIMALES} animales en el Establecimiento de Prueba.")
     print(f"Target API: {API_URL}")
     print(f"Intervalo de envío: {INTERVALO_SEGUNDOS} segundos.")
-    print(f"Escenario forzado de celo: {FORZAR_CELO_DEVICE_ID}")
+    print(f"Escenario forzado de celo: {FORZAR_CELO_DEVICE_ID} "
+          f"(historial de 24hs ya persistido por DataInitializer al arrancar el backend; "
+          f"este script ya no lo inyecta, ver sembrarHistorialCelo() en DataInitializer.java).")
     print(f"Escenario forzado de desvío sanitario: {FORZAR_SALUD_DEVICE_ID}")
 
-    inyectar_historial_celo()
     inyectar_historial_salud()
 
     while True:

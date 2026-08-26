@@ -1,7 +1,8 @@
 package dev.vigia.backend.service.impl;
 
 import dev.vigia.backend.service.UsuarioService;
-
+import dev.vigia.backend.dto.CambiarPasswordRequest;
+import dev.vigia.backend.dto.UpdatePerfilRequest;
 import dev.vigia.backend.dto.UsuarioResponse;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
@@ -10,7 +11,11 @@ import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +29,7 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final EstablecimientoRepository establecimientoRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public List<UsuarioResponse> getProductores() {
         return usuarioRepository.findByRolAndActivoTrue(Rol.PRODUCTOR).stream()
@@ -54,7 +60,8 @@ public class UsuarioServiceImpl implements UsuarioService {
             boolean pertenece = est.getEmpleados().stream()
                     .anyMatch(v -> v.getUsuario().equals(productor) && v.isActivo());
             if (!pertenece) {
-                throw new org.springframework.security.access.AccessDeniedException("No tiene acceso a este establecimiento");
+                throw new AccessDeniedException(
+                        "No tiene acceso a este establecimiento");
             }
             establecimientos = List.of(est);
         } else {
@@ -132,6 +139,64 @@ public class UsuarioServiceImpl implements UsuarioService {
         usuarioRepository.save(usuario);
     }
 
+    public UsuarioResponse getMiPerfil(String email) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+        return mapToResponse(usuario);
+    }
+
+    @Transactional
+    @SuppressWarnings("null")
+    public UsuarioResponse updateMiPerfil(String email, UpdatePerfilRequest request) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        if (request.getNombre() != null && !request.getNombre().isBlank()) {
+            usuario.setNombre(request.getNombre());
+        }
+        if (request.getApellido() != null) {
+            usuario.setApellido(request.getApellido());
+        }
+
+        usuario = usuarioRepository.save(usuario);
+        return mapToResponse(usuario);
+    }
+
+    @Transactional
+    public void cambiarPassword(String email, CambiarPasswordRequest request) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        if (usuario.getProveedorAuth() != null && !usuario.getProveedorAuth().equals("LOCAL")) {
+            throw new IllegalArgumentException(
+                    "Los usuarios registrados mediante SSO no pueden cambiar la contraseña localmente.");
+        }
+
+        if (!passwordEncoder.matches(request.getPasswordActual(), usuario.getPasswordHash())) {
+            throw new IllegalArgumentException("La contraseña actual es incorrecta.");
+        }
+
+        validatePassword(request.getNuevaPassword());
+
+        usuario.setPasswordHash(passwordEncoder.encode(request.getNuevaPassword()));
+        usuarioRepository.save(usuario);
+    }
+
+    private void validatePassword(String password) {
+        if (password == null || password.length() < 8 || password.length() > 32) {
+            throw new IllegalArgumentException("La contraseña debe tener entre 8 y 32 caracteres.");
+        }
+        if (!password.matches(".*[A-Z].*")) {
+            throw new IllegalArgumentException("La contraseña debe tener al menos una letra mayúscula.");
+        }
+        if (!password.matches(".*[a-z].*")) {
+            throw new IllegalArgumentException("La contraseña debe tener al menos una letra minúscula.");
+        }
+        if (!password.matches(".*[0-9\\W_].*")) {
+            throw new IllegalArgumentException("La contraseña debe tener al menos un número o carácter especial.");
+        }
+    }
+
     private UsuarioResponse mapToResponse(Usuario usuario) {
         return UsuarioResponse.builder()
                 .id(usuario.getId())
@@ -140,6 +205,7 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .email(usuario.getEmail())
                 .rol(usuario.getRol())
                 .activo(usuario.isActivo())
+                .proveedorAuth(usuario.getProveedorAuth())
                 .build();
     }
 }

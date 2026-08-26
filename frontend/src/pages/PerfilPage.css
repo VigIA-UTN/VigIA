@@ -1,0 +1,128 @@
+.perfil-page {
+    padding: 2rem 1.5rem;
+    min-height: calc(100vh - 60px);
+    background-color: #F8FAFC;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.perfil-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.perfil-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1E3A5F;
+    margin-bottom: 0.25rem;
+}
+
+.perfil-subtitle {
+    color: #64748B;
+    font-size: 1rem;
+    margin-bottom: 2rem;
+}
+
+.perfil-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 992px) {
+    .perfil-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.perfil-card {
+    background-color: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.perfil-card-header {
+    background-color: #f1f5f9;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.perfil-card-header i {
+    font-size: 1.25rem;
+    color: #1E3A5F;
+}
+
+.perfil-card-header h5 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1E3A5F;
+}
+
+.perfil-card-body {
+    padding: 1.5rem;
+    flex-grow: 1;
+}
+
+.perfil-card-body label {
+    font-weight: 500;
+    color: #334155;
+    margin-bottom: 0.5rem;
+}
+
+.perfil-card-body .form-control {
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    padding: 0.6rem 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.perfil-card-body .form-control:focus {
+    border-color: #1E3A5F;
+    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+
+.perfil-card-body .form-control:disabled {
+    background-color: #f8fafc;
+    color: #64748b;
+}
+
+.btn-vigia-primary {
+    background-color: #1E3A5F;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.6rem 1.25rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-vigia-primary:hover {
+    background-color: #132a47;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(30, 58, 95, 0.2);
+}
+
+.btn-vigia-outline {
+    border-color: #1E3A5F;
+    color: #1E3A5F;
+    border-radius: 8px;
+    padding: 0.6rem 1.25rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-vigia-outline:hover {
+    background-color: #1E3A5F;
+    color: white;
+}
+
+.text-sm {
+    font-size: 0.875rem;
+}
