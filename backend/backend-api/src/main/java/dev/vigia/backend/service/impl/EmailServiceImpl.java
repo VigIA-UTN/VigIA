@@ -32,9 +32,9 @@ public class EmailServiceImpl implements EmailService {
             message.setText("Hola,\n\n"
                     + "Has sido invitado para unirte a VigIA como Productor para el establecimiento: "
                     + establecimientoNombre + ".\n\n"
-                    + "Por favor utiliza el siguiente código de invitación en la plataforma para registrarte:\n"
-                    + token + "\n\n"
-                    + "Este código es válido por 7 días.\n\n"
+                    + "Por favor, haz clic en el siguiente enlace para registrarte:\n"
+                    + frontendUrl + "/aceptar-invitacion?token=" + token + "\n\n"
+                    + "Este enlace es válido por 7 días.\n\n"
                     + "Saludos,\nEl equipo de VigIA.");
 
             emailSender.send(message);

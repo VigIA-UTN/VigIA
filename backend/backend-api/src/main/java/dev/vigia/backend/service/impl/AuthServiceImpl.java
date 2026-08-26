@@ -170,11 +170,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (TipoInvitacion.PRODUCTOR.equals(invitacion.getTipoInvitacion())) {
-            if (providedEmail == null || providedEmail.isBlank()) {
-                throw new IllegalArgumentException("El email es requerido para el registro con código.");
-            }
-            if (!invitacion.getEmailDestino().equalsIgnoreCase(providedEmail)) {
-                throw new IllegalArgumentException("El email no coincide con el de la invitación.");
+            if (providedEmail != null && !providedEmail.isBlank()) {
+                if (!invitacion.getEmailDestino().equalsIgnoreCase(providedEmail)) {
+                    throw new IllegalArgumentException("El email no coincide con el de la invitación.");
+                }
             }
         }
         return invitacion;
