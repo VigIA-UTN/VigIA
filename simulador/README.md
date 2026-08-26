@@ -6,8 +6,8 @@ Script en Python que emula el comportamiento de cientos de collares IoT transmit
 - **Random Walk:** Simula el pastoreo normal de los animales en el campo.
 - **Continuidad con la base:** al arrancar, cada animal consulta al backend (`GET /api/v1/ingesta/ultima-posicion/{deviceId}`) su última posición/batería real y arranca desde ahí, en vez de coordenadas hardcodeadas — evita el salto de posición que dispara alertas de celo falsas (ver el comentario de BUGFIX en `simulador.py`).
 - **Anomalías forzadas**, para poder demostrar de punta a punta cada tipo de alerta sin depender del azar:
-  - **Celo** (`VIGIA-ARG-001` por defecto): el historial de 24hs con patrón de alta actividad sostenida y errática ya lo persiste el backend al arrancar (`DataInitializer.java`, método `sembrarHistorialCelo`) — ni `simulador.py` ni `simulador_demo.py` lo inyectan. Ambos scripts solo mandan, en su loop en vivo, los puntos nuevos con ese mismo patrón para ese device_id; basta que lleguen unos pocos para que el próximo ciclo del job de celo (cada 60s) evalúe la ventana completa y dispare la alerta.
-  - **Salud** (`VIGIA-ARG-002` por defecto): `simulador.py` sigue inyectando 8 días de historial (7+ de calibración "sana" + 1 día de cuadro de enfermedad con inmovilidad) al arrancar, y sigue mandando ese patrón de inmovilidad en el loop en vivo — esto no se movió al backend. Ver el comentario grande en `simulador.py` sobre por qué esto **requiere** que `fecha_alta` del animal ya tenga >= `vigia.salud.calibracion-dias` (7 por defecto) de antigüedad real — si no, el backend bloquea toda predicción de salud por RF03 sin importar la telemetría enviada. `VIGIA-ARG-002` viene backdateada en `DataInitializer.java` justamente para poder demostrar esto el mismo día. En `simulador_demo.py` esta inyección queda detrás del flag `INYECTAR_HISTORIAL_SALUD` (default `false`), por estar fuera del alcance de la demo del MVP.
+  - **Celo** (`VIGIA-ARG-001` por defecto): el historial de 24hs con patrón de alta actividad sostenida y errática ya lo persiste el backend al arrancar (`DataInitializer.java`, método `sembrarHistorialCelo`) — ningún script lo inyecta. Cada script que simula esta vaca solo manda, en su loop en vivo, los puntos nuevos con ese mismo patrón; basta que lleguen unos pocos para que el próximo ciclo del job de celo (cada 60s) evalúe la ventana completa y dispare la alerta.
+  - **Salud** (`VIGIA-ARG-002` por defecto): `simulador.py` sigue inyectando 8 días de historial (7+ de calibración "sana" + 1 día de cuadro de enfermedad con inmovilidad) al arrancar, y sigue mandando ese patrón de inmovilidad en el loop en vivo — esto todavía no se movió al backend. Ver el comentario grande en `simulador.py` sobre por qué esto **requiere** que `fecha_alta` del animal ya tenga >= `vigia.salud.calibracion-dias` (7 por defecto) de antigüedad real — si no, el backend bloquea toda predicción de salud por RF03 sin importar la telemetría enviada. `VIGIA-ARG-002` viene backdateada en `DataInitializer.java` justamente para poder demostrar esto el mismo día. Todavía no hay un `simulador_salud.py` separado (queda pendiente para cuando se muestre ese flujo).
 - **Consumo de Batería:** Emula el desgaste progresivo de la batería de los collares.
 
 ## Configuración
@@ -15,13 +15,13 @@ Script en Python que emula el comportamiento de cientos de collares IoT transmit
 Las variables de entorno principales son:
 - `API_URL`: URL del webhook del backend (por defecto apunta al contenedor del `backend-worker`).
 - `NUM_ANIMALES`: Cantidad de collares a simular (default 200).
-- `INTERVALO_SEGUNDOS`: Frecuencia de envío de datos. Por defecto **300 segundos** (5 min, igual que el collar real / dataset de entrenamiento) en `simulador.py` — no bajarlo ahí, ver el comentario en el código sobre por qué eso hunde la confianza del modelo. Para una demo que sí necesita ir rápido, usar `simulador_demo.py` (ver más abajo), donde este valor pasa a ser puramente el ritmo real de envío, desacoplado de la escala de movimiento por paquete.
+- `INTERVALO_SEGUNDOS`: Frecuencia de envío de datos. Por defecto **300 segundos** (5 min, igual que el collar real / dataset de entrenamiento) en `simulador.py` y en `simulador_normal.py` — no bajarlo ahí sin necesidad, aunque en estos dos scripts la distancia por paquete queda fija a esa escala así que bajarlo no rompe la calibración del modelo, solo acelera el ritmo. En `simulador_celo.py` el default es **5 segundos**, pensado para activarse puntualmente en una demo.
 - `FORZAR_CELO_DEVICE_ID`: device_id que siempre se simula en celo (default `VIGIA-ARG-001`).
-- `FORZAR_SALUD_DEVICE_ID`: device_id que siempre se simula con un desvío sanitario (default `VIGIA-ARG-002`).
+- `FORZAR_SALUD_DEVICE_ID`: device_id que siempre se simula con un desvío sanitario (default `VIGIA-ARG-002`, solo usado por `simulador.py`).
 
 ## Ejecución
 
-El simulador se ejecuta localmente usando un entorno virtual de Python:
+Los scripts se ejecutan localmente usando un entorno virtual de Python:
 
 ```bash
 # 1. Crear el entorno virtual
@@ -34,30 +34,45 @@ py -m venv .venv
 # 3. Instalar dependencias
 pip install -r requirements.txt
 
-# 4. Ejecutar el simulador
+# 4. Ejecutar el simulador que corresponda (ver más abajo cuál usar)
 py simulador.py
 ```
 
-## `simulador_demo.py` — variante para la demo del MVP (desplegada)
+## `simulador_normal.py` + `simulador_celo.py` — procesos separados para un backend ya desplegado
 
-`simulador_demo.py` es la variante pensada para prender contra un backend ya
-desplegado (no local) durante la demo del MVP. A diferencia de `simulador.py`:
+Estos dos scripts reemplazan a `simulador_demo.py` para el caso de un backend
+desplegado (Railway u otro), con un objetivo puntual: poder dejar la manada
+"de fondo" corriendo con cadencia real durante períodos largos (incluso
+varios días), y activar el escenario de celo por separado, en el momento
+exacto en que se lo quiere mostrar — sin tener que reiniciar ni reconfigurar
+el proceso de fondo.
 
-- **`INTERVALO_SEGUNDOS` ya no afecta la calibración del modelo.** En esta
-  variante es puramente el ritmo real de la demo (default **5 segundos**),
-  desacoplado de la magnitud de movimiento por paquete, que queda fija a
-  la escala de un tick de 5 minutos (`TICK_MODELADO_SEGUNDOS = 300`, no
-  configurable) tal como espera el modelo entrenado. Se puede bajar sin
-  miedo a hundir la confianza del modelo — ver el docstring del archivo
-  para el detalle de por qué esto es seguro (el modelo no usa el timestamp
-  como feature).
-- Historial sanitario detrás de `INYECTAR_HISTORIAL_SALUD` (default
-  `false`) — fuera de alcance de esta demo del MVP.
+- **`simulador_normal.py`**: manda telemetría con comportamiento orgánico
+  (sin nada forzado) para toda la manada, EXCEPTO `FORZAR_CELO_DEVICE_ID`
+  (reservado para `simulador_celo.py`) y `VIGIA-ARG-003` (reservado para el
+  indicador "sin datos recientes" del mapa, H0012 — sembrado por
+  `DataInitializer` y nunca actualizado). Pensado para dejarse corriendo
+  todo el tiempo, con cadencia real (`INTERVALO_SEGUNDOS=300` por defecto).
+- **`simulador_celo.py`**: proceso aparte, simula ÚNICAMENTE la vaca
+  forzada a celo. Se prende cuando se quiere mostrar la detección y se
+  apaga (Ctrl+C) después — no hace falta dejarlo corriendo el resto del
+  tiempo. Cadencia rápida por defecto (`INTERVALO_SEGUNDOS=5`) para que la
+  alerta aparezca a los pocos minutos de activarlo. Requiere que
+  `DataInitializer` ya haya sembrado el historial de celo de esa vaca (ver
+  arriba) — no lo inyecta él mismo.
 
-Se ejecuta igual que `simulador.py` (mismo entorno virtual y dependencias):
+**Importante:** nunca corran `simulador_normal.py` y `simulador_celo.py` (o
+`simulador.py`/`simulador_demo.py`) al mismo tiempo apuntando al mismo
+device_id — dos procesos mandando telemetría para la misma vaca, cada uno
+con su propio estado en memoria, hacen que se vea "teletransportándose"
+entre dos trayectorias distintas.
 
 ```bash
-py simulador_demo.py
+# Terminal 1 — queda corriendo de fondo
+py simulador_normal.py
+
+# Terminal 2 — se prende solo cuando se va a mostrar la detección de celo
+py simulador_celo.py
 ```
 
 ### Importante si el backend queda desplegado con anticipación
@@ -65,9 +80,23 @@ py simulador_demo.py
 El historial de celo que siembra `DataInitializer` tiene timestamps fijados
 en el momento del arranque del backend, y el job de celo siempre filtra
 "últimas 24hs desde ahora". Si pasan más de ~24hs entre que se desplegó el
-backend y se prende el simulador, ese historial ya salió de la ventana y la
-alerta va a tardar mucho más en aparecer (el simulador tendría que juntar
-de cero suficientes puntos en vivo). Para que la demo funcione como se
-espera ("prendo el simulador y a los pocos minutos aparece la alerta"),
-conviene reiniciar el backend (o re-disparar el `DataInitializer`) dentro de
-esa ventana de 24hs antes de la demo.
+backend y se prende `simulador_celo.py`, ese historial ya salió de la
+ventana y la alerta va a tardar mucho más en aparecer (el script tendría
+que juntar de cero suficientes puntos en vivo). Para que la demo funcione
+como se espera ("prendo el simulador y a los pocos minutos aparece la
+alerta"), conviene reiniciar el backend (o re-disparar el
+`DataInitializer`) dentro de esa ventana de 24hs antes de la demo.
+
+## `simulador_demo.py` — variante anterior (un solo proceso, todavía funcional)
+
+Antes de separar en `simulador_normal.py` + `simulador_celo.py`, existía
+`simulador_demo.py`: un único proceso que hace las dos cosas a la vez
+(manda a toda la manada, y fuerza el patrón de celo para
+`FORZAR_CELO_DEVICE_ID` dentro del mismo loop). Sigue andando igual que
+antes si se prefiere un solo proceso en vez de dos, pero no da control
+sobre activar el escenario de celo en un momento distinto al de arrancar el
+resto de la manada.
+
+```bash
+py simulador_demo.py
+```
