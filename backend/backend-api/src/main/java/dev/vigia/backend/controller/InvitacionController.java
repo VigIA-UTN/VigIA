@@ -87,4 +87,11 @@ public class InvitacionController {
         invitacionService.rechazarInvitacion(id, authentication.getName());
         return ResponseEntity.ok().build();
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'PRODUCTOR')")
+    public ResponseEntity<Void> cancelarInvitacion(@PathVariable Long id, Authentication authentication) {
+        invitacionService.cancelarInvitacion(id, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
 }

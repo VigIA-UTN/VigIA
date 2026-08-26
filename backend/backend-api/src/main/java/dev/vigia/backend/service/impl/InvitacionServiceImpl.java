@@ -337,4 +337,24 @@ public class InvitacionServiceImpl implements InvitacionService {
                 invitacion.setEstadoInvitacion(EstadoInvitacion.RECHAZADA);
                 invitacionRepository.save(invitacion);
         }
+
+        @Transactional
+        @SuppressWarnings("null")
+        public void cancelarInvitacion(Long id, String email) {
+                Invitacion invitacion = invitacionRepository.findById(id)
+                                .orElseThrow(() -> new IllegalArgumentException("Invitación no encontrada"));
+
+                if (invitacion.getEstadoInvitacion() != EstadoInvitacion.PENDIENTE) {
+                        throw new IllegalArgumentException("Sólo se pueden eliminar invitaciones pendientes");
+                }
+
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+                if (!invitacion.getCreador().getId().equals(usuario.getId()) && usuario.getRol() != Rol.ADMINISTRADOR) {
+                        throw new IllegalArgumentException("No tienes permiso para eliminar esta invitación");
+                }
+
+                invitacionRepository.delete(invitacion);
+        }
 }

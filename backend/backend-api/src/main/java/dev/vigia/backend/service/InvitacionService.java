@@ -22,4 +22,6 @@ public interface InvitacionService {
     void aceptarInvitacionPorToken(String token, String email);
 
     void rechazarInvitacion(Long id, String email);
+
+    void cancelarInvitacion(Long id, String email);
 }
