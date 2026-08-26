@@ -30,6 +30,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Random;
 
 @Slf4j
 @Component
@@ -132,7 +133,14 @@ public class DataInitializer implements CommandLineRunner {
 
         // ── Acto 3: Dashboard / mapa ──────────────────────────────────────
         // Posiciones recientes para que el mapa se vea poblado desde el arranque.
-        crearTelemetria(vaca1.getCaravana(), -34.9430, -59.2255, 88.0, LocalDateTime.now().minusMinutes(3), telemetriaRepository);
+        // vaca1 (forzada a celo en la demo, ver simulador/simulador_demo.py) recibe
+        // acá su historial completo de 24hs con patrón de celo, en vez de un
+        // único punto reciente: así el simulador no tiene que inyectarlo al
+        // arrancar, y solo necesita mandar un puñado de puntos nuevos en vivo
+        // para que el próximo ciclo del job de celo (corre cada 60s, ver
+        // BatchScheduler) evalúe la ventana completa —ya con forma de celo—
+        // y dispare la alerta casi de inmediato.
+        sembrarHistorialCelo(vaca1.getCaravana(), telemetriaRepository);
         crearTelemetria(vaca2.getCaravana(), -34.9448, -59.2241, 76.0, LocalDateTime.now().minusMinutes(6), telemetriaRepository);
         crearTelemetria(vaca4.getCaravana(), -34.9421, -59.2279, 91.0, LocalDateTime.now().minusMinutes(2), telemetriaRepository);
         crearTelemetria(vaca5.getCaravana(), -34.9455, -59.2260, 64.0, LocalDateTime.now().minusMinutes(10), telemetriaRepository);
@@ -141,7 +149,8 @@ public class DataInitializer implements CommandLineRunner {
         // para disparar el indicador "sin datos recientes" en el mapa (H0012).
         crearTelemetria(vaca3.getCaravana(), -34.943317, -59.225728, 45.0, LocalDateTime.now().minusHours(1), telemetriaRepository);
 
-        log.info("[DataInitializer] ✅ Telemetría cargada — 4 animales con posición reciente, 1 en estado 'sin datos recientes'.");
+        log.info("[DataInitializer] ✅ Telemetría cargada — 3 animales con posición reciente, "
+                + "vaca1 con 24hs de historial en patrón de celo, 1 en estado 'sin datos recientes'.");
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
         log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");
@@ -182,6 +191,73 @@ public class DataInitializer implements CommandLineRunner {
         a.setCaravana(caravana);
         animalRepository.save(a);
         return a;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Siembra las 288 filas (24hs, 1 cada 5 min) de historial de celo para la
+    // vaca forzada de la demo (VIGIA-ARG-001 por defecto en el simulador),
+    // con el mismo patron de "alta actividad sostenida y erratica" que antes
+    // generaba simulador_demo.py al arrancar (ver el docstring de ese
+    // archivo). Al persistirse aca, en el arranque del backend, el
+    // simulador de la demo ya no necesita mandar esos ~288 requests: solo
+    // arranca su loop en vivo y, apenas manda un puñado de puntos nuevos
+    // (quedan en estado PENDIENTE), el proximo ciclo del job de celo ya
+    // evalua una ventana de 24hs con forma de celo de punta a punta.
+    //
+    // Se marca EstadoInferencia.COMPLETADO (no PENDIENTE) porque esta
+    // telemetria sembrada no debe disparar por si sola el job de celo: el
+    // que la dispara es la primera telemetria PENDIENTE que llegue por
+    // /api/v1/ingesta/uplink (ver CeloBatchConfig.celoProcessor()).
+    //
+    // Escala fisica alineada con ml-training/celo/generate_dataset.py y con
+    // el simulador (simulador/simulador.py): SPEED_BASE = 0.000018 grados
+    // por tick de 5 min en pastoreo normal; en celo, generate_dataset.py
+    // multiplica la velocidad por 1.0 + intensidad*(2 a 3) -> hasta 4x.
+    // ---------------------------------------------------------------------------
+    private void sembrarHistorialCelo(Caravana caravana, TelemetriaRepository telemetriaRepository) {
+        final int SAMPLES_PER_DIA = 288;
+        final int TICK_HISTORIAL_SEGUNDOS = 300;
+        final double SPEED_BASE_DEG_POR_TICK_5MIN = 0.000018;
+        final double SPEED_MULT_CELO_MIN = 2.5;
+        final double SPEED_MULT_CELO_MAX = 4.0;
+        final double TURN_STD_CELO = 1.1;
+        final int MOVESTATE_ALTA_ACTIVIDAD_MIN = 7;
+        final int MOVESTATE_ALTA_ACTIVIDAD_MAX = 9;
+
+        Random rnd = new Random();
+        double lat = -34.9430;
+        double lon = -59.2255;
+        double heading = rnd.nextDouble() * 2 * Math.PI;
+        double bateria = 88.0;
+
+        // La ultima fila queda a unos minutos de "ahora" (igual que el resto
+        // de los animales del Acto 3), para que el mapa la siga mostrando
+        // como posicion reciente.
+        LocalDateTime ultimaFecha = LocalDateTime.now().minusMinutes(3);
+
+        for (int i = SAMPLES_PER_DIA; i >= 1; i--) {
+            LocalDateTime fecha = ultimaFecha.minusSeconds((long) (i - 1) * TICK_HISTORIAL_SEGUNDOS);
+            double speedMult = SPEED_MULT_CELO_MIN + rnd.nextDouble() * (SPEED_MULT_CELO_MAX - SPEED_MULT_CELO_MIN);
+            heading += rnd.nextGaussian() * TURN_STD_CELO;
+            double speed = SPEED_BASE_DEG_POR_TICK_5MIN * speedMult;
+            lat += speed * Math.cos(heading);
+            lon += speed * Math.sin(heading);
+            bateria -= 0.01;
+
+            int moveState = MOVESTATE_ALTA_ACTIVIDAD_MIN
+                    + rnd.nextInt(MOVESTATE_ALTA_ACTIVIDAD_MAX - MOVESTATE_ALTA_ACTIVIDAD_MIN + 1);
+
+            Telemetria t = new Telemetria();
+            t.setCaravana(caravana);
+            t.setFechaHora(fecha);
+            t.setLatitud(lat);
+            t.setLongitud(lon);
+            t.setMoveState(moveState);
+            t.setBateria(bateria);
+            t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+            t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+            telemetriaRepository.save(t);
+        }
     }
 
     private void crearTelemetria(Caravana caravana, double lat, double lon, double bateria,

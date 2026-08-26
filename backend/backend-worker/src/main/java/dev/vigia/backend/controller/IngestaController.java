@@ -2,6 +2,7 @@ package dev.vigia.backend.controller;
 
 import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.IngestaRequestDTO;
+import dev.vigia.backend.dto.UltimaPosicionResponseDTO;
 import dev.vigia.backend.dto.ml.TelemetriaEventDTO;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
@@ -74,5 +75,33 @@ public class IngestaController {
         }
 
         return ResponseEntity.ok("OK");
+    }
+
+    // ---------------------------------------------------------------------------
+    // Usado por el simulador (ver simulador/simulador_demo.py) para arrancar
+    // continuando la ultima posicion/bateria real que ya tiene el animal en
+    // la base -sembrada por DataInitializer o dejada por una corrida
+    // anterior del propio simulador- en vez de coordenadas hardcodeadas que
+    // pueden desincronizarse (ver el BUGFIX documentado en simulador.py: un
+    // salto de posicion desconectado de la ultima fila real dispara una
+    // alerta de celo falsa por la distancia anomala entre el punto sembrado
+    // y el primer paquete en vivo).
+    // ---------------------------------------------------------------------------
+    @GetMapping("/ultima-posicion/{deviceId}")
+    public ResponseEntity<?> getUltimaPosicion(@PathVariable("deviceId") String deviceId) {
+        Optional<Caravana> caravanaOpt = caravanaRepository.findByCodigo(deviceId);
+        if (caravanaOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Optional<Telemetria> ultimaOpt = telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravanaOpt.get());
+        if (ultimaOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Telemetria t = ultimaOpt.get();
+        UltimaPosicionResponseDTO dto = new UltimaPosicionResponseDTO(
+                t.getLatitud(), t.getLongitud(), t.getBateria(), t.getMoveState(), t.getFechaHora());
+        return ResponseEntity.ok(dto);
     }
 }
