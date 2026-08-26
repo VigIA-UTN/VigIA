@@ -149,7 +149,7 @@ export default function AcceptInvitationPage() {
         <div className="accept-invitation-card">
           <img src={logoImg} alt="VigIA Logo" className="logo" />
           <h2 style={{ color: '#28a745' }}>¡Invitación Aceptada!</h2>
-          <p>Se ha vinculado exitosamente tu usuario al establecimiento.</p>
+          <p>Se ha vinculado exitosamente tu usuario {invitationData?.establecimiento ? 'al establecimiento' : 'al sistema'}.</p>
           <p>Redirigiendo al inicio...</p>
         </div>
       </div>
@@ -179,7 +179,7 @@ export default function AcceptInvitationPage() {
         <img src={logoImg} alt="VigIA Logo" className="logo" />
         <h2 className="title">
           Te han invitado a unirte a<br />
-          <span className="establecimiento-name">{invitationData.establecimiento}</span>
+          <span className="establecimiento-name">{invitationData.establecimiento || 'VigIA'}</span>
         </h2>
 
         {error && <div className="error-message">⚠️ {error}</div>}
@@ -260,7 +260,7 @@ export default function AcceptInvitationPage() {
 
               <div className="form-group">
                 <label>Rol</label>
-                <input type="text" value={invitationData.rol} disabled className="disabled-input" />
+                <input type="text" value={invitationData.rol ? invitationData.rol.charAt(0).toUpperCase() + invitationData.rol.slice(1).toLowerCase() : ''} disabled className="disabled-input" />
               </div>
 
               <div className="form-group">
