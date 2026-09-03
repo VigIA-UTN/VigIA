@@ -169,8 +169,8 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("Debe rechazar token de productor si no provee email")
-    void validateCode_Productor_ThrowsWhenEmailNull() {
+    @DisplayName("Debe validar token de productor correctamente aunque no provea email en la consulta")
+    void validateCode_Productor_SuccessWhenEmailNull() {
         Invitacion invitacionProductor = new Invitacion();
         invitacionProductor.setToken("valid-token-prod");
         invitacionProductor.setEmailDestino("productor@test.com");
@@ -185,9 +185,10 @@ class AuthServiceTest {
         req.setToken("valid-token-prod");
         req.setEmail(null);
 
-        assertThatThrownBy(() -> authService.validateCode(req))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("El email es requerido para el registro con código");
+        ValidateCodeResponse resp = authService.validateCode(req);
+        
+        assertThat(resp).isNotNull();
+        assertThat(resp.getEmail()).isEqualTo("productor@test.com");
     }
 
     @Test

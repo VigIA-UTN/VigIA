@@ -65,3 +65,7 @@ export async function rechazarInvitacionRequest(id: number): Promise<void> {
   await axiosClient.post(`/invitaciones/${id}/rechazar`);
 }
 
+export async function eliminarInvitacionRequest(id: number): Promise<void> {
+  await axiosClient.delete(`/invitaciones/${id}`);
+}
+

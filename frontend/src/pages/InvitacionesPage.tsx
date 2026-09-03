@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   getInvitacionesProductor,
   crearInvitacionProductor,
+  eliminarInvitacionRequest,
 } from '../api/invitacionesApi';
 import type { InvitacionResponse } from '../api/invitacionesApi';
 import { getEstablecimientos } from '../api/establecimientosApi';
@@ -30,9 +31,12 @@ export default function InvitacionesPage() {
   const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [invitationToDelete, setInvitationToDelete] = useState<number | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   const [emailFilter, setEmailFilter] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
@@ -97,6 +101,27 @@ export default function InvitacionesPage() {
       setError(axiosError.response?.data?.message || 'Error al generar invitación');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleEliminar = async () => {
+    if (!invitationToDelete) return;
+    try {
+      setDeletingId(invitationToDelete);
+      setError(null);
+      await eliminarInvitacionRequest(invitationToDelete);
+      setSuccessMsg('Invitación eliminada correctamente.');
+      const invActualizadas = await getInvitacionesProductor();
+      setInvitaciones(invActualizadas);
+      setShowConfirmDelete(false);
+      setInvitationToDelete(null);
+    } catch (err) {
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      setError(axiosError.response?.data?.message || 'Error al eliminar invitación');
+      setShowConfirmDelete(false);
+      setInvitationToDelete(null);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -234,9 +259,30 @@ export default function InvitacionesPage() {
                           </span>
                         </td>
                         <td>
-                          <Badge className={`estado-badge ${estadoConf.className}`}>
-                            {estadoConf.label}
-                          </Badge>
+                          <div className="d-flex align-items-center justify-content-between gap-2">
+                            <Badge className={`estado-badge ${estadoConf.className}`}>
+                              {estadoConf.label}
+                            </Badge>
+                            {inv.estado === 'PENDIENTE' && inv.id && (
+                              <Button 
+                                variant="outline-danger" 
+                                size="sm" 
+                                onClick={() => {
+                                  setInvitationToDelete(inv.id as number);
+                                  setShowConfirmDelete(true);
+                                }}
+                                disabled={deletingId === inv.id}
+                                title="Eliminar invitación"
+                                style={{ padding: '0.2rem 0.5rem' }}
+                              >
+                                {deletingId === inv.id ? (
+                                  <Spinner animation="border" size="sm" />
+                                ) : (
+                                  <i className="bi bi-trash"></i>
+                                )}
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -304,6 +350,37 @@ export default function InvitacionesPage() {
             </button>
           </Modal.Footer>
         </Form>
+      </Modal>
+
+      {/* Modal Confirmar Eliminación */}
+      <Modal 
+        show={showConfirmDelete} 
+        onHide={() => {
+          setShowConfirmDelete(false);
+          setInvitationToDelete(null);
+        }} 
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Eliminar Invitación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          ¿Estás seguro de que deseas eliminar esta invitación? Esta acción no se puede deshacer.
+        </Modal.Body>
+        <Modal.Footer>
+          <Button 
+            variant="secondary" 
+            onClick={() => {
+              setShowConfirmDelete(false);
+              setInvitationToDelete(null);
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleEliminar}>
+            Eliminar
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );

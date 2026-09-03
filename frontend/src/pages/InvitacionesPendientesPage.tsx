@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { getEstablecimientos } from '../api/establecimientosApi';
+import { Container, Button, Alert, Spinner } from 'react-bootstrap';
 import './InvitacionesPendientesPage.css';
 
 export default function InvitacionesPendientesPage() {
@@ -66,52 +67,55 @@ export default function InvitacionesPendientesPage() {
 
   return (
     <>
-      <div className="invitaciones-pendientes-container">
-        <div className="invitaciones-pendientes-header">
-          <h2>Mis Invitaciones Pendientes</h2>
-        </div>
+      <div className="vigia-page-container">
+        <Container>
+          <div className="vigia-page-header">
+            <h2 className="vigia-page-title">Mis Invitaciones Pendientes</h2>
+          </div>
 
-        {error && <div className="alert alert-danger">{error}</div>}
+          {error && <Alert variant="danger">{error}</Alert>}
 
-        {loading ? (
-          <div className="text-center mt-5">
-            <div className="spinner-border" role="status">
-              <span className="visually-hidden">Cargando...</span>
+          {loading ? (
+            <div className="text-center mt-5">
+              <Spinner animation="border" style={{ color: '#1E3A5F' }} />
             </div>
-          </div>
-        ) : invitaciones.length === 0 ? (
-          <div className="empty-state">
-            <h4>No tenés invitaciones pendientes.</h4>
-            <p>Cuando un Productor te invite a un establecimiento, aparecerá acá.</p>
-          </div>
-        ) : (
-          <div className="invitaciones-list">
-            {invitaciones.map((inv) => (
-              <div key={inv.id} className="invitacion-card">
-                <div className="invitacion-info">
-                  <h4>{inv.establecimiento}</h4>
-                  <p><strong>Rol sugerido:</strong> {inv.rol}</p>
-                  <p><strong>Enviado por:</strong> {inv.nombreCompleto}</p>
-                  <p><strong>Fecha:</strong> {new Date(inv.fechaCreacion || '').toLocaleDateString()}</p>
+          ) : invitaciones.length === 0 ? (
+            <div className="empty-state">
+              <h4>No tenés invitaciones pendientes.</h4>
+              <p>Cuando un Productor te invite a un establecimiento, aparecerá acá.</p>
+            </div>
+          ) : (
+            <div className="invitaciones-list">
+              {invitaciones.map((inv) => (
+                <div key={inv.id} className="invitacion-card">
+                  <div className="invitacion-info">
+                    <h4>{inv.establecimiento}</h4>
+                    <p><strong>Rol sugerido:</strong> {inv.rol}</p>
+                    <p><strong>Enviado por:</strong> {inv.nombreCompleto}</p>
+                    <p><strong>Fecha:</strong> {new Date(inv.fechaCreacion || '').toLocaleDateString()}</p>
+                  </div>
+                  <div className="invitacion-actions">
+                    <Button 
+                      variant="outline-danger"
+                      onClick={() => inv.id && handleRechazar(inv.id)}
+                      className="w-100 mb-2 fw-bold"
+                    >
+                      Rechazar
+                    </Button>
+                    <Button 
+                      variant="success"
+                      onClick={() => inv.id && handleAceptar(inv.id)}
+                      className="w-100 fw-bold"
+                      style={{ backgroundColor: '#8CC63F', borderColor: '#8CC63F' }}
+                    >
+                      Aceptar Invitación
+                    </Button>
+                  </div>
                 </div>
-                <div className="invitacion-actions">
-                  <button 
-                    className="btn-rechazar"
-                    onClick={() => inv.id && handleRechazar(inv.id)}
-                  >
-                    Rechazar
-                  </button>
-                  <button 
-                    className="btn-aceptar"
-                    onClick={() => inv.id && handleAceptar(inv.id)}
-                  >
-                    Aceptar Invitación
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </Container>
       </div>
     </>
   );

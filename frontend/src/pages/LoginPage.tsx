@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { loginRequest } from '../api/authApi';
 import { useAuthStore } from '../store/authStore';
@@ -248,7 +248,9 @@ export default function LoginPage() {
           </a>
 
           <div className="login-link-container">
-            <Link to="/register" className='login-link'>¿Contas con una invitación? Registrate aquí</Link>
+            <span style={{ color: '#9aabb8', fontSize: '14px', textAlign: 'center', display: 'block', padding: '0 20px' }}>
+              Para registrarte en la plataforma, utilizá el enlace de invitación enviado a tu correo electrónico.
+            </span>
           </div>
         </form>
       </div>
