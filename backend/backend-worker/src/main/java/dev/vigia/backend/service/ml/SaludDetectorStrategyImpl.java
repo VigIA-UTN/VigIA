@@ -7,8 +7,10 @@ import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.PerfilCalibracionRequestDTO;
 import dev.vigia.backend.dto.ml.PerfilCalibracionResponseDTO;
 import dev.vigia.backend.dto.ml.PuntoTelemetriaDTO;
+import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.ml.SaludPredictRequestDTO;
 import dev.vigia.backend.dto.ml.SaludPredictResponseDTO;
+import dev.vigia.backend.util.SerieComparativaBuilder;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
@@ -211,7 +213,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         marcarCompletados(telemetriaList);
 
         if (response != null && response.isDesvioDetectado()) {
-            generarAlerta(animal, response);
+            generarAlerta(animal, response, ventanaEvaluar, perfil, perfilReferencia.getFechaCalculo());
         }
     }
 
@@ -290,7 +292,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         }
     }
 
-    private void generarAlerta(Animal animal, SaludPredictResponseDTO response) {
+    private void generarAlerta(Animal animal, SaludPredictResponseDTO response, List<Telemetria> ventanaEvaluar,
+            Map<String, Object> perfil, LocalDateTime perfilCalculadoEn) {
         SeveridadAlerta severidad = mapearSeveridad(response.getSeveridad());
         if (severidad == null) {
             // severidad 0 = sin desvío, response.desvioDetectado() ya
@@ -304,7 +307,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
 
         Alerta alerta = new Alerta();
         alerta.setAnimal(animal);
-        alerta.setTipo(response.getPosibleCausa() != null ? response.getPosibleCausa() : "Desvío Sanitario Detectado");
+        alerta.setTipo("SALUD");
         alerta.setSeveridad(severidad);
         alerta.setTsGeneracion(LocalDateTime.now());
         alerta.setDisparador(DisparadorAlerta.SALUD);
@@ -312,6 +315,10 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         alerta.setValorDetectado((double) response.getConfianzaModelo());
         alerta.setEstado(EstadoAlerta.PENDIENTE);
         alerta.setConfianzaModelo(response.getConfianzaModelo());
+        alerta.setDesvioDetectado(true);
+        alerta.setPosibleCausa(response.getPosibleCausa());
+        alerta.setSerieComparativaJson(serializarSerieComparativa(animal, ventanaEvaluar, perfil, perfilCalculadoEn,
+                severidad.name(), response.getPosibleCausa()));
 
         alerta = alertaRepository.save(alerta);
 
@@ -326,10 +333,25 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
                 .valorDetectado(alerta.getValorDetectado())
                 .estado(alerta.getEstado())
                 .confianzaModelo(alerta.getConfianzaModelo())
+                .desvioDetectado(alerta.getDesvioDetectado())
+                .posibleCausa(alerta.getPosibleCausa())
                 .build();
 
         rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
         log.info("Alerta de salud publicada en RabbitMQ con ID: {}", alerta.getId());
+    }
+
+    private String serializarSerieComparativa(Animal animal, List<Telemetria> ventanaEvaluar,
+            Map<String, Object> perfil, LocalDateTime perfilCalculadoEn, String severidad, String posibleCausa) {
+        try {
+            SerieComparativaSnapshot snapshot = SerieComparativaBuilder.build(
+                    ventanaEvaluar, perfil, perfilCalculadoEn, severidad, posibleCausa);
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (Exception e) {
+            log.warn("No se pudo serializar la serie comparativa para el animal {}: {}",
+                    animal.getId(), e.getMessage());
+            return null;
+        }
     }
 
     private SeveridadAlerta mapearSeveridad(int severidad) {

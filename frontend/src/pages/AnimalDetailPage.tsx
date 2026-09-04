@@ -20,6 +20,7 @@ import { useAuthStore } from '../store/authStore';
 import './AnimalDetailPage.css';
 import './AnimalesPage.css';
 import ActividadTab from './ActividadTab';
+import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
 
 const TIPOS_REPRODUCTIVOS: TipoReproductivo[] = ['VACIA', 'GESTANTE', 'CELO', 'ANESTRO'];
 
@@ -370,6 +371,7 @@ export default function AnimalDetailPage() {
                 {activeTab === 'actividad' && (
                     <div key="actividad" className="tab-content-animated">
                         <ActividadTab animalId={animal.id} />
+                        <AnimalAlertasSanitarias animalId={animal.id} establecimientoId={animal.establecimientoId} />
                     </div>
                 )}
 

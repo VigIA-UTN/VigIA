@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { AlertaResponse, AlertaDetalleResponse } from '../api/alertaApi';
+import type { AlertaResponse, AlertaDetalleResponse, SeveridadNivel } from '../api/alertaApi';
 import { updateAlertaEstado, getAlertaDetalle } from '../api/alertaApi';
+import SanitarioAlertDetail, { SeveridadBadge } from './SanitarioAlertDetail';
 import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useVentanaInseminacion, formatCountdown } from '../hooks/useVentanaInseminacion';
@@ -74,11 +75,11 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
     }, 280);
   };
 
-  const handleAccion = async (nuevoEstado: 'CONFIRMADA' | 'DESCARTADA') => {
+  const handleAccion = async (nuevoEstado: 'CONFIRMADA' | 'DESCARTADA', notaOverride?: string) => {
     setActionLoading(true);
     try {
       // Si la alerta es un mock, el backend va a tirar 404/500, lo atajamos acá para que actualice igual visualmente.
-      await updateAlertaEstado(alerta.id, nuevoEstado, notas).catch(err => {
+      await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride).catch(err => {
         console.warn('Backend falló (probablemente es un mock alert), forzando update frontend:', err);
       });
       
@@ -97,6 +98,12 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const animalName = detalle?.animalAlias ? `${detalle.animalAlias} (#${alerta.animalId})` : `Vaca #${alerta.animalId}`;
   
   const estadoVisual = detalle ? detalle.estadoActual : alerta.estado;
+
+  const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
+  const isSanitaria = disparador.includes('SALUD') || disparador.includes('SANITARI');
+  const detSan = detalle?.detalleSanitario ?? null;
+  const sevHeader: SeveridadNivel | null =
+    (isSanitaria ? detSan?.severidad : (alerta.severidad as SeveridadNivel | undefined)) ?? null;
 
   try {
     const ts = detalle ? detalle.tsGeneracion : alerta.tsGeneracion;
@@ -144,7 +151,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
         top: 0,
         right: 0,
         bottom: 0,
-        width: '550px',
+        width: 'min(550px, 100vw)',
+        maxWidth: '100vw',
         backgroundColor: '#FAFAFA',
         zIndex: 1050,
         boxShadow: '-2px 0 10px rgba(0,0,0,0.2)',
@@ -166,16 +174,20 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           </button>
         </div>
         
-        <div className="d-flex justify-content-between align-items-center mt-2">
-          <div>
-            <h2 className="m-0 fw-bold" style={{ color: '#1E3A5F' }}>{animalName}</h2>
+        <div className="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+          <div style={{ minWidth: 0 }}>
+            <h2 className="m-0 fw-bold text-break" style={{ color: '#1E3A5F' }}>{animalName}</h2>
             <p className="m-0 text-muted fs-6">Animal en seguimiento</p>
           </div>
-          <div className="px-3 py-1 rounded-pill d-flex align-items-center gap-2" style={{ backgroundColor: '#FDECEC', color: '#B00020', border: '1px solid #B00020', fontWeight: 'bold' }}>
-            ALTO <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#B00020' }}></div>
-          </div>
+          {sevHeader ? (
+            <SeveridadBadge severidad={sevHeader} />
+          ) : (
+            <div className="px-3 py-1 rounded-pill d-flex align-items-center gap-2" style={{ backgroundColor: '#FDECEC', color: '#B00020', border: '1px solid #B00020', fontWeight: 'bold' }}>
+              ALTO <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#B00020' }}></div>
+            </div>
+          )}
         </div>
-        
+
         <div className="text-muted mt-3 d-flex align-items-center gap-2" style={{ fontSize: '0.9rem' }}>
           <i className="bi bi-calendar-event"></i> {detectedText}
         </div>
@@ -201,7 +213,11 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           </div>
         ) : (
           <>
-            {/* Ventana de inseminacion */}
+            {/* Detalle sanitario (solo alertas de SALUD) */}
+            {isSanitaria && detSan && <SanitarioAlertDetail detalle={detSan} />}
+
+            {/* Ventana de inseminacion (solo reproductivo) */}
+            {!isSanitaria && (
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                 <i className="bi bi-clock"></i> Ventana de inseminación
@@ -334,14 +350,17 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                 </div>
               )}
             </div>
+            )}
 
-            {/* Recomendacion */}
+            {/* Recomendacion (solo reproductivo) */}
+            {!isSanitaria && (
             <div className="p-3 rounded-3 d-flex gap-3 align-items-start" style={{ backgroundColor: '#EEF2FF', color: '#1E3A5F', border: '1px solid #C7D2FE' }}>
               <i className="bi bi-info-circle-fill fs-5 mt-1" style={{ color: '#6366F1' }}></i>
               <p className="m-0" style={{ fontSize: '0.95rem' }}>
                 Se recomienda inseminar a la vaca {animalName} entre las horas indicadas en la ventana de inseminación.
               </p>
             </div>
+            )}
 
             {/* Informacion Adicional */}
             <div>
@@ -379,8 +398,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             </div>
 
-            {/* Ultimos Estados Reproductivos */}
-            {detalle?.ultimosEstadosReproductivos && detalle.ultimosEstadosReproductivos.length > 0 && (
+            {/* Ultimos Estados Reproductivos (solo reproductivo) */}
+            {!isSanitaria && detalle?.ultimosEstadosReproductivos && detalle.ultimosEstadosReproductivos.length > 0 && (
               <div>
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                   <i className="bi bi-activity"></i> Últimos estados reproductivos
@@ -451,13 +470,13 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           >
             <i className="bi bi-trash"></i> {actionLoading ? '...' : 'Descartar alerta'}
           </button>
-          <button 
+          <button
             className="btn rounded-3 fw-semibold flex-grow-1 py-2 d-flex justify-content-center align-items-center gap-2"
             style={{ backgroundColor: '#198754', color: 'white', border: '1px solid #198754' }}
-            onClick={() => handleAccion('CONFIRMADA')}
+            onClick={() => handleAccion('CONFIRMADA', isSanitaria ? 'Alerta sanitaria atendida' : undefined)}
             disabled={actionLoading}
           >
-            <i className="bi bi-check2"></i> {actionLoading ? '...' : 'Confirmar inseminación'}
+            <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : 'Confirmar inseminación'}
           </button>
         </div>
       )}

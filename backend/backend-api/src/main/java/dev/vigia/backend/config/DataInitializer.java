@@ -17,9 +17,16 @@ import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Caravana;
+import dev.vigia.backend.model.DisparadorAlerta;
+import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoInferencia;
+import dev.vigia.backend.model.SeveridadAlerta;
+import dev.vigia.backend.dto.SerieComparativaSnapshot;
+import dev.vigia.backend.util.SerieComparativaBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -29,7 +36,10 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 @Slf4j
@@ -49,6 +59,7 @@ public class DataInitializer implements CommandLineRunner {
     private final CaravanaRepository caravanaRepository;
     private final TelemetriaRepository telemetriaRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ObjectMapper objectMapper;
 
     @Override
     @SuppressWarnings("null")
@@ -129,7 +140,8 @@ public class DataInitializer implements CommandLineRunner {
         Animal vaca5 = crearAnimal(est, lote1, "55555", "Pinta", "Jersey",
                 LocalDate.of(2022, 1, 10), "VIGIA-ARG-005", caravanaRepository, animalRepository);
 
-        log.info("[DataInitializer] ✅ 5 animales generados en Rodeo 01 — Rodeo 02 vacío (reservado para demo CSV H0005).");
+        log.info("[DataInitializer] ✅ 5 animales operativos en Rodeo 01 (+ 3 de demo de alertas sanitarias en el Acto 4) "
+                + "— Rodeo 02 vacío (reservado para demo CSV H0005).");
 
         // ── Acto 3: Dashboard / mapa ──────────────────────────────────────
         // Posiciones recientes para que el mapa se vea poblado desde el arranque.
@@ -151,6 +163,71 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info("[DataInitializer] ✅ Telemetría cargada — 3 animales con posición reciente, "
                 + "vaca1 con 24hs de historial en patrón de celo, 1 en estado 'sin datos recientes'.");
+
+        // ── Acto 4: Alertas sanitarias (demo de la vista de detalle sanitario) ──
+        // El detalle sanitario del endpoint /api/v1/alertas/{id} devuelve un
+        // snapshot congelado de la serie comparativa (alertas.serie_comparativa_json)
+        // que en producción arma el worker con SerieComparativaBuilder. Acá se
+        // usa el MISMO builder con ventanas/perfiles sintéticos para cubrir los
+        // estados que la maqueta del frontend contempla:
+        //   6a  serie completa (perfil + telemetría)  -> gráfico con ambas barras
+        //   7   sin perfil de referencia               -> solo barra "actual" + aviso
+        //   8   sin telemetría en la ventana           -> aviso "sin datos"
+        //   6b  además una CONFIRMADA (estado no accionable + lista en la ficha)
+        //
+        // Estas alertas viven en ANIMALES DEDICADOS (VIGIA-ARG-006/007/008), NO
+        // en vaca1..vaca5, para no chocar con el simulador:
+        //   - vaca1 (VIGIA-ARG-001) es el animal de la demo de CELO.
+        //   - vaca2 (VIGIA-ARG-002) es el FORZAR_SALUD_DEVICE_ID del simulador:
+        //     debe quedar limpio para que el worker le genere su alerta real.
+        //   - el simulador por defecto solo maneja NUM_ANIMALES=5, así que las
+        //     vacas 006/008 no reciben telemetría en vivo.
+        // Aún así se fechan > 24 h atrás: si alguien sube NUM_ANIMALES, el
+        // cooldown de 24 h del worker (SaludDetectorStrategyImpl.process) no se
+        // dispara con datos de demo viejos.
+        LocalDateTime ahora = LocalDateTime.now();
+
+        Animal demoConPerfil = crearAnimal(est, lote1, "60006", "Demo Salud — con perfil", "Angus",
+                LocalDate.of(2021, 1, 1), "VIGIA-ARG-006", caravanaRepository, animalRepository);
+        Animal demoSinPerfil = crearAnimal(est, lote1, "70007", "Demo Salud — sin perfil", "Hereford",
+                LocalDate.of(2021, 6, 1), "VIGIA-ARG-007", caravanaRepository, animalRepository);
+        Animal demoSinTelemetria = crearAnimal(est, lote1, "80008", "Demo Salud — sin telemetría", "Brangus",
+                LocalDate.of(2021, 9, 1), "VIGIA-ARG-008", caravanaRepository, animalRepository);
+
+        Map<String, Object> perfilNormal = perfilDemo(
+                new double[] { 6.2, 5.4, 4.1, 5.0 }, new double[] { 0.8, 0.7, 0.6, 0.7 },
+                new double[] { 11.5, 9.0, 7.2, 9.5 }, new double[] { 2.1, 1.8, 1.5, 1.9 });
+
+        // 6a — ALTA, PENDIENTE (hace ~2 días): actividad y desplazamiento muy
+        // por debajo del perfil (postración) -> barras "actual" rojas.
+        crearAlertaSanitaria(demoConPerfil, SeveridadAlerta.ALTA, EstadoAlerta.PENDIENTE, 0.93f,
+                "Problema severo postrante o complicación de parto",
+                ventanaSanitaria(demoConPerfil.getCaravana(), ahora.minusDays(2), 2, 0.00001),
+                perfilNormal, ahora.minusDays(9), null, null);
+
+        // 6b — ALTA, CONFIRMADA hace ~4 días: hiperactividad sostenida por
+        // encima del perfil. Estado no accionable + el animal queda con 2 alertas.
+        crearAlertaSanitaria(demoConPerfil, SeveridadAlerta.ALTA, EstadoAlerta.CONFIRMADA, 0.88f,
+                "Problema severo postrante o complicación de parto",
+                ventanaSanitaria(demoConPerfil.getCaravana(), ahora.minusDays(4), 9, 0.00009),
+                perfilNormal, ahora.minusDays(9), ahora.minusDays(4).plusHours(2), vet);
+
+        // 7 — MEDIA, PENDIENTE (hace ~2 días), SIN perfil (animal recién
+        // calibrado): el gráfico muestra solo el comportamiento actual + nota.
+        crearAlertaSanitaria(demoSinPerfil, SeveridadAlerta.MEDIA, EstadoAlerta.PENDIENTE, 0.78f,
+                "Enfermedad moderada / Cojera clínica",
+                ventanaSanitaria(demoSinPerfil.getCaravana(), ahora.minusDays(2).minusHours(8), 3, 0.00002),
+                null, null, null, null);
+
+        // 8 — BAJA, PENDIENTE (hace ~2 días), SIN telemetría en la ventana:
+        // el gráfico muestra el aviso "no hay telemetría suficiente".
+        crearAlertaSanitaria(demoSinTelemetria, SeveridadAlerta.BAJA, EstadoAlerta.PENDIENTE, 0.61f,
+                "Enfermedad leve / Inicio",
+                new ArrayList<>(), null, null, null, null);
+
+        log.info("[DataInitializer] ✅ 3 animales de demo (VIGIA-ARG-006/007/008) con 4 alertas sanitarias "
+                + "fechadas > 24 h atrás. vaca1..vaca5 quedan libres para el simulador (celo y salud).");
+
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
         log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");
@@ -272,5 +349,105 @@ public class DataInitializer implements CommandLineRunner {
         t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
         t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
         telemetriaRepository.save(t);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Helpers para las alertas sanitarias de demo (Acto 4).
+    // ---------------------------------------------------------------------------
+
+    /** Perfil de referencia individual sintético (arrays de 4 "quarters" de 6 h). */
+    private Map<String, Object> perfilDemo(double[] moveStateMean, double[] moveStateStd,
+                                           double[] distanciaMean, double[] distanciaStd) {
+        Map<String, Object> perfil = new LinkedHashMap<>();
+        perfil.put("quarter_moveState_mean", toDoubleList(moveStateMean));
+        perfil.put("quarter_moveState_std", toDoubleList(moveStateStd));
+        perfil.put("quarter_distancia_mean", toDoubleList(distanciaMean));
+        perfil.put("quarter_distancia_std", toDoubleList(distanciaStd));
+        perfil.put("feature_version", "v1");
+        return perfil;
+    }
+
+    private List<Double> toDoubleList(double[] arr) {
+        List<Double> list = new ArrayList<>(arr.length);
+        for (double d : arr) {
+            list.add(d);
+        }
+        return list;
+    }
+
+    /**
+     * Ventana de 288 puntos (24 h, 1 cada 5 min) terminando en {@code hasta},
+     * con {@code moveState} constante y un paso de latitud fijo por tick (para
+     * que la distancia GPS agregada sea determinística). NO se persiste: solo
+     * alimenta a {@link SerieComparativaBuilder}.
+     */
+    private List<Telemetria> ventanaSanitaria(Caravana caravana, LocalDateTime hasta, int moveState, double pasoLat) {
+        final int muestras = 288;
+        final int tickSegundos = 300;
+        List<Telemetria> puntos = new ArrayList<>(muestras);
+        double lat = -34.9430;
+        double lon = -59.2255;
+        for (int i = muestras - 1; i >= 0; i--) {
+            Telemetria t = new Telemetria();
+            t.setCaravana(caravana);
+            t.setFechaHora(hasta.minusSeconds((long) i * tickSegundos));
+            t.setMoveState(moveState);
+            t.setLatitud(lat);
+            t.setLongitud(lon);
+            t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+            t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+            puntos.add(t);
+            lat += pasoLat;
+        }
+        return puntos;
+    }
+
+    /**
+     * Crea y persiste una alerta sanitaria de demo con su snapshot de serie
+     * comparativa ya calculado (mismo camino que el worker en producción).
+     *
+     * @param ventana            puntos evaluados; lista vacía => alerta sin serie
+     * @param perfil             perfil de referencia; null => serie sin referencia
+     * @param perfilCalculadoEn  fecha del perfil (null si no hay perfil)
+     * @param tsConfirmacion     null => alerta PENDIENTE recién generada
+     * @param usuarioConfirmacion quién resolvió la alerta (si aplica)
+     */
+    private void crearAlertaSanitaria(Animal animal, SeveridadAlerta severidad, EstadoAlerta estado,
+                                      float confianza, String posibleCausa, List<Telemetria> ventana,
+                                      Map<String, Object> perfil, LocalDateTime perfilCalculadoEn,
+                                      LocalDateTime tsConfirmacion, Usuario usuarioConfirmacion) {
+
+        LocalDateTime tsGeneracion = ventana.isEmpty()
+                ? LocalDateTime.now().minusHours(3)
+                : ventana.get(ventana.size() - 1).getFechaHora();
+
+        SerieComparativaSnapshot snapshot = SerieComparativaBuilder.build(
+                ventana, perfil, perfilCalculadoEn, severidad.name(), posibleCausa);
+
+        String serieJson;
+        try {
+            serieJson = objectMapper.writeValueAsString(snapshot);
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo serializar la serie comparativa de demo", e);
+        }
+
+        Alerta alerta = new Alerta();
+        alerta.setAnimal(animal);
+        alerta.setTipo("SALUD");
+        alerta.setDisparador(DisparadorAlerta.SALUD);
+        alerta.setSeveridad(severidad);
+        alerta.setEstado(estado);
+        alerta.setTsGeneracion(tsGeneracion);
+        alerta.setValorUmbral(0.5);
+        alerta.setValorDetectado((double) confianza);
+        alerta.setConfianzaModelo(confianza);
+        alerta.setDesvioDetectado(true);
+        alerta.setPosibleCausa(posibleCausa);
+        alerta.setSerieComparativaJson(serieJson);
+        if (tsConfirmacion != null) {
+            alerta.setTsConfirmacion(tsConfirmacion);
+            alerta.setUsuarioConfirmacion(usuarioConfirmacion);
+        }
+        alertaRepository.save(alerta);
     }
 }

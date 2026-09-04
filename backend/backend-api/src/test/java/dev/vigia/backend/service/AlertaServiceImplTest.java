@@ -13,18 +13,24 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.BloqueComparativoResponse;
+import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
@@ -50,6 +56,9 @@ public class AlertaServiceImplTest {
 
         @Mock
         private RabbitTemplate rabbitTemplate;
+
+        @Spy
+        private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
         @InjectMocks
         private AlertaServiceImpl alertaService;
@@ -185,6 +194,127 @@ public class AlertaServiceImplTest {
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
                                 () -> alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID));
                 assertEquals("Alerta no encontrada.", exception.getMessage());
+        }
+
+        // --- Tests para el detalle sanitario (snapshot de serie comparativa) ---
+
+        private void prepararAlertaSanitaria(String serieComparativaJson) {
+                mockAlerta.setDisparador(DisparadorAlerta.SALUD);
+                mockAlerta.setSeveridad(SeveridadAlerta.MEDIA);
+                mockAlerta.setDesvioDetectado(true);
+                mockAlerta.setPosibleCausa("Enfermedad moderada / Cojera clínica");
+                mockAlerta.setConfianzaModelo(0.82f);
+                mockAlerta.setTipo("SALUD");
+                mockAlerta.setSerieComparativaJson(serieComparativaJson);
+
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+        }
+
+        private String snapshotJson() throws Exception {
+                SerieComparativaSnapshot snap = SerieComparativaSnapshot.builder()
+                                .descripcionDesvio("Actividad promedio 66% por debajo del perfil de referencia del animal "
+                                                + "en el bloque 0-6h. Severidad media. Posible causa: Enfermedad moderada / Cojera clínica.")
+                                .ventanaDesde(LocalDateTime.of(2026, 1, 15, 0, 0))
+                                .ventanaHasta(LocalDateTime.of(2026, 1, 15, 23, 55))
+                                .perfilCalculadoEn(LocalDateTime.of(2026, 1, 10, 8, 0))
+                                .serieActividad(List.of(
+                                                BloqueComparativoResponse.builder().bloque("0-6h").actual(1.0)
+                                                                .referenciaMedia(3.0).referenciaDesvio(0.5).build(),
+                                                BloqueComparativoResponse.builder().bloque("6-12h").actual(5.0)
+                                                                .referenciaMedia(2.0).referenciaDesvio(0.4).build(),
+                                                BloqueComparativoResponse.builder().bloque("12-18h").actual(5.0)
+                                                                .referenciaMedia(4.0).referenciaDesvio(0.6).build(),
+                                                BloqueComparativoResponse.builder().bloque("18-24h").actual(5.0)
+                                                                .referenciaMedia(3.5).referenciaDesvio(0.5).build()))
+                                .serieDesplazamiento(List.of(
+                                                BloqueComparativoResponse.builder().bloque("0-6h").actual(9.8)
+                                                                .referenciaMedia(10.0).referenciaDesvio(2.0).build(),
+                                                BloqueComparativoResponse.builder().bloque("6-12h").actual(10.0)
+                                                                .referenciaMedia(8.0).referenciaDesvio(1.5).build(),
+                                                BloqueComparativoResponse.builder().bloque("12-18h").actual(10.0)
+                                                                .referenciaMedia(12.0).referenciaDesvio(2.5).build(),
+                                                BloqueComparativoResponse.builder().bloque("18-24h").actual(10.0)
+                                                                .referenciaMedia(9.0).referenciaDesvio(2.0).build()))
+                                .build();
+                return objectMapper.writeValueAsString(snap);
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_SALUD_conSnapshot_deserializaSerieComparativa() throws Exception {
+                prepararAlertaSanitaria(snapshotJson());
+
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                assertNotNull(result.getDetalleSanitario());
+                assertTrue(result.getDetalleSanitario().getDesvioDetectado());
+                assertEquals("MEDIA", result.getDetalleSanitario().getSeveridad());
+                assertEquals("Enfermedad moderada / Cojera clínica", result.getDetalleSanitario().getPosibleCausa());
+                assertEquals(0.82, result.getDetalleSanitario().getConfianzaModelo(), 0.001);
+                assertNotNull(result.getDetalleSanitario().getPerfilCalculadoEn());
+                assertNotNull(result.getDetalleSanitario().getVentanaDesde());
+                assertNotNull(result.getDetalleSanitario().getVentanaHasta());
+
+                List<BloqueComparativoResponse> actividad = result.getDetalleSanitario().getSerieActividad();
+                assertEquals(4, actividad.size());
+                assertEquals("0-6h", actividad.get(0).getBloque());
+                assertEquals("18-24h", actividad.get(3).getBloque());
+                assertEquals(1.0, actividad.get(0).getActual(), 0.001);
+                assertEquals(3.0, actividad.get(0).getReferenciaMedia(), 0.001);
+                assertEquals(0.5, actividad.get(0).getReferenciaDesvio(), 0.001);
+
+                assertEquals(4, result.getDetalleSanitario().getSerieDesplazamiento().size());
+                assertEquals(10.0, result.getDetalleSanitario().getSerieDesplazamiento().get(0).getReferenciaMedia(),
+                                0.001);
+
+                // la descripción viene del snapshot, no se regenera
+                assertTrue(result.getDetalleSanitario().getDescripcionDesvio().contains("0-6h"));
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_SALUD_sinSnapshot_seriesNullDescripcionGenerica() {
+                prepararAlertaSanitaria(null);
+
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                assertNotNull(result.getDetalleSanitario());
+                assertEquals("MEDIA", result.getDetalleSanitario().getSeveridad());
+                assertEquals("Enfermedad moderada / Cojera clínica", result.getDetalleSanitario().getPosibleCausa());
+                assertNull(result.getDetalleSanitario().getSerieActividad());
+                assertNull(result.getDetalleSanitario().getSerieDesplazamiento());
+                assertNull(result.getDetalleSanitario().getVentanaDesde());
+                assertNotNull(result.getDetalleSanitario().getDescripcionDesvio());
+                assertFalse(result.getDetalleSanitario().getDescripcionDesvio().isBlank());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_SALUD_snapshotCorrupto_noRompe() {
+                prepararAlertaSanitaria("{ esto no es json");
+
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                assertNotNull(result.getDetalleSanitario());
+                assertNull(result.getDetalleSanitario().getSerieActividad());
+                assertEquals("MEDIA", result.getDetalleSanitario().getSeveridad());
+                assertNotNull(result.getDetalleSanitario().getDescripcionDesvio());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_CELO_noTraeDetalleSanitario() {
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                assertNull(result.getDetalleSanitario());
         }
 
         // --- Tests para actualizarEstadoAlerta ---

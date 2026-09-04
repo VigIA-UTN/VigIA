@@ -448,6 +448,119 @@ class AlertaControllerTest {
     }
 
     @Test
+    @DisplayName("Detalle con rol no autorizado (ADMINISTRADOR) → 403 Forbidden")
+    @SuppressWarnings("null")
+    void obtenerDetalleAlerta_rolNoAutorizado_returns403() throws Exception {
+        crearUsuario("admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+        String adminToken = getTokenFor("admin@vigia.dev", "admin123");
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/{id}", alertaId)
+                .header("Authorization", "Bearer " + adminToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Detalle alerta reproductiva → sin bloque detalleSanitario")
+    @SuppressWarnings("null")
+    void obtenerDetalleAlerta_reproductiva_sinDetalleSanitario() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/{id}", alertaId)
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.detalleSanitario").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Detalle alerta sanitaria → 200 con causa, severidad y serie comparativa (snapshot)")
+    @SuppressWarnings("null")
+    void obtenerDetalleAlerta_sanitaria_returnsDetalleSanitario() throws Exception {
+        Animal animal = animalRepository.findAll().stream()
+                .filter(a -> a.getEstablecimiento().getId().equals(establecimientoId))
+                .findFirst().orElseThrow();
+
+        String serieComparativaJson = "{"
+                + "\"descripcionDesvio\":\"Actividad promedio 66% por debajo del perfil de referencia del animal "
+                + "en el bloque 0-6h. Severidad media. Posible causa: Enfermedad moderada / Cojera clínica.\","
+                + "\"ventanaDesde\":\"2026-01-15T00:00:00\",\"ventanaHasta\":\"2026-01-15T23:55:00\","
+                + "\"perfilCalculadoEn\":\"2026-01-12T08:00:00\","
+                + "\"serieActividad\":["
+                + "{\"bloque\":\"0-6h\",\"actual\":1.0,\"referenciaMedia\":3.0,\"referenciaDesvio\":0.5},"
+                + "{\"bloque\":\"6-12h\",\"actual\":5.0,\"referenciaMedia\":2.0,\"referenciaDesvio\":0.4},"
+                + "{\"bloque\":\"12-18h\",\"actual\":5.0,\"referenciaMedia\":4.0,\"referenciaDesvio\":0.6},"
+                + "{\"bloque\":\"18-24h\",\"actual\":5.0,\"referenciaMedia\":3.5,\"referenciaDesvio\":0.5}],"
+                + "\"serieDesplazamiento\":["
+                + "{\"bloque\":\"0-6h\",\"actual\":9.8,\"referenciaMedia\":10.0,\"referenciaDesvio\":2.0},"
+                + "{\"bloque\":\"6-12h\",\"actual\":10.0,\"referenciaMedia\":8.0,\"referenciaDesvio\":1.5},"
+                + "{\"bloque\":\"12-18h\",\"actual\":10.0,\"referenciaMedia\":12.0,\"referenciaDesvio\":2.5},"
+                + "{\"bloque\":\"18-24h\",\"actual\":10.0,\"referenciaMedia\":9.0,\"referenciaDesvio\":2.0}]}";
+
+        Alerta alertaSalud = new Alerta();
+        alertaSalud.setAnimal(animal);
+        alertaSalud.setDisparador(DisparadorAlerta.SALUD);
+        alertaSalud.setEstado(EstadoAlerta.PENDIENTE);
+        alertaSalud.setSeveridad(SeveridadAlerta.MEDIA);
+        alertaSalud.setTsGeneracion(LocalDateTime.now());
+        alertaSalud.setValorUmbral(0.5);
+        alertaSalud.setValorDetectado(0.82);
+        alertaSalud.setConfianzaModelo(0.82f);
+        alertaSalud.setDesvioDetectado(true);
+        alertaSalud.setPosibleCausa("Enfermedad moderada / Cojera clínica");
+        alertaSalud.setTipo("SALUD");
+        alertaSalud.setSerieComparativaJson(serieComparativaJson);
+        alertaSalud = alertaRepository.save(alertaSalud);
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/{id}", alertaSalud.getId())
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.detalleSanitario.desvioDetectado").value(true))
+                .andExpect(jsonPath("$.detalleSanitario.severidad").value("MEDIA"))
+                .andExpect(jsonPath("$.detalleSanitario.posibleCausa").value("Enfermedad moderada / Cojera clínica"))
+                .andExpect(jsonPath("$.detalleSanitario.descripcionDesvio").isNotEmpty())
+                .andExpect(jsonPath("$.detalleSanitario.ventanaDesde").exists())
+                .andExpect(jsonPath("$.detalleSanitario.serieActividad.length()").value(4))
+                .andExpect(jsonPath("$.detalleSanitario.serieActividad[0].bloque").value("0-6h"))
+                .andExpect(jsonPath("$.detalleSanitario.serieActividad[0].referenciaMedia").value(3.0))
+                .andExpect(jsonPath("$.detalleSanitario.serieDesplazamiento.length()").value(4));
+    }
+
+    @Test
+    @DisplayName("Detalle alerta sanitaria sin snapshot → 200, series null y descripción genérica")
+    @SuppressWarnings("null")
+    void obtenerDetalleAlerta_sanitaria_sinSnapshot_returnsEscalares() throws Exception {
+        Animal animal = animalRepository.findAll().stream()
+                .filter(a -> a.getEstablecimiento().getId().equals(establecimientoId))
+                .findFirst().orElseThrow();
+
+        Alerta alertaSalud = new Alerta();
+        alertaSalud.setAnimal(animal);
+        alertaSalud.setDisparador(DisparadorAlerta.SALUD);
+        alertaSalud.setEstado(EstadoAlerta.PENDIENTE);
+        alertaSalud.setSeveridad(SeveridadAlerta.ALTA);
+        alertaSalud.setTsGeneracion(LocalDateTime.now());
+        alertaSalud.setValorUmbral(0.5);
+        alertaSalud.setValorDetectado(0.9);
+        alertaSalud.setDesvioDetectado(true);
+        alertaSalud.setPosibleCausa("Problema severo postrante o complicación de parto");
+        alertaSalud.setTipo("SALUD");
+        alertaSalud = alertaRepository.save(alertaSalud);
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/{id}", alertaSalud.getId())
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.detalleSanitario.severidad").value("ALTA"))
+                .andExpect(jsonPath("$.detalleSanitario.descripcionDesvio").isNotEmpty())
+                .andExpect(jsonPath("$.detalleSanitario.serieActividad").doesNotExist())
+                .andExpect(jsonPath("$.detalleSanitario.serieDesplazamiento").doesNotExist());
+    }
+
+    @Test
     @DisplayName("GET /api/v1/alertas/resumen - Conteo correcto de alertas por tipo")
     @SuppressWarnings("null")
     void obtenerResumenAlertas_conteoCorrecto() throws Exception {
