@@ -27,6 +27,8 @@ import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
+import dev.vigia.backend.dto.EstadoSaludRequest;
+import dev.vigia.backend.dto.EstadoSaludResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.service.AnimalService;
 import jakarta.validation.Valid;
@@ -256,6 +258,24 @@ public class AnimalController {
             String email = authentication.getName();
             List<AnimalMetricaResponse> response = animalService.getMetricasAnimal(animalId, email);
             return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/estado-salud")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<?> registrarEstadoSalud(
+            @PathVariable("id") Long animalId,
+            @Valid @RequestBody EstadoSaludRequest request,
+            Authentication authentication) {
+
+        try {
+            String email = authentication.getName();
+            EstadoSaludResponse response = animalService.registrarEstadoSalud(animalId, email, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
         } catch (IllegalArgumentException e) {

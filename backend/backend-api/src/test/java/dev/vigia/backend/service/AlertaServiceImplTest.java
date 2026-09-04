@@ -198,6 +198,7 @@ public class AlertaServiceImplTest {
 
         // --- Tests para el detalle sanitario (snapshot de serie comparativa) ---
 
+        @SuppressWarnings("null")
         private void prepararAlertaSanitaria(String serieComparativaJson) {
                 mockAlerta.setDisparador(DisparadorAlerta.SALUD);
                 mockAlerta.setSeveridad(SeveridadAlerta.MEDIA);
@@ -215,8 +216,9 @@ public class AlertaServiceImplTest {
 
         private String snapshotJson() throws Exception {
                 SerieComparativaSnapshot snap = SerieComparativaSnapshot.builder()
-                                .descripcionDesvio("Actividad promedio 66% por debajo del perfil de referencia del animal "
-                                                + "en el bloque 0-6h. Severidad media. Posible causa: Enfermedad moderada / Cojera clínica.")
+                                .descripcionDesvio(
+                                                "Actividad promedio 66% por debajo del perfil de referencia del animal "
+                                                                + "en el bloque 0-6h. Severidad media. Posible causa: Enfermedad moderada / Cojera clínica.")
                                 .ventanaDesde(LocalDateTime.of(2026, 1, 15, 0, 0))
                                 .ventanaHasta(LocalDateTime.of(2026, 1, 15, 23, 55))
                                 .perfilCalculadoEn(LocalDateTime.of(2026, 1, 10, 8, 0))

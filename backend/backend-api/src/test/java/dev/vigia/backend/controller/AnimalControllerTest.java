@@ -1268,4 +1268,40 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + camperoToken))
                                 .andExpect(status().isForbidden());
         }
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/estado-salud - Éxito (Productor)")
+        @SuppressWarnings("null")
+        void registrarEstadoSalud_exito() throws Exception {
+                Long animalId = crearAnimal("Vaca Enferma", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.ENFERMO);
+                request.setDiagnosticoNotas("Presenta fiebre");
+                request.setTratamientoIndicado("Antibioticos 500mg");
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.estado").value("ENFERMO"))
+                                .andExpect(jsonPath("$.diagnosticoNotas").value("Presenta fiebre"))
+                                .andExpect(jsonPath("$.origen").value("MANUAL"));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/estado-salud - Rechazo por rol incorrecto (Campero)")
+        @SuppressWarnings("null")
+        void registrarEstadoSalud_rechazoPorRolIncorrecto() throws Exception {
+                Long animalId = crearAnimal("Vaca Rol Incorrecto 2", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.SANO);
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + camperoToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isForbidden());
+        }
 }

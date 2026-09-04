@@ -30,6 +30,8 @@ import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.FilaEstadoInvalida;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
+import dev.vigia.backend.dto.EstadoSaludRequest;
+import dev.vigia.backend.dto.EstadoSaludResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -38,6 +40,7 @@ import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
@@ -52,6 +55,7 @@ import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
+import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.service.AnimalService;
 import dev.vigia.backend.service.CargaMasivaService;
 import dev.vigia.backend.service.EstadoReproductivoCsvService;
@@ -70,6 +74,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstadoReproductivoRepository estadoReproductivoRepository;
         private final IntervencionRepository intervencionRepository;
         private final TelemetriaRepository telemetriaRepository;
+        private final EstadoSaludRepository estadoSaludRepository;
 
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
@@ -885,5 +890,64 @@ public class AnimalServiceImpl implements AnimalService {
                         }
                 }
                 return result;
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public EstadoSaludResponse registrarEstadoSalud(Long animalId, String emailUsuario,
+                        EstadoSaludRequest request) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimiento = animal.getEstablecimiento();
+
+                boolean perteneceAEstablecimiento = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo());
+
+                if (!perteneceAEstablecimiento && !usuario.getRol().equals(Rol.ADMINISTRADOR)) {
+                        throw new AccessDeniedException("No tiene acceso a este establecimiento");
+                }
+
+                if (animal.getEstadoActual().equals(EstadoAnimal.INACTIVO)) {
+                        throw new IllegalArgumentException(
+                                        "No se pueden registrar estados de salud en animales inactivos.");
+                }
+
+                EstadoSalud estadoSalud = new EstadoSalud();
+                estadoSalud.setAnimal(animal);
+                estadoSalud.setUsuarioVeterinario(usuario);
+                estadoSalud.setFechaRevision(LocalDate.now());
+                estadoSalud.setEstado(request.getEstado());
+                estadoSalud.setDiagnosticoNotas(request.getDiagnosticoNotas());
+                estadoSalud.setTratamientoIndicado(request.getTratamientoIndicado());
+                estadoSalud.setOrigen(OrigenEstado.MANUAL);
+                estadoSalud.setFechaRegistro(LocalDateTime.now());
+
+                EstadoSalud savedEstado = estadoSaludRepository.save(estadoSalud);
+
+                return mapToEstadoSaludResponse(savedEstado);
+        }
+
+        private EstadoSaludResponse mapToEstadoSaludResponse(EstadoSalud estadoSalud) {
+                String veterinarioNombre = null;
+                if (estadoSalud.getUsuarioVeterinario() != null) {
+                        veterinarioNombre = estadoSalud.getUsuarioVeterinario().getNombre() + " "
+                                        + estadoSalud.getUsuarioVeterinario().getApellido();
+                }
+
+                return EstadoSaludResponse.builder()
+                                .id(estadoSalud.getId())
+                                .estado(estadoSalud.getEstado())
+                                .fechaRevision(estadoSalud.getFechaRevision())
+                                .diagnosticoNotas(estadoSalud.getDiagnosticoNotas())
+                                .tratamientoIndicado(estadoSalud.getTratamientoIndicado())
+                                .origen(estadoSalud.getOrigen())
+                                .fechaRegistro(estadoSalud.getFechaRegistro())
+                                .veterinarioNombre(veterinarioNombre)
+                                .build();
         }
 }
