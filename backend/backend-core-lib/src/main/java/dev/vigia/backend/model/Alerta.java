@@ -78,4 +78,13 @@ public class Alerta {
 
     @Column(name = "ventana_optima_horas")
     private Integer ventanaOptimaHoras;
+
+    @Column(name = "desvio_detectado")
+    private Boolean desvioDetectado;
+
+    @Column(name = "posible_causa")
+    private String posibleCausa;
+
+    @Column(name = "serie_comparativa_json", columnDefinition = "TEXT")
+    private String serieComparativaJson;
 }

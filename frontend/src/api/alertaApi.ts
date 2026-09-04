@@ -71,6 +71,30 @@ export async function archivarAlertaPorVencimiento(
   return response.data;
 }
 
+export type SeveridadNivel = 'ALTA' | 'MEDIA' | 'BAJA';
+
+/** Un punto de la serie comparativa "actual vs. perfil de referencia" (bloque de 6 h). */
+export interface BloqueComparativo {
+  bloque: string;
+  actual: number | null;
+  referenciaMedia: number | null;
+  referenciaDesvio: number | null;
+}
+
+/** Bloque sanitario del detalle de alerta (solo cuando datoDisparador === 'SALUD'). */
+export interface DetalleSanitario {
+  desvioDetectado: boolean | null;
+  severidad: SeveridadNivel | null;
+  posibleCausa: string | null;
+  descripcionDesvio: string | null;
+  confianzaModelo: number | null;
+  perfilCalculadoEn: string | null;
+  ventanaDesde: string | null;
+  ventanaHasta: string | null;
+  serieActividad: BloqueComparativo[] | null;
+  serieDesplazamiento: BloqueComparativo[] | null;
+}
+
 export interface AlertaDetalleResponse {
   id: number;
   animalId: number;
@@ -94,6 +118,8 @@ export interface AlertaDetalleResponse {
     fechaRegistro: string;
     registradoPor: string;
   }[];
+  /** Presente solo para alertas sanitarias (datoDisparador === 'SALUD'). */
+  detalleSanitario?: DetalleSanitario | null;
 }
 
 export async function getAlertaDetalle(alertaId: number, establecimientoId: number): Promise<AlertaDetalleResponse> {
@@ -101,6 +127,22 @@ export async function getAlertaDetalle(alertaId: number, establecimientoId: numb
     `/alertas/${alertaId}?establecimientoId=${establecimientoId}`
   );
   return response.data;
+}
+
+/**
+ * Alertas sanitarias (tipo SALUD) de un animal concreto, más recientes primero.
+ * El backend no expone un listado por animal, así que se trae el del
+ * establecimiento filtrado por tipo y se filtra por animalId en el cliente
+ * (mismo criterio que {@link getAlertaParaAnimal} para celo).
+ */
+export async function getAlertasSanitariasAnimal(
+  establecimientoId: number,
+  animalId: number
+): Promise<AlertaResponse[]> {
+  const todas = await getAlertas(establecimientoId, 'SALUD');
+  return todas
+    .filter((a) => a.animalId === animalId)
+    .sort((a, b) => new Date(b.tsGeneracion).getTime() - new Date(a.tsGeneracion).getTime());
 }
 
 export interface AlertaResumenResponse {

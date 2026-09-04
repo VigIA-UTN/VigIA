@@ -9,10 +9,14 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.DetalleSanitarioResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
+import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -27,10 +31,12 @@ import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.service.AlertaService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AlertaServiceImpl implements AlertaService {
@@ -40,6 +46,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final EstablecimientoRepository establecimientoRepository;
         private final IntervencionRepository intervencionRepository;
         private final RabbitTemplate rabbitTemplate;
+        private final ObjectMapper objectMapper;
 
         @Override
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
@@ -246,6 +253,11 @@ public class AlertaServiceImpl implements AlertaService {
                         }
                 }
 
+                DetalleSanitarioResponse detalleSanitario = null;
+                if (alerta.getDisparador() == DisparadorAlerta.SALUD) {
+                        detalleSanitario = construirDetalleSanitario(alerta);
+                }
+
                 return AlertaDetalleResponse.builder()
                                 .id(alerta.getId())
                                 .animalId(alerta.getAnimal().getId())
@@ -260,7 +272,55 @@ public class AlertaServiceImpl implements AlertaService {
                                 .estadoActual(alerta.getEstado())
                                 .usuarioAccion(usuarioAccionStr)
                                 .ultimosEstadosReproductivos(ultimosEstados)
+                                .detalleSanitario(detalleSanitario)
                                 .build();
+        }
+
+        private DetalleSanitarioResponse construirDetalleSanitario(Alerta alerta) {
+                boolean desvio = alerta.getDesvioDetectado() != null ? alerta.getDesvioDetectado() : true;
+                String severidad = alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null;
+                String posibleCausa = alerta.getPosibleCausa() != null
+                                ? alerta.getPosibleCausa()
+                                : ("SALUD".equals(alerta.getTipo()) ? null : alerta.getTipo());
+                Double confianza = alerta.getConfianzaModelo() != null
+                                ? alerta.getConfianzaModelo().doubleValue()
+                                : null;
+
+                SerieComparativaSnapshot snap = null;
+                String json = alerta.getSerieComparativaJson();
+                if (json != null && !json.isBlank()) {
+                        try {
+                                snap = objectMapper.readValue(json, SerieComparativaSnapshot.class);
+                        } catch (Exception e) {
+                                log.warn("Snapshot de serie comparativa inválido para alerta {}: {}",
+                                                alerta.getId(), e.getMessage());
+                        }
+                }
+
+                String descripcion = (snap != null && snap.getDescripcionDesvio() != null)
+                                ? snap.getDescripcionDesvio()
+                                : descripcionGenerica(severidad, posibleCausa);
+
+                return DetalleSanitarioResponse.builder()
+                                .desvioDetectado(desvio)
+                                .severidad(severidad)
+                                .posibleCausa(posibleCausa)
+                                .descripcionDesvio(descripcion)
+                                .confianzaModelo(confianza)
+                                .perfilCalculadoEn(snap != null ? snap.getPerfilCalculadoEn() : null)
+                                .ventanaDesde(snap != null ? snap.getVentanaDesde() : null)
+                                .ventanaHasta(snap != null ? snap.getVentanaHasta() : null)
+                                .serieActividad(snap != null ? snap.getSerieActividad() : null)
+                                .serieDesplazamiento(snap != null ? snap.getSerieDesplazamiento() : null)
+                                .build();
+        }
+
+        private String descripcionGenerica(String severidad, String posibleCausa) {
+                String sev = severidad != null ? severidad.toLowerCase() : "desconocida";
+                String causa = (posibleCausa != null && !posibleCausa.isBlank()) ? posibleCausa : "no determinada";
+                return String.format(
+                                "Desvío sanitario de severidad %s detectado respecto del perfil de referencia del animal. Posible causa: %s.",
+                                sev, causa);
         }
 
         private AlertaResponse toResponse(Alerta alerta) {

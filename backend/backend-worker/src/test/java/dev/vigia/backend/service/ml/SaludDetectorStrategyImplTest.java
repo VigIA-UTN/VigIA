@@ -1,6 +1,7 @@
 package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.ml.SaludPredictResponseDTO;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
@@ -47,7 +49,7 @@ class SaludDetectorStrategyImplTest {
     @Mock
     private RabbitTemplate rabbitTemplate;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     private MockRestServiceServer mockServer;
     private SaludDetectorStrategyImpl saludDetectorStrategy;
@@ -93,8 +95,9 @@ class SaludDetectorStrategyImplTest {
             Telemetria t = new Telemetria();
             t.setCaravana(caravana);
             t.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
-            t.setMoveState(3);
-            t.setLatitud(-34.0);
+            // primer bloque de 6hs (i<72) con actividad baja, resto alta
+            t.setMoveState(i < 72 ? 1 : 5);
+            t.setLatitud(-34.0 + 0.0001 * i);
             t.setLongitud(-60.0);
             t.setFechaHora(base.plusMinutes(5L * i));
             lista.add(t);
@@ -198,6 +201,80 @@ class SaludDetectorStrategyImplTest {
         // La telemetría procesada se marca como COMPLETADA
         assertEquals(EstadoInferencia.COMPLETADO, lista.get(0).getEstadoInferenciaSalud());
         verify(telemetriaRepository).saveAll(anyList());
+    }
+
+    @SuppressWarnings("null")
+    @Test
+    void testProcess_desvioDetectado_persisteCausaYDesvioYPublicaEnEvento() throws Exception {
+        Animal animal = new Animal();
+        animal.setId(7L);
+        animal.setFechaAlta(LocalDate.now().minusDays(10));
+
+        Caravana c = new Caravana();
+        c.setAnimal(animal);
+        animal.setCaravana(c);
+
+        List<Telemetria> lista = crearVentana(animal, 288);
+
+        PerfilReferencia perfil = new PerfilReferencia();
+        perfil.setAnimal(animal);
+        perfil.setFechaCalculo(LocalDateTime.now().minusDays(1));
+        perfil.setPerfilJson("{"
+                + "\"quarter_moveState_mean\":[3.0,3.0,3.0,3.0],"
+                + "\"quarter_moveState_std\":[0.5,0.5,0.5,0.5],"
+                + "\"quarter_distancia_mean\":[10.0,10.0,10.0,10.0],"
+                + "\"quarter_distancia_std\":[2.0,2.0,2.0,2.0]}");
+
+        when(perfilReferenciaRepository.findByAnimal(animal)).thenReturn(Optional.of(perfil));
+        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(eq(animal), any(), any()))
+                .thenReturn(false);
+        when(alertaRepository.save(any())).thenAnswer(inv -> {
+            dev.vigia.backend.model.Alerta a = inv.getArgument(0);
+            a.setId(101L);
+            return a;
+        });
+
+        SaludPredictResponseDTO predictResponse = new SaludPredictResponseDTO();
+        predictResponse.setDesvioDetectado(true);
+        predictResponse.setSeveridad(2); // MEDIA
+        predictResponse.setConfianzaModelo(0.80f);
+        predictResponse.setPosibleCausa("Enfermedad moderada / Cojera clínica");
+
+        mockServer.expect(requestTo("http://localhost:8000/api/internal/ml/salud/predict"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess(objectMapper.writeValueAsString(predictResponse), MediaType.APPLICATION_JSON));
+
+        saludDetectorStrategy.process(lista, "corr-sanitario");
+
+        mockServer.verify();
+
+        org.mockito.ArgumentCaptor<dev.vigia.backend.model.Alerta> alertaCaptor =
+                org.mockito.ArgumentCaptor.forClass(dev.vigia.backend.model.Alerta.class);
+        verify(alertaRepository).save(alertaCaptor.capture());
+        dev.vigia.backend.model.Alerta guardada = alertaCaptor.getValue();
+        assertEquals(Boolean.TRUE, guardada.getDesvioDetectado());
+        assertEquals("Enfermedad moderada / Cojera clínica", guardada.getPosibleCausa());
+        assertEquals("SALUD", guardada.getTipo());
+
+        // La serie comparativa se congela como JSON en la alerta (no se recalcula on-read).
+        assertNotNull(guardada.getSerieComparativaJson());
+        SerieComparativaSnapshot snap = objectMapper.readValue(
+                guardada.getSerieComparativaJson(), SerieComparativaSnapshot.class);
+        assertEquals(4, snap.getSerieActividad().size());
+        assertEquals(4, snap.getSerieDesplazamiento().size());
+        assertEquals("0-6h", snap.getSerieActividad().get(0).getBloque());
+        assertEquals(1.0, snap.getSerieActividad().get(0).getActual(), 0.001);
+        assertEquals(3.0, snap.getSerieActividad().get(0).getReferenciaMedia(), 0.001);
+        assertNotNull(snap.getDescripcionDesvio());
+        assertNotNull(snap.getVentanaDesde());
+        assertNotNull(snap.getPerfilCalculadoEn());
+
+        org.mockito.ArgumentCaptor<dev.vigia.backend.dto.ml.AlertaEventDTO> eventCaptor =
+                org.mockito.ArgumentCaptor.forClass(dev.vigia.backend.dto.ml.AlertaEventDTO.class);
+        verify(rabbitTemplate).convertAndSend(anyString(), eq(""), eventCaptor.capture());
+        dev.vigia.backend.dto.ml.AlertaEventDTO evento = eventCaptor.getValue();
+        assertEquals(Boolean.TRUE, evento.getDesvioDetectado());
+        assertEquals("Enfermedad moderada / Cojera clínica", evento.getPosibleCausa());
     }
 
     @SuppressWarnings("null")

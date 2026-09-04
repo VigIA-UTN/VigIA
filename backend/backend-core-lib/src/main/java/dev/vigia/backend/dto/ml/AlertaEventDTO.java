@@ -27,4 +27,8 @@ public class AlertaEventDTO {
     private String accionRecomendada;
     private Float confianzaModelo;
     private Integer ventanaOptimaHoras;
+
+    // Solo alertas sanitarias (disparador = SALUD).
+    private Boolean desvioDetectado;
+    private String posibleCausa;
 }

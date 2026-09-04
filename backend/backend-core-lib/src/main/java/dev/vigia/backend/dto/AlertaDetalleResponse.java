@@ -25,4 +25,7 @@ public class AlertaDetalleResponse {
     private EstadoAlerta estadoActual;
     private String usuarioAccion;
     private java.util.List<EstadoReproductivoResponse> ultimosEstadosReproductivos;
+
+    /** Solo alertas sanitarias (datoDisparador = SALUD); null para el resto. */
+    private DetalleSanitarioResponse detalleSanitario;
 }

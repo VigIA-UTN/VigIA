@@ -99,7 +99,10 @@ CREATE TABLE alertas (
     ventana_fin_ins TIMESTAMP,
     accion_recomendada VARCHAR(255),
     confianza_modelo DOUBLE PRECISION,
-    ventana_optima_horas INT
+    ventana_optima_horas INT,
+    desvio_detectado SMALLINT,
+    posible_causa VARCHAR(255),
+    serie_comparativa_json TEXT
 );
 
 CREATE TABLE telemetria (
