@@ -174,3 +174,19 @@ export async function getVentanaInseminacion(
   );
   return response.data;
 }
+
+export interface IntervencionRequest {
+  descripcion?: string;
+  fechaHora?: string; // ISO 8601 LocalDateTime
+}
+
+export async function intervenirAlerta(
+  alertaId: number,
+  request: IntervencionRequest,
+): Promise<AlertaResponse> {
+  const response = await axiosClient.post<AlertaResponse>(
+    `/alertas/intervenir/${alertaId}`,
+    request,
+  );
+  return response.data;
+}

@@ -5,6 +5,7 @@ import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from './AlertDetailSidebar';
 import AlertNotificationCard from './AlertNotificationCard';
+import IntervencionFormPanel from './IntervencionFormPanel';
 
 interface AlertSidebarProps {
   onClose: () => void;
@@ -19,6 +20,8 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
   const [isClosing, setIsClosing] = useState(false);
 
   const [selectedAlerta, setSelectedAlerta] = useState<AlertaResponse | null>(null);
+  const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
+  const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
   const [viewedIds, setViewedIds] = useState<Set<number>>(new Set());
   const [prevExternalAlert, setPrevExternalAlert] = useState<AlertaResponse | null>(null);
 
@@ -302,6 +305,17 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           alerta={selectedAlerta}
           onClose={() => setSelectedAlerta(null)}
           onActionComplete={handleActionComplete}
+          onOpenIntervencion={() => {
+            setIntervencionAlerta(selectedAlerta);
+            setIsIntervencionOpen(true);
+          }}
+        />
+      )}
+      {isIntervencionOpen && intervencionAlerta && (
+        <IntervencionFormPanel
+          alerta={intervencionAlerta}
+          onClose={() => setIsIntervencionOpen(false)}
+          onSuccess={() => setIsIntervencionOpen(false)}
         />
       )}
     </>

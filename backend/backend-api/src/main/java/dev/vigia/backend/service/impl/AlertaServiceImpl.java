@@ -16,6 +16,7 @@ import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.DetalleSanitarioResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
@@ -403,7 +404,8 @@ public class AlertaServiceImpl implements AlertaService {
                                 .id(actualizado.getId())
                                 .animalId(actualizado.getAnimal().getId())
                                 .estado(actualizado.getEstado())
-                                .tipo(actualizado.getDisparador() != null ? actualizado.getDisparador().name() : actualizado.getTipo())
+                                .tipo(actualizado.getDisparador() != null ? actualizado.getDisparador().name()
+                                                : actualizado.getTipo())
                                 .tsGeneracion(actualizado.getTsGeneracion())
                                 .build();
                 rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
@@ -538,5 +540,39 @@ public class AlertaServiceImpl implements AlertaService {
                                 .proximaAVencer(proximaAVencer)
                                 .estado(estado)
                                 .build();
+        }
+
+        @Override
+        @org.springframework.transaction.annotation.Transactional
+        public AlertaResponse intervenirAlerta(String emailUsuario, Long alertaId, IntervencionRequest request) {
+
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada"));
+
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(alerta.getAnimal().getEstablecimiento().getId()));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException("No tiene permiso para intervenir esta alerta");
+                }
+
+                Intervencion intervencion = new Intervencion();
+                intervencion.setAlerta(alerta);
+                intervencion.setAnimal(alerta.getAnimal());
+                intervencion.setInterventor(usuario);
+                intervencion.setDescripcion(request.getDescripcion());
+                intervencion.setFechaHora(request.getFechaHora());
+                intervencionRepository.save(intervencion);
+
+                alerta.setEstado(EstadoAlerta.CONFIRMADA);
+                Alerta saved = alertaRepository.save(alerta);
+
+                return this.toResponse(saved);
         }
 }

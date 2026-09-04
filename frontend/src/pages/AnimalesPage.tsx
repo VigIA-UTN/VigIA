@@ -12,6 +12,7 @@ import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { getAlertaParaAnimal } from '../api/alertaApi';
 import type { AlertaResponse } from '../api/alertaApi';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
+import IntervencionFormPanel from '../components/IntervencionFormPanel';
 
 function formatFecha(iso: string | null) {
     if (!iso) return '—';
@@ -67,6 +68,8 @@ export default function AnimalesPage() {
 
     // Alert detail overlay
     const [selectedAlertaForAnimal, setSelectedAlertaForAnimal] = useState<AlertaResponse | null>(null);
+    const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
+    const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
     const [loadingAlerta, setLoadingAlerta] = useState<number | null>(null); // stores the animalId being loaded
 
     const fetchAnimales = async () => {
@@ -715,6 +718,22 @@ export default function AnimalesPage() {
                 mode="fixed"
                 onClose={() => setSelectedAlertaForAnimal(null)}
                 onActionComplete={handleAlertaActionComplete}
+                onOpenIntervencion={() => {
+                    setIntervencionAlerta(selectedAlertaForAnimal);
+                    setIsIntervencionOpen(true);
+                }}
+            />
+        )}
+
+        {isIntervencionOpen && intervencionAlerta && (
+            <IntervencionFormPanel
+                alerta={intervencionAlerta}
+                mode="fixed"
+                onClose={() => setIsIntervencionOpen(false)}
+                onSuccess={() => {
+                    setIsIntervencionOpen(false);
+                    fetchAnimales();
+                }}
             />
         )}
     </>

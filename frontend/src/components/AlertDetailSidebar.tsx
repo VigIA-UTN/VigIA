@@ -13,13 +13,14 @@ interface AlertDetailSidebarProps {
   /** 'absolute' (default) positions relative to nearest positioned ancestor (MapPage).
    *  'fixed' positions relative to the viewport — use this when rendering from AnimalesPage. */
   mode?: 'absolute' | 'fixed';
+  onOpenIntervencion?: () => void;
 }
 
-export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, mode = 'absolute' }: AlertDetailSidebarProps) {
+export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, mode = 'absolute', onOpenIntervencion }: AlertDetailSidebarProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [notas, setNotas] = useState('');
-  
+
   const [detalle, setDetalle] = useState<AlertaDetalleResponse | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       }
     };
     fetchDetalle();
-    
+
     return () => {
       isMounted = false;
     };
@@ -82,8 +83,11 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride).catch(err => {
         console.warn('Backend falló (probablemente es un mock alert), forzando update frontend:', err);
       });
-      
+
       onActionComplete(alerta.id, nuevoEstado);
+      if (nuevoEstado === 'CONFIRMADA') {
+        onOpenIntervencion?.();
+      }
       handleClose();
     } catch (error) {
       console.error('Error actualizando alerta:', error);
@@ -96,7 +100,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   let windowStart = new Date();
   let windowEnd = new Date();
   const animalName = detalle?.animalAlias ? `${detalle.animalAlias} (#${alerta.animalId})` : `Vaca #${alerta.animalId}`;
-  
+
   const estadoVisual = detalle ? detalle.estadoActual : alerta.estado;
 
   const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
@@ -114,7 +118,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const monthStr = date.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
     detectedText = `Detectado el ${monthStr} a las ${timeStr}`;
-    
+
     if (detalle && detalle.ventanaInicioIns && detalle.ventanaFinIns) {
       windowStart = new Date(detalle.ventanaInicioIns);
       windowEnd = new Date(detalle.ventanaFinIns);
@@ -128,7 +132,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
   const formatHour = (d: Date) => isNaN(d.getTime()) ? '--:--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const formatDateOnly = (d: Date) => isNaN(d.getTime()) ? '--' : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
-  
+
   // Calculate dynamic bar percentages based on a 24-hour window centered around the event
   let startPerc = 15;
   let endPerc = 85;
@@ -136,10 +140,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
     const windowDuration = windowEnd.getTime() - windowStart.getTime();
     const midPoint = windowStart.getTime() + windowDuration / 2;
     const totalMs = 24 * 60 * 60 * 1000;
-    
+
     // The grey line represents a 24-hour period centered on the midpoint of our window
     const grayStart = midPoint - totalMs / 2;
-    
+
     startPerc = Math.max(0, ((windowStart.getTime() - grayStart) / totalMs) * 100);
     endPerc = Math.min(100, ((windowEnd.getTime() - grayStart) / totalMs) * 100);
   }
@@ -173,7 +177,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
             <i className="bi bi-x-lg fs-5"></i>
           </button>
         </div>
-        
+
         <div className="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
           <div style={{ minWidth: 0 }}>
             <h2 className="m-0 fw-bold text-break" style={{ color: '#1E3A5F' }}>{animalName}</h2>
@@ -194,7 +198,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       </div>
 
       <div className="p-4 d-flex flex-column gap-4 flex-grow-1 custom-scrollbar" style={{ overflowY: 'auto' }}>
-        
+
         {loadingDetail ? (
           <div className="d-flex justify-content-center align-items-center h-100 flex-column text-muted">
             <div className="spinner-border text-primary mb-3" role="status">
@@ -218,148 +222,148 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
             {/* Ventana de inseminacion (solo reproductivo) */}
             {!isSanitaria && (
-            <div>
-              <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                <i className="bi bi-clock"></i> Ventana de inseminación
-              </h6>
+              <div>
+                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
+                  <i className="bi bi-clock"></i> Ventana de inseminación
+                </h6>
 
-              {/* Barra de horarios inicio-fin */}
-              <div className="card border-0 shadow-sm rounded-4 mb-3">
-                <div className="card-body d-flex justify-content-between align-items-center">
-                  <div className="text-center">
-                    <h4 className="m-0 fw-bold">{formatHour(windowStart)}</h4>
-                    <small className="text-muted">{formatDateOnly(windowStart)}</small>
-                  </div>
-                  
-                  <div className="flex-grow-1 mx-3 position-relative d-flex align-items-center justify-content-start">
-                    <div style={{ height: '4px', width: '100%', backgroundColor: '#E0E0E0', position: 'absolute' }}></div>
-                    <div style={{ height: '8px', left: `${startPerc}%`, width: `${endPerc - startPerc}%`, backgroundColor: ventana?.estado === 'VENCIDA' ? '#9E9E9E' : ventana?.proximaAVencer ? '#FF6B35' : '#E05252', position: 'absolute', borderRadius: '4px', transition: 'background-color 0.5s ease' }}></div>
-                    <div style={{ position: 'absolute', left: `${startPerc}%`, height: '16px', width: '2px', backgroundColor: '#333' }}></div>
-                    <div style={{ position: 'absolute', left: `${endPerc}%`, height: '16px', width: '2px', backgroundColor: '#333' }}></div>
-                  </div>
+                {/* Barra de horarios inicio-fin */}
+                <div className="card border-0 shadow-sm rounded-4 mb-3">
+                  <div className="card-body d-flex justify-content-between align-items-center">
+                    <div className="text-center">
+                      <h4 className="m-0 fw-bold">{formatHour(windowStart)}</h4>
+                      <small className="text-muted">{formatDateOnly(windowStart)}</small>
+                    </div>
 
-                  <div className="text-center">
-                    <h4 className="m-0 fw-bold">{formatHour(windowEnd)}</h4>
-                    <small className="text-muted">{formatDateOnly(windowEnd)}</small>
+                    <div className="flex-grow-1 mx-3 position-relative d-flex align-items-center justify-content-start">
+                      <div style={{ height: '4px', width: '100%', backgroundColor: '#E0E0E0', position: 'absolute' }}></div>
+                      <div style={{ height: '8px', left: `${startPerc}%`, width: `${endPerc - startPerc}%`, backgroundColor: ventana?.estado === 'VENCIDA' ? '#9E9E9E' : ventana?.proximaAVencer ? '#FF6B35' : '#E05252', position: 'absolute', borderRadius: '4px', transition: 'background-color 0.5s ease' }}></div>
+                      <div style={{ position: 'absolute', left: `${startPerc}%`, height: '16px', width: '2px', backgroundColor: '#333' }}></div>
+                      <div style={{ position: 'absolute', left: `${endPerc}%`, height: '16px', width: '2px', backgroundColor: '#333' }}></div>
+                    </div>
+
+                    <div className="text-center">
+                      <h4 className="m-0 fw-bold">{formatHour(windowEnd)}</h4>
+                      <small className="text-muted">{formatDateOnly(windowEnd)}</small>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Countdown en tiempo real */}
-              {isCelo && (
-                <div
-                  className="card border-0 shadow-sm rounded-4"
-                  style={{
-                    background: ventana?.estado === 'VENCIDA'
-                      ? 'linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%)'
-                      : ventana?.estado === 'FUTURA'
-                        ? 'linear-gradient(135deg, #E1F5FE 0%, #B3E5FC 100%)'
-                        : ventana?.proximaAVencer
-                          ? 'linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)'
-                          : 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
-                    border: ventana?.estado === 'VENCIDA'
-                      ? '1px solid #BDBDBD'
-                      : ventana?.estado === 'FUTURA'
-                        ? '1px solid #0288D1'
-                        : ventana?.proximaAVencer
-                          ? '1px solid #FF6B35'
-                          : '1px solid #4CAF50',
-                    transition: 'background 0.6s ease, border-color 0.6s ease',
-                  }}
-                >
-                  <div className="card-body py-3 px-4">
-                    {loadingVentana && !ventana ? (
-                      <div className="d-flex align-items-center gap-2 text-muted">
-                        <div className="spinner-border spinner-border-sm" role="status"><span className="visually-hidden">Cargando...</span></div>
-                        <small>Calculando tiempo restante...</small>
-                      </div>
-                    ) : ventana?.estado === 'FUTURA' ? (
-                      <div className="d-flex align-items-center justify-content-between">
-                        <div className="d-flex align-items-center gap-3">
-                          <i className="bi bi-clock-history fs-3" style={{ color: '#0288D1' }}></i>
-                          <div>
-                            <div
-                              className="fw-bold font-monospace"
-                              style={{
-                                fontSize: '1.5rem',
-                                color: '#0277BD',
-                                letterSpacing: '0.05em',
-                              }}
-                            >
-                              {formatCountdown(segundosRestantes)}
+                {/* Countdown en tiempo real */}
+                {isCelo && (
+                  <div
+                    className="card border-0 shadow-sm rounded-4"
+                    style={{
+                      background: ventana?.estado === 'VENCIDA'
+                        ? 'linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%)'
+                        : ventana?.estado === 'FUTURA'
+                          ? 'linear-gradient(135deg, #E1F5FE 0%, #B3E5FC 100%)'
+                          : ventana?.proximaAVencer
+                            ? 'linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)'
+                            : 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
+                      border: ventana?.estado === 'VENCIDA'
+                        ? '1px solid #BDBDBD'
+                        : ventana?.estado === 'FUTURA'
+                          ? '1px solid #0288D1'
+                          : ventana?.proximaAVencer
+                            ? '1px solid #FF6B35'
+                            : '1px solid #4CAF50',
+                      transition: 'background 0.6s ease, border-color 0.6s ease',
+                    }}
+                  >
+                    <div className="card-body py-3 px-4">
+                      {loadingVentana && !ventana ? (
+                        <div className="d-flex align-items-center gap-2 text-muted">
+                          <div className="spinner-border spinner-border-sm" role="status"><span className="visually-hidden">Cargando...</span></div>
+                          <small>Calculando tiempo restante...</small>
+                        </div>
+                      ) : ventana?.estado === 'FUTURA' ? (
+                        <div className="d-flex align-items-center justify-content-between">
+                          <div className="d-flex align-items-center gap-3">
+                            <i className="bi bi-clock-history fs-3" style={{ color: '#0288D1' }}></i>
+                            <div>
+                              <div
+                                className="fw-bold font-monospace"
+                                style={{
+                                  fontSize: '1.5rem',
+                                  color: '#0277BD',
+                                  letterSpacing: '0.05em',
+                                }}
+                              >
+                                {formatCountdown(segundosRestantes)}
+                              </div>
+                              <small style={{ color: '#0288D1' }}>Tiempo hasta inicio de ventana óptima</small>
                             </div>
-                            <small style={{ color: '#0288D1' }}>Tiempo hasta inicio de ventana óptima</small>
                           </div>
                         </div>
-                      </div>
-                    ) : ventana?.estado === 'VENCIDA' ? (
-                      <div className="d-flex align-items-center gap-3">
-                        <i className="bi bi-clock-history fs-3" style={{ color: '#9E9E9E' }}></i>
-                        <div>
-                          <div className="fw-bold" style={{ color: '#616161', fontSize: '1rem' }}>Ventana vencida</div>
-                          <small style={{ color: '#9E9E9E' }}>La oportunidad de inseminación ha expirado</small>
-                        </div>
-                      </div>
-                    ) : ventana ? (
-                      <div className="d-flex align-items-center justify-content-between">
+                      ) : ventana?.estado === 'VENCIDA' ? (
                         <div className="d-flex align-items-center gap-3">
-                          {ventana.proximaAVencer ? (
-                            <i className="bi bi-exclamation-triangle-fill fs-3 urgency-pulse" style={{ color: '#FF6B35' }}></i>
-                          ) : (
-                            <i className="bi bi-hourglass-split fs-3" style={{ color: '#4CAF50' }}></i>
-                          )}
+                          <i className="bi bi-clock-history fs-3" style={{ color: '#9E9E9E' }}></i>
                           <div>
-                            <div
-                              className="fw-bold font-monospace"
-                              style={{
-                                fontSize: '1.5rem',
-                                color: ventana.proximaAVencer ? '#E64A19' : '#2E7D32',
-                                letterSpacing: '0.05em',
-                                transition: 'color 0.5s ease',
-                              }}
-                            >
-                              {formatCountdown(segundosRestantes)}
+                            <div className="fw-bold" style={{ color: '#616161', fontSize: '1rem' }}>Ventana vencida</div>
+                            <small style={{ color: '#9E9E9E' }}>La oportunidad de inseminación ha expirado</small>
+                          </div>
+                        </div>
+                      ) : ventana ? (
+                        <div className="d-flex align-items-center justify-content-between">
+                          <div className="d-flex align-items-center gap-3">
+                            {ventana.proximaAVencer ? (
+                              <i className="bi bi-exclamation-triangle-fill fs-3 urgency-pulse" style={{ color: '#FF6B35' }}></i>
+                            ) : (
+                              <i className="bi bi-hourglass-split fs-3" style={{ color: '#4CAF50' }}></i>
+                            )}
+                            <div>
+                              <div
+                                className="fw-bold font-monospace"
+                                style={{
+                                  fontSize: '1.5rem',
+                                  color: ventana.proximaAVencer ? '#E64A19' : '#2E7D32',
+                                  letterSpacing: '0.05em',
+                                  transition: 'color 0.5s ease',
+                                }}
+                              >
+                                {formatCountdown(segundosRestantes)}
+                              </div>
+                              <small style={{ color: ventana.proximaAVencer ? '#BF360C' : '#388E3C' }}>
+                                {ventana.proximaAVencer ? '\u26a0\ufe0f Menos de 2 horas — actuar con urgencia' : 'Tiempo restante en ventana óptima'}
+                              </small>
                             </div>
-                            <small style={{ color: ventana.proximaAVencer ? '#BF360C' : '#388E3C' }}>
-                              {ventana.proximaAVencer ? '\u26a0\ufe0f Menos de 2 horas — actuar con urgencia' : 'Tiempo restante en ventana óptima'}
+                          </div>
+                          {/* Barra de progreso */}
+                          <div className="text-end" style={{ minWidth: '80px' }}>
+                            <div
+                              className="rounded-pill"
+                              style={{ height: '6px', backgroundColor: '#E0E0E0', overflow: 'hidden', marginBottom: '4px' }}
+                            >
+                              <div
+                                style={{
+                                  height: '100%',
+                                  width: `${Math.min(100, ventana.porcentajeTranscurrido)}%`,
+                                  backgroundColor: ventana.proximaAVencer ? '#FF6B35' : '#4CAF50',
+                                  transition: 'width 1s linear, background-color 0.5s ease',
+                                }}
+                              />
+                            </div>
+                            <small style={{ color: '#757575', fontSize: '0.72rem' }}>
+                              {Math.round(ventana.porcentajeTranscurrido)}% transcurrido
                             </small>
                           </div>
                         </div>
-                        {/* Barra de progreso */}
-                        <div className="text-end" style={{ minWidth: '80px' }}>
-                          <div
-                            className="rounded-pill"
-                            style={{ height: '6px', backgroundColor: '#E0E0E0', overflow: 'hidden', marginBottom: '4px' }}
-                          >
-                            <div
-                              style={{
-                                height: '100%',
-                                width: `${Math.min(100, ventana.porcentajeTranscurrido)}%`,
-                                backgroundColor: ventana.proximaAVencer ? '#FF6B35' : '#4CAF50',
-                                transition: 'width 1s linear, background-color 0.5s ease',
-                              }}
-                            />
-                          </div>
-                          <small style={{ color: '#757575', fontSize: '0.72rem' }}>
-                            {Math.round(ventana.porcentajeTranscurrido)}% transcurrido
-                          </small>
-                        </div>
-                      </div>
-                    ) : null}
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
             )}
 
             {/* Recomendacion (solo reproductivo) */}
             {!isSanitaria && (
-            <div className="p-3 rounded-3 d-flex gap-3 align-items-start" style={{ backgroundColor: '#EEF2FF', color: '#1E3A5F', border: '1px solid #C7D2FE' }}>
-              <i className="bi bi-info-circle-fill fs-5 mt-1" style={{ color: '#6366F1' }}></i>
-              <p className="m-0" style={{ fontSize: '0.95rem' }}>
-                Se recomienda inseminar a la vaca {animalName} entre las horas indicadas en la ventana de inseminación.
-              </p>
-            </div>
+              <div className="p-3 rounded-3 d-flex gap-3 align-items-start" style={{ backgroundColor: '#EEF2FF', color: '#1E3A5F', border: '1px solid #C7D2FE' }}>
+                <i className="bi bi-info-circle-fill fs-5 mt-1" style={{ color: '#6366F1' }}></i>
+                <p className="m-0" style={{ fontSize: '0.95rem' }}>
+                  Se recomienda inseminar a la vaca {animalName} entre las horas indicadas en la ventana de inseminación.
+                </p>
+              </div>
             )}
 
             {/* Informacion Adicional */}
@@ -442,9 +446,9 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                 <i className="bi bi-journal-text"></i> Notas
               </h6>
               <div className="position-relative">
-                <textarea 
-                  className="form-control rounded-4 shadow-sm border-0" 
-                  rows={3} 
+                <textarea
+                  className="form-control rounded-4 shadow-sm border-0"
+                  rows={3}
                   placeholder="Agregá una nota (opcional)..."
                   value={notas}
                   onChange={(e) => setNotas(e.target.value)}
@@ -462,7 +466,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       {/* Acciones — solo visibles para Productor y Veterinario */}
       {canActOnAlerts && !loadingDetail && !errorDetail && estadoVisual === 'PENDIENTE' && (
         <div className="p-4 bg-white border-top d-flex gap-3 justify-content-between" style={{ zIndex: 10, borderRadius: '0 0 0 12px' }}>
-          <button 
+          <button
             className="btn rounded-3 fw-semibold flex-grow-1 py-2 d-flex justify-content-center align-items-center gap-2"
             style={{ color: '#D32F2F', backgroundColor: 'white', border: '1px solid #D32F2F' }}
             onClick={() => handleAccion('DESCARTADA')}

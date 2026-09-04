@@ -21,6 +21,8 @@ import './AnimalDetailPage.css';
 import './AnimalesPage.css';
 import ActividadTab from './ActividadTab';
 import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
+import IntervencionFormPanel from '../components/IntervencionFormPanel';
+import type { AlertaResponse } from '../api/alertaApi';
 
 const TIPOS_REPRODUCTIVOS: TipoReproductivo[] = ['VACIA', 'GESTANTE', 'CELO', 'ANESTRO'];
 
@@ -88,6 +90,10 @@ export default function AnimalDetailPage() {
 
     // Tab state — 'actividad' is the default
     const [activeTab, setActiveTab] = useState<'actividad' | 'ficha'>('actividad');
+
+    // NUEVO: para manejar el modal de intervención desde la pestaña actividad
+    const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
+    const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
 
     const fetchHistorial = async (animalId: number) => {
         setLoadingHistorial(true);
@@ -371,7 +377,21 @@ export default function AnimalDetailPage() {
                 {activeTab === 'actividad' && (
                     <div key="actividad" className="tab-content-animated">
                         <ActividadTab animalId={animal.id} />
-                        <AnimalAlertasSanitarias animalId={animal.id} establecimientoId={animal.establecimientoId} />
+                        <AnimalAlertasSanitarias animalId={animal.id} establecimientoId={animal.establecimientoId} onOpenIntervencion={(alerta) => {
+                            setIntervencionAlerta(alerta);
+                            setIsIntervencionOpen(true);
+                        }} />
+                        {isIntervencionOpen && intervencionAlerta && (
+                            <IntervencionFormPanel
+                                alerta={intervencionAlerta}
+                                mode="fixed"
+                                onClose={() => setIsIntervencionOpen(false)}
+                                onSuccess={() => {
+                                    fetchIntervencionesData(animal.id);
+                                    setIsIntervencionOpen(false);
+                                }}
+                            />
+                        )}
                     </div>
                 )}
 
