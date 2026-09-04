@@ -132,3 +132,17 @@ CREATE TABLE perfiles_referencia (
     perfil_json TEXT NOT NULL,
     fecha_calculo TIMESTAMP NOT NULL
 );
+
+CREATE TABLE estados_salud (
+    estado_salud_id BIGSERIAL PRIMARY KEY,
+    animal_id BIGINT NOT NULL,
+    usuario_veterinario_id BIGINT,
+    fecha_revision DATE,
+    estado VARCHAR(50) NOT NULL,
+    diagnostico_notas TEXT,
+    tratamiento_indicado TEXT,
+    origen VARCHAR(50) NOT NULL,
+    fecha_registro TIMESTAMP NOT NULL,
+    CONSTRAINT fk_estados_salud_animal FOREIGN KEY (animal_id) REFERENCES animales (id),
+    CONSTRAINT fk_estados_salud_usuario FOREIGN KEY (usuario_veterinario_id) REFERENCES usuarios (id)
+);
