@@ -789,6 +789,7 @@ public class AnimalServiceImpl implements AnimalService {
                                                         .interventor(interventorStr)
                                                         .descripcion(i.getDescripcion())
                                                         .fechaHora(i.getFechaHora())
+                                                        .tipo(i.getTipo())
                                                         .build();
                                 })
                                 .collect(Collectors.toList());

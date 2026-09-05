@@ -10,4 +10,6 @@ import dev.vigia.backend.model.Intervencion;
 @Repository
 public interface IntervencionRepository extends JpaRepository<Intervencion, Long> {
     List<Intervencion> findByAnimalIdOrderByFechaHoraDesc(Long animalId);
+
+    boolean existsByAlertaId(Long alertaId);
 }

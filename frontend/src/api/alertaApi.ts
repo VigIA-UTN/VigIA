@@ -175,9 +175,17 @@ export async function getVentanaInseminacion(
   return response.data;
 }
 
+export type TipoIntervencion =
+  | 'TRATAMIENTO'
+  | 'VACUNACION'
+  | 'REVISION_VETERINARIA'
+  | 'INSEMINACION'
+  | 'OTRO';
+
 export interface IntervencionRequest {
   descripcion?: string;
   fechaHora?: string; // ISO 8601 LocalDateTime
+  tipo?: TipoIntervencion;
 }
 
 export async function intervenirAlerta(

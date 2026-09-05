@@ -375,30 +375,6 @@ public class AlertaServiceImpl implements AlertaService {
                 }
                 Alerta actualizado = alertaRepository.save(alerta);
 
-                if (nuevoEstado == EstadoAlerta.CONFIRMADA) {
-                        Intervencion intervencion = new Intervencion();
-                        intervencion.setAlerta(actualizado);
-                        intervencion.setAnimal(actualizado.getAnimal());
-                        intervencion.setInterventor(usuario);
-
-                        String descripcion = (notas != null && !notas.trim().isEmpty()) ? notas.trim()
-                                        : "Inseminación confirmada";
-                        intervencion.setDescripcion(descripcion);
-
-                        intervencion.setFechaHora(LocalDateTime.now());
-                        intervencionRepository.save(intervencion);
-                }
-
-                /*
-                 * String ventanaOptima = null;
-                 * if (actualizado.getVentanaInicioIns() != null &&
-                 * actualizado.getVentanaFinIns() != null) {
-                 * long horas = java.time.Duration.between(actualizado.getVentanaInicioIns(),
-                 * actualizado.getVentanaFinIns()).toHours();
-                 * ventanaOptima = horas + " horas";
-                 * }
-                 */
-
                 // Publicar evento para SSE
                 AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                                 .id(actualizado.getId())
@@ -562,17 +538,34 @@ public class AlertaServiceImpl implements AlertaService {
                         throw new AccessDeniedException("No tiene permiso para intervenir esta alerta");
                 }
 
+                if (alerta.getEstado() != EstadoAlerta.CONFIRMADA) {
+                        throw new IllegalArgumentException(
+                                        "La alerta debe estar confirmada antes de registrar una intervención.");
+                }
+
+                if (intervencionRepository.existsByAlertaId(alertaId)) {
+                        throw new IllegalArgumentException("Ya existe una intervención registrada para esta alerta.");
+                }
+
+                if (request.getDescripcion() == null || request.getDescripcion().trim().isEmpty()) {
+                        throw new IllegalArgumentException(
+                                        "La descripción es obligatoria para registrar una intervención.");
+                }
+
+                if (request.getTipo() == null) {
+                        throw new IllegalArgumentException(
+                                        "El tipo de intervención es obligatorio para registrar una intervención.");
+                }
+
                 Intervencion intervencion = new Intervencion();
                 intervencion.setAlerta(alerta);
                 intervencion.setAnimal(alerta.getAnimal());
                 intervencion.setInterventor(usuario);
-                intervencion.setDescripcion(request.getDescripcion());
-                intervencion.setFechaHora(request.getFechaHora());
+                intervencion.setDescripcion(request.getDescripcion().trim());
+                intervencion.setFechaHora(request.getFechaHora() != null ? request.getFechaHora() : LocalDateTime.now());
+                intervencion.setTipo(request.getTipo());
                 intervencionRepository.save(intervencion);
 
-                alerta.setEstado(EstadoAlerta.CONFIRMADA);
-                Alerta saved = alertaRepository.save(alerta);
-
-                return this.toResponse(saved);
+                return this.toResponse(alerta);
         }
 }

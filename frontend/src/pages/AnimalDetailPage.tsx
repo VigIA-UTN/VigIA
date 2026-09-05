@@ -26,6 +26,14 @@ import type { AlertaResponse } from '../api/alertaApi';
 
 const TIPOS_REPRODUCTIVOS: TipoReproductivo[] = ['VACIA', 'GESTANTE', 'CELO', 'ANESTRO'];
 
+const INTERVENCION_TIPO_LABELS: Record<string, string> = {
+    TRATAMIENTO: 'Tratamiento',
+    VACUNACION: 'Vacunación',
+    REVISION_VETERINARIA: 'Revisión veterinaria',
+    INSEMINACION: 'Inseminación',
+    OTRO: 'Otro',
+};
+
 function estadoReproductivoBadge(estado: string | null | undefined) {
     if (!estado) return <span className="badge bg-secondary">—</span>;
     const map: Record<string, string> = {
@@ -562,6 +570,7 @@ export default function AnimalDetailPage() {
                                         <thead>
                                             <tr>
                                                 <th>Fecha y Hora</th>
+                                                <th>Tipo</th>
                                                 <th>ID Alerta</th>
                                                 <th>Interventor</th>
                                                 <th>Descripción</th>
@@ -571,6 +580,7 @@ export default function AnimalDetailPage() {
                                             {intervenciones.map((intv) => (
                                                 <tr key={intv.id}>
                                                     <td>{formatDateTime(intv.fechaHora)}</td>
+                                                    <td>{INTERVENCION_TIPO_LABELS[intv.tipo] ?? intv.tipo ?? '—'}</td>
                                                     <td>{intv.alertaId ? `#${intv.alertaId}` : '—'}</td>
                                                     <td>{intv.interventor || '—'}</td>
                                                     <td>{intv.descripcion}</td>

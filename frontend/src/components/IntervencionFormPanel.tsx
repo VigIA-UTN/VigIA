@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { intervenirAlerta } from '../api/alertaApi';
-import type { AlertaResponse } from '../api/alertaApi';
+import type { AlertaResponse, TipoIntervencion } from '../api/alertaApi';
+
+const TIPO_LABELS: Record<TipoIntervencion, string> = {
+  TRATAMIENTO: 'Tratamiento',
+  VACUNACION: 'Vacunación',
+  REVISION_VETERINARIA: 'Revisión veterinaria',
+  INSEMINACION: 'Inseminación',
+  OTRO: 'Otro',
+};
 
 interface IntervencionFormPanelProps {
   alerta: AlertaResponse;
@@ -22,6 +30,7 @@ export default function IntervencionFormPanel({
   const [isClosing, setIsClosing] = useState(false);
   const [descripcion, setDescripcion] = useState('');
   const [fechaHora, setFechaHora] = useState('');
+  const [tipo, setTipo] = useState<TipoIntervencion | ''>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +48,7 @@ export default function IntervencionFormPanel({
       const resultado = await intervenirAlerta(alerta.id, {
         descripcion: descripcion.trim() || undefined,
         fechaHora: fechaHora || undefined,
+        tipo: tipo || undefined,
       });
       onSuccess(resultado);
       handleClose();
@@ -135,9 +145,37 @@ export default function IntervencionFormPanel({
         >
           <i className="bi bi-info-circle-fill fs-5 mt-1" style={{ color: '#6366F1' }}></i>
           <p className="m-0" style={{ fontSize: '0.9rem' }}>
-            Todos los campos son <strong>opcionales</strong>. Podés confirmar la alerta sin
-            completar ninguno.
+            La alerta ya fue confirmada. Registrar la intervención es{' '}
+            <strong>opcional</strong> — podés cerrar sin completar nada. Si decidís
+            registrarla, el <strong>tipo</strong> y la <strong>descripción</strong> son
+            obligatorios.
           </p>
+        </div>
+
+        {/* Campo: Tipo */}
+        <div>
+          <h6
+            className="fw-bold mb-3 d-flex align-items-center gap-2"
+            style={{ color: '#1E3A5F' }}
+          >
+            <i className="bi bi-tags"></i> Tipo de intervención <span className="text-danger">*</span>
+          </h6>
+          <div className="card border-0 shadow-sm rounded-4">
+            <div className="card-body p-3">
+              <select
+                className="form-select rounded-3 border-0 shadow-sm"
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value as TipoIntervencion | '')}
+              >
+                <option value="">Seleccioná un tipo...</option>
+                {Object.entries(TIPO_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Campo: Descripción */}
@@ -146,7 +184,7 @@ export default function IntervencionFormPanel({
             className="fw-bold mb-3 d-flex align-items-center gap-2"
             style={{ color: '#1E3A5F' }}
           >
-            <i className="bi bi-chat-left-text"></i> Descripción
+            <i className="bi bi-chat-left-text"></i> Descripción <span className="text-danger">*</span>
           </h6>
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body p-3">
@@ -235,19 +273,21 @@ export default function IntervencionFormPanel({
             backgroundColor: '#198754',
             color: 'white',
             border: '1px solid #198754',
+            opacity: !descripcion.trim() || !tipo ? 0.6 : 1,
           }}
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || !descripcion.trim() || !tipo}
+          title={!descripcion.trim() || !tipo ? 'Completá el tipo y la descripción para registrar la intervención' : undefined}
         >
           {loading ? (
             <>
               <div className="spinner-border spinner-border-sm" role="status" />
-              &nbsp;Confirmando...
+              &nbsp;Registrando...
             </>
           ) : (
             <>
               <i className="bi bi-check2-circle"></i>
-              {descripcion || fechaHora ? 'Confirmar con intervención' : 'Confirmar alerta'}
+              Registrar intervención
             </>
           )}
         </button>

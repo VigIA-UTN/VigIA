@@ -2,6 +2,7 @@ package dev.vigia.backend.dto;
 
 import java.time.LocalDateTime;
 
+import dev.vigia.backend.model.TipoIntervencion;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,4 +19,5 @@ public class IntervencionResponse {
     private String interventor;
     private String descripcion;
     private LocalDateTime fechaHora;
+    private TipoIntervencion tipo;
 }

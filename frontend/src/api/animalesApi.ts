@@ -177,6 +177,7 @@ export interface IntervencionResponse {
   interventor: string;
   descripcion: string;
   fechaHora: string;
+  tipo: 'TRATAMIENTO' | 'VACUNACION' | 'REVISION_VETERINARIA' | 'INSEMINACION' | 'OTRO';
 }
 
 export async function getIntervenciones(animalId: number): Promise<IntervencionResponse[]> {
