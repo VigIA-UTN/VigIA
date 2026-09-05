@@ -562,6 +562,7 @@ public class AlertaServiceImpl implements AlertaService {
 
         @Override
         @org.springframework.transaction.annotation.Transactional
+        @SuppressWarnings("null")
         public AlertaResponse intervenirAlerta(String emailUsuario, Long alertaId, IntervencionRequest request) {
 
                 Alerta alerta = alertaRepository.findById(alertaId)

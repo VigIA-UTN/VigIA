@@ -4,6 +4,9 @@ import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.PuntoTelemetriaDTO;
 import dev.vigia.backend.dto.ml.CeloPredictResponseDTO;
+import dev.vigia.backend.model.EstadoReproductivo;
+import dev.vigia.backend.model.TipoReproductivo;
+import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -13,6 +16,7 @@ import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
+import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +35,7 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
     private final RestClient restClient;
     private final TelemetriaRepository telemetriaRepository;
     private final AlertaRepository alertaRepository;
+    private final EstadoReproductivoRepository estadoReproductivoRepository;
     private final RabbitTemplate rabbitTemplate;
 
     @SuppressWarnings("null")
@@ -39,10 +44,12 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
             @Value("${vigia.ml.celo-url}") String celoUrl,
             TelemetriaRepository telemetriaRepository,
             AlertaRepository alertaRepository,
+            EstadoReproductivoRepository estadoReproductivoRepository,
             RabbitTemplate rabbitTemplate) {
         this.restClient = restClientBuilder.baseUrl(celoUrl).build();
         this.telemetriaRepository = telemetriaRepository;
         this.alertaRepository = alertaRepository;
+        this.estadoReproductivoRepository = estadoReproductivoRepository;
         this.rabbitTemplate = rabbitTemplate;
     }
 
@@ -106,6 +113,20 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
             alerta.setVentanaFinIns(alerta.getTsGeneracion().plusHours(24));
 
             alerta = alertaRepository.save(alerta);
+
+            EstadoReproductivo nuevoEstado = new EstadoReproductivo();
+            nuevoEstado.setAnimal(animal);
+            nuevoEstado.setEstado(TipoReproductivo.POSIBLE_CELO);
+            nuevoEstado.setOrigen(OrigenEstado.AUTOMATICO);
+            nuevoEstado.setFechaRegistro(java.time.LocalDateTime.now());
+            
+            if (animal != null && animal.getEstadosReproductivos() != null && !animal.getEstadosReproductivos().isEmpty()) {
+                EstadoReproductivo ultimoEstado = animal.getEstadosReproductivos().get(0);
+                nuevoEstado.setFechaUltParto(ultimoEstado.getFechaUltParto());
+                nuevoEstado.setFechaUltInseminacion(ultimoEstado.getFechaUltInseminacion());
+            }
+            
+            estadoReproductivoRepository.save(nuevoEstado);
 
             AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                     .id(alerta.getId())

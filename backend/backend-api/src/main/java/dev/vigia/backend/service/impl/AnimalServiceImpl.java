@@ -723,6 +723,7 @@ public class AnimalServiceImpl implements AnimalService {
                 }
 
                 return animal.getEstadosReproductivos().stream()
+                                .sorted((a, b) -> b.getFechaRegistro().compareTo(a.getFechaRegistro()))
                                 .map(e -> {
                                         String registradoPor = null;
                                         if (e.getUsuarioRegistrador() != null) {
