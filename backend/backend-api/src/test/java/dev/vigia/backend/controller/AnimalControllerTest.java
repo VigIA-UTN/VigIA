@@ -1304,4 +1304,58 @@ class AnimalControllerTest {
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isForbidden());
         }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/estado-salud - Aislamiento por establecimiento")
+        @SuppressWarnings("null")
+        void registrarEstadoSalud_aislamientoEstablecimiento() throws Exception {
+                // Crear un productor ajeno
+                Usuario otroProductor = new Usuario();
+                otroProductor.setEmail("otropsalud@vigia.dev");
+                otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroProductor.setNombre("Otro Productor Salud");
+                otroProductor.setRol(Rol.PRODUCTOR);
+                otroProductor.setActivo(true);
+                otroProductor = usuarioRepository.save(otroProductor);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Salud");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+                establecimientoRepository.save(otroEst);
+
+                String otroToken = getTokenFor("otropsalud@vigia.dev", "otro123");
+
+                Long animalId = crearAnimal("Vaca Establecimiento Ajeno Salud", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.SANO);
+
+                // Intento registrar estado de salud de animalId (del establecimientoId) usando el otroToken (de otroEst)
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + otroToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/estado-salud - Rechazo por estado ausente")
+        @SuppressWarnings("null")
+        void registrarEstadoSalud_rechazoPorEstadoAusente() throws Exception {
+                Long animalId = crearAnimal("Vaca Estado Ausente", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setDiagnosticoNotas("Notas sin estado");
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+        }
 }

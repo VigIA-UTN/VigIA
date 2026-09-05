@@ -1,5 +1,7 @@
 package dev.vigia.backend.dto;
 
+import java.time.LocalDate;
+
 import dev.vigia.backend.model.TipoEstadoSalud;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -13,4 +15,6 @@ public class EstadoSaludRequest {
     private String diagnosticoNotas;
 
     private String tratamientoIndicado;
+
+    private LocalDate fecha;
 }

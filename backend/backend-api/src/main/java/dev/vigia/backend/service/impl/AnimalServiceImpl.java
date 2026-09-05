@@ -921,7 +921,7 @@ public class AnimalServiceImpl implements AnimalService {
                 EstadoSalud estadoSalud = new EstadoSalud();
                 estadoSalud.setAnimal(animal);
                 estadoSalud.setUsuarioVeterinario(usuario);
-                estadoSalud.setFechaRevision(LocalDate.now());
+                estadoSalud.setFechaRevision(request.getFecha() != null ? request.getFecha() : LocalDate.now());
                 estadoSalud.setEstado(request.getEstado());
                 estadoSalud.setDiagnosticoNotas(request.getDiagnosticoNotas());
                 estadoSalud.setTratamientoIndicado(request.getTratamientoIndicado());
