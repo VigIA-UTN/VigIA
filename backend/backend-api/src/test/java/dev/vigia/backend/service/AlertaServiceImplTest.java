@@ -208,6 +208,8 @@ public class AlertaServiceImplTest {
                 mockAlerta.setDesvioDetectado(true);
                 mockAlerta.setPosibleCausa("Enfermedad moderada / Cojera clínica");
                 mockAlerta.setConfianzaModelo(0.82f);
+                mockAlerta.setValorUmbral(0.5);
+                mockAlerta.setValorDetectado(0.82);
                 mockAlerta.setTipo("SALUD");
                 mockAlerta.setSerieComparativaJson(serieComparativaJson);
 
@@ -277,6 +279,11 @@ public class AlertaServiceImplTest {
 
                 // la descripción viene del snapshot, no se regenera
                 assertTrue(result.getDetalleSanitario().getDescripcionDesvio().contains("0-6h"));
+
+                // el detalle top-level expone el mismo dato puntual para cualquier tipo de alerta
+                assertEquals(0.82, result.getValorDetectado(), 0.001);
+                assertEquals(0.5, result.getValorUmbral(), 0.001);
+                assertEquals(result.getDetalleSanitario().getDescripcionDesvio(), result.getDescripcionDatoOrigen());
         }
 
         @Test
@@ -294,6 +301,33 @@ public class AlertaServiceImplTest {
                 assertNull(result.getDetalleSanitario().getVentanaDesde());
                 assertNotNull(result.getDetalleSanitario().getDescripcionDesvio());
                 assertFalse(result.getDetalleSanitario().getDescripcionDesvio().isBlank());
+                assertEquals(result.getDetalleSanitario().getDescripcionDesvio(), result.getDescripcionDatoOrigen());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_CELO_exponeValorUmbralYDescripcionGenerica() {
+                // mockAlerta (setUp) ya es CELO con valorDetectado=98.5 y sin valorUmbral
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                assertNull(result.getDetalleSanitario());
+                assertEquals(DisparadorAlerta.CELO, result.getDatoDisparador());
+                assertEquals(98.5, result.getValorDetectado(), 0.001);
+                assertNull(result.getValorUmbral());
+                assertNotNull(result.getDescripcionDatoOrigen());
+                assertFalse(result.getDescripcionDatoOrigen().isBlank());
+
+                // con umbral seteado, la descripción incluye ambos valores
+                mockAlerta.setValorUmbral(80.0);
+                AlertaDetalleResponse resultConUmbral = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID,
+                                ALERTA_ID);
+                assertTrue(resultConUmbral.getDescripcionDatoOrigen().contains("98"));
+                assertTrue(resultConUmbral.getDescripcionDatoOrigen().contains("80"));
         }
 
         @Test

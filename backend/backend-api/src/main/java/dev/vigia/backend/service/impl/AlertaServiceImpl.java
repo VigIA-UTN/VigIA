@@ -259,6 +259,8 @@ public class AlertaServiceImpl implements AlertaService {
                         detalleSanitario = construirDetalleSanitario(alerta);
                 }
 
+                String descripcionDatoOrigen = construirDescripcionDatoOrigen(alerta, detalleSanitario);
+
                 return AlertaDetalleResponse.builder()
                                 .id(alerta.getId())
                                 .animalId(alerta.getAnimal().getId())
@@ -273,8 +275,48 @@ public class AlertaServiceImpl implements AlertaService {
                                 .estadoActual(alerta.getEstado())
                                 .usuarioAccion(usuarioAccionStr)
                                 .ultimosEstadosReproductivos(ultimosEstados)
+                                .valorDetectado(alerta.getValorDetectado())
+                                .valorUmbral(alerta.getValorUmbral())
+                                .descripcionDatoOrigen(descripcionDatoOrigen)
                                 .detalleSanitario(detalleSanitario)
                                 .build();
+        }
+
+        private String construirDescripcionDatoOrigen(Alerta alerta, DetalleSanitarioResponse detalleSanitario) {
+                if (detalleSanitario != null && detalleSanitario.getDescripcionDesvio() != null) {
+                        return detalleSanitario.getDescripcionDesvio();
+                }
+
+                Double valor = alerta.getValorDetectado();
+                Double umbral = alerta.getValorUmbral();
+                DisparadorAlerta disparador = alerta.getDisparador();
+
+                if (disparador == DisparadorAlerta.CELO) {
+                        if (valor != null && umbral != null) {
+                                return String.format(
+                                                "Indicador de comportamiento reproductivo (celo) con valor %.2f, "
+                                                                + "por encima del umbral configurado de %.2f.",
+                                                valor, umbral);
+                        }
+                        return "Evento de celo detectado por el modelo de comportamiento reproductivo.";
+                }
+
+                if (disparador == DisparadorAlerta.ABIGEATO) {
+                        if (valor != null && umbral != null) {
+                                return String.format(
+                                                "Indicador de desplazamiento geoespacial con valor %.2f, "
+                                                                + "por encima del umbral configurado de %.2f.",
+                                                valor, umbral);
+                        }
+                        return "Movimiento geoespacial anómalo detectado respecto del comportamiento habitual del animal.";
+                }
+
+                if (valor != null && umbral != null) {
+                        return String.format(
+                                        "Valor detectado %.2f, por encima del umbral configurado de %.2f.",
+                                        valor, umbral);
+                }
+                return "Evento detectado por el sistema de monitoreo.";
         }
 
         private DetalleSanitarioResponse construirDetalleSanitario(Alerta alerta) {

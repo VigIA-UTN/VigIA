@@ -462,7 +462,7 @@ class AlertaControllerTest {
     }
 
     @Test
-    @DisplayName("Detalle alerta reproductiva → sin bloque detalleSanitario")
+    @DisplayName("Detalle alerta reproductiva → sin bloque detalleSanitario, con dato disparador genérico")
     @SuppressWarnings("null")
     void obtenerDetalleAlerta_reproductiva_sinDetalleSanitario() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
@@ -470,7 +470,42 @@ class AlertaControllerTest {
                 .header("Authorization", "Bearer " + productorToken)
                 .param("establecimientoId", establecimientoId.toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.detalleSanitario").doesNotExist());
+                .andExpect(jsonPath("$.detalleSanitario").doesNotExist())
+                .andExpect(jsonPath("$.datoDisparador").value("CELO"))
+                .andExpect(jsonPath("$.valorDetectado").value(95.0))
+                .andExpect(jsonPath("$.valorUmbral").value(80.0))
+                .andExpect(jsonPath("$.descripcionDatoOrigen").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Detalle alerta geoespacial (ABIGEATO) → tipo de dato, valor, timestamp, umbral y descripción")
+    @SuppressWarnings("null")
+    void obtenerDetalleAlerta_abigeato_returnsDatoDisparadorGenerico() throws Exception {
+        Animal animal = animalRepository.findAll().stream()
+                .filter(a -> a.getEstablecimiento().getId().equals(establecimientoId))
+                .findFirst().orElseThrow();
+
+        Alerta alertaAbigeato = new Alerta();
+        alertaAbigeato.setAnimal(animal);
+        alertaAbigeato.setDisparador(DisparadorAlerta.ABIGEATO);
+        alertaAbigeato.setEstado(EstadoAlerta.PENDIENTE);
+        alertaAbigeato.setTsGeneracion(LocalDateTime.now());
+        alertaAbigeato.setValorUmbral(1.5);
+        alertaAbigeato.setValorDetectado(3.2);
+        alertaAbigeato.setTipo("ABIGEATO");
+        alertaAbigeato = alertaRepository.save(alertaAbigeato);
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/{id}", alertaAbigeato.getId())
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.detalleSanitario").doesNotExist())
+                .andExpect(jsonPath("$.datoDisparador").value("ABIGEATO"))
+                .andExpect(jsonPath("$.tsGeneracion").exists())
+                .andExpect(jsonPath("$.valorDetectado").value(3.2))
+                .andExpect(jsonPath("$.valorUmbral").value(1.5))
+                .andExpect(jsonPath("$.descripcionDatoOrigen").isNotEmpty());
     }
 
     @Test
@@ -517,6 +552,9 @@ class AlertaControllerTest {
                 .header("Authorization", "Bearer " + productorToken)
                 .param("establecimientoId", establecimientoId.toString()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valorDetectado").value(0.82))
+                .andExpect(jsonPath("$.valorUmbral").value(0.5))
+                .andExpect(jsonPath("$.descripcionDatoOrigen").isNotEmpty())
                 .andExpect(jsonPath("$.detalleSanitario.desvioDetectado").value(true))
                 .andExpect(jsonPath("$.detalleSanitario.severidad").value("MEDIA"))
                 .andExpect(jsonPath("$.detalleSanitario.posibleCausa").value("Enfermedad moderada / Cojera clínica"))
