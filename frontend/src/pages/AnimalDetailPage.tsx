@@ -41,9 +41,18 @@ function estadoReproductivoBadge(estado: string | null | undefined) {
         CELO: 'bg-danger',
         VACIA: 'bg-secondary',
         ANESTRO: 'bg-info',
+        POSIBLE_CELO: 'bg-warning text-dark',
+        INSEMINADA: 'bg-primary',
+        PARIDA: 'bg-success',
     };
     return <Badge bg="" className={`${map[estado] || 'bg-secondary'}`}>{estado}</Badge>;
 }
+
+const TIPO_EVENTO_LABEL: Record<string, string> = {
+    ESTADO_REPRODUCTIVO: 'Estado',
+    CELO_AUTOMATICO: 'Celo (ml-celo)',
+    INSEMINACION: 'Inseminación',
+};
 
 function formatFechaLocal(iso: string | null | undefined) {
     if (!iso) return '—';
@@ -196,7 +205,7 @@ export default function AnimalDetailPage() {
     const openEditarEstadoModal = (estado: EstadoReproductivoResponse) => {
         setEditingEstado(estado);
         setEstadoForm({
-            estado: estado.estado as TipoReproductivo,
+            estado: (estado.estado ?? 'VACIA') as TipoReproductivo,
             fechaUltimoParto: estado.fechaUltimoParto,
             fechaUltimaInseminacion: estado.fechaUltimaInseminacion,
         });
@@ -507,6 +516,7 @@ export default function AnimalDetailPage() {
                                     <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
                                         <thead>
                                             <tr>
+                                                <th>Tipo</th>
                                                 <th>Estado</th>
                                                 <th>Último Parto</th>
                                                 <th>Última Inseminación</th>
@@ -517,21 +527,25 @@ export default function AnimalDetailPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {historial.map((h, idx) => (
-                                                <tr key={h.id} className={idx === 0 ? 'fw-semibold' : ''}>
+                                            {historial.map((h, idx) => {
+                                                const origen = h.origenNormalizado || h.origen;
+                                                const editable = h.tipoEvento !== 'INSEMINACION';
+                                                return (
+                                                <tr key={`${h.tipoEvento ?? 'X'}-${h.id}`} className={idx === 0 ? 'fw-semibold' : ''}>
+                                                    <td>{h.tipoEvento ? (TIPO_EVENTO_LABEL[h.tipoEvento] || h.tipoEvento) : '—'}</td>
                                                     <td>{estadoReproductivoBadge(h.estado)}</td>
                                                     <td>{formatFechaLocal(h.fechaUltimoParto)}</td>
                                                     <td>{formatFechaLocal(h.fechaUltimaInseminacion)}</td>
                                                     <td>
-                                                        <span className={`badge ${h.origen === 'MANUAL' ? 'bg-primary' : h.origen === 'CARGA_MASIVA' ? 'bg-warning text-dark' : 'bg-info'}`}>
-                                                            {h.origen || '—'}
+                                                        <span className={`badge ${origen === 'MANUAL' ? 'bg-primary' : origen === 'AUTOMATICO' ? 'bg-info' : 'bg-secondary'}`}>
+                                                            {origen || '—'}
                                                         </span>
                                                     </td>
                                                     <td>{h.registradoPor || '—'}</td>
                                                     <td>{formatDateTime(h.fechaRegistro)}</td>
                                                     {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
                                                         <td className="text-center">
-                                                            {idx === 0 && (
+                                                            {idx === 0 && editable && (
                                                                 <Button
                                                                     variant="outline-primary"
                                                                     size="sm"
@@ -543,7 +557,8 @@ export default function AnimalDetailPage() {
                                                         </td>
                                                     )}
                                                 </tr>
-                                            ))}
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>

@@ -156,6 +156,8 @@ public class AnimalController {
             List<dev.vigia.backend.dto.EstadoReproductivoResponse> response = animalService
                     .listarEstadosReproductivos(animalId, email);
             return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

@@ -121,7 +121,14 @@ export async function cargarEstadosExcel(file: File, establecimientoId: number):
   return response.data;
 }
 
-export type TipoReproductivo = 'VACIA' | 'GESTANTE' | 'CELO' | 'ANESTRO';
+export type TipoReproductivo =
+  | 'VACIA'
+  | 'GESTANTE'
+  | 'CELO'
+  | 'ANESTRO'
+  | 'POSIBLE_CELO'
+  | 'INSEMINADA'
+  | 'PARIDA';
 
 export interface EstadoReproductivoRequest {
   estado: TipoReproductivo;
@@ -132,12 +139,15 @@ export interface EstadoReproductivoRequest {
 export interface EstadoReproductivoResponse {
   id: number;
   animalId: number;
-  estado: string;
+  estado: string | null;
   fechaUltimoParto: string | null;
   fechaUltimaInseminacion: string | null;
   origen: string | null;
   fechaRegistro: string;
   registradoPor: string | null;
+  // Historial consolidado
+  tipoEvento: 'ESTADO_REPRODUCTIVO' | 'CELO_AUTOMATICO' | 'INSEMINACION' | null;
+  origenNormalizado: 'AUTOMATICO' | 'MANUAL' | null;
 }
 
 export async function registrarEstadoReproductivo(

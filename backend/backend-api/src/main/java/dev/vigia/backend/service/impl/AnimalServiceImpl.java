@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -32,6 +33,7 @@ import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
+import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -45,6 +47,7 @@ import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Telemetria;
+import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
@@ -570,7 +573,6 @@ public class AnimalServiceImpl implements AnimalService {
                 estado.setFechaUltParto(request.getFechaUltimoParto());
                 estado.setFechaUltInseminacion(request.getFechaUltimaInseminacion());
                 estado.setUsuarioRegistrador(productorUser);
-                estado.setFechaRegistro(LocalDateTime.now()); // Update timestamp to reflect edit
 
                 EstadoReproductivo saved = estadoReproductivoRepository.save(estado);
 
@@ -718,42 +720,69 @@ public class AnimalServiceImpl implements AnimalService {
                                 || usuario.getRol().equals(Rol.ADMINISTRADOR);
 
                 if (!tieneAcceso) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "No tiene acceso a los datos de este animal.");
                 }
 
-                return animal.getEstadosReproductivos().stream()
-                                .sorted((a, b) -> b.getFechaRegistro().compareTo(a.getFechaRegistro()))
-                                .map(e -> {
-                                        String registradoPor = null;
-                                        if (e.getUsuarioRegistrador() != null) {
-                                                registradoPor = e.getUsuarioRegistrador().getNombre();
-                                                if (e.getUsuarioRegistrador().getApellido() != null
-                                                                && !e.getUsuarioRegistrador().getApellido().isEmpty()) {
-                                                        registradoPor += " " + e.getUsuarioRegistrador().getApellido();
-                                                }
-                                                if (registradoPor == null || registradoPor.isBlank()) {
-                                                        registradoPor = e.getUsuarioRegistrador().getEmail();
-                                                }
-                                        }
-                                        return EstadoReproductivoResponse.builder()
-                                                        .id(e.getId())
-                                                        .animalId(animal.getId())
-                                                        .estado(e.getEstado().name())
-                                                        .fechaUltimoParto(e.getFechaUltParto())
-                                                        .fechaUltimaInseminacion(e.getFechaUltInseminacion())
-                                                        .origen(e.getOrigen() != null ? e.getOrigen().name() : null)
-                                                        .fechaRegistro(e.getFechaRegistro())
-                                                        .registradoPor(registradoPor)
-                                                        .build();
-                                })
-                                .collect(Collectors.toList());
+                List<EstadoReproductivoResponse> historial = new ArrayList<>();
+
+                animal.getEstadosReproductivos().forEach(e -> {
+                        boolean esAutomatico = e.getOrigen() == OrigenEstado.AUTOMATICO;
+                        historial.add(EstadoReproductivoResponse.builder()
+                                        .id(e.getId())
+                                        .animalId(animal.getId())
+                                        .estado(e.getEstado() != null ? e.getEstado().name() : null)
+                                        .fechaUltimoParto(e.getFechaUltParto())
+                                        .fechaUltimaInseminacion(e.getFechaUltInseminacion())
+                                        .origen(e.getOrigen() != null ? e.getOrigen().name() : null)
+                                        .origenNormalizado(e.getOrigen() != null
+                                                        ? (esAutomatico ? "AUTOMATICO" : "MANUAL")
+                                                        : null)
+                                        .tipoEvento(esAutomatico ? "CELO_AUTOMATICO" : "ESTADO_REPRODUCTIVO")
+                                        .fechaRegistro(e.getFechaRegistro())
+                                        .registradoPor(formatNombreUsuario(e.getUsuarioRegistrador()))
+                                        .build());
+                });
+
+                intervencionRepository.findByAnimalIdOrderByFechaHoraDesc(animalId).stream()
+                                .filter(i -> i.getTipo() == TipoIntervencion.INSEMINACION)
+                                .forEach(i -> historial.add(EstadoReproductivoResponse.builder()
+                                                .id(i.getId())
+                                                .animalId(animal.getId())
+                                                .estado(TipoReproductivo.INSEMINADA.name())
+                                                .fechaUltimaInseminacion(i.getFechaHora().toLocalDate())
+                                                .origen(OrigenEstado.MANUAL.name())
+                                                .origenNormalizado("MANUAL")
+                                                .tipoEvento("INSEMINACION")
+                                                .fechaRegistro(i.getFechaHora())
+                                                .registradoPor(formatNombreUsuario(i.getInterventor()))
+                                                .build()));
+
+                historial.sort(java.util.Comparator.comparing(
+                                EstadoReproductivoResponse::getFechaRegistro,
+                                java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())));
+
+                return historial;
+        }
+
+        private String formatNombreUsuario(Usuario usuario) {
+                if (usuario == null) {
+                        return null;
+                }
+                String nombre = usuario.getNombre();
+                if (usuario.getApellido() != null && !usuario.getApellido().isEmpty()) {
+                        nombre = (nombre != null ? nombre : "") + " " + usuario.getApellido();
+                }
+                if (nombre == null || nombre.isBlank()) {
+                        nombre = usuario.getEmail();
+                }
+                return nombre;
         }
 
         @Override
         @Transactional
         @SuppressWarnings("null")
-        public List<dev.vigia.backend.dto.IntervencionResponse> listarIntervenciones(Long animalId,
+        public List<IntervencionResponse> listarIntervenciones(Long animalId,
                         String emailUsuario) {
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
