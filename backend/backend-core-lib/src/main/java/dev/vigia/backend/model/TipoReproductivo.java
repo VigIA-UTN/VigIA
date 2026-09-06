@@ -4,5 +4,8 @@ public enum TipoReproductivo {
     VACIA,
     GESTANTE,
     CELO,
-    ANESTRO
+    ANESTRO,
+    POSIBLE_CELO,
+    INSEMINADA,
+    PARIDA
 }

@@ -118,6 +118,11 @@ export interface AlertaDetalleResponse {
     fechaRegistro: string;
     registradoPor: string;
   }[];
+  /** Explicación en lenguaje natural del dato que originó la alerta (todos los tipos). */
+  descripcionDatoOrigen?: string | null;
+  /** Dato puntual y umbral superado. Se exponen por trazabilidad; la UI muestra solo la frase. */
+  valorDetectado?: number | null;
+  valorUmbral?: number | null;
   /** Presente solo para alertas sanitarias (datoDisparador === 'SALUD'). */
   detalleSanitario?: DetalleSanitario | null;
 }
@@ -171,6 +176,30 @@ export async function getVentanaInseminacion(
   const response = await axiosClient.get<VentanaInseminacionResponse>(
     `/alertas/${alertaId}/ventana`,
     { params: { establecimientoId } },
+  );
+  return response.data;
+}
+
+export type TipoIntervencion =
+  | 'TRATAMIENTO'
+  | 'VACUNACION'
+  | 'REVISION_VETERINARIA'
+  | 'INSEMINACION'
+  | 'OTRO';
+
+export interface IntervencionRequest {
+  descripcion?: string;
+  fechaHora?: string; // ISO 8601 LocalDateTime
+  tipo?: TipoIntervencion;
+}
+
+export async function intervenirAlerta(
+  alertaId: number,
+  request: IntervencionRequest,
+): Promise<AlertaResponse> {
+  const response = await axiosClient.post<AlertaResponse>(
+    `/alertas/intervenir/${alertaId}`,
+    request,
   );
   return response.data;
 }

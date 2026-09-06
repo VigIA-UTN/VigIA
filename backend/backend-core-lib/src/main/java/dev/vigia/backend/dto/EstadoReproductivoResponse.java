@@ -21,5 +21,7 @@ public class EstadoReproductivoResponse {
     private LocalDate fechaUltimaInseminacion;
     private String origen;
     private LocalDateTime fechaRegistro;
-    private String registradoPor; // Nombre o email del usuario
+    private String registradoPor;
+    private String tipoEvento;
+    private String origenNormalizado;
 }

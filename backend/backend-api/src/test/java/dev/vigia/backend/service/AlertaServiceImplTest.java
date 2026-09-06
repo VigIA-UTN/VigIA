@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -23,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.BloqueComparativoResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
@@ -31,6 +33,7 @@ import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.SeveridadAlerta;
+import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
@@ -92,7 +95,7 @@ public class AlertaServiceImplTest {
                 mockAlerta.setTsGeneracion(LocalDateTime.now());
                 mockAlerta.setEstado(EstadoAlerta.PENDIENTE);
                 mockAlerta.setDisparador(DisparadorAlerta.CELO);
-                mockAlerta.setValorDetectado(98.5);
+                mockAlerta.setValorDetectado(0.85);
                 mockAlerta.setVentanaInicioIns(LocalDateTime.now().plusHours(2));
                 mockAlerta.setVentanaFinIns(LocalDateTime.now().plusHours(14));
         }
@@ -198,12 +201,15 @@ public class AlertaServiceImplTest {
 
         // --- Tests para el detalle sanitario (snapshot de serie comparativa) ---
 
+        @SuppressWarnings("null")
         private void prepararAlertaSanitaria(String serieComparativaJson) {
                 mockAlerta.setDisparador(DisparadorAlerta.SALUD);
                 mockAlerta.setSeveridad(SeveridadAlerta.MEDIA);
                 mockAlerta.setDesvioDetectado(true);
                 mockAlerta.setPosibleCausa("Enfermedad moderada / Cojera clínica");
                 mockAlerta.setConfianzaModelo(0.82f);
+                mockAlerta.setValorUmbral(0.5);
+                mockAlerta.setValorDetectado(0.82);
                 mockAlerta.setTipo("SALUD");
                 mockAlerta.setSerieComparativaJson(serieComparativaJson);
 
@@ -215,8 +221,9 @@ public class AlertaServiceImplTest {
 
         private String snapshotJson() throws Exception {
                 SerieComparativaSnapshot snap = SerieComparativaSnapshot.builder()
-                                .descripcionDesvio("Actividad promedio 66% por debajo del perfil de referencia del animal "
-                                                + "en el bloque 0-6h. Severidad media. Posible causa: Enfermedad moderada / Cojera clínica.")
+                                .descripcionDesvio(
+                                                "Actividad promedio 66% por debajo del perfil de referencia del animal "
+                                                                + "en el bloque 0-6h. Severidad media. Posible causa: Enfermedad moderada / Cojera clínica.")
                                 .ventanaDesde(LocalDateTime.of(2026, 1, 15, 0, 0))
                                 .ventanaHasta(LocalDateTime.of(2026, 1, 15, 23, 55))
                                 .perfilCalculadoEn(LocalDateTime.of(2026, 1, 10, 8, 0))
@@ -272,6 +279,11 @@ public class AlertaServiceImplTest {
 
                 // la descripción viene del snapshot, no se regenera
                 assertTrue(result.getDetalleSanitario().getDescripcionDesvio().contains("0-6h"));
+
+                // el detalle top-level expone el mismo dato puntual para cualquier tipo de alerta
+                assertEquals(0.82, result.getValorDetectado(), 0.001);
+                assertEquals(0.5, result.getValorUmbral(), 0.001);
+                assertEquals(result.getDetalleSanitario().getDescripcionDesvio(), result.getDescripcionDatoOrigen());
         }
 
         @Test
@@ -289,6 +301,30 @@ public class AlertaServiceImplTest {
                 assertNull(result.getDetalleSanitario().getVentanaDesde());
                 assertNotNull(result.getDetalleSanitario().getDescripcionDesvio());
                 assertFalse(result.getDetalleSanitario().getDescripcionDesvio().isBlank());
+                assertEquals(result.getDetalleSanitario().getDescripcionDesvio(), result.getDescripcionDatoOrigen());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_CELO_exponeDescripcionNarrativa() {
+                // mockAlerta (setUp) ya es CELO con valorDetectado=0.85 (confianza del modelo)
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                assertNull(result.getDetalleSanitario());
+                assertEquals(DisparadorAlerta.CELO, result.getDatoDisparador());
+                // el dato puntual se sigue exponiendo por trazabilidad...
+                assertEquals(0.85, result.getValorDetectado(), 0.001);
+                assertNull(result.getValorUmbral());
+                // ...pero la descripción es en lenguaje natural: menciona el celo y la
+                // confianza como porcentaje, sin decimales crudos ni umbrales.
+                assertNotNull(result.getDescripcionDatoOrigen());
+                assertTrue(result.getDescripcionDatoOrigen().toLowerCase().contains("celo"));
+                assertTrue(result.getDescripcionDatoOrigen().contains("85%"));
         }
 
         @Test
@@ -337,7 +373,7 @@ public class AlertaServiceImplTest {
                 assertNotNull(result);
                 assertEquals(EstadoAlerta.CONFIRMADA, result.getEstado());
                 verify(alertaRepository, times(1)).save(mockAlerta);
-                verify(intervencionRepository, times(1)).save(any(Intervencion.class));
+                verify(intervencionRepository, never()).save(any(Intervencion.class));
         }
 
         @Test
@@ -358,6 +394,7 @@ public class AlertaServiceImplTest {
                 assertNotNull(result);
                 assertEquals(EstadoAlerta.DESCARTADA, result.getEstado());
                 verify(alertaRepository, times(1)).save(mockAlerta);
+                verify(intervencionRepository, never()).save(any(Intervencion.class));
         }
 
         @Test
@@ -441,6 +478,187 @@ public class AlertaServiceImplTest {
                                                 "Notas"));
                 assertEquals("Estado inválido para la actualización.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
+        }
+
+        // --- Tests para intervenirAlerta ---
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_Success_CreatesIntervencion() {
+                // Arrange: alerta ya confirmada, sin intervención previa
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(intervencionRepository.existsByAlertaId(ALERTA_ID)).thenReturn(false);
+
+                IntervencionRequest request = IntervencionRequest.builder()
+                                .descripcion("Se aplicó tratamiento antibiótico")
+                                .fechaHora(LocalDateTime.of(2026, 1, 1, 10, 0))
+                                .tipo(TipoIntervencion.TRATAMIENTO)
+                                .build();
+
+                // Act
+                AlertaResponse result = alertaService.intervenirAlerta(EMAIL, ALERTA_ID, request);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals(EstadoAlerta.CONFIRMADA, result.getEstado());
+
+                ArgumentCaptor<Intervencion> captor = ArgumentCaptor.forClass(Intervencion.class);
+                verify(intervencionRepository, times(1)).save(captor.capture());
+                Intervencion guardada = captor.getValue();
+                assertEquals(mockAlerta, guardada.getAlerta());
+                assertEquals(mockAnimal, guardada.getAnimal());
+                assertEquals(mockUsuario, guardada.getInterventor());
+                assertEquals("Se aplicó tratamiento antibiótico", guardada.getDescripcion());
+                assertEquals(LocalDateTime.of(2026, 1, 1, 10, 0), guardada.getFechaHora());
+                assertEquals(TipoIntervencion.TRATAMIENTO, guardada.getTipo());
+
+                // La alerta no vuelve a confirmarse ni a guardarse: ya estaba confirmada.
+                verify(alertaRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_Success_UsesDefault_ForFechaHora() {
+                // Arrange: descripción y tipo son obligatorios y se completan; fechaHora
+                // queda sin especificar y debe completarse con un valor por defecto.
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(intervencionRepository.existsByAlertaId(ALERTA_ID)).thenReturn(false);
+
+                IntervencionRequest request = IntervencionRequest.builder()
+                                .descripcion("Revisión de rutina")
+                                .tipo(TipoIntervencion.REVISION_VETERINARIA)
+                                .build();
+
+                // Act
+                alertaService.intervenirAlerta(EMAIL, ALERTA_ID, request);
+
+                // Assert: fechaHora, el único campo opcional, se completa con un valor por defecto
+                ArgumentCaptor<Intervencion> captor = ArgumentCaptor.forClass(Intervencion.class);
+                verify(intervencionRepository, times(1)).save(captor.capture());
+                Intervencion guardada = captor.getValue();
+                assertEquals("Revisión de rutina", guardada.getDescripcion());
+                assertNotNull(guardada.getFechaHora());
+                assertEquals(TipoIntervencion.REVISION_VETERINARIA, guardada.getTipo());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_ThrowsIllegalArgumentException_WhenDescripcionEsVacia() {
+                // Arrange: no debe poder registrarse una intervención sin descripción,
+                // aunque el tipo esté completo.
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(intervencionRepository.existsByAlertaId(ALERTA_ID)).thenReturn(false);
+
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.intervenirAlerta(EMAIL, ALERTA_ID,
+                                                IntervencionRequest.builder().descripcion("   ")
+                                                                .tipo(TipoIntervencion.OTRO).build()));
+                assertEquals("La descripción es obligatoria para registrar una intervención.",
+                                exception.getMessage());
+                verify(intervencionRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_ThrowsIllegalArgumentException_WhenTipoEsNulo() {
+                // Arrange: no debe poder registrarse una intervención sin tipo,
+                // aunque la descripción esté completa.
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(intervencionRepository.existsByAlertaId(ALERTA_ID)).thenReturn(false);
+
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.intervenirAlerta(EMAIL, ALERTA_ID,
+                                                IntervencionRequest.builder().descripcion("Tratamiento aplicado")
+                                                                .build()));
+                assertEquals("El tipo de intervención es obligatorio para registrar una intervención.",
+                                exception.getMessage());
+                verify(intervencionRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_ThrowsIllegalArgumentException_WhenAlertaNotFound() {
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.empty());
+
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.intervenirAlerta(EMAIL, ALERTA_ID, IntervencionRequest.builder().build()));
+                assertEquals("Alerta no encontrada", exception.getMessage());
+                verify(intervencionRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_ThrowsIllegalArgumentException_WhenUsuarioNotFound() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+
+                assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.intervenirAlerta(EMAIL, ALERTA_ID, IntervencionRequest.builder().build()));
+                verify(intervencionRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_ThrowsAccessDeniedException_WhenUserNotBelongsToEstablecimiento() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(Collections.emptyList());
+
+                assertThrows(AccessDeniedException.class,
+                                () -> alertaService.intervenirAlerta(EMAIL, ALERTA_ID, IntervencionRequest.builder().build()));
+                verify(intervencionRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_ThrowsIllegalArgumentException_WhenAlertaNoConfirmada() {
+                // Arrange: la alerta sigue PENDIENTE (setUp la deja así por defecto)
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.intervenirAlerta(EMAIL, ALERTA_ID, IntervencionRequest.builder().build()));
+                assertEquals("La alerta debe estar confirmada antes de registrar una intervención.",
+                                exception.getMessage());
+                verify(intervencionRepository, never()).save(any());
+                verify(alertaRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_ThrowsIllegalArgumentException_WhenYaExisteIntervencionParaLaAlerta() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(intervencionRepository.existsByAlertaId(ALERTA_ID)).thenReturn(true);
+
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.intervenirAlerta(EMAIL, ALERTA_ID, IntervencionRequest.builder().build()));
+                assertEquals("Ya existe una intervención registrada para esta alerta.", exception.getMessage());
+                verify(intervencionRepository, never()).save(any());
         }
 
         // --- Tests para obtenerEstadoVentanaInseminacion ---

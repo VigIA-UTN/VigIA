@@ -3,6 +3,7 @@ package dev.vigia.backend.dto;
 import java.time.LocalDate;
 
 import dev.vigia.backend.model.EstadoAnimal;
+import dev.vigia.backend.model.TipoEstadoSalud;
 import dev.vigia.backend.model.TipoReproductivo;
 import lombok.Builder;
 import lombok.Data;
@@ -23,6 +24,7 @@ public class AnimalResponse {
     private TipoReproductivo estadoReproductivo;
     private LocalDate fechaUltimoParto;
     private LocalDate fechaUltimaInseminacion;
+    private TipoEstadoSalud estadoSalud;
 
     private Boolean enCalibracion;
     private Integer diasRestantesCalibracion;

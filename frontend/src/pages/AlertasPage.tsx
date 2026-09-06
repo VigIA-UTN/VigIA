@@ -4,6 +4,7 @@ import { getAlertas, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
+import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import './AnimalesPage.css'; // For common vigia styles
 import './AlertasPage.css';
 
@@ -50,6 +51,8 @@ export default function AlertasPage() {
 
     // Sidebar overlay
     const [selectedAlerta, setSelectedAlerta] = useState<AlertaResponse | null>(null);
+    const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
+    const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
 
     const maxAlertaIdRef = useRef<number>(0);
 
@@ -324,6 +327,22 @@ export default function AlertasPage() {
                     mode="fixed"
                     onClose={() => setSelectedAlerta(null)}
                     onActionComplete={handleActionComplete}
+                    onOpenIntervencion={() => {
+                        setIntervencionAlerta(selectedAlerta);
+                        setIsIntervencionOpen(true);
+                    }}
+                />
+            )}
+
+            {isIntervencionOpen && intervencionAlerta && (
+                <IntervencionFormPanel
+                    alerta={intervencionAlerta}
+                    mode="fixed"
+                    onClose={() => setIsIntervencionOpen(false)}
+                    onSuccess={() => {
+                        setIsIntervencionOpen(false);
+                        fetchAlertas();
+                    }}
                 />
             )}
         </>

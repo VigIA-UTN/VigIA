@@ -9,7 +9,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -18,6 +20,7 @@ import org.springframework.http.MediaType;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.service.AlertaService;
@@ -212,6 +215,26 @@ public class AlertaController {
         }
     }
 
+    @PostMapping("/intervenir/{id}")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> intervenirAlerta(
+            @RequestBody IntervencionRequest request,
+            @PathVariable("id") Long alertaId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            AlertaResponse response = alertaService.intervenirAlerta(email, alertaId, request);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Alerta no encontrada".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamAlertas(
             @RequestParam(name = "establecimientoId") Long establecimientoId,
@@ -227,19 +250,22 @@ public class AlertaController {
      * Devuelve el estado actual de la ventana óptima de inseminación para una
      * alerta de celo. La ventana va de 6 a 24 horas desde la detección del celo.
      *
-     * <p>Respuesta:
+     * <p>
+     * Respuesta:
      * <ul>
-     *   <li>{@code tiempo_restante_segundos}: segundos hasta el fin (0 si venció)</li>
-     *   <li>{@code porcentaje_transcurrido}: % transcurrido (0–100)</li>
-     *   <li>{@code proxima_a_vencer}: {@code true} cuando quedan &lt; 2 horas</li>
-     *   <li>{@code estado}: {@code ACTIVA}, {@code FUTURA} o {@code VENCIDA}</li>
+     * <li>{@code tiempo_restante_segundos}: segundos hasta el fin (0 si
+     * venció)</li>
+     * <li>{@code porcentaje_transcurrido}: % transcurrido (0–100)</li>
+     * <li>{@code proxima_a_vencer}: {@code true} cuando quedan &lt; 2 horas</li>
+     * <li>{@code estado}: {@code ACTIVA}, {@code FUTURA} o {@code VENCIDA}</li>
      * </ul>
      *
      * @param establecimientoId ID del establecimiento actualmente seleccionado
      * @param alertaId          ID de la alerta
      * @param authentication    contexto de seguridad inyectado por Spring Security
      * @return 200 con el estado de la ventana, 403 si acceso denegado,
-     *         404 si la alerta no existe, 400 si la alerta no pertenece al establecimiento
+     *         404 si la alerta no existe, 400 si la alerta no pertenece al
+     *         establecimiento
      */
     @GetMapping("/{id}/ventana")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")

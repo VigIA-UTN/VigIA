@@ -42,6 +42,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+/**
+ * Siembra datos de prueba en cada arranque, LIMPIANDO antes toda la base.
+ *
+ * <p>Solo se activa con el perfil {@code dev}. El default de la aplicación es
+ * {@code prod} (ver {@code application.yaml}), así que un despliegue sin
+ * {@code SPRING_PROFILES_ACTIVE} nunca ejecuta este runner ni borra datos. El
+ * entorno de <b>develop</b> setea {@code SPRING_PROFILES_ACTIVE=dev} a propósito;
+ * <b>producción</b> nunca debe hacerlo. Para poblar producción, usar el script
+ * manual {@code infra/prod/seed_prod.sql}.
+ */
 @Slf4j
 @Component
 @Profile("dev")

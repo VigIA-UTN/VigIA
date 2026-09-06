@@ -10,15 +10,18 @@ import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
+import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Telemetria;
+import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
+import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
@@ -85,6 +88,8 @@ class AnimalControllerTest {
         @Autowired
         private EstadoReproductivoRepository estadoReproductivoRepository;
         @Autowired
+        private IntervencionRepository intervencionRepository;
+        @Autowired
         private CaravanaRepository caravanaRepository;
         @Autowired
         private TelemetriaRepository telemetriaRepository;
@@ -105,6 +110,7 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void setUp() throws Exception {
                 // Orden correcto de borrado (hijos primero)
+                intervencionRepository.deleteAll();
                 alertaRepository.deleteAll();
                 telemetriaRepository.deleteAll();
                 estadoReproductivoRepository.deleteAll();
@@ -863,6 +869,157 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$.estado").value("GESTANTE"));
         }
 
+        // =========================================================================
+        // GET /api/v1/animales/{id}/estado-reproductivo  (historial reproductivo consolidado)
+        // =========================================================================
+
+        @Test
+        @DisplayName("GET estado-reproductivo - Consolida celo automático, estado manual e inseminación, ordenado desc")
+        @SuppressWarnings("null")
+        void historialReproductivo_consolidaLasTresFuentes_ordenadoDesc() throws Exception {
+                Long animalId = crearAnimal("Vaca Historial", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
+
+                // 1) Estado manual (parto) - el más antiguo
+                EstadoReproductivo manual = new EstadoReproductivo();
+                manual.setAnimal(animal);
+                manual.setEstado(TipoReproductivo.PARIDA);
+                manual.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                manual.setUsuarioRegistrador(productor);
+                manual.setFechaUltParto(LocalDate.of(2026, 1, 10));
+                manual.setFechaRegistro(LocalDateTime.now().minusDays(5));
+                estadoReproductivoRepository.save(manual);
+
+                // 2) Celo automático (ml-celo) - intermedio
+                EstadoReproductivo automatico = new EstadoReproductivo();
+                automatico.setAnimal(animal);
+                automatico.setEstado(TipoReproductivo.POSIBLE_CELO);
+                automatico.setOrigen(dev.vigia.backend.model.OrigenEstado.AUTOMATICO);
+                automatico.setFechaRegistro(LocalDateTime.now().minusDays(2));
+                estadoReproductivoRepository.save(automatico);
+
+                // 3) Inseminación registrada como Intervencion - la más reciente
+                Intervencion insem = new Intervencion();
+                insem.setAnimal(animal);
+                insem.setInterventor(productor);
+                insem.setDescripcion("IATF");
+                insem.setTipo(TipoIntervencion.INSEMINACION);
+                insem.setFechaHora(LocalDateTime.now().minusDays(1));
+                intervencionRepository.save(insem);
+
+                // Intervención de otro tipo: NO debe aparecer en el historial reproductivo
+                Intervencion revision = new Intervencion();
+                revision.setAnimal(animal);
+                revision.setInterventor(productor);
+                revision.setDescripcion("Control sanitario");
+                revision.setTipo(TipoIntervencion.REVISION_VETERINARIA);
+                revision.setFechaHora(LocalDateTime.now());
+                intervencionRepository.save(revision);
+
+                entityManager.flush();
+                entityManager.clear();
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-reproductivo")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(3))
+                                .andExpect(jsonPath("$[0].tipoEvento").value("INSEMINACION"))
+                                .andExpect(jsonPath("$[0].origenNormalizado").value("MANUAL"))
+                                .andExpect(jsonPath("$[0].registradoPor").value("Productor"))
+                                .andExpect(jsonPath("$[1].tipoEvento").value("CELO_AUTOMATICO"))
+                                .andExpect(jsonPath("$[1].origen").value("AUTOMATICO"))
+                                .andExpect(jsonPath("$[1].origenNormalizado").value("AUTOMATICO"))
+                                .andExpect(jsonPath("$[1].registradoPor").isEmpty())
+                                .andExpect(jsonPath("$[2].tipoEvento").value("ESTADO_REPRODUCTIVO"))
+                                .andExpect(jsonPath("$[2].estado").value("PARIDA"))
+                                .andExpect(jsonPath("$[2].origenNormalizado").value("MANUAL"));
+        }
+
+        @Test
+        @DisplayName("GET estado-reproductivo - Carga masiva se normaliza a origen MANUAL")
+        @SuppressWarnings("null")
+        void historialReproductivo_cargaMasiva_origenNormalizadoManual() throws Exception {
+                Long animalId = crearAnimal("Vaca Masiva", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
+
+                EstadoReproductivo masivo = new EstadoReproductivo();
+                masivo.setAnimal(animal);
+                masivo.setEstado(TipoReproductivo.VACIA);
+                masivo.setOrigen(dev.vigia.backend.model.OrigenEstado.CARGA_MASIVA);
+                masivo.setUsuarioRegistrador(productor);
+                masivo.setFechaRegistro(LocalDateTime.now());
+                estadoReproductivoRepository.save(masivo);
+
+                entityManager.flush();
+                entityManager.clear();
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-reproductivo")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].origen").value("CARGA_MASIVA"))
+                                .andExpect(jsonPath("$[0].origenNormalizado").value("MANUAL"))
+                                .andExpect(jsonPath("$[0].tipoEvento").value("ESTADO_REPRODUCTIVO"));
+        }
+
+        @Test
+        @DisplayName("GET estado-reproductivo - Campero autorizado (200)")
+        void historialReproductivo_comoCampero_ok() throws Exception {
+                Long animalId = crearAnimal("Vaca Campero", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-reproductivo")
+                                .header("Authorization", "Bearer " + camperoToken))
+                                .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("GET estado-reproductivo - Admin ve el historial (bypass de establecimiento)")
+        @SuppressWarnings("null")
+        void historialReproductivo_comoAdmin_ok() throws Exception {
+                Long animalId = crearAnimal("Vaca Admin", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+
+                EstadoReproductivo e = new EstadoReproductivo();
+                e.setAnimal(animal);
+                e.setEstado(TipoReproductivo.VACIA);
+                e.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                e.setFechaRegistro(LocalDateTime.now());
+                estadoReproductivoRepository.save(e);
+                entityManager.flush();
+                entityManager.clear();
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-reproductivo")
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1));
+        }
+
+        @Test
+        @DisplayName("GET estado-reproductivo - Usuario de otro establecimiento recibe 403")
+        @SuppressWarnings("null")
+        void historialReproductivo_aislamientoPorEstablecimiento_forbidden() throws Exception {
+                Establecimiento est2 = new Establecimiento();
+                est2.setNombre("Estancia Ajena");
+                est2.setActivo(true);
+                est2.setFechaAlta(LocalDate.now());
+                est2.setEmpleados(new ArrayList<>());
+                est2 = establecimientoRepository.save(est2);
+
+                RodeoLote rodeo2 = new RodeoLote(est2);
+                rodeo2.setNombre("Rodeo Ajeno");
+                rodeo2 = rodeoLoteRepository.save(rodeo2);
+
+                Animal animalAjeno = new Animal(est2, rodeo2);
+                animalAjeno.setAlias("Vaca Ajena");
+                animalAjeno.setEstadoActual(EstadoAnimal.ACTIVO);
+                animalAjeno = animalRepository.save(animalAjeno);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalAjeno.getId() + "/estado-reproductivo")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isForbidden());
+        }
+
         private MockMultipartFile generateExcel(String[] headers, String[][] rows) throws Exception {
                 org.apache.poi.ss.usermodel.Workbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
                 org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("Animales");
@@ -1267,5 +1424,176 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
                                 .header("Authorization", "Bearer " + camperoToken))
                                 .andExpect(status().isForbidden());
+        }
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/estado-salud - Éxito (Productor)")
+        @SuppressWarnings("null")
+        void registrarEstadoSalud_exito() throws Exception {
+                Long animalId = crearAnimal("Vaca Enferma", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.ENFERMO);
+                request.setDiagnosticoNotas("Presenta fiebre");
+                request.setTratamientoIndicado("Antibioticos 500mg");
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.estado").value("ENFERMO"))
+                                .andExpect(jsonPath("$.diagnosticoNotas").value("Presenta fiebre"))
+                                .andExpect(jsonPath("$.origen").value("MANUAL"));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/estado-salud - Rechazo por rol incorrecto (Campero)")
+        @SuppressWarnings("null")
+        void registrarEstadoSalud_rechazoPorRolIncorrecto() throws Exception {
+                Long animalId = crearAnimal("Vaca Rol Incorrecto 2", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.SANO);
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + camperoToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/estado-salud - Aislamiento por establecimiento")
+        @SuppressWarnings("null")
+        void registrarEstadoSalud_aislamientoEstablecimiento() throws Exception {
+                // Crear un productor ajeno
+                Usuario otroProductor = new Usuario();
+                otroProductor.setEmail("otropsalud@vigia.dev");
+                otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroProductor.setNombre("Otro Productor Salud");
+                otroProductor.setRol(Rol.PRODUCTOR);
+                otroProductor.setActivo(true);
+                otroProductor = usuarioRepository.save(otroProductor);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Salud");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+                establecimientoRepository.save(otroEst);
+
+                String otroToken = getTokenFor("otropsalud@vigia.dev", "otro123");
+
+                Long animalId = crearAnimal("Vaca Establecimiento Ajeno Salud", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.SANO);
+
+                // Intento registrar estado de salud de animalId (del establecimientoId) usando el otroToken (de otroEst)
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + otroToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/estado-salud - Rechazo por estado ausente")
+        @SuppressWarnings("null")
+        void registrarEstadoSalud_rechazoPorEstadoAusente() throws Exception {
+                Long animalId = crearAnimal("Vaca Estado Ausente", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setDiagnosticoNotas("Notas sin estado");
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/estado-salud - Éxito: devuelve el historial")
+        @SuppressWarnings("null")
+        void listarEstadosSalud_exito() throws Exception {
+                Long animalId = crearAnimal("Vaca Historial Salud", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.EN_OBSERVACION);
+                request.setDiagnosticoNotas("Decaída");
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated());
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].estado").value("EN_OBSERVACION"))
+                                .andExpect(jsonPath("$[0].diagnosticoNotas").value("Decaída"))
+                                .andExpect(jsonPath("$[0].origen").value("MANUAL"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/estado-salud - Aislamiento por establecimiento")
+        @SuppressWarnings("null")
+        void listarEstadosSalud_aislamientoEstablecimiento() throws Exception {
+                Usuario otroProductor = new Usuario();
+                otroProductor.setEmail("otropsaludget@vigia.dev");
+                otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroProductor.setNombre("Otro Productor Salud Get");
+                otroProductor.setRol(Rol.PRODUCTOR);
+                otroProductor.setActivo(true);
+                usuarioRepository.save(otroProductor);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Salud Get");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+                establecimientoRepository.save(otroEst);
+
+                String otroToken = getTokenFor("otropsaludget@vigia.dev", "otro123");
+
+                Long animalId = crearAnimal("Vaca Ajena Historial Salud", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + otroToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id} - Incluye el último estado de salud manual")
+        @SuppressWarnings("null")
+        void getAnimalById_incluyeEstadoSalud() throws Exception {
+                Long animalId = crearAnimal("Vaca Con Salud", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.ENFERMO);
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated());
+
+                // Forzar recarga desde la BD (el test corre en una única transacción)
+                entityManager.flush();
+                entityManager.clear();
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.estadoSalud").value("ENFERMO"));
         }
 }

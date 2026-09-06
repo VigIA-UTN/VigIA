@@ -9,6 +9,7 @@ import { type AnimalMapa, getAnimalesMapa } from '../api/animalesApi';
 import { type AlertaResumenResponse, type AlertaResponse, getResumenAlertas } from '../api/alertaApi';
 import AnimalDetailSidebar from '../components/AnimalDetailSidebar';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
+import IntervencionFormPanel from '../components/IntervencionFormPanel';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -69,7 +70,7 @@ const alertaAltaIcon = new L.Icon({
 
 const CENTRO_CAMPO: [number, number] = [-34.6037, -58.3816];
 
-function MapUpdater({ center, trigger }: { center: [number, number], trigger: {lat: number, lng: number, t: number} | null }) {
+function MapUpdater({ center, trigger }: { center: [number, number], trigger: { lat: number, lng: number, t: number } | null }) {
   const map = useMap();
   const [lat, lng] = center;
   useEffect(() => {
@@ -101,7 +102,10 @@ export default function MapPage() {
   const [animales, setAnimales] = useState<AnimalMapa[]>([]);
   const [resumenAlertas, setResumenAlertas] = useState<AlertaResumenResponse | null>(null);
   const [selectedAnimalMap, setSelectedAnimalMap] = useState<AnimalMapa | null>(null);
-  const [flyToTrigger, setFlyToTrigger] = useState<{lat: number, lng: number, t: number} | null>(null);
+  const [flyToTrigger, setFlyToTrigger] = useState<{ lat: number, lng: number, t: number } | null>(null);
+  const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
+  // Guarda la alerta que dispara la intervención para que no se pierda cuando selectedAlertaMap se limpie
+  const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
 
   useEffect(() => {
     const fetchDatos = async () => {
@@ -128,7 +132,7 @@ export default function MapPage() {
 
     let isMounted = true;
     const token = useAuthStore.getState().token;
-    
+
     // Telemetry SSE
     const API_URL = import.meta.env.VITE_API_URL as string;
     let sseUrlTelemetria = `${API_URL}/animales/mapa/stream?establecimientoId=${selectedId}`;
@@ -176,7 +180,7 @@ export default function MapPage() {
       if (!isMounted) return;
       try {
         const newAlerta = JSON.parse(event.data) as AlertaResponse;
-        
+
         // Actualizar el array de alertas del animal
         setAnimales(prevAnimales => {
           return prevAnimales.map(animal => {
@@ -328,6 +332,15 @@ export default function MapPage() {
         <AlertSidebar onClose={() => setIsAlertsOpen(false)} externalAlert={selectedAlertaMap} />
       ) : null}
 
+      {/* Sidebar de Intervención */}
+      {isIntervencionOpen && intervencionAlerta && (
+        <IntervencionFormPanel
+          alerta={intervencionAlerta}
+          onClose={() => setIsIntervencionOpen(false)}
+          onSuccess={() => setIsIntervencionOpen(false)}
+        />
+      )}
+
       {/* Sidebar de Detalle de Animal */}
       {selectedAnimalMap && (
         <AnimalDetailSidebar
@@ -353,6 +366,10 @@ export default function MapPage() {
               ...a,
               alertasAnimal: a.alertasAnimal.map(al => al.id === id ? { ...al, estado } : al)
             })));
+          }}
+          onOpenIntervencion={() => {
+            setIntervencionAlerta(selectedAlertaMap);
+            setIsIntervencionOpen(true);
           }}
         />
       )}

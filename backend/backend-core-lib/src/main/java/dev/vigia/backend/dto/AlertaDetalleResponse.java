@@ -1,6 +1,7 @@
 package dev.vigia.backend.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.EstadoAlerta;
@@ -24,8 +25,9 @@ public class AlertaDetalleResponse {
     private DisparadorAlerta datoDisparador;
     private EstadoAlerta estadoActual;
     private String usuarioAccion;
-    private java.util.List<EstadoReproductivoResponse> ultimosEstadosReproductivos;
-
-    /** Solo alertas sanitarias (datoDisparador = SALUD); null para el resto. */
+    private List<EstadoReproductivoResponse> ultimosEstadosReproductivos;
+    private Double valorDetectado;
+    private Double valorUmbral;
+    private String descripcionDatoOrigen;
     private DetalleSanitarioResponse detalleSanitario;
 }

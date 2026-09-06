@@ -130,9 +130,11 @@ Si utiliza el plugin de PostgreSQL de Railway, este proveerá sus propias creden
 - `SPRING_RABBITMQ_PASSWORD`: Contraseña de RabbitMQ.
 
 #### 3. Backend (API y Worker)
-- `SPRING_PROFILES_ACTIVE`: `prod` (Para activar la configuración de producción).
+- `SPRING_PROFILES_ACTIVE`: **producción → dejar sin setear o `prod`.** El default de la app ya es `prod`, así que un redeploy nunca ejecuta el `DataInitializer` (que limpia y re-siembra la base). **Solo el entorno de `develop` debe setear `SPRING_PROFILES_ACTIVE=dev`** para volver a tener datos de prueba en cada deploy.
 - `CORS_ORIGINS`: URLs de su frontend en producción (ej. `https://vigia-frontend.up.railway.app`).
 - `TZ`: `America/Argentina/Buenos_Aires`
+
+> **Datos iniciales de producción:** la base de prod se puebla a mano con `infra/prod/seed_prod.sql` (y se limpia con `infra/prod/wipe_prod.sql`). Ver `infra/prod/README.md`.
 
 **Microservicios de Machine Learning (Usados por el Backend Worker):**
 Asegúrese de configurar las URLs apuntando a la red interna de Railway.

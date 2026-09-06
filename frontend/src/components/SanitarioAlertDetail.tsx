@@ -144,13 +144,10 @@ export default function SanitarioAlertDetail({ detalle }: { detalle: DetalleSani
         </h6>
         <div className="card border-0 shadow-sm rounded-4">
           <div className="card-body">
-            <div className="d-flex justify-content-between align-items-center mb-2">
+            <div className="d-flex justify-content-between align-items-center">
               <span className="text-muted" style={{ fontSize: '0.85rem' }}>Severidad</span>
               <SeveridadBadge severidad={detalle.severidad} />
             </div>
-            <p className="mb-0" style={{ color: '#2D3748', fontSize: '0.95rem' }}>
-              {detalle.descripcionDesvio || 'Se detectó un desvío respecto del perfil de referencia del animal.'}
-            </p>
           </div>
         </div>
       </div>

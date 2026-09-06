@@ -14,6 +14,7 @@ function formatFecha(iso: string) {
 interface Props {
   animalId: number;
   establecimientoId: number;
+  onOpenIntervencion: (alerta: AlertaResponse) => void;
 }
 
 /**
@@ -21,7 +22,7 @@ interface Props {
  * sanitarios detectados para el animal y abre la vista de detalle
  * ({@link AlertDetailSidebar}, que ramifica a la maqueta sanitaria).
  */
-export default function AnimalAlertasSanitarias({ animalId, establecimientoId }: Props) {
+export default function AnimalAlertasSanitarias({ animalId, establecimientoId, onOpenIntervencion }: Props) {
   const [alertas, setAlertas] = useState<AlertaResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AlertaResponse | null>(null);
@@ -98,6 +99,9 @@ export default function AnimalAlertasSanitarias({ animalId, establecimientoId }:
           mode="fixed"
           onClose={() => setSelected(null)}
           onActionComplete={handleActionComplete}
+          onOpenIntervencion={() => {
+            onOpenIntervencion(selected);
+          }}
         />
       )}
     </>

@@ -16,6 +16,7 @@ import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.DetalleSanitarioResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
@@ -258,6 +259,8 @@ public class AlertaServiceImpl implements AlertaService {
                         detalleSanitario = construirDetalleSanitario(alerta);
                 }
 
+                String descripcionDatoOrigen = construirDescripcionDatoOrigen(alerta, detalleSanitario);
+
                 return AlertaDetalleResponse.builder()
                                 .id(alerta.getId())
                                 .animalId(alerta.getAnimal().getId())
@@ -272,8 +275,56 @@ public class AlertaServiceImpl implements AlertaService {
                                 .estadoActual(alerta.getEstado())
                                 .usuarioAccion(usuarioAccionStr)
                                 .ultimosEstadosReproductivos(ultimosEstados)
+                                .valorDetectado(alerta.getValorDetectado())
+                                .valorUmbral(alerta.getValorUmbral())
+                                .descripcionDatoOrigen(descripcionDatoOrigen)
                                 .detalleSanitario(detalleSanitario)
                                 .build();
+        }
+
+        private String construirDescripcionDatoOrigen(Alerta alerta, DetalleSanitarioResponse detalleSanitario) {
+                if (detalleSanitario != null && detalleSanitario.getDescripcionDesvio() != null) {
+                        return detalleSanitario.getDescripcionDesvio();
+                }
+
+                Integer confianzaPct = formatConfianzaPct(alerta.getValorDetectado());
+                DisparadorAlerta disparador = alerta.getDisparador();
+
+                if (disparador == DisparadorAlerta.CELO) {
+                        if (confianzaPct != null) {
+                                return String.format(
+                                                "Se detectaron signos de celo en el comportamiento del animal "
+                                                                + "(mayor actividad y montas), con una confianza del %d%%.",
+                                                confianzaPct);
+                        }
+                        return "Se detectaron signos de celo a partir del patrón de comportamiento del animal.";
+                }
+
+                if (disparador == DisparadorAlerta.ABIGEATO) {
+                        if (confianzaPct != null) {
+                                return String.format(
+                                                "Se detectó un patrón de desplazamiento inusual del animal, distinto de su "
+                                                                + "movimiento habitual en el establecimiento, con una confianza del %d%%.",
+                                                confianzaPct);
+                        }
+                        return "Se detectó un patrón de desplazamiento inusual del animal, distinto de su "
+                                        + "movimiento habitual en el establecimiento.";
+                }
+
+                if (confianzaPct != null) {
+                        return String.format(
+                                        "El sistema detectó un comportamiento que se aparta de lo habitual para este animal, "
+                                                        + "con una confianza del %d%%.",
+                                        confianzaPct);
+                }
+                return "El sistema detectó un comportamiento que se aparta de lo habitual para este animal.";
+        }
+
+        private Integer formatConfianzaPct(Double valor) {
+                if (valor == null || valor < 0.0 || valor > 1.0) {
+                        return null;
+                }
+                return (int) Math.round(valor * 100.0);
         }
 
         private DetalleSanitarioResponse construirDetalleSanitario(Alerta alerta) {
@@ -374,36 +425,13 @@ public class AlertaServiceImpl implements AlertaService {
                 }
                 Alerta actualizado = alertaRepository.save(alerta);
 
-                if (nuevoEstado == EstadoAlerta.CONFIRMADA) {
-                        Intervencion intervencion = new Intervencion();
-                        intervencion.setAlerta(actualizado);
-                        intervencion.setAnimal(actualizado.getAnimal());
-                        intervencion.setInterventor(usuario);
-
-                        String descripcion = (notas != null && !notas.trim().isEmpty()) ? notas.trim()
-                                        : "Inseminación confirmada";
-                        intervencion.setDescripcion(descripcion);
-
-                        intervencion.setFechaHora(LocalDateTime.now());
-                        intervencionRepository.save(intervencion);
-                }
-
-                /*
-                 * String ventanaOptima = null;
-                 * if (actualizado.getVentanaInicioIns() != null &&
-                 * actualizado.getVentanaFinIns() != null) {
-                 * long horas = java.time.Duration.between(actualizado.getVentanaInicioIns(),
-                 * actualizado.getVentanaFinIns()).toHours();
-                 * ventanaOptima = horas + " horas";
-                 * }
-                 */
-
                 // Publicar evento para SSE
                 AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                                 .id(actualizado.getId())
                                 .animalId(actualizado.getAnimal().getId())
                                 .estado(actualizado.getEstado())
-                                .tipo(actualizado.getDisparador() != null ? actualizado.getDisparador().name() : actualizado.getTipo())
+                                .tipo(actualizado.getDisparador() != null ? actualizado.getDisparador().name()
+                                                : actualizado.getTipo())
                                 .tsGeneracion(actualizado.getTsGeneracion())
                                 .build();
                 rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
@@ -538,5 +566,57 @@ public class AlertaServiceImpl implements AlertaService {
                                 .proximaAVencer(proximaAVencer)
                                 .estado(estado)
                                 .build();
+        }
+
+        @Override
+        @org.springframework.transaction.annotation.Transactional
+        @SuppressWarnings("null")
+        public AlertaResponse intervenirAlerta(String emailUsuario, Long alertaId, IntervencionRequest request) {
+
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada"));
+
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(alerta.getAnimal().getEstablecimiento().getId()));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException("No tiene permiso para intervenir esta alerta");
+                }
+
+                if (alerta.getEstado() != EstadoAlerta.CONFIRMADA) {
+                        throw new IllegalArgumentException(
+                                        "La alerta debe estar confirmada antes de registrar una intervención.");
+                }
+
+                if (intervencionRepository.existsByAlertaId(alertaId)) {
+                        throw new IllegalArgumentException("Ya existe una intervención registrada para esta alerta.");
+                }
+
+                if (request.getDescripcion() == null || request.getDescripcion().trim().isEmpty()) {
+                        throw new IllegalArgumentException(
+                                        "La descripción es obligatoria para registrar una intervención.");
+                }
+
+                if (request.getTipo() == null) {
+                        throw new IllegalArgumentException(
+                                        "El tipo de intervención es obligatorio para registrar una intervención.");
+                }
+
+                Intervencion intervencion = new Intervencion();
+                intervencion.setAlerta(alerta);
+                intervencion.setAnimal(alerta.getAnimal());
+                intervencion.setInterventor(usuario);
+                intervencion.setDescripcion(request.getDescripcion().trim());
+                intervencion.setFechaHora(request.getFechaHora() != null ? request.getFechaHora() : LocalDateTime.now());
+                intervencion.setTipo(request.getTipo());
+                intervencionRepository.save(intervencion);
+
+                return this.toResponse(alerta);
         }
 }
