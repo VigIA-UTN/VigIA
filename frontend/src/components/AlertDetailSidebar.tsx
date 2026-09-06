@@ -217,6 +217,24 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           </div>
         ) : (
           <>
+            {/* Dato de origen — misma seccion para cualquier tipo de alerta */}
+            <div>
+              <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
+                <i className="bi bi-search"></i> Dato de origen
+              </h6>
+              <div className="card border-0 shadow-sm rounded-4">
+                <div className="card-body">
+                  <p className="m-0" style={{ color: '#2D3748', fontSize: '0.95rem' }}>
+                    {detalle?.descripcionDatoOrigen ||
+                      'El sistema detectó un comportamiento que se aparta de lo habitual para este animal.'}
+                  </p>
+                  <small className="text-muted d-block mt-2">
+                    <i className="bi bi-calendar-event me-1"></i>{detectedText}
+                  </small>
+                </div>
+              </div>
+            </div>
+
             {/* Detalle sanitario (solo alertas de SALUD) */}
             {isSanitaria && detSan && <SanitarioAlertDetail detalle={detSan} />}
 

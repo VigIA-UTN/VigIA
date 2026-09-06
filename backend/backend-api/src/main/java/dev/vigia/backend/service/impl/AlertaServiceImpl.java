@@ -287,36 +287,44 @@ public class AlertaServiceImpl implements AlertaService {
                         return detalleSanitario.getDescripcionDesvio();
                 }
 
-                Double valor = alerta.getValorDetectado();
-                Double umbral = alerta.getValorUmbral();
+                Integer confianzaPct = formatConfianzaPct(alerta.getValorDetectado());
                 DisparadorAlerta disparador = alerta.getDisparador();
 
                 if (disparador == DisparadorAlerta.CELO) {
-                        if (valor != null && umbral != null) {
+                        if (confianzaPct != null) {
                                 return String.format(
-                                                "Indicador de comportamiento reproductivo (celo) con valor %.2f, "
-                                                                + "por encima del umbral configurado de %.2f.",
-                                                valor, umbral);
+                                                "Se detectaron signos de celo en el comportamiento del animal "
+                                                                + "(mayor actividad y montas), con una confianza del %d%%.",
+                                                confianzaPct);
                         }
-                        return "Evento de celo detectado por el modelo de comportamiento reproductivo.";
+                        return "Se detectaron signos de celo a partir del patrón de comportamiento del animal.";
                 }
 
                 if (disparador == DisparadorAlerta.ABIGEATO) {
-                        if (valor != null && umbral != null) {
+                        if (confianzaPct != null) {
                                 return String.format(
-                                                "Indicador de desplazamiento geoespacial con valor %.2f, "
-                                                                + "por encima del umbral configurado de %.2f.",
-                                                valor, umbral);
+                                                "Se detectó un patrón de desplazamiento inusual del animal, distinto de su "
+                                                                + "movimiento habitual en el establecimiento, con una confianza del %d%%.",
+                                                confianzaPct);
                         }
-                        return "Movimiento geoespacial anómalo detectado respecto del comportamiento habitual del animal.";
+                        return "Se detectó un patrón de desplazamiento inusual del animal, distinto de su "
+                                        + "movimiento habitual en el establecimiento.";
                 }
 
-                if (valor != null && umbral != null) {
+                if (confianzaPct != null) {
                         return String.format(
-                                        "Valor detectado %.2f, por encima del umbral configurado de %.2f.",
-                                        valor, umbral);
+                                        "El sistema detectó un comportamiento que se aparta de lo habitual para este animal, "
+                                                        + "con una confianza del %d%%.",
+                                        confianzaPct);
                 }
-                return "Evento detectado por el sistema de monitoreo.";
+                return "El sistema detectó un comportamiento que se aparta de lo habitual para este animal.";
+        }
+
+        private Integer formatConfianzaPct(Double valor) {
+                if (valor == null || valor < 0.0 || valor > 1.0) {
+                        return null;
+                }
+                return (int) Math.round(valor * 100.0);
         }
 
         private DetalleSanitarioResponse construirDetalleSanitario(Alerta alerta) {

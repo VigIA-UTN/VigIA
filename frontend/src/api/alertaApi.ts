@@ -118,6 +118,11 @@ export interface AlertaDetalleResponse {
     fechaRegistro: string;
     registradoPor: string;
   }[];
+  /** Explicación en lenguaje natural del dato que originó la alerta (todos los tipos). */
+  descripcionDatoOrigen?: string | null;
+  /** Dato puntual y umbral superado. Se exponen por trazabilidad; la UI muestra solo la frase. */
+  valorDetectado?: number | null;
+  valorUmbral?: number | null;
   /** Presente solo para alertas sanitarias (datoDisparador === 'SALUD'). */
   detalleSanitario?: DetalleSanitario | null;
 }

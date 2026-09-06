@@ -95,7 +95,7 @@ public class AlertaServiceImplTest {
                 mockAlerta.setTsGeneracion(LocalDateTime.now());
                 mockAlerta.setEstado(EstadoAlerta.PENDIENTE);
                 mockAlerta.setDisparador(DisparadorAlerta.CELO);
-                mockAlerta.setValorDetectado(98.5);
+                mockAlerta.setValorDetectado(0.85);
                 mockAlerta.setVentanaInicioIns(LocalDateTime.now().plusHours(2));
                 mockAlerta.setVentanaFinIns(LocalDateTime.now().plusHours(14));
         }
@@ -306,8 +306,8 @@ public class AlertaServiceImplTest {
 
         @Test
         @SuppressWarnings("null")
-        void obtenerDetalleAlerta_CELO_exponeValorUmbralYDescripcionGenerica() {
-                // mockAlerta (setUp) ya es CELO con valorDetectado=98.5 y sin valorUmbral
+        void obtenerDetalleAlerta_CELO_exponeDescripcionNarrativa() {
+                // mockAlerta (setUp) ya es CELO con valorDetectado=0.85 (confianza del modelo)
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
@@ -317,17 +317,14 @@ public class AlertaServiceImplTest {
 
                 assertNull(result.getDetalleSanitario());
                 assertEquals(DisparadorAlerta.CELO, result.getDatoDisparador());
-                assertEquals(98.5, result.getValorDetectado(), 0.001);
+                // el dato puntual se sigue exponiendo por trazabilidad...
+                assertEquals(0.85, result.getValorDetectado(), 0.001);
                 assertNull(result.getValorUmbral());
+                // ...pero la descripción es en lenguaje natural: menciona el celo y la
+                // confianza como porcentaje, sin decimales crudos ni umbrales.
                 assertNotNull(result.getDescripcionDatoOrigen());
-                assertFalse(result.getDescripcionDatoOrigen().isBlank());
-
-                // con umbral seteado, la descripción incluye ambos valores
-                mockAlerta.setValorUmbral(80.0);
-                AlertaDetalleResponse resultConUmbral = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID,
-                                ALERTA_ID);
-                assertTrue(resultConUmbral.getDescripcionDatoOrigen().contains("98"));
-                assertTrue(resultConUmbral.getDescripcionDatoOrigen().contains("80"));
+                assertTrue(result.getDescripcionDatoOrigen().toLowerCase().contains("celo"));
+                assertTrue(result.getDescripcionDatoOrigen().contains("85%"));
         }
 
         @Test
