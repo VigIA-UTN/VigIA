@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
-import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal } from '../api/animalesApi';
+import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
@@ -285,15 +285,18 @@ export default function AnimalesPage() {
     const filteredAnimales = animales.filter(a => {
         // Filter by selected establecimiento
         if (selectedId && a.establecimientoId !== selectedId) return false;
-        if (activeTab === 'salud' && a.estadoActual !== 'CON_ALERTA') return false;
+        if (activeTab === 'salud' && a.estadoSalud !== 'EN_OBSERVACION' && a.estadoSalud !== 'ENFERMO') return false;
         if (!searchTerm) return true;
         const q = searchTerm.toLowerCase();
+        const matchEstado = (v: string | null | undefined, labels: Record<string, string>) =>
+            !!v && (v.toLowerCase().includes(q) || (labels[v] ?? '').toLowerCase().includes(q));
         return (
             (a.idCaravanaOficial?.toLowerCase().includes(q) ?? false) ||
             (a.alias?.toLowerCase().includes(q) ?? false) ||
             (a.rodeoLoteNombre?.toLowerCase().includes(q) ?? false) ||
             (a.estadoActual?.toLowerCase().includes(q) ?? false) ||
-            (a.estadoReproductivo?.toLowerCase().includes(q) ?? false)
+            matchEstado(a.estadoReproductivo, ESTADO_REPRODUCTIVO_LABEL) ||
+            matchEstado(a.estadoSalud, ESTADO_SALUD_LABEL)
         );
     });
 
@@ -427,6 +430,11 @@ export default function AnimalesPage() {
                                                         Estado <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoActual' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
+                                                <th onClick={() => handleSort('estadoSalud')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
+                                                    <div className="d-flex align-items-center justify-content-center">
+                                                        Salud <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoSalud' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                    </div>
+                                                </th>
                                                 <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
                                                     <div className="d-flex align-items-center justify-content-center">
                                                         Reproductivo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
@@ -440,7 +448,7 @@ export default function AnimalesPage() {
                                 <tbody>
                                     {sortedAnimales.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="text-center py-4 text-muted">
+                                            <td colSpan={9} className="text-center py-4 text-muted">
                                                 No se encontraron animales.
                                             </td>
                                         </tr >
@@ -456,7 +464,7 @@ export default function AnimalesPage() {
                                                                 <span className={`estado-badge-celo ${a.estadoReproductivo === 'GESTANTE' ? 'celo-gestante' :
                                                                     a.estadoReproductivo === 'CELO' ? 'celo-celo' :
                                                                         a.estadoReproductivo === 'VACIA' ? 'celo-vacia' : 'celo-otro'
-                                                                    }`}>{a.estadoReproductivo}</span>
+                                                                    }`}>{ESTADO_REPRODUCTIVO_LABEL[a.estadoReproductivo] ?? a.estadoReproductivo}</span>
                                                             ) : '—'}
                                                         </td>
                                                         <td className="col-mobile-hide">{formatFecha(a.fechaUltimoParto ?? null)}</td>
@@ -469,11 +477,19 @@ export default function AnimalesPage() {
                                                         <td className="col-mobile-hide">{a.rodeoLoteNombre || '—'}</td>
                                                         <td className="text-center"><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
                                                         <td className="text-center col-mobile-hide">
+                                                            {a.estadoSalud ? (
+                                                                <span className={`badge ${a.estadoSalud === 'SANO' ? 'bg-success' :
+                                                                    a.estadoSalud === 'ENFERMO' ? 'bg-danger' :
+                                                                        a.estadoSalud === 'EN_OBSERVACION' ? 'bg-warning text-dark' : 'bg-secondary'
+                                                                    }`}>{ESTADO_SALUD_LABEL[a.estadoSalud] ?? a.estadoSalud}</span>
+                                                            ) : '—'}
+                                                        </td>
+                                                        <td className="text-center col-mobile-hide">
                                                             {a.estadoReproductivo ? (
                                                                 <span className={`badge ${a.estadoReproductivo === 'GESTANTE' ? 'bg-success' :
                                                                     a.estadoReproductivo === 'CELO' ? 'bg-danger' :
                                                                         a.estadoReproductivo === 'VACIA' ? 'bg-secondary' : 'bg-info'
-                                                                    }`}>{a.estadoReproductivo}</span>
+                                                                    }`}>{ESTADO_REPRODUCTIVO_LABEL[a.estadoReproductivo] ?? a.estadoReproductivo}</span>
                                                             ) : '—'}
                                                         </td>
                                                     </>

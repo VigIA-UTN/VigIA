@@ -3,20 +3,24 @@ package dev.vigia.backend.dto;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-import dev.vigia.backend.model.OrigenEstado;
-import dev.vigia.backend.model.TipoEstadoSalud;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class EstadoSaludResponse {
+
     private Long id;
-    private TipoEstadoSalud estado;
+    private Long animalId;
+    private String estado;
     private LocalDate fechaRevision;
     private String diagnosticoNotas;
     private String tratamientoIndicado;
-    private OrigenEstado origen;
+    private String origen;
     private LocalDateTime fechaRegistro;
-    private String veterinarioNombre;
+    private String registradoPor;
 }

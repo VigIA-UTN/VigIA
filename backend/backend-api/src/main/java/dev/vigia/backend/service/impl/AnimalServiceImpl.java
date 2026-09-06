@@ -301,6 +301,10 @@ public class AnimalServiceImpl implements AnimalService {
                                 .findFirst()
                                 .orElse(null);
 
+                EstadoSalud ultimoEstadoSalud = animal.getEstadosSalud().stream()
+                                .findFirst()
+                                .orElse(null);
+
                 AnimalResponse.AnimalResponseBuilder builder = AnimalResponse.builder()
                                 .id(animal.getId())
                                 .idCaravanaOficial(animal.getIdCaravanaOficial())
@@ -319,7 +323,8 @@ public class AnimalServiceImpl implements AnimalService {
                                 .estadoReproductivo(ultimoEstado != null ? ultimoEstado.getEstado() : null)
                                 .fechaUltimoParto(ultimoEstado != null ? ultimoEstado.getFechaUltParto() : null)
                                 .fechaUltimaInseminacion(
-                                                ultimoEstado != null ? ultimoEstado.getFechaUltInseminacion() : null);
+                                                ultimoEstado != null ? ultimoEstado.getFechaUltInseminacion() : null)
+                                .estadoSalud(ultimoEstadoSalud != null ? ultimoEstadoSalud.getEstado() : null);
 
                 calcularCalibracion(animal, builder);
                 return builder.build();
@@ -963,22 +968,43 @@ public class AnimalServiceImpl implements AnimalService {
                 return mapToEstadoSaludResponse(savedEstado);
         }
 
-        private EstadoSaludResponse mapToEstadoSaludResponse(EstadoSalud estadoSalud) {
-                String veterinarioNombre = null;
-                if (estadoSalud.getUsuarioVeterinario() != null) {
-                        veterinarioNombre = estadoSalud.getUsuarioVeterinario().getNombre() + " "
-                                        + estadoSalud.getUsuarioVeterinario().getApellido();
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public List<EstadoSaludResponse> listarEstadosSalud(Long animalId, String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimiento = animal.getEstablecimiento();
+
+                boolean tieneAcceso = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo())
+                                || usuario.getRol().equals(Rol.ADMINISTRADOR);
+
+                if (!tieneAcceso) {
+                        throw new AccessDeniedException(
+                                        "No tiene acceso a los datos de este animal.");
                 }
 
+                return estadoSaludRepository.findByAnimalIdOrderByFechaRegistroDesc(animalId).stream()
+                                .map(this::mapToEstadoSaludResponse)
+                                .collect(Collectors.toList());
+        }
+
+        private EstadoSaludResponse mapToEstadoSaludResponse(EstadoSalud estadoSalud) {
                 return EstadoSaludResponse.builder()
                                 .id(estadoSalud.getId())
-                                .estado(estadoSalud.getEstado())
+                                .animalId(estadoSalud.getAnimal() != null ? estadoSalud.getAnimal().getId() : null)
+                                .estado(estadoSalud.getEstado() != null ? estadoSalud.getEstado().name() : null)
                                 .fechaRevision(estadoSalud.getFechaRevision())
                                 .diagnosticoNotas(estadoSalud.getDiagnosticoNotas())
                                 .tratamientoIndicado(estadoSalud.getTratamientoIndicado())
-                                .origen(estadoSalud.getOrigen())
+                                .origen(estadoSalud.getOrigen() != null ? estadoSalud.getOrigen().name() : null)
                                 .fechaRegistro(estadoSalud.getFechaRegistro())
-                                .veterinarioNombre(veterinarioNombre)
+                                .registradoPor(formatNombreUsuario(estadoSalud.getUsuarioVeterinario()))
                                 .build();
         }
 }

@@ -1515,4 +1515,85 @@ class AnimalControllerTest {
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest());
         }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/estado-salud - Éxito: devuelve el historial")
+        @SuppressWarnings("null")
+        void listarEstadosSalud_exito() throws Exception {
+                Long animalId = crearAnimal("Vaca Historial Salud", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.EN_OBSERVACION);
+                request.setDiagnosticoNotas("Decaída");
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated());
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].estado").value("EN_OBSERVACION"))
+                                .andExpect(jsonPath("$[0].diagnosticoNotas").value("Decaída"))
+                                .andExpect(jsonPath("$[0].origen").value("MANUAL"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/estado-salud - Aislamiento por establecimiento")
+        @SuppressWarnings("null")
+        void listarEstadosSalud_aislamientoEstablecimiento() throws Exception {
+                Usuario otroProductor = new Usuario();
+                otroProductor.setEmail("otropsaludget@vigia.dev");
+                otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroProductor.setNombre("Otro Productor Salud Get");
+                otroProductor.setRol(Rol.PRODUCTOR);
+                otroProductor.setActivo(true);
+                usuarioRepository.save(otroProductor);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Salud Get");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+                establecimientoRepository.save(otroEst);
+
+                String otroToken = getTokenFor("otropsaludget@vigia.dev", "otro123");
+
+                Long animalId = crearAnimal("Vaca Ajena Historial Salud", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + otroToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id} - Incluye el último estado de salud manual")
+        @SuppressWarnings("null")
+        void getAnimalById_incluyeEstadoSalud() throws Exception {
+                Long animalId = crearAnimal("Vaca Con Salud", establecimientoId, rodeoLoteId);
+
+                dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
+                request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.ENFERMO);
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated());
+
+                // Forzar recarga desde la BD (el test corre en una única transacción)
+                entityManager.flush();
+                entityManager.clear();
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.estadoSalud").value("ENFERMO"));
+        }
 }

@@ -3,6 +3,15 @@ import axiosClient from './axiosClient';
 
 export type EstadoAnimal = 'ACTIVO' | 'CON_ALERTA' | 'INACTIVO';
 
+export type TipoEstadoSalud = 'SANO' | 'EN_OBSERVACION' | 'ENFERMO';
+
+/** Etiquetas legibles para los valores de estado de salud (evita mostrar el enum crudo). */
+export const ESTADO_SALUD_LABEL: Record<string, string> = {
+  SANO: 'Sano',
+  EN_OBSERVACION: 'En observación',
+  ENFERMO: 'Enfermo',
+};
+
 export interface AnimalResponse {
   id: number;
   idCaravanaOficial: string | null;
@@ -17,6 +26,7 @@ export interface AnimalResponse {
   estadoReproductivo?: string | null;
   fechaUltimoParto?: string | null;
   fechaUltimaInseminacion?: string | null;
+  estadoSalud?: TipoEstadoSalud | null;
   enCalibracion?: boolean;
   diasRestantesCalibracion?: number;
 }
@@ -130,6 +140,17 @@ export type TipoReproductivo =
   | 'INSEMINADA'
   | 'PARIDA';
 
+/** Etiquetas legibles para los valores de estado reproductivo (evita mostrar el enum crudo). */
+export const ESTADO_REPRODUCTIVO_LABEL: Record<string, string> = {
+  VACIA: 'Vacía',
+  GESTANTE: 'Gestante',
+  CELO: 'Celo',
+  ANESTRO: 'Anestro',
+  POSIBLE_CELO: 'Posible celo',
+  INSEMINADA: 'Inseminada',
+  PARIDA: 'Parida',
+};
+
 export interface EstadoReproductivoRequest {
   estado: TipoReproductivo;
   fechaUltimoParto?: string | null;
@@ -205,5 +226,43 @@ export interface AnimalMetricaResponse {
 
 export async function getMetricasAnimal(animalId: number): Promise<AnimalMetricaResponse[]> {
   const response = await axiosClient.get<AnimalMetricaResponse[]>(`/animales/${animalId}/metricas`);
+  return response.data;
+}
+
+export interface EstadoSaludRequest {
+  estado: TipoEstadoSalud;
+  diagnosticoNotas?: string | null;
+  tratamientoIndicado?: string | null;
+  /** YYYY-MM-DD. Si es null/undefined, el backend usa la fecha de hoy. */
+  fecha?: string | null;
+}
+
+export interface EstadoSaludResponse {
+  id: number;
+  animalId: number;
+  estado: string | null;
+  fechaRevision: string | null;
+  diagnosticoNotas: string | null;
+  tratamientoIndicado: string | null;
+  origen: string | null;
+  fechaRegistro: string;
+  registradoPor: string | null;
+}
+
+export async function registrarEstadoSalud(
+  animalId: number,
+  data: EstadoSaludRequest
+): Promise<EstadoSaludResponse> {
+  const response = await axiosClient.post<EstadoSaludResponse>(
+    `/animales/${animalId}/estado-salud`,
+    data
+  );
+  return response.data;
+}
+
+export async function getHistorialSalud(animalId: number): Promise<EstadoSaludResponse[]> {
+  const response = await axiosClient.get<EstadoSaludResponse[]>(
+    `/animales/${animalId}/estado-salud`
+  );
   return response.data;
 }

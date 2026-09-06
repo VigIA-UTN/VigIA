@@ -7,11 +7,17 @@ import {
     getHistorialEstados,
     registrarEstadoReproductivo,
     editarEstadoReproductivo,
+    getHistorialSalud,
+    registrarEstadoSalud,
+    ESTADO_REPRODUCTIVO_LABEL,
+    ESTADO_SALUD_LABEL,
     type AnimalResponse,
     type AnimalRequest,
     type EstadoReproductivoResponse,
     type EstadoReproductivoRequest,
     type TipoReproductivo,
+    type TipoEstadoSalud,
+    type EstadoSaludResponse,
     getIntervenciones,
     type IntervencionResponse
 } from '../api/animalesApi';
@@ -25,6 +31,25 @@ import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import type { AlertaResponse } from '../api/alertaApi';
 
 const TIPOS_REPRODUCTIVOS: TipoReproductivo[] = ['VACIA', 'GESTANTE', 'CELO', 'ANESTRO'];
+
+const TIPOS_ESTADO_SALUD: TipoEstadoSalud[] = ['SANO', 'EN_OBSERVACION', 'ENFERMO'];
+
+function estadoSaludBadge(estado: string | null | undefined) {
+    if (!estado) return <span className="badge bg-secondary">—</span>;
+    const map: Record<string, string> = {
+        SANO: 'bg-success',
+        EN_OBSERVACION: 'bg-warning text-dark',
+        ENFERMO: 'bg-danger',
+    };
+    return <Badge bg="" className={`${map[estado] || 'bg-secondary'}`}>{ESTADO_SALUD_LABEL[estado] ?? estado}</Badge>;
+}
+
+interface SaludForm {
+    estado: TipoEstadoSalud | '';
+    diagnosticoNotas: string;
+    tratamientoIndicado: string;
+    fecha: string;
+}
 
 const INTERVENCION_TIPO_LABELS: Record<string, string> = {
     TRATAMIENTO: 'Tratamiento',
@@ -45,7 +70,7 @@ function estadoReproductivoBadge(estado: string | null | undefined) {
         INSEMINADA: 'bg-primary',
         PARIDA: 'bg-success',
     };
-    return <Badge bg="" className={`${map[estado] || 'bg-secondary'}`}>{estado}</Badge>;
+    return <Badge bg="" className={`${map[estado] || 'bg-secondary'}`}>{ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado}</Badge>;
 }
 
 const TIPO_EVENTO_LABEL: Record<string, string> = {
@@ -71,6 +96,13 @@ const EMPTY_ESTADO_FORM: EstadoReproductivoRequest = {
     estado: 'VACIA',
     fechaUltimoParto: null,
     fechaUltimaInseminacion: null,
+};
+
+const EMPTY_SALUD_FORM: SaludForm = {
+    estado: '',
+    diagnosticoNotas: '',
+    tratamientoIndicado: '',
+    fecha: '',
 };
 
 export default function AnimalDetailPage() {
@@ -105,6 +137,17 @@ export default function AnimalDetailPage() {
     const [estadoFormError, setEstadoFormError] = useState<string | null>(null);
     const [estadoSuccess, setEstadoSuccess] = useState<string | null>(null);
 
+    // Historial de estados de salud
+    const [saludHistorial, setSaludHistorial] = useState<EstadoSaludResponse[]>([]);
+    const [loadingSalud, setLoadingSalud] = useState(false);
+
+    // Modal de estado de salud
+    const [showSaludModal, setShowSaludModal] = useState(false);
+    const [saludForm, setSaludForm] = useState<SaludForm>(EMPTY_SALUD_FORM);
+    const [submittingSalud, setSubmittingSalud] = useState(false);
+    const [saludFormError, setSaludFormError] = useState<string | null>(null);
+    const [saludSuccess, setSaludSuccess] = useState<string | null>(null);
+
     // Tab state — 'actividad' is the default
     const [activeTab, setActiveTab] = useState<'actividad' | 'ficha'>('actividad');
 
@@ -136,6 +179,18 @@ export default function AnimalDetailPage() {
         }
     };
 
+    const fetchSalud = async (animalId: number) => {
+        setLoadingSalud(true);
+        try {
+            const data = await getHistorialSalud(animalId);
+            setSaludHistorial(data);
+        } catch {
+            // no-op: historial de salud is optional
+        } finally {
+            setLoadingSalud(false);
+        }
+    };
+
     useEffect(() => {
         if (!id) return;
         (async () => {
@@ -159,6 +214,7 @@ export default function AnimalDetailPage() {
 
                 fetchHistorial(data.id);
                 fetchIntervencionesData(data.id);
+                fetchSalud(data.id);
             } catch (err) {
                 const e = err as { response?: { data?: { message?: string } } };
                 setError(e.response?.data?.message || 'Error al cargar la ficha del animal.');
@@ -283,6 +339,64 @@ export default function AnimalDetailPage() {
             );
         } finally {
             setSubmittingEstado(false);
+        }
+    };
+
+    const openNuevoSaludModal = () => {
+        setSaludForm({ ...EMPTY_SALUD_FORM, fecha: new Date().toISOString().split('T')[0] });
+        setSaludFormError(null);
+        setSaludSuccess(null);
+        setShowSaludModal(true);
+    };
+
+    const handleSaludFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setSaludForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSubmitSalud = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!id) return;
+        setSaludFormError(null);
+        setSaludSuccess(null);
+
+        if (!saludForm.estado) {
+            setSaludFormError('El estado general es obligatorio.');
+            return;
+        }
+
+        setSubmittingSalud(true);
+        try {
+            await registrarEstadoSalud(Number(id), {
+                estado: saludForm.estado,
+                diagnosticoNotas: saludForm.diagnosticoNotas.trim() || null,
+                tratamientoIndicado: saludForm.tratamientoIndicado.trim() || null,
+                fecha: saludForm.fecha || null,
+            });
+            setSaludSuccess('Estado de salud registrado correctamente.');
+            try {
+                const [updatedAnimal, updatedSalud] = await Promise.all([
+                    getAnimalById(Number(id)),
+                    getHistorialSalud(Number(id)),
+                ]);
+                setAnimal(updatedAnimal);
+                setSaludHistorial(updatedSalud);
+            } catch {
+                await fetchSalud(Number(id));
+            }
+            setTimeout(() => {
+                setShowSaludModal(false);
+                setSaludSuccess(null);
+            }, 1200);
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setSaludFormError(
+                typeof e.response?.data === 'string'
+                    ? e.response.data
+                    : e.response?.data?.message || 'Error al guardar el estado de salud.'
+            );
+        } finally {
+            setSubmittingSalud(false);
         }
     };
 
@@ -485,6 +599,7 @@ export default function AnimalDetailPage() {
                                                 <li><strong>Rodeo/Lote:</strong> {animal.rodeoLoteNombre || (animal.rodeoLoteId ? `#${String(animal.rodeoLoteId).padStart(2, '0')}` : '—')}</li>
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
                                                 <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
+                                                <li><strong>Estado de Salud:</strong> {estadoSaludBadge(saludHistorial[0]?.estado ?? animal.estadoSalud)}</li>
                                             </ul>
                                         </Col>
                                     </Row>
@@ -566,6 +681,61 @@ export default function AnimalDetailPage() {
                         </Card.Body>
                     </Card>
 
+                    {/* ── Sección Estado de Salud ── */}
+                    <Card className="shadow-sm border-0 animal-card mt-4">
+                        <Card.Body>
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h4 className="section-title mb-0">Estado de Salud</h4>
+                                {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
+                                    <Button className="btn-vigia-success btn-sm px-3" onClick={openNuevoSaludModal}>
+                                        <i className="bi bi-plus-lg me-1" /> Registrar estado
+                                    </Button>
+                                )}
+                            </div>
+
+                            {loadingSalud ? (
+                                <div className="text-center py-3">
+                                    <Spinner animation="border" size="sm" style={{ color: '#1E3A5F' }} />
+                                </div>
+                            ) : saludHistorial.length === 0 ? (
+                                <p className="text-muted text-center py-3">Sin registros de salud aún.</p>
+                            ) : (
+                                <div className="table-responsive">
+                                    <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
+                                        <thead>
+                                            <tr>
+                                                <th>Fecha Revisión</th>
+                                                <th>Estado</th>
+                                                <th>Diagnóstico / Notas</th>
+                                                <th>Tratamiento</th>
+                                                <th>Origen</th>
+                                                <th>Registrado por</th>
+                                                <th>Fecha Registro</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {saludHistorial.map((s, idx) => (
+                                                <tr key={s.id} className={idx === 0 ? 'fw-semibold' : ''}>
+                                                    <td>{formatFechaLocal(s.fechaRevision)}</td>
+                                                    <td>{estadoSaludBadge(s.estado)}</td>
+                                                    <td>{s.diagnosticoNotas || '—'}</td>
+                                                    <td>{s.tratamientoIndicado || '—'}</td>
+                                                    <td>
+                                                        <span className={`badge ${s.origen === 'MANUAL' ? 'bg-primary' : s.origen === 'AUTOMATICO' ? 'bg-info' : 'bg-secondary'}`}>
+                                                            {s.origen || '—'}
+                                                        </span>
+                                                    </td>
+                                                    <td>{s.registradoPor || '—'}</td>
+                                                    <td>{formatDateTime(s.fechaRegistro)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </Card.Body>
+                    </Card>
+
                     {/* ── Sección Intervenciones ── */}
                     <Card className="shadow-sm border-0 animal-card mt-4">
                         <Card.Body>
@@ -626,7 +796,7 @@ export default function AnimalDetailPage() {
                             <Form.Label>Estado Reproductivo*</Form.Label>
                             <Form.Select name="estado" value={estadoForm.estado} onChange={handleEstadoFormChange} required>
                                 {TIPOS_REPRODUCTIVOS.map(t => (
-                                    <option key={t} value={t}>{t}</option>
+                                    <option key={t} value={t}>{ESTADO_REPRODUCTIVO_LABEL[t] ?? t}</option>
                                 ))}
                             </Form.Select>
                         </Form.Group>
@@ -662,6 +832,73 @@ export default function AnimalDetailPage() {
                         {submittingEstado
                             ? <Spinner as="span" animation="border" size="sm" />
                             : editingEstado ? 'Actualizar' : 'Registrar'
+                        }
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* ── Modal Registrar Estado de Salud ── */}
+            <Modal show={showSaludModal} onHide={() => setShowSaludModal(false)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Registrar Estado de Salud</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {saludFormError && <Alert variant="danger">{saludFormError}</Alert>}
+                    {saludSuccess && <Alert variant="success">{saludSuccess}</Alert>}
+                    <Form onSubmit={handleSubmitSalud} id="form-estado-salud">
+                        <Form.Group className="mb-3">
+                            <Form.Label>Fecha de revisión</Form.Label>
+                            <Form.Control
+                                type="date"
+                                name="fecha"
+                                value={saludForm.fecha}
+                                onChange={handleSaludFormChange}
+                                max={new Date().toISOString().split('T')[0]}
+                            />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Estado General*</Form.Label>
+                            <Form.Select name="estado" value={saludForm.estado} onChange={handleSaludFormChange} required>
+                                <option value="" disabled>Seleccioná un estado</option>
+                                {TIPOS_ESTADO_SALUD.map(t => (
+                                    <option key={t} value={t}>{ESTADO_SALUD_LABEL[t] ?? t}</option>
+                                ))}
+                            </Form.Select>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Diagnóstico / Notas</Form.Label>
+                            <Form.Control
+                                as="textarea"
+                                rows={3}
+                                name="diagnosticoNotas"
+                                value={saludForm.diagnosticoNotas}
+                                onChange={handleSaludFormChange}
+                                maxLength={1000}
+                            />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Tratamiento indicado</Form.Label>
+                            <Form.Control
+                                as="textarea"
+                                rows={2}
+                                name="tratamientoIndicado"
+                                value={saludForm.tratamientoIndicado}
+                                onChange={handleSaludFormChange}
+                                maxLength={1000}
+                            />
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button
+                        type="submit"
+                        form="form-estado-salud"
+                        disabled={submittingSalud || !!saludSuccess || !saludForm.estado}
+                        className="btn-guardar-animal"
+                    >
+                        {submittingSalud
+                            ? <Spinner as="span" animation="border" size="sm" />
+                            : 'Registrar'
                         }
                     </Button>
                 </Modal.Footer>

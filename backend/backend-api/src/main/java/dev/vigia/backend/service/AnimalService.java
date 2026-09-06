@@ -45,6 +45,8 @@ public interface AnimalService {
         EstadoSaludResponse registrarEstadoSalud(Long animalId, String emailProductor,
                         EstadoSaludRequest request);
 
+        List<EstadoSaludResponse> listarEstadosSalud(Long animalId, String emailUsuario);
+
         CargaMasivaEstadoResponse cargarEstadosMasivo(MultipartFile file, Long establecimientoId, String emailProductor)
                         throws IOException;
 
