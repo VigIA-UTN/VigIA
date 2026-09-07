@@ -874,14 +874,14 @@ class AnimalControllerTest {
         // =========================================================================
 
         @Test
-        @DisplayName("GET estado-reproductivo - Consolida celo automático, estado manual e inseminación, ordenado desc")
+        @DisplayName("GET estado-reproductivo - Sale íntegro de estados_reproductivos, ordenado desc")
         @SuppressWarnings("null")
-        void historialReproductivo_consolidaLasTresFuentes_ordenadoDesc() throws Exception {
+        void historialReproductivo_soloEstadosReproductivos_ordenadoDesc() throws Exception {
                 Long animalId = crearAnimal("Vaca Historial", establecimientoId, rodeoLoteId);
                 Animal animal = animalRepository.findById(animalId).orElseThrow();
                 Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
 
-                // 1) Estado manual (parto) - el más antiguo
+                // 1) Parto (estado PARIDA manual) - el más antiguo
                 EstadoReproductivo manual = new EstadoReproductivo();
                 manual.setAnimal(animal);
                 manual.setEstado(TipoReproductivo.PARIDA);
@@ -899,16 +899,17 @@ class AnimalControllerTest {
                 automatico.setFechaRegistro(LocalDateTime.now().minusDays(2));
                 estadoReproductivoRepository.save(automatico);
 
-                // 3) Inseminación registrada como Intervencion - la más reciente
-                Intervencion insem = new Intervencion();
+                // 3) Inseminación: fila INSEMINADA (la crea intervenirAlerta) - la más reciente
+                EstadoReproductivo insem = new EstadoReproductivo();
                 insem.setAnimal(animal);
-                insem.setInterventor(productor);
-                insem.setDescripcion("IATF");
-                insem.setTipo(TipoIntervencion.INSEMINACION);
-                insem.setFechaHora(LocalDateTime.now().minusDays(1));
-                intervencionRepository.save(insem);
+                insem.setEstado(TipoReproductivo.INSEMINADA);
+                insem.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                insem.setUsuarioRegistrador(productor);
+                insem.setFechaUltInseminacion(LocalDate.now().minusDays(1));
+                insem.setFechaRegistro(LocalDateTime.now().minusDays(1));
+                estadoReproductivoRepository.save(insem);
 
-                // Intervención de otro tipo: NO debe aparecer en el historial reproductivo
+                // Intervención suelta: NO debe aparecer (el historial ya no fusiona intervenciones)
                 Intervencion revision = new Intervencion();
                 revision.setAnimal(animal);
                 revision.setInterventor(productor);
@@ -924,22 +925,80 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.length()").value(3))
-                                .andExpect(jsonPath("$[0].tipoEvento").value("INSEMINACION"))
-                                .andExpect(jsonPath("$[0].origenNormalizado").value("MANUAL"))
+                                .andExpect(jsonPath("$[0].estado").value("INSEMINADA"))
+                                .andExpect(jsonPath("$[0].origen").value("MANUAL"))
                                 .andExpect(jsonPath("$[0].registradoPor").value("Productor"))
-                                .andExpect(jsonPath("$[1].tipoEvento").value("CELO_AUTOMATICO"))
+                                .andExpect(jsonPath("$[1].estado").value("POSIBLE_CELO"))
                                 .andExpect(jsonPath("$[1].origen").value("AUTOMATICO"))
-                                .andExpect(jsonPath("$[1].origenNormalizado").value("AUTOMATICO"))
                                 .andExpect(jsonPath("$[1].registradoPor").isEmpty())
-                                .andExpect(jsonPath("$[2].tipoEvento").value("ESTADO_REPRODUCTIVO"))
                                 .andExpect(jsonPath("$[2].estado").value("PARIDA"))
-                                .andExpect(jsonPath("$[2].origenNormalizado").value("MANUAL"));
+                                .andExpect(jsonPath("$[2].fechaUltimoParto").value("2026-01-10"))
+                                .andExpect(jsonPath("$[2].origen").value("MANUAL"))
+                                .andExpect(jsonPath("$[2].registradoPor").value("Productor"));
         }
 
         @Test
-        @DisplayName("GET estado-reproductivo - Carga masiva se normaliza a origen MANUAL")
+        @DisplayName("GET estado-reproductivo - Ordenado desc; mismo estado con distinto origen (manual vs automático)")
         @SuppressWarnings("null")
-        void historialReproductivo_cargaMasiva_origenNormalizadoManual() throws Exception {
+        void historialReproductivo_ordenDescYOrigen() throws Exception {
+                Long animalId = crearAnimal("Vaca Eventos", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
+
+                EstadoReproductivo gestante = new EstadoReproductivo();
+                gestante.setAnimal(animal);
+                gestante.setEstado(TipoReproductivo.GESTANTE);
+                gestante.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                gestante.setUsuarioRegistrador(productor);
+                gestante.setFechaRegistro(LocalDateTime.now().minusDays(30));
+                estadoReproductivoRepository.save(gestante);
+
+                // Celo cargado a mano -> origen MANUAL
+                EstadoReproductivo celoManual = new EstadoReproductivo();
+                celoManual.setAnimal(animal);
+                celoManual.setEstado(TipoReproductivo.CELO);
+                celoManual.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                celoManual.setUsuarioRegistrador(productor);
+                celoManual.setFechaRegistro(LocalDateTime.now().minusDays(20));
+                estadoReproductivoRepository.save(celoManual);
+
+                // Celo detectado por ml-celo -> origen AUTOMATICO (mismo estado, distinto origen)
+                EstadoReproductivo celoAuto = new EstadoReproductivo();
+                celoAuto.setAnimal(animal);
+                celoAuto.setEstado(TipoReproductivo.POSIBLE_CELO);
+                celoAuto.setOrigen(dev.vigia.backend.model.OrigenEstado.AUTOMATICO);
+                celoAuto.setFechaRegistro(LocalDateTime.now().minusDays(10));
+                estadoReproductivoRepository.save(celoAuto);
+
+                EstadoReproductivo parida = new EstadoReproductivo();
+                parida.setAnimal(animal);
+                parida.setEstado(TipoReproductivo.PARIDA);
+                parida.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                parida.setUsuarioRegistrador(productor);
+                parida.setFechaUltParto(LocalDate.of(2026, 8, 1));
+                parida.setFechaRegistro(LocalDateTime.now().minusDays(3));
+                estadoReproductivoRepository.save(parida);
+
+                entityManager.flush();
+                entityManager.clear();
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-reproductivo")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(4))
+                                .andExpect(jsonPath("$[0].estado").value("PARIDA"))
+                                .andExpect(jsonPath("$[1].estado").value("POSIBLE_CELO"))
+                                .andExpect(jsonPath("$[1].origen").value("AUTOMATICO"))
+                                .andExpect(jsonPath("$[2].estado").value("CELO"))
+                                .andExpect(jsonPath("$[2].origen").value("MANUAL"))
+                                .andExpect(jsonPath("$[3].estado").value("GESTANTE"))
+                                .andExpect(jsonPath("$[3].origen").value("MANUAL"));
+        }
+
+        @Test
+        @DisplayName("GET estado-reproductivo - Carga masiva conserva su origen CARGA_MASIVA")
+        @SuppressWarnings("null")
+        void historialReproductivo_cargaMasiva_origen() throws Exception {
                 Long animalId = crearAnimal("Vaca Masiva", establecimientoId, rodeoLoteId);
                 Animal animal = animalRepository.findById(animalId).orElseThrow();
                 Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
@@ -958,9 +1017,7 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-reproductivo")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$[0].origen").value("CARGA_MASIVA"))
-                                .andExpect(jsonPath("$[0].origenNormalizado").value("MANUAL"))
-                                .andExpect(jsonPath("$[0].tipoEvento").value("ESTADO_REPRODUCTIVO"));
+                                .andExpect(jsonPath("$[0].origen").value("CARGA_MASIVA"));
         }
 
         @Test

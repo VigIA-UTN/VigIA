@@ -22,6 +22,4 @@ public class EstadoReproductivoResponse {
     private String origen;
     private LocalDateTime fechaRegistro;
     private String registradoPor;
-    private String tipoEvento;
-    private String origenNormalizado;
 }

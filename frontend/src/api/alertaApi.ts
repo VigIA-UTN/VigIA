@@ -187,10 +187,14 @@ export type TipoIntervencion =
   | 'INSEMINACION'
   | 'OTRO';
 
+export type TipoEstadoSaludResultante = 'SANO' | 'EN_OBSERVACION' | 'ENFERMO';
+
 export interface IntervencionRequest {
   descripcion?: string;
   fechaHora?: string; // ISO 8601 LocalDateTime
   tipo?: TipoIntervencion;
+  /** Sólo para REVISION_VETERINARIA: estado de salud con el que concluye la revisión. */
+  estadoSalud?: TipoEstadoSaludResultante;
 }
 
 export async function intervenirAlerta(
