@@ -1,12 +1,24 @@
-import { MapContainer, TileLayer, Marker, useMap, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, ZoomControl, Polygon, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useState } from 'react';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertSidebar from '../components/AlertSidebar';
+import PerimetroSidebar from '../components/PerimetroSidebar';
 import { type AnimalMapa, getAnimalesMapa } from '../api/animalesApi';
 import { type AlertaResumenResponse, type AlertaResponse, getResumenAlertas } from '../api/alertaApi';
+import {
+  getPerimetros,
+  activarPerimetro,
+  desactivarPerimetro,
+  actualizarPerimetro,
+  crearPerimetro,
+  type PerimetroResponse,
+  type CoordenadaDTO,
+} from '../api/perimetrosApi';
+import { getRodeoLotes, type RodeoLoteResponse } from '../api/rodeoLotesApi';
+import { insertPointInClosestEdge } from '../utils/mapGeometryUtils';
 import AnimalDetailSidebar from '../components/AnimalDetailSidebar';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
@@ -17,6 +29,38 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+const vertexIcon = L.divIcon({
+  className: 'custom-vertex-icon',
+  html: `<div style="
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #00FFF6;
+    border: 3px solid #FFFFFF;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    cursor: grab;
+  "></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+});
+
+function MapEditorEvents({
+  isEditing,
+  onMapClick,
+}: {
+  isEditing: boolean;
+  onMapClick: (lat: number, lng: number) => void;
+}) {
+  useMapEvents({
+    click(e) {
+      if (isEditing) {
+        onMapClick(e.latlng.lat, e.latlng.lng);
+      }
+    },
+  });
+  return null;
+}
 
 const staleIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png',
@@ -106,6 +150,51 @@ export default function MapPage() {
   const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
   // Guarda la alerta que dispara la intervención para que no se pierda cuando selectedAlertaMap se limpie
   const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
+
+  // Estados del módulo de Perímetros
+  const [isPerimetrosOpen, setIsPerimetrosOpen] = useState(false);
+  const [perimetros, setPerimetros] = useState<PerimetroResponse[]>([]);
+  const [rodeos, setRodeos] = useState<RodeoLoteResponse[]>([]);
+  const [loadingPerimetros, setLoadingPerimetros] = useState(false);
+  const [hoveredPerimetroId, setHoveredPerimetroId] = useState<number | null>(null);
+  const [editingPerimetro, setEditingPerimetro] = useState<PerimetroResponse | null>(null);
+  const [coordenadasEditadas, setCoordenadasEditadas] = useState<CoordenadaDTO[]>([]);
+  const [isSavingPerimetro, setIsSavingPerimetro] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPerimetrosYRodeos = async () => {
+      try {
+        if (selectedId) {
+          setLoadingPerimetros(true);
+          const [perimetrosData, rodeosData] = await Promise.all([
+            getPerimetros(selectedId),
+            getRodeoLotes(selectedId),
+          ]);
+          if (isMounted) {
+            setPerimetros(perimetrosData);
+            setRodeos(rodeosData);
+          }
+        } else {
+          await Promise.resolve();
+          if (isMounted) {
+            setPerimetros([]);
+            setRodeos([]);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching perímetros o rodeos", err);
+      } finally {
+        if (isMounted) {
+          setLoadingPerimetros(false);
+        }
+      }
+    };
+    fetchPerimetrosYRodeos();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedId]);
 
   useEffect(() => {
     const fetchDatos = async () => {
@@ -230,15 +319,95 @@ export default function MapPage() {
   }, [selectedId]);
 
   const activeEstablecimiento = establecimientos.find(e => e.id === selectedId);
-
   const animalConPosicion = animales.find(a => a.latitud != null && a.longitud != null);
-
   const center: [number, number] = activeEstablecimiento?.latitud != null && activeEstablecimiento?.longitud != null
     ? [activeEstablecimiento.latitud, activeEstablecimiento.longitud]
     : animalConPosicion
       ? [animalConPosicion.latitud!, animalConPosicion.longitud!]
       : CENTRO_CAMPO;
 
+  const handleToggleActivoPerimetro = async (perimetro: PerimetroResponse) => {
+    const nuevoEstado = !perimetro.activo;
+    setPerimetros(prev =>
+      prev.map(p => (p.id === perimetro.id ? { ...p, activo: nuevoEstado } : p))
+    );
+    try {
+      if (nuevoEstado) {
+        await activarPerimetro(perimetro.id);
+      } else {
+        await desactivarPerimetro(perimetro.id);
+      }
+    } catch (err) {
+      console.error("Error al cambiar estado activo del perímetro", err);
+      setPerimetros(prev =>
+        prev.map(p => (p.id === perimetro.id ? { ...p, activo: !nuevoEstado } : p))
+      );
+    }
+  };
+
+  const handleStartEditPerimetro = (perimetro: PerimetroResponse) => {
+    setEditingPerimetro(perimetro);
+    setCoordenadasEditadas(perimetro.coordenadas ? [...perimetro.coordenadas] : []);
+  };
+
+  const handleCancelEditPerimetro = () => {
+    setEditingPerimetro(null);
+    setCoordenadasEditadas([]);
+  };
+
+  const handleCreateNewPerimetro = () => {
+    if (!selectedId) return;
+    const [cLat, cLng] = center;
+    const delta = 0.003;
+    const defaultCoords: CoordenadaDTO[] = [
+      { latitud: cLat + delta, longitud: cLng - delta },
+      { latitud: cLat + delta, longitud: cLng + delta },
+      { latitud: cLat - delta, longitud: cLng + delta },
+      { latitud: cLat - delta, longitud: cLng - delta },
+    ];
+    const nuevo: PerimetroResponse = {
+      id: 0,
+      establecimientoId: selectedId,
+      establecimientoNombre: activeEstablecimiento?.nombre || '',
+      nombre: `Perímetro #${perimetros.length + 1}`,
+      activo: true,
+      loteIds: [],
+      coordenadas: defaultCoords,
+    };
+    setEditingPerimetro(nuevo);
+    setCoordenadasEditadas(defaultCoords);
+  };
+
+  const handleSaveEditPerimetro = async (nombre: string, loteIds: number[]) => {
+    if (!editingPerimetro || !selectedId) return;
+    setIsSavingPerimetro(true);
+    try {
+      if (editingPerimetro.id === 0) {
+        const saved = await crearPerimetro({
+          nombre,
+          establecimientoId: selectedId,
+          loteIds,
+          coordenadas: coordenadasEditadas,
+        });
+        setPerimetros(prev => [...prev, saved]);
+      } else {
+        const updated = await actualizarPerimetro(editingPerimetro.id, {
+          nombre,
+          establecimientoId: selectedId,
+          loteIds,
+          coordenadas: coordenadasEditadas,
+        });
+        setPerimetros(prev => prev.map(p => (p.id === updated.id ? updated : p)));
+      }
+      setEditingPerimetro(null);
+      setCoordenadasEditadas([]);
+    } catch (err) {
+      console.error("Error al guardar perímetro", err);
+      throw err;
+    } finally {
+      setIsSavingPerimetro(false);
+    }
+  };
 
   return (
     <div style={{ height: '100%', width: '100%', margin: 0, padding: 0, position: 'relative', overflow: 'hidden' }}>
@@ -249,6 +418,125 @@ export default function MapPage() {
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
         <MapUpdater center={center} trigger={flyToTrigger} />
+
+        {/* Captura de clicks en el mapa para agregar vértices en modo edición */}
+        <MapEditorEvents
+          isEditing={Boolean(editingPerimetro)}
+          onMapClick={(lat, lng) => {
+            setCoordenadasEditadas(prev => insertPointInClosestEdge(prev, { lat, lng }));
+          }}
+        />
+
+        {/* Capa de Perímetros Activos (Contorno continuo celeste #00FFF6 con relleno 20% opacidad) */}
+        {perimetros.map(p => {
+          if (!p.activo || (editingPerimetro && editingPerimetro.id === p.id)) return null;
+          const isHovered = hoveredPerimetroId === p.id;
+          const positions: [number, number][] = p.coordenadas.map(c => [c.latitud, c.longitud]);
+          return (
+            <Polygon
+              key={`activo-${p.id}`}
+              positions={positions}
+              pathOptions={{
+                color: '#00FFF6',
+                weight: isHovered ? 4 : 3,
+                fillColor: '#00FFF6',
+                fillOpacity: 0.2,
+              }}
+            />
+          );
+        })}
+
+        {/* Capa de Perímetro en Hover (Línea de contorno punteada #00FFF6 sin relleno) */}
+        {hoveredPerimetroId && !editingPerimetro && (() => {
+          const hoveredP = perimetros.find(p => p.id === hoveredPerimetroId);
+          if (!hoveredP) return null;
+          if (!hoveredP.activo) {
+            const positions: [number, number][] = hoveredP.coordenadas.map(c => [c.latitud, c.longitud]);
+            return (
+              <Polygon
+                key={`hover-${hoveredP.id}`}
+                positions={positions}
+                pathOptions={{
+                  color: '#00FFF6',
+                  weight: 2.5,
+                  dashArray: '8, 8',
+                  fill: false,
+                }}
+              />
+            );
+          }
+          return null;
+        })()}
+
+        {/* Capa de Perímetro en Edición interactiva */}
+        {editingPerimetro && (
+          <>
+            {coordenadasEditadas.length >= 3 && (
+              <Polygon
+                positions={coordenadasEditadas.map(c => [c.latitud, c.longitud])}
+                pathOptions={{
+                  color: '#00FFF6',
+                  weight: 3,
+                  fillColor: '#00FFF6',
+                  fillOpacity: 0.25,
+                  dashArray: '4, 4',
+                }}
+              />
+            )}
+
+            {/* Vértices arrastrables con eliminación dual: click derecho directo o click izquierdo con popup */}
+            {coordenadasEditadas.map((c, idx) => (
+              <Marker
+                key={`vertex-${idx}`}
+                position={[c.latitud, c.longitud]}
+                icon={vertexIcon}
+                draggable={true}
+                eventHandlers={{
+                  dragend: (e) => {
+                    const newLatLng = e.target.getLatLng();
+                    setCoordenadasEditadas(prev => {
+                      const copy = [...prev];
+                      copy[idx] = { latitud: newLatLng.lat, longitud: newLatLng.lng };
+                      return copy;
+                    });
+                  },
+                  contextmenu: (e) => {
+                    // Click derecho: eliminación instantánea si quedan más de 3
+                    L.DomEvent.stopPropagation(e);
+                    if (coordenadasEditadas.length > 3) {
+                      setCoordenadasEditadas(prev => prev.filter((_, i) => i !== idx));
+                    }
+                  },
+                }}
+              >
+                <Popup>
+                  <div style={{ textAlign: 'center', padding: '4px' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                      Vértice #{idx + 1}
+                    </div>
+                    {coordenadasEditadas.length > 3 ? (
+                      <button
+                        onClick={() => {
+                          setCoordenadasEditadas(prev => prev.filter((_, i) => i !== idx));
+                        }}
+                        className="btn btn-sm btn-danger py-1 px-2"
+                        style={{ fontSize: '0.78rem' }}
+                      >
+                        <i className="bi bi-trash3-fill"></i> Eliminar punto
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', color: '#666' }}>
+                        Mínimo 3 vértices requeridos
+                      </span>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+          </>
+        )}
+
+        {/* Animales en el mapa */}
         {animales.map(animal => {
           if (animal.latitud == null || animal.longitud == null) return null;
           return (
@@ -267,9 +555,14 @@ export default function MapPage() {
       </MapContainer>
 
       {/* Botón de Alertas */}
-      {!isAlertsOpen && (
+      {!isAlertsOpen && !isPerimetrosOpen && (
         <button
-          onClick={() => { setSelectedAlertaMap(null); setIsAlertsOpen(true) }}
+          onClick={() => {
+            setSelectedAlertaMap(null);
+            setIsPerimetrosOpen(false);
+            setEditingPerimetro(null);
+            setIsAlertsOpen(true);
+          }}
           className="btn d-flex align-items-center gap-2 fw-bold"
           style={{
             position: 'absolute',
@@ -282,10 +575,37 @@ export default function MapPage() {
             borderWidth: '2px',
             borderRadius: '10px',
             padding: '8px 20px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
           }}
         >
           <i className="bi bi-bell-fill" style={{ color: '#13D4FB' }}></i> Alertas
+        </button>
+      )}
+
+      {/* Botón de Perímetros justo debajo del de Alertas */}
+      {!isPerimetrosOpen && !isAlertsOpen && (
+        <button
+          onClick={() => {
+            setSelectedAlertaMap(null);
+            setIsAlertsOpen(false);
+            setIsPerimetrosOpen(true);
+          }}
+          className="btn d-flex align-items-center gap-2 fw-bold"
+          style={{
+            position: 'absolute',
+            top: '75px',
+            left: '20px',
+            zIndex: 1000,
+            backgroundColor: '#1E3A5F',
+            color: 'white',
+            borderColor: '#13D4FB',
+            borderWidth: '2px',
+            borderRadius: '10px',
+            padding: '8px 20px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+          }}
+        >
+          <i className="bi bi-bounding-box-circles" style={{ color: '#13D4FB' }}></i> Perímetros
         </button>
       )}
 
@@ -332,6 +652,30 @@ export default function MapPage() {
         <AlertSidebar onClose={() => setIsAlertsOpen(false)} externalAlert={selectedAlertaMap} />
       ) : null}
 
+      {/* Sidebar de Perímetros */}
+      {isPerimetrosOpen ? (
+        <PerimetroSidebar
+          onClose={() => {
+            setIsPerimetrosOpen(false);
+            setEditingPerimetro(null);
+            setCoordenadasEditadas([]);
+          }}
+          perimetros={perimetros}
+          rodeos={rodeos}
+          loading={loadingPerimetros}
+          onToggleActivo={handleToggleActivoPerimetro}
+          onStartEdit={handleStartEditPerimetro}
+          onCancelEdit={handleCancelEditPerimetro}
+          onSaveEdit={handleSaveEditPerimetro}
+          onCreateNew={handleCreateNewPerimetro}
+          editingPerimetro={editingPerimetro}
+          coordenadasEditadas={coordenadasEditadas}
+          onHoverStart={(id) => setHoveredPerimetroId(id)}
+          onHoverEnd={() => setHoveredPerimetroId(null)}
+          isSaving={isSavingPerimetro}
+        />
+      ) : null}
+
       {/* Sidebar de Intervención */}
       {isIntervencionOpen && intervencionAlerta && (
         <IntervencionFormPanel
@@ -361,7 +705,6 @@ export default function MapPage() {
           alerta={selectedAlertaMap}
           onClose={() => setSelectedAlertaMap(null)}
           onActionComplete={(id, estado) => {
-            // Actualización local opcional, el SSE de alertas/telemetría debería refrescar
             setAnimales(prev => prev.map(a => ({
               ...a,
               alertasAnimal: a.alertasAnimal.map(al => al.id === id ? { ...al, estado } : al)
