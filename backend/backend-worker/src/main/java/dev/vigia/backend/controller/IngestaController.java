@@ -26,13 +26,15 @@ public class IngestaController {
     private final AnimalRepository animalRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final RabbitTemplate rabbitTemplate;
+    private final dev.vigia.backend.service.GeofenceVerificationService geofenceVerificationService;
 
-    public IngestaController(TelemetriaRepository telemetriaRepository, CaravanaRepository caravanaRepository, AnimalRepository animalRepository, ApplicationEventPublisher eventPublisher, RabbitTemplate rabbitTemplate) {
+    public IngestaController(TelemetriaRepository telemetriaRepository, CaravanaRepository caravanaRepository, AnimalRepository animalRepository, ApplicationEventPublisher eventPublisher, RabbitTemplate rabbitTemplate, dev.vigia.backend.service.GeofenceVerificationService geofenceVerificationService) {
         this.telemetriaRepository = telemetriaRepository;
         this.caravanaRepository = caravanaRepository;
         this.animalRepository = animalRepository;
         this.eventPublisher = eventPublisher;
         this.rabbitTemplate = rabbitTemplate;
+        this.geofenceVerificationService = geofenceVerificationService;
     }
 
     @PostMapping("/uplink")
@@ -72,6 +74,10 @@ public class IngestaController {
                 .fechaHora(telemetria.getFechaHora())
                 .build();
             rabbitTemplate.convertAndSend(RabbitMQConfig.TELEMETRIA_EXCHANGE, "", dto);
+
+            // Verificación en tiempo real de salida de perímetro
+            geofenceVerificationService.verificarPosicion(
+                animal, telemetria.getLatitud(), telemetria.getLongitud(), telemetria.getFechaHora());
         }
 
         return ResponseEntity.ok("OK");

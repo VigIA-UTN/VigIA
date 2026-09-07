@@ -29,6 +29,9 @@ public class Establecimiento {
     @OneToMany(mappedBy = "establecimiento", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Empleado> empleados = new ArrayList<>();
 
+    @OneToMany(mappedBy = "establecimiento", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Perimetro> perimetros = new ArrayList<>();
+
     @Convert(converter = BooleanToSmallintConverter.class)
     private boolean activo = true;
 
