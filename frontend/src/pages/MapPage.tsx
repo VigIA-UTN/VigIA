@@ -370,6 +370,7 @@ export default function MapPage() {
       establecimientoId: selectedId,
       establecimientoNombre: activeEstablecimiento?.nombre || '',
       nombre: `Perímetro #${perimetros.length + 1}`,
+      descripcion: '',
       activo: true,
       loteIds: [],
       coordenadas: defaultCoords,
@@ -378,13 +379,14 @@ export default function MapPage() {
     setCoordenadasEditadas(defaultCoords);
   };
 
-  const handleSaveEditPerimetro = async (nombre: string, loteIds: number[]) => {
+  const handleSaveEditPerimetro = async (nombre: string, loteIds: number[], descripcion?: string) => {
     if (!editingPerimetro || !selectedId) return;
     setIsSavingPerimetro(true);
     try {
       if (editingPerimetro.id === 0) {
         const saved = await crearPerimetro({
           nombre,
+          descripcion,
           establecimientoId: selectedId,
           loteIds,
           coordenadas: coordenadasEditadas,
@@ -393,6 +395,7 @@ export default function MapPage() {
       } else {
         const updated = await actualizarPerimetro(editingPerimetro.id, {
           nombre,
+          descripcion,
           establecimientoId: selectedId,
           loteIds,
           coordenadas: coordenadasEditadas,
@@ -563,22 +566,38 @@ export default function MapPage() {
             setEditingPerimetro(null);
             setIsAlertsOpen(true);
           }}
-          className="btn d-flex align-items-center gap-2 fw-bold"
+          className="btn d-flex align-items-center fw-bold"
           style={{
             position: 'absolute',
             top: '20px',
             left: '20px',
             zIndex: 1000,
+            width: '170px',
             backgroundColor: '#1E3A5F',
             color: 'white',
             borderColor: '#13D4FB',
             borderWidth: '2px',
             borderRadius: '10px',
-            padding: '8px 20px',
+            padding: '8px 0',
             boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+            whiteSpace: 'nowrap',
           }}
         >
-          <i className="bi bi-bell-fill" style={{ color: '#13D4FB' }}></i> Alertas
+          <i
+            className="bi bi-bell-fill"
+            style={{
+              position: 'absolute',
+              left: '16px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#13D4FB',
+              fontSize: '1rem',
+              lineHeight: 1,
+            }}
+          ></i>
+          <span style={{ width: '100%', textAlign: 'center', paddingLeft: '32px' }}>
+            Alertas
+          </span>
         </button>
       )}
 
@@ -590,22 +609,38 @@ export default function MapPage() {
             setIsAlertsOpen(false);
             setIsPerimetrosOpen(true);
           }}
-          className="btn d-flex align-items-center gap-2 fw-bold"
+          className="btn d-flex align-items-center fw-bold"
           style={{
             position: 'absolute',
             top: '75px',
             left: '20px',
             zIndex: 1000,
+            width: '170px',
             backgroundColor: '#1E3A5F',
             color: 'white',
             borderColor: '#13D4FB',
             borderWidth: '2px',
             borderRadius: '10px',
-            padding: '8px 20px',
+            padding: '8px 0',
             boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+            whiteSpace: 'nowrap',
           }}
         >
-          <i className="bi bi-bounding-box-circles" style={{ color: '#13D4FB' }}></i> Perímetros
+          <i
+            className="bi bi-bounding-box-circles"
+            style={{
+              position: 'absolute',
+              left: '16px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#13D4FB',
+              fontSize: '1rem',
+              lineHeight: 1,
+            }}
+          ></i>
+          <span style={{ width: '100%', textAlign: 'center', paddingLeft: '32px' }}>
+            Perímetros
+          </span>
         </button>
       )}
 

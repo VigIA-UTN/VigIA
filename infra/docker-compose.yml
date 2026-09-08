@@ -1,9 +1,8 @@
 services:
   db:
-    image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb-ha:pg16
     container_name: vigia-db
     restart: unless-stopped
-    command: [ "postgres", "-c", "listen_addresses=*" ]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-vigia}
       POSTGRES_USER: ${POSTGRES_USER:-vigia_user}
@@ -11,8 +10,13 @@ services:
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
-      - vigia_pgdata:/var/lib/postgresql/data
+      - vigia_pgdata:/home/postgres/pgdata/data
       - ./postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vigia_user} -d ${POSTGRES_DB:-vigia}" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   backend-api:
     build:
@@ -23,6 +27,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
       - DB_HOST=db
       - DB_NAME=${POSTGRES_DB:-vigia}
       - DB_USER=${POSTGRES_USER:-vigia_user}
@@ -37,8 +42,16 @@ services:
       - OAUTH2_REDIRECT_URI=${OAUTH2_REDIRECT_URI:-http://localhost:5173/oauth2/callback}
       - TZ=America/Argentina/Buenos_Aires
     depends_on:
-      - db
-      - rabbitmq
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--spider", "http://localhost:8080/actuator/health" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
 
   backend-worker:
     build:
@@ -49,6 +62,7 @@ services:
     ports:
       - "8081:8081"
     environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
       - DB_HOST=db
       - DB_NAME=${POSTGRES_DB:-vigia}
       - DB_USER=${POSTGRES_USER:-vigia_user}
@@ -64,12 +78,18 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       - TZ=America/Argentina/Buenos_Aires
     depends_on:
-      - db
-      - ml-celo
-      - ml-salud
-      - ml-geo
-      - rabbitmq
-      - backend-api
+      db:
+        condition: service_healthy
+      ml-celo:
+        condition: service_started
+      ml-salud:
+        condition: service_started
+      ml-geo:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      backend-api:
+        condition: service_healthy
     healthcheck:
       test: [ "CMD", "wget", "--quiet", "--spider", "http://localhost:8081/actuator/health" ]
       interval: 5s

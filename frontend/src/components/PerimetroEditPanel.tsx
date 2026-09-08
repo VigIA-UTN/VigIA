@@ -8,7 +8,7 @@ interface PerimetroEditPanelProps {
   perimetro: PerimetroResponse;
   rodeos: RodeoLoteResponse[];
   coordenadasEditadas: CoordenadaDTO[];
-  onSave: (nombre: string, loteIds: number[]) => Promise<void>;
+  onSave: (nombre: string, loteIds: number[], descripcion?: string) => Promise<void>;
   onCancel: () => void;
   isSaving?: boolean;
 }
@@ -22,6 +22,7 @@ export default function PerimetroEditPanel({
   isSaving = false,
 }: PerimetroEditPanelProps) {
   const [nombre, setNombre] = useState(perimetro.nombre);
+  const [descripcion, setDescripcion] = useState(perimetro.descripcion || '');
   const [selectedRodeoIds, setSelectedRodeoIds] = useState<number[]>(perimetro.loteIds || []);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +37,7 @@ export default function PerimetroEditPanel({
     }
     setError(null);
     try {
-      await onSave(nombre, selectedRodeoIds);
+      await onSave(nombre.trim(), selectedRodeoIds, descripcion.trim() || undefined);
     } catch (e: unknown) {
       if (axios.isAxiosError(e) && e.response?.data) {
         setError(typeof e.response.data === 'string' ? e.response.data : 'Error guardando perímetro');
@@ -70,7 +71,7 @@ export default function PerimetroEditPanel({
             color: '#1E293B',
           }}
         >
-          Editando {perimetro.nombre}
+          {perimetro.id === 0 ? 'Nuevo Perímetro' : `Editando ${perimetro.nombre}`}
         </h4>
       </div>
 
@@ -101,6 +102,40 @@ export default function PerimetroEditPanel({
         />
       </div>
 
+      {/* Edición de Descripción */}
+      <div>
+        <label
+          style={{
+            display: 'block',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            color: '#475467',
+            marginBottom: '6px',
+          }}
+        >
+          Descripción
+        </label>
+        <textarea
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          rows={2}
+          maxLength={500}
+          placeholder="Descripción"
+          className="form-control"
+          style={{
+            borderRadius: '8px',
+            border: '1px solid #D0D5DD',
+            padding: '8px 12px',
+            fontSize: '0.9rem',
+            resize: 'vertical',
+          }}
+        />
+        <div className="d-flex justify-content-end mt-1">
+          <small className="text-muted" style={{ fontSize: '0.75rem' }}>
+            {descripcion.length}/500
+          </small>
+        </div>
+      </div>
       {/* Sección Rodeos Asignados */}
       <div>
         <label
@@ -120,38 +155,6 @@ export default function PerimetroEditPanel({
           onChange={setSelectedRodeoIds}
         />
       </div>
-
-      {/* Tips / Instrucciones de Edición en el Mapa */}
-      <div
-        style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: '10px',
-          padding: '12px 14px',
-          fontSize: '0.82rem',
-          color: '#334155',
-          border: '1px dashed #CBD5E1',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '6px',
-        }}
-      >
-        <div className="d-flex align-items-center gap-2">
-          <i className="bi bi-arrows-move text-primary"></i>
-          <span>Arrastra los puntos circulares para reubicarlos.</span>
-        </div>
-        <div className="d-flex align-items-center gap-2">
-          <i className="bi bi-plus-circle-fill text-success"></i>
-          <span>Haz click en el mapa para agregar un nuevo punto.</span>
-        </div>
-        <div className="d-flex align-items-center gap-2">
-          <i className="bi bi-trash3-fill text-danger"></i>
-          <span>Click derecho o click en un punto para eliminarlo.</span>
-        </div>
-        <div className="text-muted mt-1" style={{ fontSize: '0.78rem' }}>
-          Vértices actuales: <strong>{coordenadasEditadas.length}</strong> (mínimo 3)
-        </div>
-      </div>
-
       {error && (
         <div
           className="alert alert-danger p-2 mb-0"
