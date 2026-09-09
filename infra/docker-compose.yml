@@ -62,7 +62,7 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
       - DB_HOST=db
       - DB_NAME=${POSTGRES_DB:-vigia}
       - DB_USER=${POSTGRES_USER:-vigia_user}
