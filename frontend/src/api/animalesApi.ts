@@ -163,12 +163,9 @@ export interface EstadoReproductivoResponse {
   estado: string | null;
   fechaUltimoParto: string | null;
   fechaUltimaInseminacion: string | null;
-  origen: string | null;
+  origen: string | null; // MANUAL | CARGA_MASIVA | AUTOMATICO
   fechaRegistro: string;
   registradoPor: string | null;
-  // Historial consolidado
-  tipoEvento: 'ESTADO_REPRODUCTIVO' | 'CELO_AUTOMATICO' | 'INSEMINACION' | null;
-  origenNormalizado: 'AUTOMATICO' | 'MANUAL' | null;
 }
 
 export async function registrarEstadoReproductivo(

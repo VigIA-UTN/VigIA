@@ -47,7 +47,6 @@ import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Telemetria;
-import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
@@ -731,37 +730,16 @@ public class AnimalServiceImpl implements AnimalService {
 
                 List<EstadoReproductivoResponse> historial = new ArrayList<>();
 
-                animal.getEstadosReproductivos().forEach(e -> {
-                        boolean esAutomatico = e.getOrigen() == OrigenEstado.AUTOMATICO;
-                        historial.add(EstadoReproductivoResponse.builder()
-                                        .id(e.getId())
-                                        .animalId(animal.getId())
-                                        .estado(e.getEstado() != null ? e.getEstado().name() : null)
-                                        .fechaUltimoParto(e.getFechaUltParto())
-                                        .fechaUltimaInseminacion(e.getFechaUltInseminacion())
-                                        .origen(e.getOrigen() != null ? e.getOrigen().name() : null)
-                                        .origenNormalizado(e.getOrigen() != null
-                                                        ? (esAutomatico ? "AUTOMATICO" : "MANUAL")
-                                                        : null)
-                                        .tipoEvento(esAutomatico ? "CELO_AUTOMATICO" : "ESTADO_REPRODUCTIVO")
-                                        .fechaRegistro(e.getFechaRegistro())
-                                        .registradoPor(formatNombreUsuario(e.getUsuarioRegistrador()))
-                                        .build());
-                });
-
-                intervencionRepository.findByAnimalIdOrderByFechaHoraDesc(animalId).stream()
-                                .filter(i -> i.getTipo() == TipoIntervencion.INSEMINACION)
-                                .forEach(i -> historial.add(EstadoReproductivoResponse.builder()
-                                                .id(i.getId())
-                                                .animalId(animal.getId())
-                                                .estado(TipoReproductivo.INSEMINADA.name())
-                                                .fechaUltimaInseminacion(i.getFechaHora().toLocalDate())
-                                                .origen(OrigenEstado.MANUAL.name())
-                                                .origenNormalizado("MANUAL")
-                                                .tipoEvento("INSEMINACION")
-                                                .fechaRegistro(i.getFechaHora())
-                                                .registradoPor(formatNombreUsuario(i.getInterventor()))
-                                                .build()));
+                animal.getEstadosReproductivos().forEach(e -> historial.add(EstadoReproductivoResponse.builder()
+                                .id(e.getId())
+                                .animalId(animal.getId())
+                                .estado(e.getEstado() != null ? e.getEstado().name() : null)
+                                .fechaUltimoParto(e.getFechaUltParto())
+                                .fechaUltimaInseminacion(e.getFechaUltInseminacion())
+                                .origen(e.getOrigen() != null ? e.getOrigen().name() : null)
+                                .fechaRegistro(e.getFechaRegistro())
+                                .registradoPor(formatNombreUsuario(e.getUsuarioRegistrador()))
+                                .build()));
 
                 historial.sort(java.util.Comparator.comparing(
                                 EstadoReproductivoResponse::getFechaRegistro,

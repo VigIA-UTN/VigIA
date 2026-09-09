@@ -26,10 +26,17 @@ import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.EstadoReproductivoRepository;
+import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
+import dev.vigia.backend.model.EstadoReproductivo;
+import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.SeveridadAlerta;
+import dev.vigia.backend.model.TipoIntervencion;
+import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.service.AlertaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +53,8 @@ public class AlertaServiceImpl implements AlertaService {
         private final UsuarioRepository usuarioRepository;
         private final EstablecimientoRepository establecimientoRepository;
         private final IntervencionRepository intervencionRepository;
+        private final EstadoReproductivoRepository estadoReproductivoRepository;
+        private final EstadoSaludRepository estadoSaludRepository;
         private final RabbitTemplate rabbitTemplate;
         private final ObjectMapper objectMapper;
 
@@ -617,6 +626,32 @@ public class AlertaServiceImpl implements AlertaService {
                 intervencion.setTipo(request.getTipo());
                 intervencionRepository.save(intervencion);
 
+                registrarEstadoDerivado(intervencion, request, usuario);
+
                 return this.toResponse(alerta);
+        }
+
+        private void registrarEstadoDerivado(Intervencion intervencion, IntervencionRequest request, Usuario usuario) {
+                if (intervencion.getTipo() == TipoIntervencion.INSEMINACION) {
+                        EstadoReproductivo estado = new EstadoReproductivo();
+                        estado.setAnimal(intervencion.getAnimal());
+                        estado.setUsuarioRegistrador(usuario);
+                        estado.setEstado(TipoReproductivo.INSEMINADA);
+                        estado.setFechaUltInseminacion(intervencion.getFechaHora().toLocalDate());
+                        estado.setOrigen(OrigenEstado.MANUAL);
+                        estado.setFechaRegistro(intervencion.getFechaHora());
+                        estadoReproductivoRepository.save(estado);
+                } else if (intervencion.getTipo() == TipoIntervencion.REVISION_VETERINARIA
+                                && request.getEstadoSalud() != null) {
+                        EstadoSalud estado = new EstadoSalud();
+                        estado.setAnimal(intervencion.getAnimal());
+                        estado.setUsuarioVeterinario(usuario);
+                        estado.setFechaRevision(intervencion.getFechaHora().toLocalDate());
+                        estado.setEstado(request.getEstadoSalud());
+                        estado.setDiagnosticoNotas(intervencion.getDescripcion());
+                        estado.setOrigen(OrigenEstado.MANUAL);
+                        estado.setFechaRegistro(intervencion.getFechaHora());
+                        estadoSaludRepository.save(estado);
+                }
         }
 }

@@ -32,11 +32,18 @@ import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.model.EstadoReproductivo;
+import dev.vigia.backend.model.EstadoSalud;
+import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.SeveridadAlerta;
+import dev.vigia.backend.model.TipoEstadoSalud;
 import dev.vigia.backend.model.TipoIntervencion;
+import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.EstadoReproductivoRepository;
+import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.service.impl.AlertaServiceImpl;
@@ -56,6 +63,12 @@ public class AlertaServiceImplTest {
 
         @Mock
         private IntervencionRepository intervencionRepository;
+
+        @Mock
+        private EstadoReproductivoRepository estadoReproductivoRepository;
+
+        @Mock
+        private EstadoSaludRepository estadoSaludRepository;
 
         @Mock
         private RabbitTemplate rabbitTemplate;
@@ -518,6 +531,91 @@ public class AlertaServiceImplTest {
 
                 // La alerta no vuelve a confirmarse ni a guardarse: ya estaba confirmada.
                 verify(alertaRepository, never()).save(any());
+                // Un tratamiento no deriva en ningún cambio de estado.
+                verify(estadoReproductivoRepository, never()).save(any());
+                verify(estadoSaludRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_Inseminacion_RegistraEstadoReproductivoInseminada() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(intervencionRepository.existsByAlertaId(ALERTA_ID)).thenReturn(false);
+
+                IntervencionRequest request = IntervencionRequest.builder()
+                                .descripcion("IATF")
+                                .fechaHora(LocalDateTime.of(2026, 3, 1, 9, 0))
+                                .tipo(TipoIntervencion.INSEMINACION)
+                                .build();
+
+                alertaService.intervenirAlerta(EMAIL, ALERTA_ID, request);
+
+                ArgumentCaptor<EstadoReproductivo> captor = ArgumentCaptor.forClass(EstadoReproductivo.class);
+                verify(estadoReproductivoRepository, times(1)).save(captor.capture());
+                EstadoReproductivo estado = captor.getValue();
+                assertEquals(mockAnimal, estado.getAnimal());
+                assertEquals(mockUsuario, estado.getUsuarioRegistrador());
+                assertEquals(TipoReproductivo.INSEMINADA, estado.getEstado());
+                assertEquals(OrigenEstado.MANUAL, estado.getOrigen());
+                assertEquals(LocalDateTime.of(2026, 3, 1, 9, 0), estado.getFechaRegistro());
+                assertEquals(LocalDateTime.of(2026, 3, 1, 9, 0).toLocalDate(), estado.getFechaUltInseminacion());
+                verify(estadoSaludRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_RevisionConEstadoSalud_RegistraEstadoSalud() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(intervencionRepository.existsByAlertaId(ALERTA_ID)).thenReturn(false);
+
+                IntervencionRequest request = IntervencionRequest.builder()
+                                .descripcion("Mastitis clínica en cuarto anterior izquierdo")
+                                .fechaHora(LocalDateTime.of(2026, 4, 2, 15, 30))
+                                .tipo(TipoIntervencion.REVISION_VETERINARIA)
+                                .estadoSalud(TipoEstadoSalud.ENFERMO)
+                                .build();
+
+                alertaService.intervenirAlerta(EMAIL, ALERTA_ID, request);
+
+                ArgumentCaptor<EstadoSalud> captor = ArgumentCaptor.forClass(EstadoSalud.class);
+                verify(estadoSaludRepository, times(1)).save(captor.capture());
+                EstadoSalud estado = captor.getValue();
+                assertEquals(mockAnimal, estado.getAnimal());
+                assertEquals(mockUsuario, estado.getUsuarioVeterinario());
+                assertEquals(TipoEstadoSalud.ENFERMO, estado.getEstado());
+                assertEquals(OrigenEstado.MANUAL, estado.getOrigen());
+                assertEquals("Mastitis clínica en cuarto anterior izquierdo", estado.getDiagnosticoNotas());
+                assertEquals(LocalDateTime.of(2026, 4, 2, 15, 30), estado.getFechaRegistro());
+                verify(estadoReproductivoRepository, never()).save(any());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void intervenirAlerta_RevisionSinEstadoSalud_NoRegistraEstado() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(intervencionRepository.existsByAlertaId(ALERTA_ID)).thenReturn(false);
+
+                IntervencionRequest request = IntervencionRequest.builder()
+                                .descripcion("Revisión de rutina sin hallazgos")
+                                .tipo(TipoIntervencion.REVISION_VETERINARIA)
+                                .build();
+
+                alertaService.intervenirAlerta(EMAIL, ALERTA_ID, request);
+
+                verify(estadoSaludRepository, never()).save(any());
+                verify(estadoReproductivoRepository, never()).save(any());
         }
 
         @Test
