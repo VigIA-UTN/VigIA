@@ -34,6 +34,8 @@ import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
+import dev.vigia.backend.dto.RegistroPesoRequest;
+import dev.vigia.backend.dto.RegistroPesoResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -43,6 +45,7 @@ import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.EstadoSalud;
+import dev.vigia.backend.model.RegistroPeso;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
@@ -58,6 +61,7 @@ import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
+import dev.vigia.backend.repository.RegistroPesoRepository;
 import dev.vigia.backend.service.AnimalService;
 import dev.vigia.backend.service.CargaMasivaService;
 import dev.vigia.backend.service.EstadoReproductivoCsvService;
@@ -77,6 +81,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final IntervencionRepository intervencionRepository;
         private final TelemetriaRepository telemetriaRepository;
         private final EstadoSaludRepository estadoSaludRepository;
+        private final RegistroPesoRepository registroPesoRepository;
 
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
@@ -983,6 +988,119 @@ public class AnimalServiceImpl implements AnimalService {
                                 .origen(estadoSalud.getOrigen() != null ? estadoSalud.getOrigen().name() : null)
                                 .fechaRegistro(estadoSalud.getFechaRegistro())
                                 .registradoPor(formatNombreUsuario(estadoSalud.getUsuarioVeterinario()))
+                                .build();
+        }
+
+        // ── Historial de pesos ────────────────────────────────────────────────────────
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public RegistroPesoResponse registrarPeso(Long animalId, String email, RegistroPesoRequest request) {
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                if (animal.getEstadoActual().equals(EstadoAnimal.INACTIVO)) {
+                        throw new IllegalArgumentException("No se pueden registrar pesos en animales inactivos.");
+                }
+
+                RegistroPeso registro = new RegistroPeso();
+                registro.setAnimal(animal);
+                registro.setFecha(request.getFecha() != null ? request.getFecha() : LocalDate.now());
+                registro.setValorKg(request.getValorKg());
+                registro.setUnidad(request.getUnidad());
+                registro.setFechaRegistro(LocalDateTime.now());
+
+                return mapToRegistroPesoResponse(registroPesoRepository.save(registro));
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public RegistroPesoResponse editarPeso(Long animalId, Long pesoId, String email, RegistroPesoRequest request) {
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                RegistroPeso registro = registroPesoRepository.findById(pesoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Registro de peso no encontrado."));
+
+                if (!registro.getAnimal().getId().equals(animalId)) {
+                        throw new IllegalArgumentException("El registro de peso no corresponde a este animal.");
+                }
+
+                registro.setFecha(request.getFecha() != null ? request.getFecha() : registro.getFecha());
+                registro.setValorKg(request.getValorKg());
+                registro.setUnidad(request.getUnidad());
+
+                return mapToRegistroPesoResponse(registroPesoRepository.save(registro));
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public void eliminarPeso(Long animalId, Long pesoId, String email) {
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                RegistroPeso registro = registroPesoRepository.findById(pesoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Registro de peso no encontrado."));
+
+                if (!registro.getAnimal().getId().equals(animalId)) {
+                        throw new IllegalArgumentException("El registro de peso no corresponde a este animal.");
+                }
+
+                registroPesoRepository.delete(registro);
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public List<RegistroPesoResponse> listarHistorialPesos(Long animalId, String email) {
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                return registroPesoRepository.findByAnimalIdOrderByFechaDesc(animalId).stream()
+                                .map(this::mapToRegistroPesoResponse)
+                                .collect(Collectors.toList());
+        }
+
+        private void validarAccesoEstablecimiento(Usuario usuario, Establecimiento establecimiento) {
+                boolean tieneAcceso = establecimiento.getEmpleados().stream()
+                                .anyMatch(e -> e.getUsuario().equals(usuario) && e.isActivo())
+                                || usuario.getRol().equals(Rol.ADMINISTRADOR);
+                if (!tieneAcceso) {
+                        throw new AccessDeniedException("No tiene acceso a este establecimiento.");
+                }
+        }
+
+        private RegistroPesoResponse mapToRegistroPesoResponse(RegistroPeso registro) {
+                return RegistroPesoResponse.builder()
+                                .id(registro.getId())
+                                .animalId(registro.getAnimal() != null ? registro.getAnimal().getId() : null)
+                                .fecha(registro.getFecha())
+                                .valorKg(registro.getValorKg())
+                                .unidad(registro.getUnidad())
+                                .fechaRegistro(registro.getFechaRegistro())
                                 .build();
         }
 }

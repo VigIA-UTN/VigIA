@@ -60,6 +60,10 @@ public class Animal {
     @OrderBy("fechaRegistro DESC")
     private List<EstadoSalud> estadosSalud = new ArrayList<>();
 
+    @OneToMany(mappedBy = "animal", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("fecha DESC")
+    private List<RegistroPeso> registrosPeso = new ArrayList<>();
+
     public Animal(Establecimiento establecimiento, RodeoLote rodeoLote) {
         this.establecimiento = establecimiento;
         this.rodeoLote = rodeoLote;

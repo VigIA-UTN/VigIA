@@ -30,6 +30,8 @@ import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
+import dev.vigia.backend.dto.RegistroPesoRequest;
+import dev.vigia.backend.dto.RegistroPesoResponse;
 import dev.vigia.backend.service.AnimalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -295,6 +297,80 @@ public class AnimalController {
             String email = authentication.getName();
             List<EstadoSaludResponse> response = animalService.listarEstadosSalud(animalId, email);
             return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // ── Historial de pesos ──────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/historial-pesos")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarHistorialPesos(
+            @PathVariable("id") Long animalId,
+            Authentication authentication) {
+
+        try {
+            String email = authentication.getName();
+            List<RegistroPesoResponse> response = animalService.listarHistorialPesos(animalId, email);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/historial-pesos")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> registrarPeso(
+            @PathVariable("id") Long animalId,
+            @Valid @RequestBody RegistroPesoRequest request,
+            Authentication authentication) {
+
+        try {
+            String email = authentication.getName();
+            RegistroPesoResponse response = animalService.registrarPeso(animalId, email, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/{id}/historial-pesos/{pesoId}")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> editarPeso(
+            @PathVariable("id") Long animalId,
+            @PathVariable("pesoId") Long pesoId,
+            @Valid @RequestBody RegistroPesoRequest request,
+            Authentication authentication) {
+
+        try {
+            String email = authentication.getName();
+            RegistroPesoResponse response = animalService.editarPeso(animalId, pesoId, email, request);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{id}/historial-pesos/{pesoId}")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> eliminarPeso(
+            @PathVariable("id") Long animalId,
+            @PathVariable("pesoId") Long pesoId,
+            Authentication authentication) {
+
+        try {
+            String email = authentication.getName();
+            animalService.eliminarPeso(animalId, pesoId, email);
+            return ResponseEntity.ok("Registro de peso eliminado exitosamente.");
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
         } catch (IllegalArgumentException e) {
