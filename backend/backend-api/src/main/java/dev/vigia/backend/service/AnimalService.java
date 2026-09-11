@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import dev.vigia.backend.dto.AnimalIndicadoresSaludResponse;
 import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
@@ -54,4 +55,6 @@ public interface AnimalService {
                         throws IOException;
 
         List<AnimalMetricaResponse> getMetricasAnimal(Long animalId, String emailUsuario);
+
+        AnimalIndicadoresSaludResponse getIndicadoresSalud(Long animalId, String emailProductor);
 }

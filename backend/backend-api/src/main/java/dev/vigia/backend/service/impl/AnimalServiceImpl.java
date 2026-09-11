@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -18,7 +19,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AnimalIndicadoresSaludResponse;
 import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
@@ -29,6 +34,7 @@ import dev.vigia.backend.dto.EstadoReproductivoCsvRequest;
 import dev.vigia.backend.dto.EstadoReproductivoParseResult;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.FilaEstadoInvalida;
+import dev.vigia.backend.dto.IndicadorResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
@@ -42,6 +48,7 @@ import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.PerfilReferencia;
 import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
@@ -984,5 +991,111 @@ public class AnimalServiceImpl implements AnimalService {
                                 .fechaRegistro(estadoSalud.getFechaRegistro())
                                 .registradoPor(formatNombreUsuario(estadoSalud.getUsuarioVeterinario()))
                                 .build();
+        }
+
+        @Override
+        @Transactional
+        public AnimalIndicadoresSaludResponse getIndicadoresSalud(Long animalId, String emailProductor) {
+                Usuario usuario = usuarioRepository.findByEmail(emailProductor)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimiento = animal.getEstablecimiento();
+
+                boolean tieneAcceso = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo())
+                                || usuario.getRol().equals(Rol.ADMINISTRADOR);
+
+                if (!tieneAcceso) {
+                        throw new AccessDeniedException(
+                                        "No tiene acceso a los datos de este animal.");
+                }
+                PerfilReferencia perfilAnimal = animal.getPerfilReferencia();
+
+                List<IndicadorResponse> indicadores = new ArrayList<>();
+
+                Optional<Telemetria> ultimaTelemetria = telemetriaRepository
+                                .findFirstByCaravanaOrderByFechaHoraDesc(animal.getCaravana());
+
+                if (ultimaTelemetria.isPresent() && perfilAnimal != null) {
+                        Gson gson = new Gson();
+                        System.out.println(perfilAnimal.getPerfilJson());
+                        JsonObject jsonPerfil = gson.fromJson(perfilAnimal.getPerfilJson(), JsonObject.class);
+                        System.out.println(jsonPerfil);
+
+                        Float mean_mov = jsonPerfil.get("mean_moveState_mean").getAsFloat();
+                        Float std_mov = jsonPerfil.get("mean_moveState_std").getAsFloat();
+
+                        Telemetria telemetria = ultimaTelemetria.get();
+                        IndicadorResponse indicador = IndicadorResponse.builder()
+                                        .nombre("Estado de movimiento")
+                                        .descripcion("Estado de movimiento del animal.")
+                                        .valor(String.valueOf(telemetria.getMoveState()))
+                                        .estado(this.getEstadoSalud(telemetria.getMoveState(), mean_mov, std_mov))
+                                        .build();
+                        indicadores.add(indicador);
+                } else {
+                        IndicadorResponse indicador = IndicadorResponse.builder()
+                                        .nombre("Estado de movimiento")
+                                        .descripcion("Estado de movimiento del animal.")
+                                        .valor("0")
+                                        .estado("SIN DATOS")
+                                        .build();
+                        indicadores.add(indicador);
+                }
+
+                Optional<EstadoReproductivo> estadoReproductivo = estadoReproductivoRepository
+                                .findFirstByAnimalIdOrderByFechaRegistroDesc(animal.getId());
+
+                if (estadoReproductivo.isPresent()) {
+                        EstadoReproductivo estadoRep = estadoReproductivo.get();
+
+                        IndicadorResponse indicador = IndicadorResponse.builder()
+                                        .nombre("Estado reproductivo")
+                                        .descripcion("Estado reproductivo del animal.")
+                                        .valor(estadoRep.getEstado().name())
+                                        .estado(this.getEstadoReproductivo(estadoRep))
+                                        .build();
+                        indicadores.add(indicador);
+                } else {
+                        IndicadorResponse indicador = IndicadorResponse.builder()
+                                        .nombre("Estado reproductivo")
+                                        .descripcion("Estado reproductivo del animal.")
+                                        .valor("SIN DATOS")
+                                        .estado("SIN DATOS")
+                                        .build();
+                        indicadores.add(indicador);
+                }
+
+                return AnimalIndicadoresSaludResponse.builder()
+                                .animalId(animal.getId())
+                                .caravana(animal.getCaravana().getCodigo())
+                                .indicadores(indicadores)
+                                .build();
+        }
+
+        private String getEstadoSalud(Integer valor, Float mean, Float std) {
+                if ((mean - std) < valor && valor < (mean + std)) {
+                        return "VERDE";
+                } else if ((mean - 2 * std) < valor && valor < (mean + 2 * std)) {
+                        return "AMARILLO";
+                } else {
+                        return "ROJO";
+                }
+        }
+
+        private List<TipoReproductivo> listEstadosRepOk = Arrays.asList(TipoReproductivo.GESTANTE,
+                        TipoReproductivo.PARIDA, TipoReproductivo.VACIA, TipoReproductivo.INSEMINADA);
+
+        private String getEstadoReproductivo(EstadoReproductivo estadoRep) {
+                if (this.listEstadosRepOk.contains(estadoRep.getEstado())) {
+                        return "VERDE";
+                } else if (estadoRep.getEstado().equals(TipoReproductivo.POSIBLE_CELO)) {
+                        return "AMARILLO";
+                } else {
+                        return "ROJO";
+                }
         }
 }

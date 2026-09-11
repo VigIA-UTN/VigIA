@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import dev.vigia.backend.dto.AnimalIndicadoresSaludResponse;
 import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
@@ -301,4 +302,21 @@ public class AnimalController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @GetMapping("/{id}/indicadores-salud")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<?> getIndicadoresSalud(
+            @PathVariable("id") Long animalId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            AnimalIndicadoresSaludResponse response = animalService.getIndicadoresSalud(animalId, email);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }
