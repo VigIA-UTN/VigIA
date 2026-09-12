@@ -1,4 +1,5 @@
 import * as L from 'leaflet';
+import axios from 'axios';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import {
     BarChart, Bar,
@@ -277,9 +278,13 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                     fecha: new Date().toISOString().split('T')[0],
                 });
             }, 1000);
-        } catch (err: any) {
+        } catch (err) {
             console.error('Error al registrar peso:', err);
-            setPesoFormError(err.response?.data?.message || 'Error al registrar el peso. Verifique los datos ingresados.');
+            if (axios.isAxiosError(err) && err.response?.data?.message) {
+                setPesoFormError(err.response.data.message);
+            } else {
+                setPesoFormError('Error al registrar el peso. Verifique los datos ingresados.');
+            }
         } finally {
             setSubmittingPeso(false);
         }
@@ -517,7 +522,7 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                                         tickFormatter={v => `${v}`}
                                     />
                                     <Tooltip
-                                        formatter={(value: number) => [`${value} ${unidad}`, 'Peso']}
+                                        formatter={(value) => [`${value} ${unidad}`, 'Peso']}
                                         contentStyle={{
                                             background: '#fff',
                                             border: '1px solid #E2E8F0',
