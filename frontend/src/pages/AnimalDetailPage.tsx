@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Button, Spinner, Alert, Card, Row, Col, Form, Modal, Badge } from 'react-bootstrap';
 import {
@@ -257,13 +257,18 @@ export default function AnimalDetailPage() {
         }
     };
 
+    const formatDateForInput = (dateStr: string | null | undefined) => {
+        if (!dateStr) return null;
+        return dateStr.split('T')[0];
+    };
+
     const openNuevoEstadoModal = () => {
         setEditingEstado(null);
         const lastEstado = historial.length > 0 ? historial[0] : null;
         setEstadoForm({
             estado: 'VACIA',
-            fechaUltimoParto: lastEstado?.fechaUltimoParto || null,
-            fechaUltimaInseminacion: lastEstado?.fechaUltimaInseminacion || null,
+            fechaUltimoParto: formatDateForInput(lastEstado?.fechaUltimoParto),
+            fechaUltimaInseminacion: formatDateForInput(lastEstado?.fechaUltimaInseminacion),
         });
         setEstadoFormError(null);
         setEstadoSuccess(null);
@@ -274,8 +279,8 @@ export default function AnimalDetailPage() {
         setEditingEstado(estado);
         setEstadoForm({
             estado: (estado.estado ?? 'VACIA') as TipoReproductivo,
-            fechaUltimoParto: estado.fechaUltimoParto,
-            fechaUltimaInseminacion: estado.fechaUltimaInseminacion,
+            fechaUltimoParto: formatDateForInput(estado.fechaUltimoParto),
+            fechaUltimaInseminacion: formatDateForInput(estado.fechaUltimaInseminacion),
         });
         setEstadoFormError(null);
         setEstadoSuccess(null);
@@ -659,27 +664,27 @@ export default function AnimalDetailPage() {
                                                 const editable = h.estado !== 'INSEMINADA';
                                                 const rowOrigenClass = origen === 'AUTOMATICO' ? 'hist-row-auto' : 'hist-row-manual';
                                                 return (
-                                                <tr key={`${h.id}-${h.fechaRegistro}`} className={`${idx === 0 ? 'fw-semibold ' : ''}${rowOrigenClass}`}>
-                                                    <td>{estadoReproductivoBadge(h.estado)}</td>
-                                                    <td>{formatFechaLocal(h.fechaUltimoParto)}</td>
-                                                    <td>{formatFechaLocal(h.fechaUltimaInseminacion)}</td>
-                                                    <td>{origenBadge(origen)}</td>
-                                                    <td>{h.registradoPor || '—'}</td>
-                                                    <td>{formatDateTime(h.fechaRegistro)}</td>
-                                                    {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
-                                                        <td className="text-center">
-                                                            {idx === 0 && editable && (
-                                                                <Button
-                                                                    variant="outline-primary"
-                                                                    size="sm"
-                                                                    onClick={() => openEditarEstadoModal(h)}
-                                                                >
-                                                                    <i className="bi bi-pencil" /> Editar
-                                                                </Button>
-                                                            )}
-                                                        </td>
-                                                    )}
-                                                </tr>
+                                                    <tr key={`${h.id}-${h.fechaRegistro}`} className={`${idx === 0 ? 'fw-semibold ' : ''}${rowOrigenClass}`}>
+                                                        <td>{estadoReproductivoBadge(h.estado)}</td>
+                                                        <td>{formatFechaLocal(h.fechaUltimoParto)}</td>
+                                                        <td>{formatFechaLocal(h.fechaUltimaInseminacion)}</td>
+                                                        <td>{origenBadge(origen)}</td>
+                                                        <td>{h.registradoPor || '—'}</td>
+                                                        <td>{formatDateTime(h.fechaRegistro)}</td>
+                                                        {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
+                                                            <td className="text-center">
+                                                                {idx === 0 && editable && (
+                                                                    <Button
+                                                                        variant="outline-primary"
+                                                                        size="sm"
+                                                                        onClick={() => openEditarEstadoModal(h)}
+                                                                    >
+                                                                        <i className="bi bi-pencil" /> Editar
+                                                                    </Button>
+                                                                )}
+                                                            </td>
+                                                        )}
+                                                    </tr>
                                                 );
                                             })}
                                         </tbody>

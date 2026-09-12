@@ -63,7 +63,7 @@ public class SseAlertaPublisher {
         // Send missed alerts if lastEventId > 0
         if (lastEventId != null && lastEventId > 0) {
             List<Alerta> perdidas = alertaRepository
-                    .findCeloByEstablecimientoAndIdGreaterThanOrderByIdAsc(establecimientoId, lastEventId);
+                    .findByEstablecimientoAndIdGreaterThanOrderByIdAsc(establecimientoId, lastEventId);
             if (!perdidas.isEmpty()) {
                 log.info("Enviando {} alertas perdidas al cliente reconectado del establecimiento {}", perdidas.size(),
                         establecimientoId);

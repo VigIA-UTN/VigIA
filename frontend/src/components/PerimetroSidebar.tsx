@@ -38,6 +38,15 @@ export default function PerimetroSidebar({
   isSaving = false,
 }: PerimetroSidebarProps) {
   const [isClosing, setIsClosing] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+
+  const handleCancelWithAnimation = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      setIsExiting(false);
+      onCancelEdit();
+    }, 200);
+  };
 
   const handleClose = () => {
     setIsClosing(true);
@@ -88,22 +97,32 @@ export default function PerimetroSidebar({
             </button>
           )}
         </div>
-        <button className="btn btn-link text-secondary p-0" onClick={handleClose}>
-          <i className="bi bi-chevron-double-left fs-5"></i>
+        <button
+          className="btn btn-link text-secondary p-0"
+          onClick={editingPerimetro ? handleCancelWithAnimation : handleClose}
+          title={editingPerimetro ? 'Volver a perímetros' : 'Cerrar'}
+        >
+          <i className={`bi ${editingPerimetro ? 'bi-arrow-left' : 'bi-chevron-double-left'} fs-5`}></i>
         </button>
       </div>
 
       {/* Contenido: Si está en edición muestra el EditPanel, sino el Listado */}
       <div className="flex-grow-1 overflow-auto pe-1 d-flex flex-column gap-3 custom-scrollbar">
         {editingPerimetro ? (
-          <PerimetroEditPanel
-            perimetro={editingPerimetro}
-            rodeos={rodeos}
-            coordenadasEditadas={coordenadasEditadas}
-            onSave={onSaveEdit}
-            onCancel={onCancelEdit}
-            isSaving={isSaving}
-          />
+          <div
+            style={{
+              animation: isExiting ? 'editPanelOut 0.2s ease-in both' : undefined,
+            }}
+          >
+            <PerimetroEditPanel
+              perimetro={editingPerimetro}
+              rodeos={rodeos}
+              coordenadasEditadas={coordenadasEditadas}
+              onSave={onSaveEdit}
+              onCancel={handleCancelWithAnimation}
+              isSaving={isSaving}
+            />
+          </div>
         ) : (
           <>
             {loading && (
@@ -127,7 +146,7 @@ export default function PerimetroSidebar({
                 onEdit={onStartEdit}
                 onHoverStart={onHoverStart}
                 onHoverEnd={onHoverEnd}
-                isEditing={editingPerimetro?.id === perimetro.id}
+                isEditing={false}
               />
             ))}
           </>
@@ -142,6 +161,10 @@ export default function PerimetroSidebar({
         @keyframes slideInLeft {
           from { opacity: 0; transform: translateX(-20px); }
           to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes editPanelOut {
+          from { opacity: 1; transform: translateY(0); }
+          to   { opacity: 0; transform: translateY(12px); }
         }
         @keyframes slideOutLeft {
           from { opacity: 1; transform: translateX(0); }

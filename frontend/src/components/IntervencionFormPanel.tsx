@@ -33,10 +33,12 @@ export default function IntervencionFormPanel({
   onSuccess,
   mode = 'absolute',
 }: IntervencionFormPanelProps) {
+  const isReproductive = (alerta.tipo || '').toUpperCase().includes('CELO');
+  
   const [isClosing, setIsClosing] = useState(false);
   const [descripcion, setDescripcion] = useState('');
   const [fechaHora, setFechaHora] = useState('');
-  const [tipo, setTipo] = useState<TipoIntervencion | ''>('');
+  const [tipo, setTipo] = useState<TipoIntervencion | ''>(isReproductive ? 'INSEMINACION' : '');
   const [estadoSalud, setEstadoSalud] = useState<TipoEstadoSaludResultante | ''>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -174,6 +176,7 @@ export default function IntervencionFormPanel({
                 className="form-select rounded-3 border-0 shadow-sm"
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value as TipoIntervencion | '')}
+                disabled={isReproductive}
               >
                 <option value="">Seleccioná un tipo...</option>
                 {Object.entries(TIPO_LABELS).map(([value, label]) => (

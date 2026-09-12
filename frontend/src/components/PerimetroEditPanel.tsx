@@ -59,8 +59,15 @@ export default function PerimetroEditPanel({
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
+        animation: 'editPanelIn 0.22s ease-out both',
       }}
     >
+      <style>{`
+        @keyframes editPanelIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       {/* Título de Edición */}
       <div>
         <h4
