@@ -43,7 +43,7 @@ export default function AnimalesPage() {
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [formSuccess, setFormSuccess] = useState<string | null>(null);
-    const [form, setForm] = useState<Partial<AnimalRequest>>({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO' });
+    const [form, setForm] = useState<Partial<AnimalRequest>>({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO', pesoInicial: null });
     const [rodeoLotes, setRodeoLotes] = useState<RodeoLoteResponse[]>([]);
 
     const [createRodeoModal, setCreateRodeoModal] = useState(false);
@@ -313,7 +313,7 @@ export default function AnimalesPage() {
     });
 
     const openModal = async () => {
-        setForm({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO' });
+        setForm({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO', pesoInicial: null });
         setFormError(null);
         setFormSuccess(null);
         try {
@@ -563,6 +563,18 @@ export default function AnimalesPage() {
                                     <option key={l.id} value={l.id}>{l.nombre}</option>
                                 ))}
                             </Form.Select>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Peso inicial (kg)</Form.Label>
+                            <Form.Control
+                                name="pesoInicial"
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                placeholder="Ej: 320.5 (opcional)"
+                                value={form.pesoInicial ?? ''}
+                                onChange={e => setForm(prev => ({ ...prev, pesoInicial: e.target.value ? parseFloat(e.target.value) : null }))}
+                            />
                         </Form.Group>
                     </Form>
                 </Modal.Body>

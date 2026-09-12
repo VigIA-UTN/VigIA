@@ -59,6 +59,8 @@ export interface AnimalRequest {
   rodeoLoteId: number | null;
   estadoActual: EstadoAnimal;
   establecimientoId: number;
+  /** Peso inicial en kg (opcional). Si se provee, se crea el primer registro de peso. */
+  pesoInicial?: number | null;
 }
 
 export async function getAnimales(establecimientoId?: number): Promise<AnimalResponse[]> {

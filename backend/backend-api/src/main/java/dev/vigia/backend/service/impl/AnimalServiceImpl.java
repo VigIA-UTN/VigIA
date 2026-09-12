@@ -132,6 +132,16 @@ public class AnimalServiceImpl implements AnimalService {
 
                 Animal savedAnimal = animalRepository.save(animal);
 
+                if (request.getPesoInicial() != null) {
+                        RegistroPeso registroInicial = new RegistroPeso();
+                        registroInicial.setAnimal(savedAnimal);
+                        registroInicial.setValorKg(request.getPesoInicial());
+                        registroInicial.setUnidad("kg");
+                        registroInicial.setFecha(LocalDate.now());
+                        registroInicial.setFechaRegistro(java.time.LocalDateTime.now());
+                        registroPesoRepository.save(registroInicial);
+                }
+
                 return mapToResponse(savedAnimal);
         }
 

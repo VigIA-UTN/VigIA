@@ -375,7 +375,6 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
             {/* ── Gráfico 3: Evolución de Peso ── */}
             <ChartCard
                 title="Evolución de Peso"
-                subtitle="Peso registrado manualmente a lo largo del tiempo"
                 action={
                     <button
                         onClick={() => {
@@ -392,7 +391,7 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 6,
-                            background: '#1E3A5F',
+                            background: '#94C11E',
                             color: '#fff',
                             border: 'none',
                             borderRadius: 8,
@@ -402,8 +401,8 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                             cursor: 'pointer',
                             transition: 'background 0.2s',
                         }}
-                        onMouseOver={(e) => (e.currentTarget.style.background = '#2A4D7D')}
-                        onMouseOut={(e) => (e.currentTarget.style.background = '#1E3A5F')}
+                        onMouseOver={(e) => (e.currentTarget.style.background = '#82B70C')}
+                        onMouseOut={(e) => (e.currentTarget.style.background = '#94C11E')}
                     >
                         <i className="bi bi-plus-circle" /> Registrar Peso
                     </button>
@@ -411,7 +410,7 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
             >
                 {/* Unit toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: 8 }}>
-                    <LegendDot color="#6366F1" label={unidad === 'kg' ? 'Peso (kg)' : 'Peso (lbs)'} />
+                    <LegendDot color="#1E3A5F" label={unidad === 'kg' ? 'Peso (kg)' : 'Peso (lbs)'} />
                     <div style={{
                         display: 'inline-flex',
                         borderRadius: 8,
@@ -428,7 +427,7 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                                     padding: '4px 14px',
                                     border: 'none',
                                     cursor: 'pointer',
-                                    background: unidad === u ? '#6366F1' : '#F7FAFC',
+                                    background: unidad === u ? '#1E3A5F' : '#F7FAFC',
                                     color: unidad === u ? '#fff' : '#718096',
                                     transition: 'background 0.15s, color 0.15s',
                                     fontWeight: unidad === u ? 700 : 400,
@@ -452,7 +451,6 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                         fontSize: '0.88rem',
                         fontStyle: 'italic',
                     }}>
-                        <i className="bi bi-clipboard-x" style={{ fontSize: '1.6rem', display: 'block', marginBottom: 6 }} />
                         Sin registros de peso aún.
                     </div>
                 ) : (() => {
@@ -486,7 +484,7 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                                 {[
                                     { label: 'Mínimo', value: `${Math.min(...values)} ${unidad}`, color: '#38A169' },
                                     { label: 'Máximo', value: `${Math.max(...values)} ${unidad}`, color: '#E53E3E' },
-                                    { label: 'Promedio', value: `${avg} ${unidad}`, color: '#6366F1' },
+                                    { label: 'Promedio', value: `${avg} ${unidad}`, color: '#1B344D' },
                                 ].map(pill => (
                                     <div key={pill.label} style={{
                                         background: '#F7FAFC',
@@ -531,18 +529,18 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                                     />
                                     <ReferenceLine
                                         y={avg}
-                                        stroke="#6366F1"
+                                        stroke="#1B344D"
                                         strokeDasharray="5 3"
                                         strokeWidth={1.5}
-                                        label={{ value: `Prom. ${avg}`, position: 'insideTopRight', fontSize: 10, fill: '#6366F1' }}
+                                        label={{ value: `Prom. ${avg}`, position: 'insideTopRight', fontSize: 10, fill: '#1B344D' }}
                                     />
                                     <Line
                                         type="monotone"
                                         dataKey="value"
-                                        stroke="#6366F1"
+                                        stroke="#1B344D"
                                         strokeWidth={2.5}
-                                        dot={{ r: 4, fill: '#6366F1', strokeWidth: 2, stroke: '#fff' }}
-                                        activeDot={{ r: 6, fill: '#6366F1', stroke: '#fff', strokeWidth: 2 }}
+                                        dot={{ r: 4, fill: '#1B344D', strokeWidth: 2, stroke: '#fff' }}
+                                        activeDot={{ r: 6, fill: '#1B344D', stroke: '#fff', strokeWidth: 2 }}
                                     />
                                 </LineChart>
                             </ResponsiveContainer>
