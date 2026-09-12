@@ -429,6 +429,23 @@ public class AlertaServiceImpl implements AlertaService {
                         if (nuevoEstado == EstadoAlerta.DESCARTADA && notas != null && !notas.trim().isEmpty()) {
                                 alerta.setMotivoDescarte(notas.trim());
                         }
+
+                        if (nuevoEstado == EstadoAlerta.CONFIRMADA && alerta.getDisparador() == DisparadorAlerta.CELO) {
+                                EstadoReproductivo estadoCelo = new EstadoReproductivo();
+                                estadoCelo.setAnimal(alerta.getAnimal());
+                                estadoCelo.setUsuarioRegistrador(usuario);
+                                estadoCelo.setEstado(TipoReproductivo.CELO);
+                                estadoCelo.setOrigen(OrigenEstado.MANUAL);
+                                estadoCelo.setFechaRegistro(LocalDateTime.now());
+                                
+                                List<EstadoReproductivo> estadosActuales = alerta.getAnimal().getEstadosReproductivos();
+                                if (estadosActuales != null && !estadosActuales.isEmpty()) {
+                                        EstadoReproductivo ultimo = estadosActuales.get(0);
+                                        estadoCelo.setFechaUltParto(ultimo.getFechaUltParto());
+                                        estadoCelo.setFechaUltInseminacion(ultimo.getFechaUltInseminacion());
+                                }
+                                estadoReproductivoRepository.save(estadoCelo);
+                        }
                 } else {
                         throw new IllegalArgumentException("Estado inválido para la actualización.");
                 }

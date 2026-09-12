@@ -76,7 +76,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
     }, 280);
   };
 
-  const handleAccion = async (nuevoEstado: 'CONFIRMADA' | 'DESCARTADA', notaOverride?: string) => {
+  const handleAccion = async (nuevoEstado: 'CONFIRMADA' | 'DESCARTADA', triggerIntervencion: boolean = true, notaOverride?: string) => {
     setActionLoading(true);
     try {
       // Si la alerta es un mock, el backend va a tirar 404/500, lo atajamos acá para que actualice igual visualmente.
@@ -85,7 +85,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       });
 
       onActionComplete(alerta.id, nuevoEstado);
-      if (nuevoEstado === 'CONFIRMADA') {
+      if (nuevoEstado === 'CONFIRMADA' && triggerIntervencion) {
         onOpenIntervencion?.();
       }
       handleClose();
@@ -483,23 +483,35 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
       {/* Acciones — solo visibles para Productor y Veterinario */}
       {canActOnAlerts && !loadingDetail && !errorDetail && estadoVisual === 'PENDIENTE' && (
-        <div className="p-4 bg-white border-top d-flex gap-3 justify-content-between" style={{ zIndex: 10, borderRadius: '0 0 0 12px' }}>
-          <button
-            className="btn rounded-3 fw-semibold flex-grow-1 py-2 d-flex justify-content-center align-items-center gap-2"
-            style={{ color: '#D32F2F', backgroundColor: 'white', border: '1px solid #D32F2F' }}
-            onClick={() => handleAccion('DESCARTADA')}
-            disabled={actionLoading}
-          >
-            <i className="bi bi-trash"></i> {actionLoading ? '...' : 'Descartar alerta'}
-          </button>
-          <button
-            className="btn rounded-3 fw-semibold flex-grow-1 py-2 d-flex justify-content-center align-items-center gap-2"
-            style={{ backgroundColor: '#198754', color: 'white', border: '1px solid #198754' }}
-            onClick={() => handleAccion('CONFIRMADA', isSanitaria ? 'Alerta sanitaria atendida' : undefined)}
-            disabled={actionLoading}
-          >
-            <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : 'Confirmar inseminación'}
-          </button>
+        <div className="p-4 bg-white border-top d-flex flex-column gap-2" style={{ zIndex: 10, borderRadius: '0 0 0 12px' }}>
+          <div className="d-flex gap-3 justify-content-between">
+            <button
+              className="btn rounded-3 fw-semibold flex-grow-1 py-2 d-flex justify-content-center align-items-center gap-2"
+              style={{ color: '#D32F2F', backgroundColor: 'white', border: '1px solid #D32F2F' }}
+              onClick={() => handleAccion('DESCARTADA', false)}
+              disabled={actionLoading}
+            >
+              <i className="bi bi-trash"></i> {actionLoading ? '...' : 'Descartar alerta'}
+            </button>
+            <button
+              className="btn rounded-3 fw-semibold flex-grow-1 py-2 d-flex justify-content-center align-items-center gap-2"
+              style={{ backgroundColor: isSanitaria ? '#198754' : 'white', color: isSanitaria ? 'white' : '#198754', border: '1px solid #198754' }}
+              onClick={() => handleAccion('CONFIRMADA', false, isSanitaria ? 'Alerta sanitaria atendida' : undefined)}
+              disabled={actionLoading}
+            >
+              <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : 'Confirmar celo'}
+            </button>
+          </div>
+          {!isSanitaria && (
+            <button
+              className="btn rounded-3 fw-semibold w-100 py-2 d-flex justify-content-center align-items-center gap-2"
+              style={{ backgroundColor: '#198754', color: 'white', border: '1px solid #198754' }}
+              onClick={() => handleAccion('CONFIRMADA', true)}
+              disabled={actionLoading}
+            >
+              <i className="bi bi-clipboard-plus"></i> {actionLoading ? '...' : 'Confirmar celo e inseminación'}
+            </button>
+          )}
         </div>
       )}
 

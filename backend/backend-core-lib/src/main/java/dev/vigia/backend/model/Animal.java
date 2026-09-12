@@ -53,11 +53,11 @@ public class Animal {
     private LocalDate fechaAlta;
 
     @OneToMany(mappedBy = "animal", fetch = FetchType.LAZY)
-    @OrderBy("fechaRegistro DESC")
+    @OrderBy("fechaRegistro DESC, id DESC")
     private List<EstadoReproductivo> estadosReproductivos = new ArrayList<>();
 
     @OneToMany(mappedBy = "animal", fetch = FetchType.LAZY)
-    @OrderBy("fechaRegistro DESC")
+    @OrderBy("fechaRegistro DESC, id DESC")
     private List<EstadoSalud> estadosSalud = new ArrayList<>();
 
     public Animal(Establecimiento establecimiento, RodeoLote rodeoLote) {

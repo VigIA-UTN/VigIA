@@ -995,6 +995,7 @@ public class AnimalServiceImpl implements AnimalService {
 
         @Override
         @Transactional
+        @SuppressWarnings("null")
         public AnimalIndicadoresSaludResponse getIndicadoresSalud(Long animalId, String emailProductor) {
                 Usuario usuario = usuarioRepository.findByEmail(emailProductor)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
