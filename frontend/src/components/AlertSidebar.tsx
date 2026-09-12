@@ -35,69 +35,74 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
   useEffect(() => {
     if (!selectedId) return;
     let isMounted = true;
-    const fetchAlertas = async () => {
+    let eventSource: EventSource | null = null;
+
+    const init = async () => {
       setLoading(true);
       try {
         const data = await getAlertas(selectedId, undefined, undefined, 'PENDIENTE');
-        if (isMounted) {
-          setAlertas(data);
-          if (data.length > 0) {
-            maxAlertaIdRef.current = Math.max(...data.map(a => a.id));
-          }
+        if (!isMounted) return;
+        setAlertas(data);
+        if (data.length > 0) {
+          maxAlertaIdRef.current = Math.max(...data.map(a => a.id));
         }
       } catch (error) {
         console.error("Error fetching alertas:", error);
       } finally {
         if (isMounted) setLoading(false);
       }
-    };
-    fetchAlertas();
 
-    // Setup SSE connection
-    const token = useAuthStore.getState().token;
-    const API_URL = import.meta.env.VITE_API_URL as string;
-    let sseUrl = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
-    if (token) {
-      sseUrl += `&token=${token}`;
-    }
-    if (maxAlertaIdRef.current > 0) {
-      sseUrl += `&lastEventId=${maxAlertaIdRef.current}`;
-    }
-
-    const eventSource = new EventSource(sseUrl);
-
-    eventSource.onmessage = (event) => {
       if (!isMounted) return;
-      const newAlerta = JSON.parse(event.data) as AlertaResponse;
-      console.log("Alerta SSE recibida:", newAlerta);
 
-      // Update max ID
-      if (newAlerta.id > maxAlertaIdRef.current) {
-        maxAlertaIdRef.current = newAlerta.id;
+      // Setup SSE connection AFTER fetching initial data
+      const token = useAuthStore.getState().token;
+      const API_URL = import.meta.env.VITE_API_URL as string;
+      let sseUrl = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
+      if (token) {
+        sseUrl += `&token=${token}`;
+      }
+      if (maxAlertaIdRef.current > 0) {
+        sseUrl += `&lastEventId=${maxAlertaIdRef.current}`;
       }
 
-      // Si la alerta ya existe, la actualizamos
-      setAlertas((prev) => {
-        if (prev.some(a => a.id === newAlerta.id)) {
-          return prev.map(a => a.id === newAlerta.id ? newAlerta : a);
+      eventSource = new EventSource(sseUrl);
+
+      eventSource.onmessage = (event) => {
+        if (!isMounted) return;
+        const newAlerta = JSON.parse(event.data) as AlertaResponse;
+        console.log("Alerta SSE recibida en sidebar:", newAlerta);
+
+        // Update max ID
+        if (newAlerta.id > maxAlertaIdRef.current) {
+          maxAlertaIdRef.current = newAlerta.id;
         }
-        // Solo guardamos si es PENDIENTE (al menos como alerta nueva)
-        if (newAlerta.estado !== 'PENDIENTE') return prev;
-        return [newAlerta, ...prev];
-      });
 
-      // Si la alerta actualizada es la que estamos viendo en detalle, actualizamos el estado
-      setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? newAlerta : prev));
+        // Si la alerta ya existe, la actualizamos
+        setAlertas((prev) => {
+          if (prev.some(a => a.id === newAlerta.id)) {
+            return prev.map(a => a.id === newAlerta.id ? newAlerta : a);
+          }
+          // Solo guardamos si es PENDIENTE (al menos como alerta nueva)
+          if (newAlerta.estado !== 'PENDIENTE') return prev;
+          return [newAlerta, ...prev];
+        });
+
+        // Si la alerta actualizada es la que estamos viendo en detalle, actualizamos el estado
+        setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? newAlerta : prev));
+      };
+
+      eventSource.onerror = (error) => {
+        console.error("SSE connection error in sidebar:", error);
+      };
     };
 
-    eventSource.onerror = (error) => {
-      console.error("SSE connection error:", error);
-      // EventSource tries to reconnect automatically.
-    };
+    init();
 
     return () => {
       isMounted = false;
-      eventSource.close();
+      if (eventSource) {
+        eventSource.close();
+      }
     };
   }, [selectedId]);
 
