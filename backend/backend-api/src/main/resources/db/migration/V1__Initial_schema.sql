@@ -105,6 +105,15 @@ CREATE TABLE alertas (
     serie_comparativa_json TEXT
 );
 
+CREATE TABLE registros_peso (
+    id BIGSERIAL PRIMARY KEY,
+    animal_id BIGINT NOT NULL REFERENCES animales(id),
+    fecha DATE NOT NULL,
+    valor_kg DOUBLE PRECISION NOT NULL,
+    unidad VARCHAR(10) NOT NULL DEFAULT 'kg',
+    fecha_registro TIMESTAMP NOT NULL
+);
+
 CREATE TABLE telemetria (
     id BIGSERIAL PRIMARY KEY,
     fecha_hora TIMESTAMP NOT NULL,

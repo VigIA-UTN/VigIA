@@ -59,6 +59,8 @@ export interface AnimalRequest {
   rodeoLoteId: number | null;
   estadoActual: EstadoAnimal;
   establecimientoId: number;
+  /** Peso inicial en kg (opcional). Si se provee, se crea el primer registro de peso. */
+  pesoInicial?: number | null;
 }
 
 export async function getAnimales(establecimientoId?: number): Promise<AnimalResponse[]> {
@@ -263,3 +265,57 @@ export async function getHistorialSalud(animalId: number): Promise<EstadoSaludRe
   );
   return response.data;
 }
+
+// ─── Historial de Pesos ───────────────────────────────────────────────────────
+
+export interface RegistroPesoRequest {
+  valorKg: number;
+  /** 'kg' | 'lbs' — la unidad en la que se registra el peso */
+  unidad: string;
+  /** YYYY-MM-DD. Si es null/undefined, el backend usa la fecha de hoy. */
+  fecha?: string | null;
+}
+
+export interface RegistroPesoResponse {
+  id: number;
+  animalId: number;
+  fecha: string;
+  valorKg: number;
+  unidad: string;
+  fechaRegistro: string;
+}
+
+export async function getHistorialPesos(animalId: number): Promise<RegistroPesoResponse[]> {
+  const response = await axiosClient.get<RegistroPesoResponse[]>(
+    `/animales/${animalId}/historial-pesos`
+  );
+  return response.data;
+}
+
+export async function registrarPeso(
+  animalId: number,
+  data: RegistroPesoRequest
+): Promise<RegistroPesoResponse> {
+  const response = await axiosClient.post<RegistroPesoResponse>(
+    `/animales/${animalId}/historial-pesos`,
+    data
+  );
+  return response.data;
+}
+
+export async function editarPeso(
+  animalId: number,
+  pesoId: number,
+  data: RegistroPesoRequest
+): Promise<RegistroPesoResponse> {
+  const response = await axiosClient.put<RegistroPesoResponse>(
+    `/animales/${animalId}/historial-pesos/${pesoId}`,
+    data
+  );
+  return response.data;
+}
+
+export async function eliminarPeso(animalId: number, pesoId: number): Promise<void> {
+  await axiosClient.delete(`/animales/${animalId}/historial-pesos/${pesoId}`);
+}
+
