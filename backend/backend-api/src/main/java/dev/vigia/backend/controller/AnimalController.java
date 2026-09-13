@@ -31,8 +31,10 @@ import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
+import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.dto.RegistroPesoRequest;
 import dev.vigia.backend.dto.RegistroPesoResponse;
+import dev.vigia.backend.service.AlertaService;
 import dev.vigia.backend.service.AnimalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +45,7 @@ import lombok.RequiredArgsConstructor;
 public class AnimalController {
 
     private final AnimalService animalService;
+    private final AlertaService alertaService;
     private final dev.vigia.backend.service.SseTelemetriaPublisher sseTelemetriaPublisher;
 
     @GetMapping
@@ -389,6 +392,48 @@ public class AnimalController {
         try {
             String email = authentication.getName();
             AnimalIndicadoresSaludResponse response = animalService.getIndicadoresSalud(animalId, email);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // ── Línea de tiempo de alertas ────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/animales/{id}/linea-tiempo-alertas
+     * <p>
+     * Devuelve la línea de tiempo unificada de alertas e intervenciones del animal
+     * ordenada cronológicamente. Soporta filtros opcionales por tipo de alerta y
+     * por rango de fechas.
+     *
+     * @param animalId       ID del animal
+     * @param tipo           (opcional) celo | reproductivo | sanitario | geoespacial | perimetro
+     * @param desde          (opcional) inicio del rango de fechas en formato ISO-8601
+     * @param hasta          (opcional) fin del rango de fechas en formato ISO-8601
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de eventos, 400 si hay error de argumento, 403 si acceso denegado
+     */
+    @GetMapping("/{id}/linea-tiempo-alertas")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> getLineaTiempoAlertas(
+            @PathVariable("id") Long animalId,
+            @RequestParam(name = "tipo",  required = false) String tipo,
+            @RequestParam(name = "desde", required = false)
+            @org.springframework.format.annotation.DateTimeFormat(
+                    iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+                    java.time.LocalDateTime desde,
+            @RequestParam(name = "hasta", required = false)
+            @org.springframework.format.annotation.DateTimeFormat(
+                    iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+                    java.time.LocalDateTime hasta,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<LineaTiempoEventoResponse> response =
+                    alertaService.obtenerLineaTiempoAlertas(email, animalId, tipo, desde, hasta);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());

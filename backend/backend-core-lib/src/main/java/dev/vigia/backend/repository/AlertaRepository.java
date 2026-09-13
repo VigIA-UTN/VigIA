@@ -89,6 +89,21 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
        List<Alerta> alertasAnimalActivas(@Param("animalId") Long animalId);
 
        /**
+        * Lista las alertas de un animal concreto aplicando filtros opcionales.
+        */
+       @Query("SELECT a FROM Alerta a " +
+                     "WHERE a.animal.id = :animalId " +
+                     "AND (:disparador IS NULL OR a.disparador = :disparador) " +
+                     "AND (cast(:desde as timestamp) IS NULL OR a.tsGeneracion >= :desde) " +
+                     "AND (cast(:hasta as timestamp) IS NULL OR a.tsGeneracion <= :hasta) " +
+                     "ORDER BY a.tsGeneracion ASC")
+       List<Alerta> findByAnimalConFiltros(
+                     @Param("animalId") Long animalId,
+                     @Param("disparador") DisparadorAlerta disparador,
+                     @Param("desde") LocalDateTime desde,
+                     @Param("hasta") LocalDateTime hasta);
+
+       /**
         * Lista las alertas de un establecimiento concreto aplicando filtros
         * opcionales.
         * Ordena por severidad descendente (ALTA, MEDIA, BAJA) y luego por fecha.

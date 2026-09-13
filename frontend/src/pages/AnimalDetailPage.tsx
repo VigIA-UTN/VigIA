@@ -29,6 +29,7 @@ import ActividadTab from './ActividadTab';
 import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import type { AlertaResponse } from '../api/alertaApi';
+import LineaTiempoAlertas from '../components/LineaTiempoAlertas';
 
 const TIPOS_REPRODUCTIVOS: TipoReproductivo[] = ['VACIA', 'GESTANTE', 'CELO', 'ANESTRO'];
 
@@ -786,6 +787,9 @@ export default function AnimalDetailPage() {
                             )}
                         </Card.Body>
                     </Card>
+
+                    {/* ── Línea de Tiempo de Alertas ── */}
+                    <LineaTiempoAlertas animalId={animal.id} />
 
                 </div>)}
             </Container>

@@ -1,11 +1,13 @@
 package dev.vigia.backend.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
+import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.EstadoAlerta;
 
@@ -96,4 +98,31 @@ public interface AlertaService {
                         Long alertaId);
 
         AlertaResponse intervenirAlerta(String emailUsuario, Long alertaId, IntervencionRequest request);
+
+        /**
+         * Devuelve la línea de tiempo unificada de alertas e intervenciones de un animal,
+         * ordenada cronológicamente (ASC). Las alertas y las intervenciones (H0021) se
+         * mezclan en una sola lista distinguibles por el campo {@code tipoEvento}.
+         *
+         * <p>Las intervenciones se devuelven siempre que cumplan el rango de fechas;
+         * el filtro por {@code tipo} se aplica únicamente a las alertas.
+         *
+         * @param emailUsuario email del usuario autenticado (extraído del JWT)
+         * @param animalId     ID del animal
+         * @param tipo         filtro opcional de tipo de alerta:
+         *                     {@code "celo"}, {@code "sanitario"},
+         *                     {@code "geoespacial"}, {@code "perimetro"} (null = todos)
+         * @param desde        inicio del rango de fechas, inclusive (null = sin límite)
+         * @param hasta        fin del rango de fechas, inclusive (null = sin límite)
+         * @return lista de eventos ordenados por fecha ASC
+         * @throws AccessDeniedException    si el usuario no pertenece al establecimiento
+         *                                  del animal
+         * @throws IllegalArgumentException si el usuario o el animal no existen
+         */
+        List<LineaTiempoEventoResponse> obtenerLineaTiempoAlertas(
+                        String emailUsuario,
+                        Long animalId,
+                        String tipo,
+                        LocalDateTime desde,
+                        LocalDateTime hasta);
 }

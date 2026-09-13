@@ -319,3 +319,42 @@ export async function eliminarPeso(animalId: number, pesoId: number): Promise<vo
   await axiosClient.delete(`/animales/${animalId}/historial-pesos/${pesoId}`);
 }
 
+// ─── Línea de tiempo de alertas ───────────────────────────────────────────────
+
+export interface LineaTiempoEventoResponse {
+  /** "ALERTA" | "INTERVENCION" */
+  tipoEvento: string;
+  id: number;
+  /** tsGeneracion para alertas, fechaHora para intervenciones (ISO-8601) */
+  fecha: string;
+  // ── Campos de ALERTA ──────────────────────────────────────────────────────
+  tipo: string | null;
+  severidad: 'ALTA' | 'MEDIA' | 'BAJA' | null;
+  /** "CONFIRMADA" | "DESCARTADA" | "SIN_ATENDER" */
+  estadoResolucion: string | null;
+  // ── Campos de INTERVENCION ────────────────────────────────────────────────
+  tipoIntervencion: string | null;
+  descripcion: string | null;
+  interventor: string | null;
+  alertaAsociadaId: number | null;
+}
+
+export interface LineaTiempoFiltros {
+  tipo?: string;
+  desde?: string; // ISO-8601 datetime
+  hasta?: string; // ISO-8601 datetime
+}
+
+export async function getLineaTiempoAlertas(
+  animalId: number,
+  filtros?: LineaTiempoFiltros
+): Promise<LineaTiempoEventoResponse[]> {
+  const params = new URLSearchParams();
+  if (filtros?.tipo) params.append('tipo', filtros.tipo);
+  if (filtros?.desde) params.append('desde', filtros.desde);
+  if (filtros?.hasta) params.append('hasta', filtros.hasta);
+  const query = params.toString();
+  const url = `/animales/${animalId}/linea-tiempo-alertas${query ? `?${query}` : ''}`;
+  const response = await axiosClient.get<LineaTiempoEventoResponse[]>(url);
+  return response.data;
+}

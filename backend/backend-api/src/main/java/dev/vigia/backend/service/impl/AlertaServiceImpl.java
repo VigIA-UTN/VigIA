@@ -1,7 +1,9 @@
 package dev.vigia.backend.service.impl;
 
+import java.util.Comparator;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,14 +19,17 @@ import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.DetalleSanitarioResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
+import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
@@ -50,6 +55,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 public class AlertaServiceImpl implements AlertaService {
 
         private final AlertaRepository alertaRepository;
+        private final AnimalRepository animalRepository;
         private final UsuarioRepository usuarioRepository;
         private final EstablecimientoRepository establecimientoRepository;
         private final IntervencionRepository intervencionRepository;
@@ -646,6 +652,154 @@ public class AlertaServiceImpl implements AlertaService {
                 registrarEstadoDerivado(intervencion, request, usuario);
 
                 return this.toResponse(alerta);
+        }
+
+        // ── Línea de tiempo ───────────────────────────────────────────────────────────
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<LineaTiempoEventoResponse> obtenerLineaTiempoAlertas(
+                        String emailUsuario,
+                        Long animalId,
+                        String tipo,
+                        LocalDateTime desde,
+                        LocalDateTime hasta) {
+
+                // 1. Validar que el usuario existe
+                usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                // 2. Obtener el animal
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                // 3. Verificar aislamiento multi-tenant: el animal debe pertenecer a un
+                //    establecimiento activo del usuario autenticado
+                Long establecimientoId = animal.getEstablecimiento() != null
+                                ? animal.getEstablecimiento().getId()
+                                : null;
+
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientoId != null &&
+                                establecimientos.stream()
+                                                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento del animal indicado.");
+                }
+
+                // 4. Resolver el filtro de tipo a DisparadorAlerta (solo se aplica a alertas)
+                DisparadorAlerta disparadorEnum = resolverDisparador(tipo);
+
+                // 5. Consultar alertas del animal con filtros
+                List<Alerta> alertas = alertaRepository.findByAnimalConFiltros(
+                                animalId, disparadorEnum, desde, hasta);
+
+                // 6. Consultar intervenciones del animal (solo filtradas por rango de fechas)
+                List<Intervencion> intervenciones = intervencionRepository
+                                .findByAnimalConRango(animalId, desde, hasta);
+
+                // 7. Mapear alertas a eventos de línea de tiempo
+                List<LineaTiempoEventoResponse> eventos = new ArrayList<>();
+
+                alertas.stream()
+                                .map(this::alertaToLineaTiempo)
+                                .forEach(eventos::add);
+
+                // 8. Mapear intervenciones a eventos de línea de tiempo
+                intervenciones.stream()
+                                .map(this::intervencionToLineaTiempo)
+                                .forEach(eventos::add);
+
+                // 9. Ordenar la lista combinada cronológicamente
+                eventos.sort(Comparator.comparing(
+                                LineaTiempoEventoResponse::getFecha,
+                                Comparator.nullsLast(Comparator.naturalOrder())));
+
+                return eventos;
+        }
+
+        /**
+         * Traduce el parámetro {@code tipo} (string del query param) al enum
+         * {@link DisparadorAlerta} correspondiente. Devuelve {@code null} si el
+         * valor es nulo, vacío o no reconocido (sin filtro).
+         */
+        private DisparadorAlerta resolverDisparador(String tipo) {
+                if (tipo == null || tipo.isBlank()) {
+                        return null;
+                }
+                return switch (tipo.trim().toLowerCase()) {
+                        case "celo", "reproductivo" -> DisparadorAlerta.CELO;
+                        case "sanitario"            -> DisparadorAlerta.SALUD;
+                        case "geoespacial"           -> DisparadorAlerta.ABIGEATO;
+                        case "perimetro"             -> DisparadorAlerta.FUERA_DE_PERIMETRO;
+                        default                      -> null;
+                };
+        }
+
+        /**
+         * Determina el estado de resolución legible para la ficha del animal a partir
+         * del {@link EstadoAlerta} interno.
+         *
+         * <ul>
+         *   <li>{@code CONFIRMADA} → {@code "CONFIRMADA"}</li>
+         *   <li>{@code DESCARTADA} → {@code "DESCARTADA"}</li>
+         *   <li>Cualquier otro estado → {@code "SIN_ATENDER"}</li>
+         * </ul>
+         */
+        private String resolverEstadoResolucion(EstadoAlerta estado) {
+                if (estado == null) return "SIN_ATENDER";
+                return switch (estado) {
+                        case CONFIRMADA -> "CONFIRMADA";
+                        case DESCARTADA -> "DESCARTADA";
+                        default         -> "SIN_ATENDER";
+                };
+        }
+
+        private LineaTiempoEventoResponse alertaToLineaTiempo(Alerta alerta) {
+                return LineaTiempoEventoResponse.builder()
+                                .tipoEvento("ALERTA")
+                                .id(alerta.getId())
+                                .fecha(alerta.getTsGeneracion())
+                                .tipo(alerta.getDisparador() != null
+                                                ? alerta.getDisparador().name()
+                                                : alerta.getTipo())
+                                .severidad(alerta.getSeveridad() != null
+                                                ? alerta.getSeveridad().name()
+                                                : null)
+                                .estadoResolucion(resolverEstadoResolucion(alerta.getEstado()))
+                                .build();
+        }
+
+        private LineaTiempoEventoResponse intervencionToLineaTiempo(Intervencion intervencion) {
+                String interventorNombre = null;
+                if (intervencion.getInterventor() != null) {
+                        interventorNombre = intervencion.getInterventor().getNombre();
+                        if (intervencion.getInterventor().getApellido() != null
+                                        && !intervencion.getInterventor().getApellido().isBlank()) {
+                                interventorNombre += " " + intervencion.getInterventor().getApellido();
+                        }
+                        if (interventorNombre == null || interventorNombre.isBlank()) {
+                                interventorNombre = intervencion.getInterventor().getEmail();
+                        }
+                }
+
+                return LineaTiempoEventoResponse.builder()
+                                .tipoEvento("INTERVENCION")
+                                .id(intervencion.getId())
+                                .fecha(intervencion.getFechaHora())
+                                .tipoIntervencion(intervencion.getTipo() != null
+                                                ? intervencion.getTipo().name()
+                                                : null)
+                                .descripcion(intervencion.getDescripcion())
+                                .interventor(interventorNombre)
+                                .alertaAsociadaId(intervencion.getAlerta() != null
+                                                ? intervencion.getAlerta().getId()
+                                                : null)
+                                .build();
         }
 
         private void registrarEstadoDerivado(Intervencion intervencion, IntervencionRequest request, Usuario usuario) {
