@@ -322,17 +322,12 @@ export async function eliminarPeso(animalId: number, pesoId: number): Promise<vo
 // ─── Línea de tiempo de alertas ───────────────────────────────────────────────
 
 export interface LineaTiempoEventoResponse {
-  /** "ALERTA" | "INTERVENCION" */
   tipoEvento: string;
   id: number;
-  /** tsGeneracion para alertas, fechaHora para intervenciones (ISO-8601) */
-  fecha: string;
-  // ── Campos de ALERTA ──────────────────────────────────────────────────────
+  fecha: string
   tipo: string | null;
   severidad: 'ALTA' | 'MEDIA' | 'BAJA' | null;
-  /** "CONFIRMADA" | "DESCARTADA" | "SIN_ATENDER" */
   estadoResolucion: string | null;
-  // ── Campos de INTERVENCION ────────────────────────────────────────────────
   tipoIntervencion: string | null;
   descripcion: string | null;
   interventor: string | null;

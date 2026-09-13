@@ -18,9 +18,9 @@ const TIPO_ALERTA_LABEL: Record<string, string> = {
 
 const TIPO_ALERTA_ICON: Record<string, string> = {
   CELO: 'bi-heart-pulse-fill',
-  SALUD: 'bi-shield-exclamation',
+  SALUD: 'bi-shield-fill-exclamation',
   ABIGEATO: 'bi-geo-alt-fill',
-  FUERA_DE_PERIMETRO: 'bi-bounding-box',
+  FUERA_DE_PERIMETRO: 'bi-bounding-box-circles',
 };
 
 const TIPO_INTERVENCION_LABEL: Record<string, string> = {
@@ -34,8 +34,8 @@ const TIPO_INTERVENCION_LABEL: Record<string, string> = {
 const TIPO_INTERVENCION_ICON: Record<string, string> = {
   TRATAMIENTO: 'bi-capsule-pill',
   VACUNACION: 'bi-syringe',
-  REVISION_VETERINARIA: 'bi-stethoscope',
-  INSEMINACION: 'bi-dribbble',
+  REVISION_VETERINARIA: 'bi-clipboard-plus-fill',
+  INSEMINACION: 'bi-eyedropper',
   OTRO: 'bi-clipboard2-pulse-fill',
 };
 
@@ -253,8 +253,8 @@ function EventoNodo({ evento, position, index }: NodoProps) {
     : TIPO_INTERVENCION_LABEL[evento.tipoIntervencion ?? ''] ?? 'Intervención';
 
   const icon = isAlerta
-    ? TIPO_ALERTA_ICON[evento.tipo ?? ''] ?? 'bi-bell-fill'
-    : TIPO_INTERVENCION_ICON[evento.tipoIntervencion ?? ''] ?? 'bi-clipboard2-pulse-fill';
+    ? TIPO_ALERTA_ICON[evento.tipo?.toUpperCase() ?? ''] ?? 'bi-bell-fill'
+    : TIPO_INTERVENCION_ICON[evento.tipoIntervencion?.toUpperCase() ?? ''] ?? 'bi-clipboard2-pulse-fill';
 
   return (
     <div className="lt-nodo-wrapper" style={{ '--nodo-index': index } as React.CSSProperties}>

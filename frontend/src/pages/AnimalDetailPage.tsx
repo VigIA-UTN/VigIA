@@ -626,6 +626,9 @@ export default function AnimalDetailPage() {
                         </Card.Body>
                     </Card>
 
+                    {/* ── Línea de Tiempo de Alertas ── */}
+                    <LineaTiempoAlertas animalId={animal.id} />
+
                     {/* ── Sección Historial Reproductivo ── */}
                     <Card className="shadow-sm border-0 animal-card">
                         <Card.Body>
@@ -787,9 +790,6 @@ export default function AnimalDetailPage() {
                             )}
                         </Card.Body>
                     </Card>
-
-                    {/* ── Línea de Tiempo de Alertas ── */}
-                    <LineaTiempoAlertas animalId={animal.id} />
 
                 </div>)}
             </Container>

@@ -400,22 +400,7 @@ public class AnimalController {
         }
     }
 
-    // ── Línea de tiempo de alertas ────────────────────────────────────────────
-
-    /**
-     * GET /api/v1/animales/{id}/linea-tiempo-alertas
-     * <p>
-     * Devuelve la línea de tiempo unificada de alertas e intervenciones del animal
-     * ordenada cronológicamente. Soporta filtros opcionales por tipo de alerta y
-     * por rango de fechas.
-     *
-     * @param animalId       ID del animal
-     * @param tipo           (opcional) celo | reproductivo | sanitario | geoespacial | perimetro
-     * @param desde          (opcional) inicio del rango de fechas en formato ISO-8601
-     * @param hasta          (opcional) fin del rango de fechas en formato ISO-8601
-     * @param authentication contexto de seguridad inyectado por Spring Security
-     * @return 200 con la lista de eventos, 400 si hay error de argumento, 403 si acceso denegado
-     */
+    // ── Línea de tiempo de alertas ────────────────────────────────────────────────────
     @GetMapping("/{id}/linea-tiempo-alertas")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getLineaTiempoAlertas(
