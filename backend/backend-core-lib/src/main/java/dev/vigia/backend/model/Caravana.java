@@ -36,4 +36,14 @@ public class Caravana {
 
     @OneToOne(mappedBy = "caravana", fetch = FetchType.LAZY)
     private Animal animal;
+
+    @Column(name = "dev_eui", nullable = false, unique = true)
+    private String devEui;
+
+    @Column(name = "ultimo_frame_counter")
+    private Integer ultimoFrameCounter;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_sensor")
+    private EstadoSensor estadoSensor;
 }
