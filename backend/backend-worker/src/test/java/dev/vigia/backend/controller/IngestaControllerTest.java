@@ -1,8 +1,11 @@
 package dev.vigia.backend.controller;
 
+import dev.vigia.backend.config.RabbitMQConfig;
+import dev.vigia.backend.dto.ml.TelemetriaEventDTO;
 import dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
+import dev.vigia.backend.model.EstadoInferencia;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.repository.AnimalRepository;
@@ -24,6 +27,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,6 +78,26 @@ class IngestaControllerTest {
         decoded.setLatitude(-34.5);
         decoded.setLongitude(-58.5);
         decoded.setBattery("80%");
+
+        TTNWebhookRequestDTO.UplinkMessage uplink = new TTNWebhookRequestDTO.UplinkMessage();
+        uplink.setDecodedPayload(decoded);
+        uplink.setReceivedAt("2026-01-01T00:00:00Z");
+        uplink.setFCnt(fCnt);
+
+        TTNWebhookRequestDTO payload = new TTNWebhookRequestDTO();
+        payload.setEndDeviceIds(endDeviceIds);
+        payload.setUplinkMessage(uplink);
+        return payload;
+    }
+
+    private TTNWebhookRequestDTO heartbeatCon(Integer fCnt, String battery, Integer moveState) {
+        TTNWebhookRequestDTO.EndDeviceIds endDeviceIds = new TTNWebhookRequestDTO.EndDeviceIds();
+        endDeviceIds.setDevEui(DEV_EUI);
+
+        TTNWebhookRequestDTO.DecodedPayload decoded = new TTNWebhookRequestDTO.DecodedPayload();
+        decoded.setType("Heartbeat");
+        decoded.setBattery(battery);
+        decoded.setMoveState(moveState);
 
         TTNWebhookRequestDTO.UplinkMessage uplink = new TTNWebhookRequestDTO.UplinkMessage();
         uplink.setDecodedPayload(decoded);
@@ -197,5 +221,98 @@ class IngestaControllerTest {
         assertThat(response.getBody()).isEqualTo("Ignorado: Sin decoded_payload");
         verifyNoInteractions(telemetriaRepository);
         verify(caravanaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Posición procesada: publica evento de telemetría en RabbitMQ y dispara verificación de geocerca")
+    void posicionProcesada_publicaRabbitYVerificaGeocerca() {
+        when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
+        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
+
+        ResponseEntity<String> response = controller.receiveUplink(payloadCon(1));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+
+        ArgumentCaptor<TelemetriaEventDTO> eventCaptor = ArgumentCaptor.forClass(TelemetriaEventDTO.class);
+        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.TELEMETRIA_EXCHANGE), eq(""), eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getAnimalId()).isEqualTo(animal.getId());
+        assertThat(eventCaptor.getValue().getLatitud()).isEqualTo(-34.5);
+        assertThat(eventCaptor.getValue().getLongitud()).isEqualTo(-58.5);
+
+        verify(geofenceVerificationService, times(1))
+                .verificarPosicion(eq(animal), eq(-34.5), eq(-58.5), any());
+        verify(eventPublisher, times(1)).publishEvent("NUEVA_TELEMETRIA");
+    }
+
+    @Test
+    @DisplayName("Heartbeat sin telemetría previa, crea fila nueva sin coordenadas con batería y moveState")
+    void heartbeatSinTelemetriaPrevia_creaFilaNueva() {
+        when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
+        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
+
+        ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, "75%", 0));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+
+        ArgumentCaptor<Telemetria> telemetriaCaptor = ArgumentCaptor.forClass(Telemetria.class);
+        verify(telemetriaRepository, times(1)).save(telemetriaCaptor.capture());
+        Telemetria guardada = telemetriaCaptor.getValue();
+        assertThat(guardada.getLatitud()).isNull();
+        assertThat(guardada.getLongitud()).isNull();
+        assertThat(guardada.getMoveState()).isEqualTo(0);
+        assertThat(guardada.getBateria()).isEqualTo(75.0);
+        assertThat(guardada.getEstadoInferenciaCelo()).isEqualTo(EstadoInferencia.PENDIENTE);
+        assertThat(guardada.getEstadoInferenciaSalud()).isEqualTo(EstadoInferencia.PENDIENTE);
+
+        verify(eventPublisher, times(1)).publishEvent("NUEVA_TELEMETRIA");
+    }
+
+    @Test
+    @DisplayName("Heartbeat con telemetría previa, actualiza la fila existente en vez de crear una nueva")
+    void heartbeatConTelemetriaPrevia_actualizaFilaExistente() {
+        Telemetria previa = new Telemetria();
+        previa.setCaravana(caravana);
+        previa.setLatitud(-34.5);
+        previa.setLongitud(-58.5);
+        previa.setMoveState(0);
+        previa.setBateria(90.0);
+
+        when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
+        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.of(previa));
+
+        ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, "60%", 1));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+
+        ArgumentCaptor<Telemetria> telemetriaCaptor = ArgumentCaptor.forClass(Telemetria.class);
+        verify(telemetriaRepository, times(1)).save(telemetriaCaptor.capture());
+        Telemetria guardada = telemetriaCaptor.getValue();
+        assertThat(guardada).isSameAs(previa);
+        assertThat(guardada.getLatitud()).isEqualTo(-34.5);
+        assertThat(guardada.getMoveState()).isEqualTo(1);
+        assertThat(guardada.getBateria()).isEqualTo(60.0);
+
+        // Al actualizar una fila existente no se considera una fila "nueva" de telemetría
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Heartbeat con batería en formato inválido, no falla y no pisa el valor previo")
+    void heartbeatConBateriaInvalida_noFalla() {
+        Telemetria previa = new Telemetria();
+        previa.setCaravana(caravana);
+        previa.setBateria(90.0);
+
+        when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
+        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.of(previa));
+
+        ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, "no-numerico", 1));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+        assertThat(previa.getBateria()).isEqualTo(90.0);
     }
 }
