@@ -93,6 +93,12 @@ public class AnimalServiceImpl implements AnimalService {
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
 
+        @Value("${vigia.indicadores.movimiento.sigma-amarillo:1.0}")
+        private double sigmaAmarilloMovimiento;
+
+        @Value("${vigia.indicadores.movimiento.sigma-rojo:2.0}")
+        private double sigmaRojoMovimiento;
+
         private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
 
@@ -1123,7 +1129,6 @@ public class AnimalServiceImpl implements AnimalService {
 
         @Override
         @Transactional
-        @SuppressWarnings("null")
         public AnimalIndicadoresSaludResponse getIndicadoresSalud(Long animalId, String emailProductor) {
                 Usuario usuario = usuarioRepository.findByEmail(emailProductor)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
@@ -1141,90 +1146,121 @@ public class AnimalServiceImpl implements AnimalService {
                         throw new AccessDeniedException(
                                         "No tiene acceso a los datos de este animal.");
                 }
-                PerfilReferencia perfilAnimal = animal.getPerfilReferencia();
 
                 List<IndicadorResponse> indicadores = new ArrayList<>();
-
-                Optional<Telemetria> ultimaTelemetria = telemetriaRepository
-                                .findFirstByCaravanaOrderByFechaHoraDesc(animal.getCaravana());
-
-                if (ultimaTelemetria.isPresent() && perfilAnimal != null) {
-                        Gson gson = new Gson();
-                        System.out.println(perfilAnimal.getPerfilJson());
-                        JsonObject jsonPerfil = gson.fromJson(perfilAnimal.getPerfilJson(), JsonObject.class);
-                        System.out.println(jsonPerfil);
-
-                        Float mean_mov = jsonPerfil.get("mean_moveState_mean").getAsFloat();
-                        Float std_mov = jsonPerfil.get("mean_moveState_std").getAsFloat();
-
-                        Telemetria telemetria = ultimaTelemetria.get();
-                        IndicadorResponse indicador = IndicadorResponse.builder()
-                                        .nombre("Estado de movimiento")
-                                        .descripcion("Estado de movimiento del animal.")
-                                        .valor(String.valueOf(telemetria.getMoveState()))
-                                        .estado(this.getEstadoSalud(telemetria.getMoveState(), mean_mov, std_mov))
-                                        .build();
-                        indicadores.add(indicador);
-                } else {
-                        IndicadorResponse indicador = IndicadorResponse.builder()
-                                        .nombre("Estado de movimiento")
-                                        .descripcion("Estado de movimiento del animal.")
-                                        .valor("0")
-                                        .estado("SIN DATOS")
-                                        .build();
-                        indicadores.add(indicador);
-                }
-
-                Optional<EstadoReproductivo> estadoReproductivo = estadoReproductivoRepository
-                                .findFirstByAnimalIdOrderByFechaRegistroDesc(animal.getId());
-
-                if (estadoReproductivo.isPresent()) {
-                        EstadoReproductivo estadoRep = estadoReproductivo.get();
-
-                        IndicadorResponse indicador = IndicadorResponse.builder()
-                                        .nombre("Estado reproductivo")
-                                        .descripcion("Estado reproductivo del animal.")
-                                        .valor(estadoRep.getEstado().name())
-                                        .estado(this.getEstadoReproductivo(estadoRep))
-                                        .build();
-                        indicadores.add(indicador);
-                } else {
-                        IndicadorResponse indicador = IndicadorResponse.builder()
-                                        .nombre("Estado reproductivo")
-                                        .descripcion("Estado reproductivo del animal.")
-                                        .valor("SIN DATOS")
-                                        .estado("SIN DATOS")
-                                        .build();
-                        indicadores.add(indicador);
-                }
+                indicadores.add(calcularIndicadorMovimiento(animal));
+                indicadores.add(calcularIndicadorReproductivo(animal));
 
                 return AnimalIndicadoresSaludResponse.builder()
                                 .animalId(animal.getId())
-                                .caravana(animal.getCaravana().getCodigo())
+                                .caravana(animal.getCaravana() != null ? animal.getCaravana().getCodigo() : null)
                                 .indicadores(indicadores)
                                 .build();
         }
 
+        private IndicadorResponse calcularIndicadorMovimiento(Animal animal) {
+                PerfilReferencia perfilAnimal = animal.getPerfilReferencia();
+
+                Optional<Telemetria> ultimaTelemetria = animal.getCaravana() != null
+                                ? telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(animal.getCaravana())
+                                : Optional.empty();
+
+                if (ultimaTelemetria.isEmpty() || perfilAnimal == null) {
+                        return IndicadorResponse.builder()
+                                        .nombre("Estado de movimiento")
+                                        .descripcion(descripcionMovimiento("SIN DATOS"))
+                                        .valor("0")
+                                        .estado("SIN DATOS")
+                                        .build();
+                }
+
+                Gson gson = new Gson();
+                JsonObject jsonPerfil = gson.fromJson(perfilAnimal.getPerfilJson(), JsonObject.class);
+                Float meanMov = jsonPerfil.get("mean_moveState_mean").getAsFloat();
+                Float stdMov = jsonPerfil.get("mean_moveState_std").getAsFloat();
+
+                Telemetria telemetria = ultimaTelemetria.get();
+                String estado = getEstadoSalud(telemetria.getMoveState(), meanMov, stdMov);
+
+                return IndicadorResponse.builder()
+                                .nombre("Estado de movimiento")
+                                .descripcion(descripcionMovimiento(estado))
+                                .valor(String.valueOf(telemetria.getMoveState()))
+                                .estado(estado)
+                                .build();
+        }
+
+        private IndicadorResponse calcularIndicadorReproductivo(Animal animal) {
+                Optional<EstadoReproductivo> estadoReproductivo = estadoReproductivoRepository
+                                .findFirstByAnimalIdOrderByFechaRegistroDesc(animal.getId());
+
+                if (estadoReproductivo.isEmpty()) {
+                        return IndicadorResponse.builder()
+                                        .nombre("Estado reproductivo")
+                                        .descripcion(descripcionReproductivo("SIN DATOS"))
+                                        .valor("SIN DATOS")
+                                        .estado("SIN DATOS")
+                                        .build();
+                }
+
+                EstadoReproductivo estadoRep = estadoReproductivo.get();
+                String estado = getEstadoReproductivo(estadoRep);
+
+                return IndicadorResponse.builder()
+                                .nombre("Estado reproductivo")
+                                .descripcion(descripcionReproductivo(estado))
+                                .valor(estadoRep.getEstado().name())
+                                .estado(estado)
+                                .build();
+        }
+
         private String getEstadoSalud(Integer valor, Float mean, Float std) {
-                if ((mean - std) < valor && valor < (mean + std)) {
+                if ((mean - sigmaAmarilloMovimiento * std) < valor && valor < (mean + sigmaAmarilloMovimiento * std)) {
                         return "VERDE";
-                } else if ((mean - 2 * std) < valor && valor < (mean + 2 * std)) {
+                } else if ((mean - sigmaRojoMovimiento * std) < valor && valor < (mean + sigmaRojoMovimiento * std)) {
                         return "AMARILLO";
                 } else {
                         return "ROJO";
                 }
         }
 
-        private List<TipoReproductivo> listEstadosRepOk = Arrays.asList(TipoReproductivo.GESTANTE,
-                        TipoReproductivo.PARIDA, TipoReproductivo.VACIA, TipoReproductivo.INSEMINADA);
+        private static final List<TipoReproductivo> ESTADOS_REPRODUCTIVOS_OK = Arrays.asList(
+                        TipoReproductivo.GESTANTE, TipoReproductivo.PARIDA, TipoReproductivo.VACIA,
+                        TipoReproductivo.INSEMINADA);
 
         private String getEstadoReproductivo(EstadoReproductivo estadoRep) {
-                if (this.listEstadosRepOk.contains(estadoRep.getEstado())) {
+                if (ESTADOS_REPRODUCTIVOS_OK.contains(estadoRep.getEstado())) {
                         return "VERDE";
                 } else if (estadoRep.getEstado().equals(TipoReproductivo.POSIBLE_CELO)) {
                         return "AMARILLO";
                 } else {
                         return "ROJO";
+                }
+        }
+
+        private String descripcionMovimiento(String estado) {
+                switch (estado) {
+                        case "VERDE":
+                                return "Actividad dentro del rango normal para este animal.";
+                        case "AMARILLO":
+                                return "Actividad fuera del rango normal, dentro de un margen leve.";
+                        case "ROJO":
+                                return "Actividad muy alejada del rango normal para este animal.";
+                        default:
+                                return "No hay datos de telemetría o perfil de referencia suficientes para calcular este indicador.";
+                }
+        }
+
+        private String descripcionReproductivo(String estado) {
+                switch (estado) {
+                        case "VERDE":
+                                return "Estado reproductivo dentro de lo esperado.";
+                        case "AMARILLO":
+                                return "Estado reproductivo a seguir de cerca (posible celo).";
+                        case "ROJO":
+                                return "Estado reproductivo que requiere atención.";
+                        default:
+                                return "No hay registros de estado reproductivo cargados para este animal.";
                 }
         }
 }
