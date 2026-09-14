@@ -1243,6 +1243,7 @@ class AnimalControllerTest {
                 Caravana caravana3 = new Caravana();
                 caravana3.setCodigo("C-RECIENTE");
                 caravana3.setActivo(true);
+                caravana3.setDevEui("DEV-MET-004");
                 caravana3 = caravanaRepository.save(caravana3);
                 animal3.setCaravana(caravana3);
                 animalRepository.save(animal3);
