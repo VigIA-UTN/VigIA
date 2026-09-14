@@ -10,6 +10,9 @@ import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
+import dev.vigia.backend.service.GeofenceVerificationService;
+import dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO;
+
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +30,7 @@ public class IngestaController {
     private final AnimalRepository animalRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final RabbitTemplate rabbitTemplate;
-    private final dev.vigia.backend.service.GeofenceVerificationService geofenceVerificationService;
+    private final GeofenceVerificationService geofenceVerificationService;
 
     public IngestaController(TelemetriaRepository telemetriaRepository, CaravanaRepository caravanaRepository, AnimalRepository animalRepository, ApplicationEventPublisher eventPublisher, RabbitTemplate rabbitTemplate, dev.vigia.backend.service.GeofenceVerificationService geofenceVerificationService) {
         this.telemetriaRepository = telemetriaRepository;
@@ -40,8 +43,8 @@ public class IngestaController {
 
     @PostMapping("/uplink")
     @SuppressWarnings("null")
-    public ResponseEntity<String> receiveUplink(@RequestBody dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO requestRaw) {
-        dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO payload = requestRaw.getData() != null ? requestRaw.getData() : requestRaw;
+    public ResponseEntity<String> receiveUplink(@RequestBody TTNWebhookRequestDTO requestRaw) {
+        TTNWebhookRequestDTO payload = requestRaw.getData() != null ? requestRaw.getData() : requestRaw;
         
         if (payload.getEndDeviceIds() == null || payload.getEndDeviceIds().getDevEui() == null) {
             log.warn("Payload TTN recibido sin dev_eui.");
@@ -49,8 +52,8 @@ public class IngestaController {
         }
 
         String devEui = payload.getEndDeviceIds().getDevEui();
-        Optional<Caravana> caravanaOpt = caravanaRepository.findByCodigo(devEui);
-        
+        Optional<Caravana> caravanaOpt = caravanaRepository.findByDevEui(devEui);
+
         if (caravanaOpt.isEmpty()) {
             log.warn("Webhook TTN recibido para devEui {} no registrado en el sistema.", devEui);
             return ResponseEntity.ok("Ignorado: Dispositivo no registrado");
@@ -64,15 +67,22 @@ public class IngestaController {
         }
         Animal animal = animalOpt.get();
 
-        dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO.UplinkMessage uplink = payload.getUplinkMessage();
+        TTNWebhookRequestDTO.UplinkMessage uplink = payload.getUplinkMessage();
         if (uplink == null || uplink.getDecodedPayload() == null) {
             log.warn("Webhook TTN recibido para devEui {} sin payload decodificado.", devEui);
             return ResponseEntity.ok("Ignorado: Sin decoded_payload");
         }
 
-        dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO.DecodedPayload decoded = uplink.getDecodedPayload();
+        Integer frameCounter = uplink.getFCnt();
+        if (frameCounter != null && caravana.getUltimoFrameCounter() != null
+                && frameCounter <= caravana.getUltimoFrameCounter()) {
+            log.info("Frame duplicado o retransmitido para devEui {} (fCnt={}, ultimoFrameCounter={}), ignorado por idempotencia.",
+                    devEui, frameCounter, caravana.getUltimoFrameCounter());
+            return ResponseEntity.ok("Ignorado: frame duplicado (idempotencia)");
+        }
 
-        // Obtener última telemetría para fallback de datos o para actualizar
+        TTNWebhookRequestDTO.DecodedPayload decoded = uplink.getDecodedPayload();
+
         Optional<Telemetria> ultimaOpt = telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana);
 
         Telemetria telemetria;
@@ -149,7 +159,12 @@ public class IngestaController {
         }
 
         telemetriaRepository.save(telemetria);
-        
+
+        if (frameCounter != null) {
+            caravana.setUltimoFrameCounter(frameCounter);
+            caravanaRepository.save(caravana);
+        }
+
         if (esNueva) {
             eventPublisher.publishEvent("NUEVA_TELEMETRIA");
         }

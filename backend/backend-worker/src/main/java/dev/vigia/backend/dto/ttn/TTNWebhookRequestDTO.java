@@ -34,6 +34,9 @@ public class TTNWebhookRequestDTO {
         
         @JsonProperty("received_at")
         private String receivedAt;
+
+        @JsonProperty("f_cnt")
+        private Integer fCnt;
     }
 
     @Data
