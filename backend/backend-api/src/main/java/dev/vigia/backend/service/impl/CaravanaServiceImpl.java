@@ -1,6 +1,7 @@
 package dev.vigia.backend.service.impl;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Service;
 import dev.vigia.backend.dto.CaravanaRequest;
 import dev.vigia.backend.dto.CaravanaResponse;
 import dev.vigia.backend.model.Caravana;
+import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
@@ -31,12 +33,20 @@ public class CaravanaServiceImpl implements CaravanaService {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        if (!usuario.getRol().equals(Rol.ADMINISTRADOR)) {
-            throw new AccessDeniedException("No tiene permiso para crear caravanas");
-        }
-
-        establecimientoRepository.findById(caravanaRequest.getEstablecimientoId())
+        Establecimiento establecimiento = establecimientoRepository.findById(caravanaRequest.getEstablecimientoId())
                 .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado"));
+
+        validarAccesoEstablecimiento(usuario, establecimiento);
+
+        caravanaRepository.findByCodigo(caravanaRequest.getIdCaravanaOficial())
+                .ifPresent(c -> {
+                    throw new IllegalArgumentException("Ya existe una caravana con este codigo");
+                });
+
+        caravanaRepository.findByDevEui(caravanaRequest.getDev_eui())
+                .ifPresent(c -> {
+                    throw new IllegalArgumentException("Ya existe una caravana con este devEUI");
+                });
 
         Caravana caravana = new Caravana();
         caravana.setCodigo(caravanaRequest.getIdCaravanaOficial());
@@ -58,5 +68,38 @@ public class CaravanaServiceImpl implements CaravanaService {
                 .activo(newCaravana.isActivo())
                 .estadoSensor(newCaravana.getEstadoSensor())
                 .build();
+    }
+
+    private void validarAccesoEstablecimiento(Usuario usuario, Establecimiento establecimiento) {
+        boolean tieneAcceso = establecimiento.getEmpleados().stream()
+                .anyMatch(e -> e.getUsuario().equals(usuario) && e.isActivo())
+                || usuario.getRol().equals(Rol.ADMINISTRADOR);
+        if (!tieneAcceso) {
+            throw new AccessDeniedException("No tiene acceso a este establecimiento.");
+        }
+    }
+
+    @Override
+    public List<CaravanaResponse> obtenerSensores(String email, Long establecimientoId) {
+
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado"));
+
+        validarAccesoEstablecimiento(usuario, establecimiento);
+
+        return caravanaRepository.findAllByAnimalEstablecimientoId(establecimientoId)
+                .stream().map(c -> CaravanaResponse.builder()
+                        .id(c.getId())
+                        .codigo(c.getCodigo())
+                        .fechaAsignacion(c.getFechaAsignacion())
+                        .fechaAlta(c.getFechaAlta())
+                        .devEui(c.getDevEui())
+                        .activo(c.isActivo())
+                        .estadoSensor(c.getEstadoSensor())
+                        .build())
+                .toList();
     }
 }
