@@ -146,17 +146,20 @@ def generar_payload(device_id, estado):
     estado["lat"] += speed * math.cos(estado["heading"])
     estado["lon"] += speed * math.sin(estado["heading"])
 
+    # Generamos el formato TTN v3 Webhook
     return {
-        "device_id": device_id,
-        # Timestamp real: el modelo no lo usa como feature (solo moveState y
-        # distancia geométrica cruda entre puntos, ver ml-celo/app/main.py),
-        # así que no hay motivo para fabricarlo.
-        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
-        "payload": {
-            "latitud": round(estado["lat"], 6),
-            "longitud": round(estado["lon"], 6),
-            "moveState": move_state,
-            "bateria": round(estado["bateria"], 1)
+        "end_device_ids": {
+            "dev_eui": device_id
+        },
+        "uplink_message": {
+            "received_at": datetime.now(timezone.utc).isoformat(),
+            "decoded_payload": {
+                "type": "GNSSPosition",
+                "latitude": round(estado["lat"], 6),
+                "longitude": round(estado["lon"], 6),
+                "moveState": move_state,
+                "battery": f"{round(estado['bateria'], 1)}%"
+            }
         }
     }
 
@@ -175,10 +178,16 @@ def main():
         errores = 0
 
         print(f"--- Iniciando ciclo de envío ({datetime.now().isoformat()}) ---")
+        
+        headers = {}
+        api_key = os.getenv("TTN_WEBHOOK_API_KEY")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
         for device_id, estado in animales.items():
             payload = generar_payload(device_id, estado)
             try:
-                response = requests.post(API_URL, json=payload, timeout=5)
+                response = requests.post(API_URL, json=payload, headers=headers, timeout=5)
                 if response.status_code in [200, 201, 202]:
                     exitos += 1
                 else:

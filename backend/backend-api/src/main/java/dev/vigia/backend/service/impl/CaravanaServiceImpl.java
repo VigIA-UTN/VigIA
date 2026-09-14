@@ -28,6 +28,7 @@ public class CaravanaServiceImpl implements CaravanaService {
     private final EstablecimientoRepository establecimientoRepository;
 
     @Override
+    @SuppressWarnings("null")
     public CaravanaResponse crearCaravana(CaravanaRequest caravanaRequest, String email) {
 
         Usuario usuario = usuarioRepository.findByEmail(email)

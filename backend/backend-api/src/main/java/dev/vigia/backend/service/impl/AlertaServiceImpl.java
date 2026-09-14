@@ -658,6 +658,7 @@ public class AlertaServiceImpl implements AlertaService {
 
         @Override
         @Transactional(readOnly = true)
+        @SuppressWarnings("null")
         public List<LineaTiempoEventoResponse> obtenerLineaTiempoAlertas(
                         String emailUsuario,
                         Long animalId,
@@ -727,6 +728,7 @@ public class AlertaServiceImpl implements AlertaService {
          * {@link DisparadorAlerta} correspondiente. Devuelve {@code null} si el
          * valor es nulo, vacío o no reconocido (sin filtro).
          */
+        @SuppressWarnings("null")
         private DisparadorAlerta resolverDisparador(String tipo) {
                 if (tipo == null || tipo.isBlank()) {
                         return null;

@@ -1,7 +1,6 @@
 package dev.vigia.backend.controller;
 
 import dev.vigia.backend.config.RabbitMQConfig;
-import dev.vigia.backend.dto.IngestaRequestDTO;
 import dev.vigia.backend.dto.UltimaPosicionResponseDTO;
 import dev.vigia.backend.dto.ml.TelemetriaEventDTO;
 import dev.vigia.backend.model.Animal;
@@ -16,9 +15,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/v1/ingesta")
+@Slf4j
 public class IngestaController {
 
     private final TelemetriaRepository telemetriaRepository;
@@ -38,44 +39,131 @@ public class IngestaController {
     }
 
     @PostMapping("/uplink")
-    public ResponseEntity<String> receiveUplink(@RequestBody IngestaRequestDTO request) {
-        Optional<Caravana> caravanaOpt = caravanaRepository.findByCodigo(request.getDevice_id());
+    @SuppressWarnings("null")
+    public ResponseEntity<String> receiveUplink(@RequestBody dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO requestRaw) {
+        dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO payload = requestRaw.getData() != null ? requestRaw.getData() : requestRaw;
+        
+        if (payload.getEndDeviceIds() == null || payload.getEndDeviceIds().getDevEui() == null) {
+            log.warn("Payload TTN recibido sin dev_eui.");
+            return ResponseEntity.ok("Ignorado: Sin dev_eui");
+        }
+
+        String devEui = payload.getEndDeviceIds().getDevEui();
+        Optional<Caravana> caravanaOpt = caravanaRepository.findByCodigo(devEui);
+        
         if (caravanaOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body("Dispositivo no registrado");
+            log.warn("Webhook TTN recibido para devEui {} no registrado en el sistema.", devEui);
+            return ResponseEntity.ok("Ignorado: Dispositivo no registrado");
         }
 
         Caravana caravana = caravanaOpt.get();
+        Optional<Animal> animalOpt = animalRepository.findByCaravanaId(caravana.getId());
+        if (animalOpt.isEmpty()) {
+            log.warn("Webhook TTN recibido para devEui {} que no está asociado a ningún animal.", devEui);
+            return ResponseEntity.ok("Ignorado: Sin animal asociado");
+        }
+        Animal animal = animalOpt.get();
 
-        Telemetria telemetria = new Telemetria();
-        telemetria.setCaravana(caravana);
-        telemetria.setFechaHora(request.getTimestamp());
-        telemetria.setLatitud(request.getPayload().getLatitud());
-        telemetria.setLongitud(request.getPayload().getLongitud());
-        telemetria.setMoveState(request.getPayload().getMoveState());
-        telemetria.setBateria(request.getPayload().getBateria());
-        telemetria.setEstadoInferenciaCelo(EstadoInferencia.PENDIENTE);
-        telemetria.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
+        dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO.UplinkMessage uplink = payload.getUplinkMessage();
+        if (uplink == null || uplink.getDecodedPayload() == null) {
+            log.warn("Webhook TTN recibido para devEui {} sin payload decodificado.", devEui);
+            return ResponseEntity.ok("Ignorado: Sin decoded_payload");
+        }
+
+        dev.vigia.backend.dto.ttn.TTNWebhookRequestDTO.DecodedPayload decoded = uplink.getDecodedPayload();
+
+        // Obtener última telemetría para fallback de datos o para actualizar
+        Optional<Telemetria> ultimaOpt = telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana);
+
+        Telemetria telemetria;
+        boolean esNueva = false;
+
+        if ("Heartbeat".equalsIgnoreCase(decoded.getType())) {
+            if (ultimaOpt.isPresent()) {
+                // Actualizamos la fila existente para no inyectar coordenadas duplicadas en la serie de tiempo
+                telemetria = ultimaOpt.get();
+                if (decoded.getMoveState() != null) {
+                    telemetria.setMoveState(decoded.getMoveState());
+                }
+                if (decoded.getBattery() != null) {
+                    try {
+                        telemetria.setBateria(Double.parseDouble(decoded.getBattery().replace("%", "")));
+                    } catch (NumberFormatException e) {
+                        // ignore
+                    }
+                }
+            } else {
+                // Si no hay última posición, no podemos hacer mucho con un heartbeat sin coordenadas, 
+                // pero lo guardamos para tener la batería.
+                telemetria = new Telemetria();
+                telemetria.setCaravana(caravana);
+                telemetria.setFechaHora(java.time.LocalDateTime.now());
+                telemetria.setMoveState(decoded.getMoveState());
+                if (decoded.getBattery() != null) {
+                    try {
+                        telemetria.setBateria(Double.parseDouble(decoded.getBattery().replace("%", "")));
+                    } catch (NumberFormatException e) {
+                        // ignore
+                    }
+                }
+                telemetria.setEstadoInferenciaCelo(EstadoInferencia.PENDIENTE);
+                telemetria.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
+                esNueva = true;
+            }
+        } else {
+            // GNSSPosition o similar: creamos nueva fila, a menos que la última fila sea un
+            // Heartbeat sin coordenadas creado hace instantes (llegó desordenado).
+            if (ultimaOpt.isPresent() && ultimaOpt.get().getLatitud() == null &&
+                ultimaOpt.get().getFechaHora().isAfter(java.time.LocalDateTime.now().minusMinutes(5))) {
+                telemetria = ultimaOpt.get();
+                esNueva = false;
+            } else {
+                telemetria = new Telemetria();
+                telemetria.setCaravana(caravana);
+                esNueva = true;
+            }
+            
+            try {
+                telemetria.setFechaHora(java.time.Instant.parse(uplink.getReceivedAt()).atZone(java.time.ZoneId.of("UTC")).toLocalDateTime());
+            } catch (Exception e) {
+                // Solo pisamos la fecha si es una fila nueva, para no arruinar la del heartbeat si actualizamos
+                if (esNueva) telemetria.setFechaHora(java.time.LocalDateTime.now());
+            }
+            
+            telemetria.setLatitud(decoded.getLatitude());
+            telemetria.setLongitud(decoded.getLongitude());
+            
+            // Heredamos batería y moveState del último si no vienen en este payload
+            telemetria.setMoveState(decoded.getMoveState() != null ? decoded.getMoveState() : ultimaOpt.map(Telemetria::getMoveState).orElse(null));
+            if (decoded.getBattery() != null) {
+                try {
+                    telemetria.setBateria(Double.parseDouble(decoded.getBattery().replace("%", "")));
+                } catch (NumberFormatException e) {
+                    telemetria.setBateria(ultimaOpt.map(Telemetria::getBateria).orElse(null));
+                }
+            } else {
+                telemetria.setBateria(ultimaOpt.map(Telemetria::getBateria).orElse(null));
+            }
+            telemetria.setEstadoInferenciaCelo(EstadoInferencia.PENDIENTE);
+            telemetria.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
+        }
 
         telemetriaRepository.save(telemetria);
         
-        // El pipeline (CeloBatchConfig) lee de la base de datos periódicamente.
-        // Opcional: publicar evento de spring
-        eventPublisher.publishEvent("NUEVA_TELEMETRIA");
+        if (esNueva) {
+            eventPublisher.publishEvent("NUEVA_TELEMETRIA");
+        }
 
-        // Buscar el animal para obtener el establecimientoId
-        Optional<Animal> animalOpt = animalRepository.findByCaravanaId(caravana.getId());
-        if (animalOpt.isPresent()) {
-            Animal animal = animalOpt.get();
-            TelemetriaEventDTO dto = TelemetriaEventDTO.builder()
-                .animalId(animal.getId())
-                .establecimientoId(animal.getEstablecimiento().getId())
-                .latitud(telemetria.getLatitud())
-                .longitud(telemetria.getLongitud())
-                .fechaHora(telemetria.getFechaHora())
-                .build();
-            rabbitTemplate.convertAndSend(RabbitMQConfig.TELEMETRIA_EXCHANGE, "", dto);
+        TelemetriaEventDTO dto = TelemetriaEventDTO.builder()
+            .animalId(animal.getId())
+            .establecimientoId(animal.getEstablecimiento().getId())
+            .latitud(telemetria.getLatitud())
+            .longitud(telemetria.getLongitud())
+            .fechaHora(telemetria.getFechaHora())
+            .build();
+        rabbitTemplate.convertAndSend(RabbitMQConfig.TELEMETRIA_EXCHANGE, "", dto);
 
-            // Verificación en tiempo real de salida de perímetro
+        if (telemetria.getLatitud() != null && telemetria.getLongitud() != null) {
             geofenceVerificationService.verificarPosicion(
                 animal, telemetria.getLatitud(), telemetria.getLongitud(), telemetria.getFechaHora());
         }

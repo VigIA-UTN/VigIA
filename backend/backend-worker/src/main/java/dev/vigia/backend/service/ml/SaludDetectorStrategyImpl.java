@@ -181,17 +181,22 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         // recientes (telemetriaList viene ordenada ascendente por
         // fechaHora) y si todavia no hay 288, se reintenta en el proximo
         // ciclo en vez de mandar una ventana invalida.
+        // Primero filtramos puntos con datos nulos para evitar errores 422 en el microservicio ML
+        List<Telemetria> telemetriaValida = telemetriaList.stream()
+                .filter(t -> t.getLatitud() != null && t.getLongitud() != null && t.getMoveState() != null)
+                .collect(Collectors.toList());
+
         final int SAMPLES_PER_DAY = 288;
-        if (telemetriaList.size() < SAMPLES_PER_DAY) {
+        if (telemetriaValida.size() < SAMPLES_PER_DAY) {
             log.info(
                     "Animal {} todavia no tiene una ventana completa de 24hs para evaluar ({} de {} puntos); se reintenta en el proximo ciclo.",
-                    animal.getId(), telemetriaList.size(), SAMPLES_PER_DAY);
+                    animal.getId(), telemetriaValida.size(), SAMPLES_PER_DAY);
             marcarCompletados(telemetriaList);
             return;
         }
-        List<Telemetria> ventanaEvaluar = telemetriaList.size() > SAMPLES_PER_DAY
-                ? telemetriaList.subList(telemetriaList.size() - SAMPLES_PER_DAY, telemetriaList.size())
-                : telemetriaList;
+        List<Telemetria> ventanaEvaluar = telemetriaValida.size() > SAMPLES_PER_DAY
+                ? telemetriaValida.subList(telemetriaValida.size() - SAMPLES_PER_DAY, telemetriaValida.size())
+                : telemetriaValida;
 
         List<PuntoTelemetriaDTO> serie = ventanaEvaluar.stream()
                 .map(t -> PuntoTelemetriaDTO.builder()

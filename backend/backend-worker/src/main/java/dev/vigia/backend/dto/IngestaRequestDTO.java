@@ -3,6 +3,7 @@ package dev.vigia.backend.dto;
 import lombok.Data;
 import java.time.LocalDateTime;
 
+//TODO creo que quedo obsoleto, revisar
 @Data
 public class IngestaRequestDTO {
     private String device_id;
