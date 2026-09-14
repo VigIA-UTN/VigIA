@@ -17,4 +17,6 @@ public interface CaravanaRepository extends JpaRepository<Caravana, Long> {
     Optional<Caravana> findByDevEui(String devEui);
 
     List<Caravana> findAllByAnimalEstablecimientoId(Long establecimientoId);
+
+    List<Caravana> findAllByEstablecimientoId(Long establecimientoId);
 }

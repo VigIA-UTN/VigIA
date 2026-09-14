@@ -19,8 +19,14 @@ public class Caravana {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true)
     private String codigo;
+
+    private String alias;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "establecimiento_id")
+    private Establecimiento establecimiento;
 
     @Column(name = "fecha_asignacion")
     private LocalDate fechaAsignacion;

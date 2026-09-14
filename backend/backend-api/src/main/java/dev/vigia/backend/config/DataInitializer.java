@@ -115,7 +115,8 @@ public class DataInitializer implements CommandLineRunner {
         establecimientoRepository.save(est);
 
         // Vinculamos a los TRES roles operativos con el establecimiento
-        // (antes solo se vinculaba al productor — campero y vet quedaban sin acceso al rodeo)
+        // (antes solo se vinculaba al productor — campero y vet quedaban sin acceso al rodeo).
+        // ADMINISTRADOR no se vincula: es un rol global sin Empleado asociado.
         Empleado vinculoProductor = new Empleado(est, productor);
         Empleado vinculoCampero = new Empleado(est, campero);
         Empleado vinculoVet = new Empleado(est, vet);
@@ -405,6 +406,7 @@ public class DataInitializer implements CommandLineRunner {
         Caravana caravana = new Caravana();
         caravana.setCodigo(codigoCaravana);
         caravana.setActivo(true);
+        caravana.setEstablecimiento(est);
         caravanaRepository.save(caravana);
 
         a.setCaravana(caravana);
