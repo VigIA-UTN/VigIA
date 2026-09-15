@@ -10,7 +10,7 @@ services:
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
-      - vigia_pgdata:/home/postgres/pgdata/data
+      - vigia_pgdata:/var/lib/pgdata/data
       - ./postgres-init:/docker-entrypoint-initdb.d
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vigia_user} -d ${POSTGRES_DB:-vigia}" ]

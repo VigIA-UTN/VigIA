@@ -26,6 +26,7 @@ import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoInferencia;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.EstadoSalud;
+import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.SeveridadAlerta;
@@ -405,8 +406,10 @@ public class DataInitializer implements CommandLineRunner {
 
         Caravana caravana = new Caravana();
         caravana.setCodigo(codigoCaravana);
+        caravana.setDevEui(codigoCaravana);
         caravana.setActivo(true);
         caravana.setEstablecimiento(est);
+        caravana.setEstadoSensor(EstadoSensor.VINCULADO);
         caravanaRepository.save(caravana);
 
         a.setCaravana(caravana);
