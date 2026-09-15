@@ -1686,6 +1686,12 @@ class AnimalControllerTest {
          */
         @SuppressWarnings("null")
         private void asignarCollarConMoveState(Long animalId, int moveState) {
+                asignarCollarConMoveState(animalId, moveState, LocalDateTime.now());
+        }
+
+        /** Igual que {@link #asignarCollarConMoveState(Long, int)} pero permite fijar la fecha de la última telemetría. */
+        @SuppressWarnings("null")
+        private void asignarCollarConMoveState(Long animalId, int moveState, LocalDateTime fechaHoraTelemetria) {
                 Animal animal = animalRepository.findById(animalId).orElseThrow();
 
                 Caravana caravana = new Caravana();
@@ -1700,7 +1706,7 @@ class AnimalControllerTest {
 
                 Telemetria telemetria = new Telemetria();
                 telemetria.setCaravana(caravana);
-                telemetria.setFechaHora(LocalDateTime.now());
+                telemetria.setFechaHora(fechaHoraTelemetria);
                 telemetria.setMoveState(moveState);
                 telemetriaRepository.save(telemetria);
 
@@ -1832,6 +1838,51 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Telemetría a menos de 6hs conserva el color calculado (caso límite)")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_telemetriaJustoDentroDeLas6Horas_mantieneColor() throws Exception {
+                Long animalId = crearAnimal("Vaca Telemetria Reciente", establecimientoId, rodeoLoteId);
+                // 5h59m de antigüedad: todavía dentro de la ventana de 6hs -> se calcula el color normalmente.
+                asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).plusMinutes(1));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("VERDE"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Telemetría a más de 6hs pasa a SIN DATOS y no conserva el color previo (caso límite)")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_telemetriaSuperaLas6Horas_pasaASinDatos() throws Exception {
+                Long animalId = crearAnimal("Vaca Telemetria Vieja", establecimientoId, rodeoLoteId);
+                // 6h01m de antigüedad: supera la ventana de 6hs -> SIN DATOS, aunque el moveState sea "normal" (VERDE).
+                asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).minusMinutes(1));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Telemetría vieja no conserva un estado ROJO previo")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_telemetriaViejaConValorAnomalo_noConservaRojo() throws Exception {
+                Long animalId = crearAnimal("Vaca Telemetria Vieja Rojo", establecimientoId, rodeoLoteId);
+                // moveState muy alejado de la media (daría ROJO), pero la telemetría es de hace más de 6hs.
+                asignarCollarConMoveState(animalId, 500, LocalDateTime.now().minusHours(7));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"))
+                                .andExpect(jsonPath("$.indicadores[0].nombre").value("Estado de movimiento"))
+                                .andExpect(jsonPath("$.indicadores[0].descripcion",
+                                                org.hamcrest.Matchers.containsString("6 horas")));
         }
 
         @Test

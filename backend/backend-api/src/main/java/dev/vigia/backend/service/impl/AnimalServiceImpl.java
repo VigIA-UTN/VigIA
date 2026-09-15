@@ -1,6 +1,7 @@
 package dev.vigia.backend.service.impl;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -93,11 +94,11 @@ public class AnimalServiceImpl implements AnimalService {
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
 
-        @Value("${vigia.indicadores.movimiento.sigma-amarillo:1.0}")
-        private double sigmaAmarilloMovimiento;
+        private static final double SIGMA_AMARILLO_MOVIMIENTO = 1.0;
 
-        @Value("${vigia.indicadores.movimiento.sigma-rojo:2.0}")
-        private double sigmaRojoMovimiento;
+        private static final double SIGMA_ROJO_MOVIMIENTO = 2.0;
+
+        private static final long HORAS_SIN_DATOS_MOVIMIENTO = 6;
 
         private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
@@ -1174,12 +1175,22 @@ public class AnimalServiceImpl implements AnimalService {
                                         .build();
                 }
 
+                Telemetria telemetria = ultimaTelemetria.get();
+
+                if (telemetriaDesactualizada(telemetria)) {
+                        return IndicadorResponse.builder()
+                                        .nombre("Estado de movimiento")
+                                        .descripcion(descripcionSinDatosPorCollarDesactualizado())
+                                        .valor(String.valueOf(telemetria.getMoveState()))
+                                        .estado("SIN DATOS")
+                                        .build();
+                }
+
                 Gson gson = new Gson();
                 JsonObject jsonPerfil = gson.fromJson(perfilAnimal.getPerfilJson(), JsonObject.class);
                 Float meanMov = jsonPerfil.get("mean_moveState_mean").getAsFloat();
                 Float stdMov = jsonPerfil.get("mean_moveState_std").getAsFloat();
 
-                Telemetria telemetria = ultimaTelemetria.get();
                 String estado = getEstadoSalud(telemetria.getMoveState(), meanMov, stdMov);
 
                 return IndicadorResponse.builder()
@@ -1188,6 +1199,17 @@ public class AnimalServiceImpl implements AnimalService {
                                 .valor(String.valueOf(telemetria.getMoveState()))
                                 .estado(estado)
                                 .build();
+        }
+
+        /** El collar se considera desactualizado si su última transmisión supera {@link #HORAS_SIN_DATOS_MOVIMIENTO}. */
+        private boolean telemetriaDesactualizada(Telemetria telemetria) {
+                Duration antiguedad = Duration.between(telemetria.getFechaHora(), LocalDateTime.now());
+                return antiguedad.compareTo(Duration.ofHours(HORAS_SIN_DATOS_MOVIMIENTO)) > 0;
+        }
+
+        private String descripcionSinDatosPorCollarDesactualizado() {
+                return "El collar no transmitió datos en las últimas " + HORAS_SIN_DATOS_MOVIMIENTO
+                                + " horas; no se puede calcular el estado de movimiento actual.";
         }
 
         private IndicadorResponse calcularIndicadorReproductivo(Animal animal) {
@@ -1215,9 +1237,9 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         private String getEstadoSalud(Integer valor, Float mean, Float std) {
-                if ((mean - sigmaAmarilloMovimiento * std) < valor && valor < (mean + sigmaAmarilloMovimiento * std)) {
+                if ((mean - SIGMA_AMARILLO_MOVIMIENTO * std) < valor && valor < (mean + SIGMA_AMARILLO_MOVIMIENTO * std)) {
                         return "VERDE";
-                } else if ((mean - sigmaRojoMovimiento * std) < valor && valor < (mean + sigmaRojoMovimiento * std)) {
+                } else if ((mean - SIGMA_ROJO_MOVIMIENTO * std) < valor && valor < (mean + SIGMA_ROJO_MOVIMIENTO * std)) {
                         return "AMARILLO";
                 } else {
                         return "ROJO";
