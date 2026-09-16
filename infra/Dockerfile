@@ -2,7 +2,13 @@
 # servicio simple de un solo nodo en Railway (sin Patroni/HA).
 FROM postgis/postgis:16-3.4
 
-RUN apt-get update \
+# bullseye-security esta rota (paquetes 404 tras el fin de soporte de
+# Debian 11) y no la necesitamos para instalar curl/gnupg/lsb-release:
+# la sacamos de la lista de fuentes antes de actualizar.
+RUN (sed -i '/bullseye-security/d' /etc/apt/sources.list 2>/dev/null || true) \
+    && (sed -i '/bullseye-security/d' /etc/apt/sources.list.d/*.list 2>/dev/null || true) \
+    && (find /etc/apt/sources.list.d -name '*security*' -delete 2>/dev/null || true) \
+    && apt-get update \
     && apt-get install -y --no-install-recommends curl gnupg ca-certificates lsb-release \
     && curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey \
        | gpg --dearmor -o /usr/share/keyrings/timescaledb-archive-keyring.gpg \
