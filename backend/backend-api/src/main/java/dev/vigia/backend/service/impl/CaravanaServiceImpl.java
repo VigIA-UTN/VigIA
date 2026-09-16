@@ -79,6 +79,26 @@ public class CaravanaServiceImpl implements CaravanaService {
                 .toList();
     }
 
+    @Override
+    public List<CaravanaResponse> listarCaravanasDisponibles(Long establecimientoId, String emailUsuario) {
+        Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+
+        if (usuario.getRol().equals(Rol.VETERINARIO)) {
+            throw new AccessDeniedException("El rol VETERINARIO no tiene acceso a las caravanas.");
+        }
+
+        validarAccesoEstablecimiento(usuario, establecimiento);
+
+        return caravanaRepository.findAllByEstablecimientoIdAndEstadoSensor(establecimientoId, EstadoSensor.DISPONIBLE)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     private void validarAccesoEstablecimiento(Usuario usuario, Establecimiento establecimiento) {
         boolean tieneAcceso = establecimiento.getEmpleados().stream()
                 .anyMatch(e -> e.getUsuario().equals(usuario) && e.isActivo())

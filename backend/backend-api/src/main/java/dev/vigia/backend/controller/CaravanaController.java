@@ -58,4 +58,22 @@ public class CaravanaController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @GetMapping("/disponibles")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarCaravanasDisponibles(
+            @RequestParam("establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            return ResponseEntity.ok(caravanaService.listarCaravanasDisponibles(establecimientoId, email));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Establecimiento no encontrado.".equals(e.getMessage()) || "Usuario no encontrado".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

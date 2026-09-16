@@ -368,4 +368,47 @@ class CaravanaControllerTest {
                 .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    @DisplayName("GET /api/v1/caravana/disponibles debe retornar únicamente las caravanas en estado DISPONIBLE")
+    void listarCaravanasDisponibles_retornaSoloDisponibles() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+        Caravana disponible = new Caravana();
+        disponible.setDevEui("SENSOR-SOLO-DISPONIBLE");
+        disponible.setEstablecimiento(est);
+        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+        caravanaRepository.save(disponible);
+
+        Caravana vinculada = new Caravana();
+        vinculada.setDevEui("SENSOR-YA-VINCULADO");
+        vinculada.setEstablecimiento(est);
+        vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
+        caravanaRepository.save(vinculada);
+
+        mockMvc.perform(get("/api/v1/caravana/disponibles")
+                .param("establecimientoId", establecimientoId.toString())
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-SOLO-DISPONIBLE')].estadoSensor").value("DISPONIBLE"))
+                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-YA-VINCULADO')]").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/caravana/disponibles - Veterinario recibe 403")
+    void listarCaravanasDisponibles_veterinario_forbidden() throws Exception {
+        Usuario vet = new Usuario();
+        vet.setEmail("vet.disponibles@vigia.dev");
+        vet.setPasswordHash(passwordEncoder.encode("vet123"));
+        vet.setNombre("Veterinario");
+        vet.setRol(Rol.VETERINARIO);
+        vet.setActivo(true);
+        usuarioRepository.save(vet);
+        String vetToken = getTokenFor("vet.disponibles@vigia.dev", "vet123");
+
+        mockMvc.perform(get("/api/v1/caravana/disponibles")
+                .param("establecimientoId", establecimientoId.toString())
+                .header("Authorization", "Bearer " + vetToken))
+                .andExpect(status().isForbidden());
+    }
 }

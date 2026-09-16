@@ -250,4 +250,44 @@ class CaravanaServiceImplTest {
 
         verify(caravanaRepository, never()).findAllByEstablecimientoId(any());
     }
+
+    @Test
+    @DisplayName("Debe listar únicamente las caravanas disponibles para un usuario autorizado")
+    void listarCaravanasDisponiblesExitoso() {
+        Caravana libre = new Caravana();
+        libre.setId(1L);
+        libre.setDevEui("DISPO-1");
+        libre.setAlias("Caravana Libre");
+        libre.setEstadoSensor(EstadoSensor.DISPONIBLE);
+        libre.setEstablecimiento(establecimiento);
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+        establecimiento.setEmpleados(List.of(new Empleado(establecimiento, productor)));
+        when(caravanaRepository.findAllByEstablecimientoIdAndEstadoSensor(10L, EstadoSensor.DISPONIBLE))
+                .thenReturn(List.of(libre));
+
+        List<CaravanaResponse> result = caravanaService.listarCaravanasDisponibles(10L, "productor@vigia.dev");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getEstadoSensor()).isEqualTo(EstadoSensor.DISPONIBLE);
+        assertThat(result.get(0).getDevEui()).isEqualTo("DISPO-1");
+    }
+
+    @Test
+    @DisplayName("Debe denegar listar caravanas disponibles a un veterinario")
+    void listarCaravanasDisponiblesVeterinarioDenegado() {
+        Usuario vet = new Usuario();
+        vet.setEmail("vet@vigia.dev");
+        vet.setRol(Rol.VETERINARIO);
+
+        when(usuarioRepository.findByEmail("vet@vigia.dev")).thenReturn(Optional.of(vet));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+
+        assertThatThrownBy(() -> caravanaService.listarCaravanasDisponibles(10L, "vet@vigia.dev"))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("VETERINARIO no tiene acceso");
+
+        verify(caravanaRepository, never()).findAllByEstablecimientoIdAndEstadoSensor(any(), any());
+    }
 }

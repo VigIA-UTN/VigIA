@@ -9,4 +9,6 @@ public interface CaravanaService {
     CaravanaResponse crearCaravana(CaravanaRequest caravanaRequest);
 
     List<CaravanaResponse> listarCaravanas(String email, Long establecimientoId);
+
+    List<CaravanaResponse> listarCaravanasDisponibles(Long establecimientoId, String emailUsuario);
 }

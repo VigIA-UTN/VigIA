@@ -1,6 +1,7 @@
 package dev.vigia.backend.repository;
 
 import dev.vigia.backend.model.Caravana;
+import dev.vigia.backend.model.EstadoSensor;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,4 +20,6 @@ public interface CaravanaRepository extends JpaRepository<Caravana, Long> {
     List<Caravana> findAllByAnimalEstablecimientoId(Long establecimientoId);
 
     List<Caravana> findAllByEstablecimientoId(Long establecimientoId);
+
+    List<Caravana> findAllByEstablecimientoIdAndEstadoSensor(Long establecimientoId, EstadoSensor estadoSensor);
 }
