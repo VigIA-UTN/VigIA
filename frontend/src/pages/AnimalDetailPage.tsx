@@ -27,6 +27,7 @@ import './AnimalDetailPage.css';
 import './AnimalesPage.css';
 import ActividadTab from './ActividadTab';
 import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
+import AnimalIndicadoresSalud from '../components/AnimalIndicadoresSalud';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import type { AlertaResponse } from '../api/alertaApi';
 import LineaTiempoAlertas from '../components/LineaTiempoAlertas';
@@ -625,6 +626,9 @@ export default function AnimalDetailPage() {
                             )}
                         </Card.Body>
                     </Card>
+
+                    {/* ── Indicadores de Salud ── */}
+                    <AnimalIndicadoresSalud animalId={animal.id} />
 
                     {/* ── Línea de Tiempo de Alertas ── */}
                     <LineaTiempoAlertas animalId={animal.id} />
