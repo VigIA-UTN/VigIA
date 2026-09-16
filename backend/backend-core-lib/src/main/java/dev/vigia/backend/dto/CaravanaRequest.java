@@ -1,5 +1,6 @@
 package dev.vigia.backend.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,13 +13,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CaravanaRequest {
 
-    @NotNull(message = "El identificador de la caravana es obligatorio.")
     private String idCaravanaOficial;
+
+    private String alias;
 
     @NotNull(message = "El identificador del establecimiento es obligatorio.")
     private Long establecimientoId;
 
-    @NotNull(message = "El codigo es obligatorio.")
+    @NotBlank(message = "El dev_eui es obligatorio.")
     private String dev_eui;
 
 }

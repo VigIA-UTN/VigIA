@@ -6,7 +6,7 @@ import dev.vigia.backend.dto.CaravanaRequest;
 import dev.vigia.backend.dto.CaravanaResponse;
 
 public interface CaravanaService {
-    public CaravanaResponse crearCaravana(CaravanaRequest caravanaRequest, String email);
+    CaravanaResponse crearCaravana(CaravanaRequest caravanaRequest);
 
-    public List<CaravanaResponse> obtenerSensores(String email, Long establecimientoId);
+    List<CaravanaResponse> listarCaravanas(String email, Long establecimientoId);
 }
