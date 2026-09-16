@@ -32,7 +32,9 @@ public class IngestaController {
     private final RabbitTemplate rabbitTemplate;
     private final GeofenceVerificationService geofenceVerificationService;
 
-    public IngestaController(TelemetriaRepository telemetriaRepository, CaravanaRepository caravanaRepository, AnimalRepository animalRepository, ApplicationEventPublisher eventPublisher, RabbitTemplate rabbitTemplate, dev.vigia.backend.service.GeofenceVerificationService geofenceVerificationService) {
+    public IngestaController(TelemetriaRepository telemetriaRepository, CaravanaRepository caravanaRepository,
+            AnimalRepository animalRepository, ApplicationEventPublisher eventPublisher, RabbitTemplate rabbitTemplate,
+            dev.vigia.backend.service.GeofenceVerificationService geofenceVerificationService) {
         this.telemetriaRepository = telemetriaRepository;
         this.caravanaRepository = caravanaRepository;
         this.animalRepository = animalRepository;
@@ -45,7 +47,7 @@ public class IngestaController {
     @SuppressWarnings("null")
     public ResponseEntity<String> receiveUplink(@RequestBody TTNWebhookRequestDTO requestRaw) {
         TTNWebhookRequestDTO payload = requestRaw.getData() != null ? requestRaw.getData() : requestRaw;
-        
+
         if (payload.getEndDeviceIds() == null || payload.getEndDeviceIds().getDevEui() == null) {
             log.warn("Payload TTN recibido sin dev_eui.");
             return ResponseEntity.ok("Ignorado: Sin dev_eui");
@@ -76,7 +78,8 @@ public class IngestaController {
         Integer frameCounter = uplink.getFCnt();
         if (frameCounter != null && caravana.getUltimoFrameCounter() != null
                 && frameCounter <= caravana.getUltimoFrameCounter()) {
-            log.info("Frame duplicado o retransmitido para devEui {} (fCnt={}, ultimoFrameCounter={}), ignorado por idempotencia.",
+            log.info(
+                    "Frame duplicado o retransmitido para devEui {} (fCnt={}, ultimoFrameCounter={}), ignorado por idempotencia.",
                     devEui, frameCounter, caravana.getUltimoFrameCounter());
             return ResponseEntity.ok("Ignorado: frame duplicado (idempotencia)");
         }
@@ -90,7 +93,8 @@ public class IngestaController {
 
         if ("Heartbeat".equalsIgnoreCase(decoded.getType())) {
             if (ultimaOpt.isPresent()) {
-                // Actualizamos la fila existente para no inyectar coordenadas duplicadas en la serie de tiempo
+                // Actualizamos la fila existente para no inyectar coordenadas duplicadas en la
+                // serie de tiempo
                 telemetria = ultimaOpt.get();
                 if (decoded.getMoveState() != null) {
                     telemetria.setMoveState(decoded.getMoveState());
@@ -103,7 +107,8 @@ public class IngestaController {
                     }
                 }
             } else {
-                // Si no hay última posición, no podemos hacer mucho con un heartbeat sin coordenadas, 
+                // Si no hay última posición, no podemos hacer mucho con un heartbeat sin
+                // coordenadas,
                 // pero lo guardamos para tener la batería.
                 telemetria = new Telemetria();
                 telemetria.setCaravana(caravana);
@@ -120,11 +125,11 @@ public class IngestaController {
                 telemetria.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
                 esNueva = true;
             }
-        } else {
+        } else if ("GNSSPosition".equalsIgnoreCase(decoded.getType())) {
             // GNSSPosition o similar: creamos nueva fila, a menos que la última fila sea un
             // Heartbeat sin coordenadas creado hace instantes (llegó desordenado).
             if (ultimaOpt.isPresent() && ultimaOpt.get().getLatitud() == null &&
-                ultimaOpt.get().getFechaHora().isAfter(java.time.LocalDateTime.now().minusMinutes(5))) {
+                    ultimaOpt.get().getFechaHora().isAfter(java.time.LocalDateTime.now().minusMinutes(5))) {
                 telemetria = ultimaOpt.get();
                 esNueva = false;
             } else {
@@ -132,19 +137,23 @@ public class IngestaController {
                 telemetria.setCaravana(caravana);
                 esNueva = true;
             }
-            
+
             try {
-                telemetria.setFechaHora(java.time.Instant.parse(uplink.getReceivedAt()).atZone(java.time.ZoneId.of("UTC")).toLocalDateTime());
+                telemetria.setFechaHora(java.time.Instant.parse(uplink.getReceivedAt())
+                        .atZone(java.time.ZoneId.of("UTC")).toLocalDateTime());
             } catch (Exception e) {
-                // Solo pisamos la fecha si es una fila nueva, para no arruinar la del heartbeat si actualizamos
-                if (esNueva) telemetria.setFechaHora(java.time.LocalDateTime.now());
+                // Solo pisamos la fecha si es una fila nueva, para no arruinar la del heartbeat
+                // si actualizamos
+                if (esNueva)
+                    telemetria.setFechaHora(java.time.LocalDateTime.now());
             }
-            
+
             telemetria.setLatitud(decoded.getLatitude());
             telemetria.setLongitud(decoded.getLongitude());
-            
+
             // Heredamos batería y moveState del último si no vienen en este payload
-            telemetria.setMoveState(decoded.getMoveState() != null ? decoded.getMoveState() : ultimaOpt.map(Telemetria::getMoveState).orElse(null));
+            telemetria.setMoveState(decoded.getMoveState() != null ? decoded.getMoveState()
+                    : ultimaOpt.map(Telemetria::getMoveState).orElse(null));
             if (decoded.getBattery() != null) {
                 try {
                     telemetria.setBateria(Double.parseDouble(decoded.getBattery().replace("%", "")));
@@ -156,6 +165,9 @@ public class IngestaController {
             }
             telemetria.setEstadoInferenciaCelo(EstadoInferencia.PENDIENTE);
             telemetria.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
+        } else {
+            log.warn("Webhook TTN recibido para devEui {} con tipo desconocido: {}.", devEui, decoded.getType());
+            return ResponseEntity.ok("Ignorado: Tipo desconocido");
         }
 
         telemetriaRepository.save(telemetria);
@@ -170,17 +182,17 @@ public class IngestaController {
         }
 
         TelemetriaEventDTO dto = TelemetriaEventDTO.builder()
-            .animalId(animal.getId())
-            .establecimientoId(animal.getEstablecimiento().getId())
-            .latitud(telemetria.getLatitud())
-            .longitud(telemetria.getLongitud())
-            .fechaHora(telemetria.getFechaHora())
-            .build();
+                .animalId(animal.getId())
+                .establecimientoId(animal.getEstablecimiento().getId())
+                .latitud(telemetria.getLatitud())
+                .longitud(telemetria.getLongitud())
+                .fechaHora(telemetria.getFechaHora())
+                .build();
         rabbitTemplate.convertAndSend(RabbitMQConfig.TELEMETRIA_EXCHANGE, "", dto);
 
         if (telemetria.getLatitud() != null && telemetria.getLongitud() != null) {
             geofenceVerificationService.verificarPosicion(
-                animal, telemetria.getLatitud(), telemetria.getLongitud(), telemetria.getFechaHora());
+                    animal, telemetria.getLatitud(), telemetria.getLongitud(), telemetria.getFechaHora());
         }
 
         return ResponseEntity.ok("OK");
@@ -203,7 +215,8 @@ public class IngestaController {
             return ResponseEntity.notFound().build();
         }
 
-        Optional<Telemetria> ultimaOpt = telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravanaOpt.get());
+        Optional<Telemetria> ultimaOpt = telemetriaRepository
+                .findFirstByCaravanaOrderByFechaHoraDesc(caravanaOpt.get());
         if (ultimaOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
