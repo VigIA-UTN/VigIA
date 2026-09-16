@@ -15,6 +15,6 @@ export async function getRodeoLotes(establecimientoId?: number): Promise<RodeoLo
 }
 
 export async function crearRodeoLote(nombre: string, establecimientoId: number): Promise<RodeoLoteResponse> {
-  const response = await axiosClient.post<RodeoLoteResponse>('/rodeo-lotes/crear', { nombre, establecimientoId });
+  const response = await axiosClient.post<RodeoLoteResponse>('/rodeo-lotes', { nombre, establecimientoId });
   return response.data;
 }
