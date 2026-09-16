@@ -113,15 +113,20 @@ def generar_payload(estado):
     estado["lat"] += speed * math.cos(estado["heading"])
     estado["lon"] += speed * math.sin(estado["heading"])
 
+    # Generamos el formato TTN v3 Webhook
     return {
-        "device_id": FORZAR_CELO_DEVICE_ID,
-        # Timestamp real: el modelo no lo usa como feature, ver docstring.
-        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
-        "payload": {
-            "latitud": round(estado["lat"], 6),
-            "longitud": round(estado["lon"], 6),
-            "moveState": move_state,
-            "bateria": round(estado["bateria"], 1)
+        "end_device_ids": {
+            "dev_eui": FORZAR_CELO_DEVICE_ID
+        },
+        "uplink_message": {
+            "received_at": datetime.now(timezone.utc).isoformat(),
+            "decoded_payload": {
+                "type": "GNSSPosition",
+                "latitude": round(estado["lat"], 6),
+                "longitude": round(estado["lon"], 6),
+                "moveState": move_state,
+                "battery": f"{round(estado['bateria'], 1)}%"
+            }
         }
     }
 
@@ -147,12 +152,19 @@ def main():
     while True:
         inicio_ciclo = time.time()
         payload = generar_payload(estado)
+        
+        headers = {}
+        api_key = os.getenv("TTN_WEBHOOK_API_KEY")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            
         try:
-            response = requests.post(API_URL, json=payload, timeout=5)
+            response = requests.post(API_URL, json=payload, headers=headers, timeout=5)
             if response.status_code in [200, 201, 202]:
+                decoded = payload['uplink_message']['decoded_payload']
                 print(f"[{datetime.now().isoformat()}] OK — "
-                      f"lat={payload['payload']['latitud']} lon={payload['payload']['longitud']} "
-                      f"moveState={payload['payload']['moveState']}")
+                      f"lat={decoded['latitude']} lon={decoded['longitude']} "
+                      f"moveState={decoded['moveState']}")
             else:
                 print(f"Error {response.status_code}: {response.text}")
         except requests.exceptions.RequestException as e:

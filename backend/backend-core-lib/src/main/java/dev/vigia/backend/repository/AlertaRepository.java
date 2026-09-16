@@ -53,15 +53,14 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("establecimientoId") Long establecimientoId);
 
        /**
-        * Lista alertas de celo para recuperar mensajes perdidos mediante
+        * Lista alertas de cualquier tipo para recuperar mensajes perdidos mediante
         * Last-Event-ID.
         */
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
-                     "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
                      "AND a.id > :lastId " +
                      "ORDER BY a.id ASC")
-       List<Alerta> findCeloByEstablecimientoAndIdGreaterThanOrderByIdAsc(
+       List<Alerta> findByEstablecimientoAndIdGreaterThanOrderByIdAsc(
                      @Param("establecimientoId") Long establecimientoId,
                      @Param("lastId") Long lastId);
 
@@ -88,6 +87,21 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
 
        @Query("SELECT a FROM Alerta a WHERE a.animal.id = :animalId AND a.estado = 'PENDIENTE' ORDER BY CASE WHEN a.severidad = 'ALTA' THEN 1 WHEN a.severidad = 'MEDIA' THEN 2 ELSE 3 END ASC")
        List<Alerta> alertasAnimalActivas(@Param("animalId") Long animalId);
+
+       /**
+        * Lista las alertas de un animal concreto aplicando filtros opcionales.
+        */
+       @Query("SELECT a FROM Alerta a " +
+                     "WHERE a.animal.id = :animalId " +
+                     "AND (:disparador IS NULL OR a.disparador = :disparador) " +
+                     "AND (cast(:desde as timestamp) IS NULL OR a.tsGeneracion >= :desde) " +
+                     "AND (cast(:hasta as timestamp) IS NULL OR a.tsGeneracion <= :hasta) " +
+                     "ORDER BY a.tsGeneracion ASC")
+       List<Alerta> findByAnimalConFiltros(
+                     @Param("animalId") Long animalId,
+                     @Param("disparador") DisparadorAlerta disparador,
+                     @Param("desde") LocalDateTime desde,
+                     @Param("hasta") LocalDateTime hasta);
 
        /**
         * Lista las alertas de un establecimiento concreto aplicando filtros

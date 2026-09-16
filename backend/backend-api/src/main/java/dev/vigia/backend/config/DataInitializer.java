@@ -9,6 +9,7 @@ import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
+import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
@@ -23,7 +24,15 @@ import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoInferencia;
+import dev.vigia.backend.model.EstadoReproductivo;
+import dev.vigia.backend.model.EstadoSalud;
+import dev.vigia.backend.model.EstadoSensor;
+import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.SeveridadAlerta;
+import dev.vigia.backend.model.TipoEstadoSalud;
+import dev.vigia.backend.model.TipoIntervencion;
+import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.util.SerieComparativaBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -64,6 +73,7 @@ public class DataInitializer implements CommandLineRunner {
     private final AnimalRepository animalRepository;
     private final RodeoLoteRepository rodeoLoteRepository;
     private final EstadoReproductivoRepository estadoReproductivoRepository;
+    private final EstadoSaludRepository estadoSaludRepository;
     private final AlertaRepository alertaRepository;
     private final IntervencionRepository intervencionRepository;
     private final CaravanaRepository caravanaRepository;
@@ -79,6 +89,7 @@ public class DataInitializer implements CommandLineRunner {
         intervencionRepository.deleteAll();
         alertaRepository.deleteAll();
         estadoReproductivoRepository.deleteAll();
+        estadoSaludRepository.deleteAll();
         invitacionRepository.deleteAll();
         animalRepository.deleteAll();
         caravanaRepository.deleteAll();
@@ -105,7 +116,8 @@ public class DataInitializer implements CommandLineRunner {
         establecimientoRepository.save(est);
 
         // Vinculamos a los TRES roles operativos con el establecimiento
-        // (antes solo se vinculaba al productor — campero y vet quedaban sin acceso al rodeo)
+        // (antes solo se vinculaba al productor — campero y vet quedaban sin acceso al rodeo).
+        // ADMINISTRADOR no se vincula: es un rol global sin Empleado asociado.
         Empleado vinculoProductor = new Empleado(est, productor);
         Empleado vinculoCampero = new Empleado(est, campero);
         Empleado vinculoVet = new Empleado(est, vet);
@@ -238,12 +250,134 @@ public class DataInitializer implements CommandLineRunner {
         log.info("[DataInitializer] ✅ 3 animales de demo (VIGIA-ARG-006/007/008) con 4 alertas sanitarias "
                 + "fechadas > 24 h atrás. vaca1..vaca5 quedan libres para el simulador (celo y salud).");
 
+        // ── Acto 5: Historial reproductivo (demo de la sección de la ficha del animal) ──
+        // Animal dedicado (VIGIA-ARG-009) para no chocar con el simulador. El historial
+        // sale íntegro de estados_reproductivos; la inseminación y la revisión veterinaria
+        // se siembran por el mismo camino que produce intervenirAlerta: la intervención
+        // (acto) + el EstadoReproductivo / EstadoSalud que ese acto genera.
+        Animal demoRepro = crearAnimal(est, lote1, "90009", "Demo Historial Reproductivo", "Angus",
+                LocalDate.of(2020, 6, 1), "VIGIA-ARG-009", caravanaRepository, animalRepository);
+        LocalDateTime hoyDt = LocalDateTime.now();
+
+        sembrarEstadoReproductivo(demoRepro, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                LocalDate.now().minusMonths(8), hoyDt.minusMonths(8));
+        sembrarEstadoReproductivo(demoRepro, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA, productor,
+                null, hoyDt.minusMonths(6));
+        sembrarEstadoReproductivo(demoRepro, TipoReproductivo.POSIBLE_CELO, OrigenEstado.AUTOMATICO, null,
+                null, hoyDt.minusDays(42));
+        sembrarInseminacionDesdeIntervencion(demoRepro, vet, hoyDt.minusDays(40));
+        sembrarRevisionConEstadoSalud(demoRepro, vet, TipoEstadoSalud.EN_OBSERVACION, hoyDt.minusDays(20));
+        sembrarEstadoReproductivo(demoRepro, TipoReproductivo.GESTANTE, OrigenEstado.MANUAL, vet,
+                null, hoyDt.minusDays(9));
+
+        log.info("[DataInitializer] ✅ Animal VIGIA-ARG-009 con historial reproductivo de demo "
+                + "(parto, vacía, celo ml, inseminación, gestante) + una revisión veterinaria con estado de salud.");
+
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
         log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");
         log.info("  campero@vigia.dev      / campero123    → CAMPERO");
         log.info("  veterinario@vigia.dev  / vet123        → VETERINARIO");
         log.info("  pendiente@vigia.dev    / pendiente123  → PENDIENTE");
+    }
+
+    // ---------------------------------------------------------------------------
+    // Helpers del Acto 5 — historial reproductivo / de salud de demo.
+    // ---------------------------------------------------------------------------
+
+    private void sembrarEstadoReproductivo(Animal animal, TipoReproductivo estado, OrigenEstado origen,
+                                           Usuario usuario, LocalDate fechaUltParto, LocalDateTime fechaRegistro) {
+        EstadoReproductivo e = new EstadoReproductivo();
+        e.setAnimal(animal);
+        e.setEstado(estado);
+        e.setOrigen(origen);
+        e.setUsuarioRegistrador(usuario);
+        e.setFechaUltParto(fechaUltParto);
+        e.setFechaRegistro(fechaRegistro);
+        estadoReproductivoRepository.save(e);
+    }
+
+    /**
+     * Siembra una inseminación como lo hace {@code AlertaServiceImpl.intervenirAlerta}:
+     * una alerta de celo confirmada + la intervención (acto) + el
+     * {@code EstadoReproductivo{INSEMINADA}} que ese acto genera.
+     */
+    private void sembrarInseminacionDesdeIntervencion(Animal animal, Usuario interventor, LocalDateTime fechaHora) {
+        Alerta alerta = new Alerta();
+        alerta.setAnimal(animal);
+        alerta.setTipo("Celo Detectado");
+        alerta.setDisparador(DisparadorAlerta.CELO);
+        alerta.setSeveridad(SeveridadAlerta.ALTA);
+        alerta.setEstado(EstadoAlerta.CONFIRMADA);
+        alerta.setTsGeneracion(fechaHora.minusHours(8));
+        alerta.setTsConfirmacion(fechaHora.minusHours(6));
+        alerta.setUsuarioConfirmacion(interventor);
+        alerta.setValorUmbral(0.5);
+        alerta.setValorDetectado(0.9);
+        alerta.setConfianzaModelo(0.9f);
+        alerta.setVentanaInicioIns(fechaHora.minusHours(2));
+        alerta.setVentanaFinIns(fechaHora.plusHours(10));
+        alertaRepository.save(alerta);
+
+        Intervencion intervencion = new Intervencion();
+        intervencion.setAlerta(alerta);
+        intervencion.setAnimal(animal);
+        intervencion.setInterventor(interventor);
+        intervencion.setDescripcion("IATF — inseminación a tiempo fijo");
+        intervencion.setFechaHora(fechaHora);
+        intervencion.setTipo(TipoIntervencion.INSEMINACION);
+        intervencionRepository.save(intervencion);
+
+        EstadoReproductivo estado = new EstadoReproductivo();
+        estado.setAnimal(animal);
+        estado.setUsuarioRegistrador(interventor);
+        estado.setEstado(TipoReproductivo.INSEMINADA);
+        estado.setFechaUltInseminacion(fechaHora.toLocalDate());
+        estado.setOrigen(OrigenEstado.MANUAL);
+        estado.setFechaRegistro(fechaHora);
+        estadoReproductivoRepository.save(estado);
+    }
+
+    /**
+     * Siembra una revisión veterinaria que concluye con un estado de salud:
+     * alerta sanitaria confirmada + la intervención + el {@code EstadoSalud} asociado.
+     */
+    private void sembrarRevisionConEstadoSalud(Animal animal, Usuario vet, TipoEstadoSalud estadoSalud,
+                                               LocalDateTime fechaHora) {
+        String notas = "Revisión clínica: leve cojera en miembro posterior, se deja en observación.";
+
+        Alerta alerta = new Alerta();
+        alerta.setAnimal(animal);
+        alerta.setTipo("SALUD");
+        alerta.setDisparador(DisparadorAlerta.SALUD);
+        alerta.setSeveridad(SeveridadAlerta.MEDIA);
+        alerta.setEstado(EstadoAlerta.CONFIRMADA);
+        alerta.setTsGeneracion(fechaHora.minusDays(1));
+        alerta.setTsConfirmacion(fechaHora.minusHours(3));
+        alerta.setUsuarioConfirmacion(vet);
+        alerta.setValorUmbral(0.5);
+        alerta.setValorDetectado(0.7);
+        alerta.setConfianzaModelo(0.7f);
+        alertaRepository.save(alerta);
+
+        Intervencion intervencion = new Intervencion();
+        intervencion.setAlerta(alerta);
+        intervencion.setAnimal(animal);
+        intervencion.setInterventor(vet);
+        intervencion.setDescripcion(notas);
+        intervencion.setFechaHora(fechaHora);
+        intervencion.setTipo(TipoIntervencion.REVISION_VETERINARIA);
+        intervencionRepository.save(intervencion);
+
+        EstadoSalud es = new EstadoSalud();
+        es.setAnimal(animal);
+        es.setUsuarioVeterinario(vet);
+        es.setFechaRevision(fechaHora.toLocalDate());
+        es.setEstado(estadoSalud);
+        es.setDiagnosticoNotas(notas);
+        es.setOrigen(OrigenEstado.MANUAL);
+        es.setFechaRegistro(fechaHora);
+        estadoSaludRepository.save(es);
     }
 
     private Usuario buildUsuario(String nombre, String apellido, String email, String password, Rol rol) {
@@ -272,7 +406,10 @@ public class DataInitializer implements CommandLineRunner {
 
         Caravana caravana = new Caravana();
         caravana.setCodigo(codigoCaravana);
+        caravana.setDevEui(codigoCaravana);
         caravana.setActivo(true);
+        caravana.setEstablecimiento(est);
+        caravana.setEstadoSensor(EstadoSensor.VINCULADO);
         caravanaRepository.save(caravana);
 
         a.setCaravana(caravana);

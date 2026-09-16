@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Button, Spinner, Alert, Card, Row, Col, Form, Modal, Badge } from 'react-bootstrap';
 import {
@@ -29,6 +29,7 @@ import ActividadTab from './ActividadTab';
 import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import type { AlertaResponse } from '../api/alertaApi';
+import LineaTiempoAlertas from '../components/LineaTiempoAlertas';
 
 const TIPOS_REPRODUCTIVOS: TipoReproductivo[] = ['VACIA', 'GESTANTE', 'CELO', 'ANESTRO'];
 
@@ -42,6 +43,24 @@ function estadoSaludBadge(estado: string | null | undefined) {
         ENFERMO: 'bg-danger',
     };
     return <Badge bg="" className={`${map[estado] || 'bg-secondary'}`}>{ESTADO_SALUD_LABEL[estado] ?? estado}</Badge>;
+}
+
+/**
+ * Badge de origen del dato (automático vs manual), con ícono y etiqueta legible.
+ * Se usa tanto en el historial reproductivo como en el de salud. Acepta el valor
+ * crudo (`MANUAL` | `CARGA_MASIVA` | `AUTOMATICO`) o el normalizado.
+ */
+function origenBadge(origen: string | null | undefined) {
+    switch (origen) {
+        case 'AUTOMATICO':
+            return <Badge bg="" className="bg-info"><i className="bi bi-robot me-1" />Automático</Badge>;
+        case 'MANUAL':
+            return <Badge bg="" className="bg-primary"><i className="bi bi-person-fill me-1" />Manual</Badge>;
+        case 'CARGA_MASIVA':
+            return <Badge bg="" className="bg-primary"><i className="bi bi-upload me-1" />Carga masiva</Badge>;
+        default:
+            return <span className="badge bg-secondary">—</span>;
+    }
 }
 
 interface SaludForm {
@@ -72,12 +91,6 @@ function estadoReproductivoBadge(estado: string | null | undefined) {
     };
     return <Badge bg="" className={`${map[estado] || 'bg-secondary'}`}>{ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado}</Badge>;
 }
-
-const TIPO_EVENTO_LABEL: Record<string, string> = {
-    ESTADO_REPRODUCTIVO: 'Estado',
-    CELO_AUTOMATICO: 'Celo (ml-celo)',
-    INSEMINACION: 'Inseminación',
-};
 
 function formatFechaLocal(iso: string | null | undefined) {
     if (!iso) return '—';
@@ -245,13 +258,18 @@ export default function AnimalDetailPage() {
         }
     };
 
+    const formatDateForInput = (dateStr: string | null | undefined) => {
+        if (!dateStr) return null;
+        return dateStr.split('T')[0];
+    };
+
     const openNuevoEstadoModal = () => {
         setEditingEstado(null);
         const lastEstado = historial.length > 0 ? historial[0] : null;
         setEstadoForm({
             estado: 'VACIA',
-            fechaUltimoParto: lastEstado?.fechaUltimoParto || null,
-            fechaUltimaInseminacion: lastEstado?.fechaUltimaInseminacion || null,
+            fechaUltimoParto: formatDateForInput(lastEstado?.fechaUltimoParto),
+            fechaUltimaInseminacion: formatDateForInput(lastEstado?.fechaUltimaInseminacion),
         });
         setEstadoFormError(null);
         setEstadoSuccess(null);
@@ -262,8 +280,8 @@ export default function AnimalDetailPage() {
         setEditingEstado(estado);
         setEstadoForm({
             estado: (estado.estado ?? 'VACIA') as TipoReproductivo,
-            fechaUltimoParto: estado.fechaUltimoParto,
-            fechaUltimaInseminacion: estado.fechaUltimaInseminacion,
+            fechaUltimoParto: formatDateForInput(estado.fechaUltimoParto),
+            fechaUltimaInseminacion: formatDateForInput(estado.fechaUltimaInseminacion),
         });
         setEstadoFormError(null);
         setEstadoSuccess(null);
@@ -608,6 +626,9 @@ export default function AnimalDetailPage() {
                         </Card.Body>
                     </Card>
 
+                    {/* ── Línea de Tiempo de Alertas ── */}
+                    <LineaTiempoAlertas animalId={animal.id} />
+
                     {/* ── Sección Historial Reproductivo ── */}
                     <Card className="shadow-sm border-0 animal-card">
                         <Card.Body>
@@ -631,7 +652,6 @@ export default function AnimalDetailPage() {
                                     <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
                                         <thead>
                                             <tr>
-                                                <th>Tipo</th>
                                                 <th>Estado</th>
                                                 <th>Último Parto</th>
                                                 <th>Última Inseminación</th>
@@ -643,35 +663,32 @@ export default function AnimalDetailPage() {
                                         </thead>
                                         <tbody>
                                             {historial.map((h, idx) => {
-                                                const origen = h.origenNormalizado || h.origen;
-                                                const editable = h.tipoEvento !== 'INSEMINACION';
+                                                const origen = h.origen;
+                                                // Las inseminaciones provienen de `intervenciones` (id de otra tabla), no se editan acá.
+                                                const editable = h.estado !== 'INSEMINADA';
+                                                const rowOrigenClass = origen === 'AUTOMATICO' ? 'hist-row-auto' : 'hist-row-manual';
                                                 return (
-                                                <tr key={`${h.tipoEvento ?? 'X'}-${h.id}`} className={idx === 0 ? 'fw-semibold' : ''}>
-                                                    <td>{h.tipoEvento ? (TIPO_EVENTO_LABEL[h.tipoEvento] || h.tipoEvento) : '—'}</td>
-                                                    <td>{estadoReproductivoBadge(h.estado)}</td>
-                                                    <td>{formatFechaLocal(h.fechaUltimoParto)}</td>
-                                                    <td>{formatFechaLocal(h.fechaUltimaInseminacion)}</td>
-                                                    <td>
-                                                        <span className={`badge ${origen === 'MANUAL' ? 'bg-primary' : origen === 'AUTOMATICO' ? 'bg-info' : 'bg-secondary'}`}>
-                                                            {origen || '—'}
-                                                        </span>
-                                                    </td>
-                                                    <td>{h.registradoPor || '—'}</td>
-                                                    <td>{formatDateTime(h.fechaRegistro)}</td>
-                                                    {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
-                                                        <td className="text-center">
-                                                            {idx === 0 && editable && (
-                                                                <Button
-                                                                    variant="outline-primary"
-                                                                    size="sm"
-                                                                    onClick={() => openEditarEstadoModal(h)}
-                                                                >
-                                                                    <i className="bi bi-pencil" /> Editar
-                                                                </Button>
-                                                            )}
-                                                        </td>
-                                                    )}
-                                                </tr>
+                                                    <tr key={`${h.id}-${h.fechaRegistro}`} className={`${idx === 0 ? 'fw-semibold ' : ''}${rowOrigenClass}`}>
+                                                        <td>{estadoReproductivoBadge(h.estado)}</td>
+                                                        <td>{formatFechaLocal(h.fechaUltimoParto)}</td>
+                                                        <td>{formatFechaLocal(h.fechaUltimaInseminacion)}</td>
+                                                        <td>{origenBadge(origen)}</td>
+                                                        <td>{h.registradoPor || '—'}</td>
+                                                        <td>{formatDateTime(h.fechaRegistro)}</td>
+                                                        {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
+                                                            <td className="text-center">
+                                                                {idx === 0 && editable && (
+                                                                    <Button
+                                                                        variant="outline-primary"
+                                                                        size="sm"
+                                                                        onClick={() => openEditarEstadoModal(h)}
+                                                                    >
+                                                                        <i className="bi bi-pencil" /> Editar
+                                                                    </Button>
+                                                                )}
+                                                            </td>
+                                                        )}
+                                                    </tr>
                                                 );
                                             })}
                                         </tbody>
@@ -720,11 +737,7 @@ export default function AnimalDetailPage() {
                                                     <td>{estadoSaludBadge(s.estado)}</td>
                                                     <td>{s.diagnosticoNotas || '—'}</td>
                                                     <td>{s.tratamientoIndicado || '—'}</td>
-                                                    <td>
-                                                        <span className={`badge ${s.origen === 'MANUAL' ? 'bg-primary' : s.origen === 'AUTOMATICO' ? 'bg-info' : 'bg-secondary'}`}>
-                                                            {s.origen || '—'}
-                                                        </span>
-                                                    </td>
+                                                    <td>{origenBadge(s.origen)}</td>
                                                     <td>{s.registradoPor || '—'}</td>
                                                     <td>{formatDateTime(s.fechaRegistro)}</td>
                                                 </tr>

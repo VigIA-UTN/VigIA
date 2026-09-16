@@ -130,3 +130,12 @@
 .tab-content-animated {
     animation: tab-fade-in 0.25s ease forwards;
 }
+
+/* ── Historial: acento de origen del dato (auto vs manual) ── */
+.vigia-table tbody tr.hist-row-auto td:first-child {
+    box-shadow: inset 3px 0 0 #66C6EB;
+}
+
+.vigia-table tbody tr.hist-row-manual td:first-child {
+    box-shadow: inset 3px 0 0 #1E3A5F;
+}

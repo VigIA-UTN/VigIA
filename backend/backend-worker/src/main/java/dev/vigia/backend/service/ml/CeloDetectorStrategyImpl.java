@@ -157,6 +157,7 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
 
     private List<PuntoTelemetriaDTO> buildRequest(List<Telemetria> telemetriaList) {
         return telemetriaList.stream()
+                .filter(t -> t.getLatitud() != null && t.getLongitud() != null && t.getMoveState() != null)
                 .map(t -> PuntoTelemetriaDTO.builder()
                         .moveState(t.getMoveState())
                         .latitud(t.getLatitud())

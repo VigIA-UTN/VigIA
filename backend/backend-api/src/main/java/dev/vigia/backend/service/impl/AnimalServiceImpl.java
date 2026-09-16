@@ -1,12 +1,14 @@
 package dev.vigia.backend.service.impl;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -18,7 +20,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AnimalIndicadoresSaludResponse;
 import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
@@ -29,11 +35,14 @@ import dev.vigia.backend.dto.EstadoReproductivoCsvRequest;
 import dev.vigia.backend.dto.EstadoReproductivoParseResult;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.FilaEstadoInvalida;
+import dev.vigia.backend.dto.IndicadorResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
+import dev.vigia.backend.dto.RegistroPesoRequest;
+import dev.vigia.backend.dto.RegistroPesoResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -42,12 +51,13 @@ import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.PerfilReferencia;
 import dev.vigia.backend.model.EstadoSalud;
+import dev.vigia.backend.model.RegistroPeso;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Telemetria;
-import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
@@ -59,6 +69,7 @@ import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
+import dev.vigia.backend.repository.RegistroPesoRepository;
 import dev.vigia.backend.service.AnimalService;
 import dev.vigia.backend.service.CargaMasivaService;
 import dev.vigia.backend.service.EstadoReproductivoCsvService;
@@ -78,9 +89,16 @@ public class AnimalServiceImpl implements AnimalService {
         private final IntervencionRepository intervencionRepository;
         private final TelemetriaRepository telemetriaRepository;
         private final EstadoSaludRepository estadoSaludRepository;
+        private final RegistroPesoRepository registroPesoRepository;
 
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
+
+        private static final double SIGMA_AMARILLO_MOVIMIENTO = 1.0;
+
+        private static final double SIGMA_ROJO_MOVIMIENTO = 2.0;
+
+        private static final long HORAS_SIN_DATOS_MOVIMIENTO = 6;
 
         private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
@@ -127,6 +145,16 @@ public class AnimalServiceImpl implements AnimalService {
                 animal.setEstadoActual(request.getEstadoActual());
 
                 Animal savedAnimal = animalRepository.save(animal);
+
+                if (request.getPesoInicial() != null) {
+                        RegistroPeso registroInicial = new RegistroPeso();
+                        registroInicial.setAnimal(savedAnimal);
+                        registroInicial.setValorKg(request.getPesoInicial());
+                        registroInicial.setUnidad("kg");
+                        registroInicial.setFecha(LocalDate.now());
+                        registroInicial.setFechaRegistro(java.time.LocalDateTime.now());
+                        registroPesoRepository.save(registroInicial);
+                }
 
                 return mapToResponse(savedAnimal);
         }
@@ -731,37 +759,16 @@ public class AnimalServiceImpl implements AnimalService {
 
                 List<EstadoReproductivoResponse> historial = new ArrayList<>();
 
-                animal.getEstadosReproductivos().forEach(e -> {
-                        boolean esAutomatico = e.getOrigen() == OrigenEstado.AUTOMATICO;
-                        historial.add(EstadoReproductivoResponse.builder()
-                                        .id(e.getId())
-                                        .animalId(animal.getId())
-                                        .estado(e.getEstado() != null ? e.getEstado().name() : null)
-                                        .fechaUltimoParto(e.getFechaUltParto())
-                                        .fechaUltimaInseminacion(e.getFechaUltInseminacion())
-                                        .origen(e.getOrigen() != null ? e.getOrigen().name() : null)
-                                        .origenNormalizado(e.getOrigen() != null
-                                                        ? (esAutomatico ? "AUTOMATICO" : "MANUAL")
-                                                        : null)
-                                        .tipoEvento(esAutomatico ? "CELO_AUTOMATICO" : "ESTADO_REPRODUCTIVO")
-                                        .fechaRegistro(e.getFechaRegistro())
-                                        .registradoPor(formatNombreUsuario(e.getUsuarioRegistrador()))
-                                        .build());
-                });
-
-                intervencionRepository.findByAnimalIdOrderByFechaHoraDesc(animalId).stream()
-                                .filter(i -> i.getTipo() == TipoIntervencion.INSEMINACION)
-                                .forEach(i -> historial.add(EstadoReproductivoResponse.builder()
-                                                .id(i.getId())
-                                                .animalId(animal.getId())
-                                                .estado(TipoReproductivo.INSEMINADA.name())
-                                                .fechaUltimaInseminacion(i.getFechaHora().toLocalDate())
-                                                .origen(OrigenEstado.MANUAL.name())
-                                                .origenNormalizado("MANUAL")
-                                                .tipoEvento("INSEMINACION")
-                                                .fechaRegistro(i.getFechaHora())
-                                                .registradoPor(formatNombreUsuario(i.getInterventor()))
-                                                .build()));
+                animal.getEstadosReproductivos().forEach(e -> historial.add(EstadoReproductivoResponse.builder()
+                                .id(e.getId())
+                                .animalId(animal.getId())
+                                .estado(e.getEstado() != null ? e.getEstado().name() : null)
+                                .fechaUltimoParto(e.getFechaUltParto())
+                                .fechaUltimaInseminacion(e.getFechaUltInseminacion())
+                                .origen(e.getOrigen() != null ? e.getOrigen().name() : null)
+                                .fechaRegistro(e.getFechaRegistro())
+                                .registradoPor(formatNombreUsuario(e.getUsuarioRegistrador()))
+                                .build()));
 
                 historial.sort(java.util.Comparator.comparing(
                                 EstadoReproductivoResponse::getFechaRegistro,
@@ -1006,5 +1013,276 @@ public class AnimalServiceImpl implements AnimalService {
                                 .fechaRegistro(estadoSalud.getFechaRegistro())
                                 .registradoPor(formatNombreUsuario(estadoSalud.getUsuarioVeterinario()))
                                 .build();
+        }
+
+        // ── Historial de pesos ────────────────────────────────────────────────────────
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public RegistroPesoResponse registrarPeso(Long animalId, String email, RegistroPesoRequest request) {
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                if (animal.getEstadoActual().equals(EstadoAnimal.INACTIVO)) {
+                        throw new IllegalArgumentException("No se pueden registrar pesos en animales inactivos.");
+                }
+
+                RegistroPeso registro = new RegistroPeso();
+                registro.setAnimal(animal);
+                registro.setFecha(request.getFecha() != null ? request.getFecha() : LocalDate.now());
+                registro.setValorKg(request.getValorKg());
+                registro.setUnidad(request.getUnidad());
+                registro.setFechaRegistro(LocalDateTime.now());
+
+                return mapToRegistroPesoResponse(registroPesoRepository.save(registro));
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public RegistroPesoResponse editarPeso(Long animalId, Long pesoId, String email, RegistroPesoRequest request) {
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                RegistroPeso registro = registroPesoRepository.findById(pesoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Registro de peso no encontrado."));
+
+                if (!registro.getAnimal().getId().equals(animalId)) {
+                        throw new IllegalArgumentException("El registro de peso no corresponde a este animal.");
+                }
+
+                registro.setFecha(request.getFecha() != null ? request.getFecha() : registro.getFecha());
+                registro.setValorKg(request.getValorKg());
+                registro.setUnidad(request.getUnidad());
+
+                return mapToRegistroPesoResponse(registroPesoRepository.save(registro));
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public void eliminarPeso(Long animalId, Long pesoId, String email) {
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                RegistroPeso registro = registroPesoRepository.findById(pesoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Registro de peso no encontrado."));
+
+                if (!registro.getAnimal().getId().equals(animalId)) {
+                        throw new IllegalArgumentException("El registro de peso no corresponde a este animal.");
+                }
+
+                registroPesoRepository.delete(registro);
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public List<RegistroPesoResponse> listarHistorialPesos(Long animalId, String email) {
+                Usuario usuario = usuarioRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                return registroPesoRepository.findByAnimalIdOrderByFechaDesc(animalId).stream()
+                                .map(this::mapToRegistroPesoResponse)
+                                .collect(Collectors.toList());
+        }
+
+        private void validarAccesoEstablecimiento(Usuario usuario, Establecimiento establecimiento) {
+                boolean tieneAcceso = establecimiento.getEmpleados().stream()
+                                .anyMatch(e -> e.getUsuario().equals(usuario) && e.isActivo())
+                                || usuario.getRol().equals(Rol.ADMINISTRADOR);
+                if (!tieneAcceso) {
+                        throw new AccessDeniedException("No tiene acceso a este establecimiento.");
+                }
+        }
+
+        private RegistroPesoResponse mapToRegistroPesoResponse(RegistroPeso registro) {
+                return RegistroPesoResponse.builder()
+                                .id(registro.getId())
+                                .animalId(registro.getAnimal() != null ? registro.getAnimal().getId() : null)
+                                .fecha(registro.getFecha())
+                                .valorKg(registro.getValorKg())
+                                .unidad(registro.getUnidad())
+                                .fechaRegistro(registro.getFechaRegistro())
+                                .build();
+        }
+
+        @Override
+        @Transactional
+        public AnimalIndicadoresSaludResponse getIndicadoresSalud(Long animalId, String emailProductor) {
+                Usuario usuario = usuarioRepository.findByEmail(emailProductor)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimiento = animal.getEstablecimiento();
+
+                boolean tieneAcceso = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo())
+                                || usuario.getRol().equals(Rol.ADMINISTRADOR);
+
+                if (!tieneAcceso) {
+                        throw new AccessDeniedException(
+                                        "No tiene acceso a los datos de este animal.");
+                }
+
+                List<IndicadorResponse> indicadores = new ArrayList<>();
+                indicadores.add(calcularIndicadorMovimiento(animal));
+                indicadores.add(calcularIndicadorReproductivo(animal));
+
+                return AnimalIndicadoresSaludResponse.builder()
+                                .animalId(animal.getId())
+                                .caravana(animal.getCaravana() != null ? animal.getCaravana().getCodigo() : null)
+                                .indicadores(indicadores)
+                                .build();
+        }
+
+        private IndicadorResponse calcularIndicadorMovimiento(Animal animal) {
+                PerfilReferencia perfilAnimal = animal.getPerfilReferencia();
+
+                Optional<Telemetria> ultimaTelemetria = animal.getCaravana() != null
+                                ? telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(animal.getCaravana())
+                                : Optional.empty();
+
+                if (ultimaTelemetria.isEmpty() || perfilAnimal == null) {
+                        return IndicadorResponse.builder()
+                                        .nombre("Estado de movimiento")
+                                        .descripcion(descripcionMovimiento("SIN DATOS"))
+                                        .valor("0")
+                                        .estado("SIN DATOS")
+                                        .build();
+                }
+
+                Telemetria telemetria = ultimaTelemetria.get();
+
+                if (telemetriaDesactualizada(telemetria)) {
+                        return IndicadorResponse.builder()
+                                        .nombre("Estado de movimiento")
+                                        .descripcion(descripcionSinDatosPorCollarDesactualizado())
+                                        .valor(String.valueOf(telemetria.getMoveState()))
+                                        .estado("SIN DATOS")
+                                        .build();
+                }
+
+                Gson gson = new Gson();
+                JsonObject jsonPerfil = gson.fromJson(perfilAnimal.getPerfilJson(), JsonObject.class);
+                Float meanMov = jsonPerfil.get("mean_moveState_mean").getAsFloat();
+                Float stdMov = jsonPerfil.get("mean_moveState_std").getAsFloat();
+
+                String estado = getEstadoSalud(telemetria.getMoveState(), meanMov, stdMov);
+
+                return IndicadorResponse.builder()
+                                .nombre("Estado de movimiento")
+                                .descripcion(descripcionMovimiento(estado))
+                                .valor(String.valueOf(telemetria.getMoveState()))
+                                .estado(estado)
+                                .build();
+        }
+
+        /** El collar se considera desactualizado si su última transmisión supera {@link #HORAS_SIN_DATOS_MOVIMIENTO}. */
+        private boolean telemetriaDesactualizada(Telemetria telemetria) {
+                Duration antiguedad = Duration.between(telemetria.getFechaHora(), LocalDateTime.now());
+                return antiguedad.compareTo(Duration.ofHours(HORAS_SIN_DATOS_MOVIMIENTO)) > 0;
+        }
+
+        private String descripcionSinDatosPorCollarDesactualizado() {
+                return "El collar no transmitió datos en las últimas " + HORAS_SIN_DATOS_MOVIMIENTO
+                                + " horas; no se puede calcular el estado de movimiento actual.";
+        }
+
+        private IndicadorResponse calcularIndicadorReproductivo(Animal animal) {
+                Optional<EstadoReproductivo> estadoReproductivo = estadoReproductivoRepository
+                                .findFirstByAnimalIdOrderByFechaRegistroDesc(animal.getId());
+
+                if (estadoReproductivo.isEmpty()) {
+                        return IndicadorResponse.builder()
+                                        .nombre("Estado reproductivo")
+                                        .descripcion(descripcionReproductivo("SIN DATOS"))
+                                        .valor("SIN DATOS")
+                                        .estado("SIN DATOS")
+                                        .build();
+                }
+
+                EstadoReproductivo estadoRep = estadoReproductivo.get();
+                String estado = getEstadoReproductivo(estadoRep);
+
+                return IndicadorResponse.builder()
+                                .nombre("Estado reproductivo")
+                                .descripcion(descripcionReproductivo(estado))
+                                .valor(estadoRep.getEstado().name())
+                                .estado(estado)
+                                .build();
+        }
+
+        private String getEstadoSalud(Integer valor, Float mean, Float std) {
+                if ((mean - SIGMA_AMARILLO_MOVIMIENTO * std) < valor && valor < (mean + SIGMA_AMARILLO_MOVIMIENTO * std)) {
+                        return "VERDE";
+                } else if ((mean - SIGMA_ROJO_MOVIMIENTO * std) < valor && valor < (mean + SIGMA_ROJO_MOVIMIENTO * std)) {
+                        return "AMARILLO";
+                } else {
+                        return "ROJO";
+                }
+        }
+
+        private static final List<TipoReproductivo> ESTADOS_REPRODUCTIVOS_OK = Arrays.asList(
+                        TipoReproductivo.GESTANTE, TipoReproductivo.PARIDA, TipoReproductivo.VACIA,
+                        TipoReproductivo.INSEMINADA);
+
+        private String getEstadoReproductivo(EstadoReproductivo estadoRep) {
+                if (ESTADOS_REPRODUCTIVOS_OK.contains(estadoRep.getEstado())) {
+                        return "VERDE";
+                } else if (estadoRep.getEstado().equals(TipoReproductivo.POSIBLE_CELO)) {
+                        return "AMARILLO";
+                } else {
+                        return "ROJO";
+                }
+        }
+
+        private String descripcionMovimiento(String estado) {
+                switch (estado) {
+                        case "VERDE":
+                                return "Actividad dentro del rango normal para este animal.";
+                        case "AMARILLO":
+                                return "Actividad fuera del rango normal, dentro de un margen leve.";
+                        case "ROJO":
+                                return "Actividad muy alejada del rango normal para este animal.";
+                        default:
+                                return "No hay datos de telemetría o perfil de referencia suficientes para calcular este indicador.";
+                }
+        }
+
+        private String descripcionReproductivo(String estado) {
+                switch (estado) {
+                        case "VERDE":
+                                return "Estado reproductivo dentro de lo esperado.";
+                        case "AMARILLO":
+                                return "Estado reproductivo a seguir de cerca (posible celo).";
+                        case "ROJO":
+                                return "Estado reproductivo que requiere atención.";
+                        default:
+                                return "No hay registros de estado reproductivo cargados para este animal.";
+                }
         }
 }

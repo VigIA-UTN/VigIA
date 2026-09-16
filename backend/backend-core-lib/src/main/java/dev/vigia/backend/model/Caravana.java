@@ -19,8 +19,14 @@ public class Caravana {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true)
     private String codigo;
+
+    private String alias;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "establecimiento_id")
+    private Establecimiento establecimiento;
 
     @Column(name = "fecha_asignacion")
     private LocalDate fechaAsignacion;
@@ -36,4 +42,14 @@ public class Caravana {
 
     @OneToOne(mappedBy = "caravana", fetch = FetchType.LAZY)
     private Animal animal;
+
+    @Column(name = "dev_eui", nullable = false, unique = true)
+    private String devEui;
+
+    @Column(name = "ultimo_frame_counter")
+    private Integer ultimoFrameCounter;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_sensor")
+    private EstadoSensor estadoSensor;
 }

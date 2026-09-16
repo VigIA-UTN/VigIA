@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { intervenirAlerta } from '../api/alertaApi';
-import type { AlertaResponse, TipoIntervencion } from '../api/alertaApi';
+import type { AlertaResponse, TipoIntervencion, TipoEstadoSaludResultante } from '../api/alertaApi';
 
 const TIPO_LABELS: Record<TipoIntervencion, string> = {
   TRATAMIENTO: 'Tratamiento',
@@ -8,6 +8,12 @@ const TIPO_LABELS: Record<TipoIntervencion, string> = {
   REVISION_VETERINARIA: 'Revisión veterinaria',
   INSEMINACION: 'Inseminación',
   OTRO: 'Otro',
+};
+
+const ESTADO_SALUD_LABELS: Record<TipoEstadoSaludResultante, string> = {
+  SANO: 'Sano',
+  EN_OBSERVACION: 'En observación',
+  ENFERMO: 'Enfermo',
 };
 
 interface IntervencionFormPanelProps {
@@ -27,10 +33,13 @@ export default function IntervencionFormPanel({
   onSuccess,
   mode = 'absolute',
 }: IntervencionFormPanelProps) {
+  const isReproductive = (alerta.tipo || '').toUpperCase().includes('CELO');
+  
   const [isClosing, setIsClosing] = useState(false);
   const [descripcion, setDescripcion] = useState('');
   const [fechaHora, setFechaHora] = useState('');
-  const [tipo, setTipo] = useState<TipoIntervencion | ''>('');
+  const [tipo, setTipo] = useState<TipoIntervencion | ''>(isReproductive ? 'INSEMINACION' : '');
+  const [estadoSalud, setEstadoSalud] = useState<TipoEstadoSaludResultante | ''>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +58,7 @@ export default function IntervencionFormPanel({
         descripcion: descripcion.trim() || undefined,
         fechaHora: fechaHora || undefined,
         tipo: tipo || undefined,
+        estadoSalud: tipo === 'REVISION_VETERINARIA' && estadoSalud ? estadoSalud : undefined,
       });
       onSuccess(resultado);
       handleClose();
@@ -166,6 +176,7 @@ export default function IntervencionFormPanel({
                 className="form-select rounded-3 border-0 shadow-sm"
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value as TipoIntervencion | '')}
+                disabled={isReproductive}
               >
                 <option value="">Seleccioná un tipo...</option>
                 {Object.entries(TIPO_LABELS).map(([value, label]) => (
@@ -174,9 +185,45 @@ export default function IntervencionFormPanel({
                   </option>
                 ))}
               </select>
+              {tipo === 'INSEMINACION' && (
+                <small className="text-muted d-block mt-2" style={{ fontSize: '0.78rem' }}>
+                  Se registrará el estado reproductivo del animal como <strong>Inseminada</strong>.
+                </small>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Campo: Estado de salud resultante (sólo revisión veterinaria) */}
+        {tipo === 'REVISION_VETERINARIA' && (
+          <div>
+            <h6
+              className="fw-bold mb-3 d-flex align-items-center gap-2"
+              style={{ color: '#1E3A5F' }}
+            >
+              <i className="bi bi-heart-pulse"></i> Estado de salud resultante
+            </h6>
+            <div className="card border-0 shadow-sm rounded-4">
+              <div className="card-body p-3">
+                <select
+                  className="form-select rounded-3 border-0 shadow-sm"
+                  value={estadoSalud}
+                  onChange={(e) => setEstadoSalud(e.target.value as TipoEstadoSaludResultante | '')}
+                >
+                  <option value="">Sin cambio de estado</option>
+                  {Object.entries(ESTADO_SALUD_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <small className="text-muted d-block mt-2" style={{ fontSize: '0.78rem' }}>
+                  Si lo indicás, se registra en el historial de salud del animal.
+                </small>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Campo: Descripción */}
         <div>

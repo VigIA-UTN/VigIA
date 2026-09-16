@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import dev.vigia.backend.dto.AnimalIndicadoresSaludResponse;
 import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
@@ -14,6 +15,8 @@ import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
+import dev.vigia.backend.dto.RegistroPesoRequest;
+import dev.vigia.backend.dto.RegistroPesoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
 
@@ -54,4 +57,14 @@ public interface AnimalService {
                         throws IOException;
 
         List<AnimalMetricaResponse> getMetricasAnimal(Long animalId, String emailUsuario);
+
+        RegistroPesoResponse registrarPeso(Long animalId, String email, RegistroPesoRequest request);
+
+        RegistroPesoResponse editarPeso(Long animalId, Long pesoId, String email, RegistroPesoRequest request);
+
+        void eliminarPeso(Long animalId, Long pesoId, String email);
+
+        List<RegistroPesoResponse> listarHistorialPesos(Long animalId, String email);
+
+        AnimalIndicadoresSaludResponse getIndicadoresSalud(Long animalId, String emailProductor);
 }

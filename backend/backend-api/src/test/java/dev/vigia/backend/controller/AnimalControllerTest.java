@@ -11,6 +11,7 @@ import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.PerfilReferencia;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Telemetria;
@@ -23,6 +24,7 @@ import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
+import dev.vigia.backend.repository.PerfilReferenciaRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -63,8 +65,8 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 class AnimalControllerTest {
 
-    @MockBean
-    private ConnectionFactory connectionFactory;
+        @MockBean
+        private ConnectionFactory connectionFactory;
 
         @Autowired
         private MockMvc mockMvc;
@@ -97,6 +99,8 @@ class AnimalControllerTest {
         private EntityManager entityManager;
         @Autowired
         private AlertaRepository alertaRepository;
+        @Autowired
+        private PerfilReferenciaRepository perfilReferenciaRepository;
 
         private Long establecimientoId;
         private Long rodeoLoteId;
@@ -114,6 +118,7 @@ class AnimalControllerTest {
                 alertaRepository.deleteAll();
                 telemetriaRepository.deleteAll();
                 estadoReproductivoRepository.deleteAll();
+                perfilReferenciaRepository.deleteAll();
                 animalRepository.deleteAll();
                 caravanaRepository.deleteAll();
                 rodeoLoteRepository.deleteAll();
@@ -870,18 +875,19 @@ class AnimalControllerTest {
         }
 
         // =========================================================================
-        // GET /api/v1/animales/{id}/estado-reproductivo  (historial reproductivo consolidado)
+        // GET /api/v1/animales/{id}/estado-reproductivo (historial reproductivo
+        // consolidado)
         // =========================================================================
 
         @Test
-        @DisplayName("GET estado-reproductivo - Consolida celo automático, estado manual e inseminación, ordenado desc")
+        @DisplayName("GET estado-reproductivo - Sale íntegro de estados_reproductivos, ordenado desc")
         @SuppressWarnings("null")
-        void historialReproductivo_consolidaLasTresFuentes_ordenadoDesc() throws Exception {
+        void historialReproductivo_soloEstadosReproductivos_ordenadoDesc() throws Exception {
                 Long animalId = crearAnimal("Vaca Historial", establecimientoId, rodeoLoteId);
                 Animal animal = animalRepository.findById(animalId).orElseThrow();
                 Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
 
-                // 1) Estado manual (parto) - el más antiguo
+                // 1) Parto (estado PARIDA manual) - el más antiguo
                 EstadoReproductivo manual = new EstadoReproductivo();
                 manual.setAnimal(animal);
                 manual.setEstado(TipoReproductivo.PARIDA);
@@ -899,16 +905,18 @@ class AnimalControllerTest {
                 automatico.setFechaRegistro(LocalDateTime.now().minusDays(2));
                 estadoReproductivoRepository.save(automatico);
 
-                // 3) Inseminación registrada como Intervencion - la más reciente
-                Intervencion insem = new Intervencion();
+                // 3) Inseminación: fila INSEMINADA (la crea intervenirAlerta) - la más reciente
+                EstadoReproductivo insem = new EstadoReproductivo();
                 insem.setAnimal(animal);
-                insem.setInterventor(productor);
-                insem.setDescripcion("IATF");
-                insem.setTipo(TipoIntervencion.INSEMINACION);
-                insem.setFechaHora(LocalDateTime.now().minusDays(1));
-                intervencionRepository.save(insem);
+                insem.setEstado(TipoReproductivo.INSEMINADA);
+                insem.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                insem.setUsuarioRegistrador(productor);
+                insem.setFechaUltInseminacion(LocalDate.now().minusDays(1));
+                insem.setFechaRegistro(LocalDateTime.now().minusDays(1));
+                estadoReproductivoRepository.save(insem);
 
-                // Intervención de otro tipo: NO debe aparecer en el historial reproductivo
+                // Intervención suelta: NO debe aparecer (el historial ya no fusiona
+                // intervenciones)
                 Intervencion revision = new Intervencion();
                 revision.setAnimal(animal);
                 revision.setInterventor(productor);
@@ -924,22 +932,81 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.length()").value(3))
-                                .andExpect(jsonPath("$[0].tipoEvento").value("INSEMINACION"))
-                                .andExpect(jsonPath("$[0].origenNormalizado").value("MANUAL"))
+                                .andExpect(jsonPath("$[0].estado").value("INSEMINADA"))
+                                .andExpect(jsonPath("$[0].origen").value("MANUAL"))
                                 .andExpect(jsonPath("$[0].registradoPor").value("Productor"))
-                                .andExpect(jsonPath("$[1].tipoEvento").value("CELO_AUTOMATICO"))
+                                .andExpect(jsonPath("$[1].estado").value("POSIBLE_CELO"))
                                 .andExpect(jsonPath("$[1].origen").value("AUTOMATICO"))
-                                .andExpect(jsonPath("$[1].origenNormalizado").value("AUTOMATICO"))
                                 .andExpect(jsonPath("$[1].registradoPor").isEmpty())
-                                .andExpect(jsonPath("$[2].tipoEvento").value("ESTADO_REPRODUCTIVO"))
                                 .andExpect(jsonPath("$[2].estado").value("PARIDA"))
-                                .andExpect(jsonPath("$[2].origenNormalizado").value("MANUAL"));
+                                .andExpect(jsonPath("$[2].fechaUltimoParto").value("2026-01-10"))
+                                .andExpect(jsonPath("$[2].origen").value("MANUAL"))
+                                .andExpect(jsonPath("$[2].registradoPor").value("Productor"));
         }
 
         @Test
-        @DisplayName("GET estado-reproductivo - Carga masiva se normaliza a origen MANUAL")
+        @DisplayName("GET estado-reproductivo - Ordenado desc; mismo estado con distinto origen (manual vs automático)")
         @SuppressWarnings("null")
-        void historialReproductivo_cargaMasiva_origenNormalizadoManual() throws Exception {
+        void historialReproductivo_ordenDescYOrigen() throws Exception {
+                Long animalId = crearAnimal("Vaca Eventos", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
+
+                EstadoReproductivo gestante = new EstadoReproductivo();
+                gestante.setAnimal(animal);
+                gestante.setEstado(TipoReproductivo.GESTANTE);
+                gestante.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                gestante.setUsuarioRegistrador(productor);
+                gestante.setFechaRegistro(LocalDateTime.now().minusDays(30));
+                estadoReproductivoRepository.save(gestante);
+
+                // Celo cargado a mano -> origen MANUAL
+                EstadoReproductivo celoManual = new EstadoReproductivo();
+                celoManual.setAnimal(animal);
+                celoManual.setEstado(TipoReproductivo.CELO);
+                celoManual.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                celoManual.setUsuarioRegistrador(productor);
+                celoManual.setFechaRegistro(LocalDateTime.now().minusDays(20));
+                estadoReproductivoRepository.save(celoManual);
+
+                // Celo detectado por ml-celo -> origen AUTOMATICO (mismo estado, distinto
+                // origen)
+                EstadoReproductivo celoAuto = new EstadoReproductivo();
+                celoAuto.setAnimal(animal);
+                celoAuto.setEstado(TipoReproductivo.POSIBLE_CELO);
+                celoAuto.setOrigen(dev.vigia.backend.model.OrigenEstado.AUTOMATICO);
+                celoAuto.setFechaRegistro(LocalDateTime.now().minusDays(10));
+                estadoReproductivoRepository.save(celoAuto);
+
+                EstadoReproductivo parida = new EstadoReproductivo();
+                parida.setAnimal(animal);
+                parida.setEstado(TipoReproductivo.PARIDA);
+                parida.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                parida.setUsuarioRegistrador(productor);
+                parida.setFechaUltParto(LocalDate.of(2026, 8, 1));
+                parida.setFechaRegistro(LocalDateTime.now().minusDays(3));
+                estadoReproductivoRepository.save(parida);
+
+                entityManager.flush();
+                entityManager.clear();
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-reproductivo")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(4))
+                                .andExpect(jsonPath("$[0].estado").value("PARIDA"))
+                                .andExpect(jsonPath("$[1].estado").value("POSIBLE_CELO"))
+                                .andExpect(jsonPath("$[1].origen").value("AUTOMATICO"))
+                                .andExpect(jsonPath("$[2].estado").value("CELO"))
+                                .andExpect(jsonPath("$[2].origen").value("MANUAL"))
+                                .andExpect(jsonPath("$[3].estado").value("GESTANTE"))
+                                .andExpect(jsonPath("$[3].origen").value("MANUAL"));
+        }
+
+        @Test
+        @DisplayName("GET estado-reproductivo - Carga masiva conserva su origen CARGA_MASIVA")
+        @SuppressWarnings("null")
+        void historialReproductivo_cargaMasiva_origen() throws Exception {
                 Long animalId = crearAnimal("Vaca Masiva", establecimientoId, rodeoLoteId);
                 Animal animal = animalRepository.findById(animalId).orElseThrow();
                 Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
@@ -958,9 +1025,7 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/estado-reproductivo")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$[0].origen").value("CARGA_MASIVA"))
-                                .andExpect(jsonPath("$[0].origenNormalizado").value("MANUAL"))
-                                .andExpect(jsonPath("$[0].tipoEvento").value("ESTADO_REPRODUCTIVO"));
+                                .andExpect(jsonPath("$[0].origen").value("CARGA_MASIVA"));
         }
 
         @Test
@@ -1165,10 +1230,11 @@ class AnimalControllerTest {
                 Caravana caravana2 = new Caravana();
                 caravana2.setCodigo("C-ANTIGUA");
                 caravana2.setActivo(true);
+                caravana2.setDevEui("DEV-MET-003");
                 caravana2 = caravanaRepository.save(caravana2);
                 animal2.setCaravana(caravana2);
                 animalRepository.save(animal2);
-                
+
                 Telemetria t2 = new Telemetria();
                 t2.setCaravana(caravana2);
                 t2.setFechaHora(LocalDateTime.now().minusMinutes(20));
@@ -1182,10 +1248,11 @@ class AnimalControllerTest {
                 Caravana caravana3 = new Caravana();
                 caravana3.setCodigo("C-RECIENTE");
                 caravana3.setActivo(true);
+                caravana3.setDevEui("DEV-MET-004");
                 caravana3 = caravanaRepository.save(caravana3);
                 animal3.setCaravana(caravana3);
                 animalRepository.save(animal3);
-                
+
                 Telemetria t3 = new Telemetria();
                 t3.setCaravana(caravana3);
                 t3.setFechaHora(LocalDateTime.now().minusMinutes(5));
@@ -1214,11 +1281,11 @@ class AnimalControllerTest {
                 est2.setFechaAlta(LocalDate.now());
                 est2.setEmpleados(new ArrayList<>()); // sin empleados
                 est2 = establecimientoRepository.save(est2);
-                
+
                 RodeoLote rodeo2 = new RodeoLote(est2);
                 rodeo2.setNombre("Rodeo 2");
                 rodeo2 = rodeoLoteRepository.save(rodeo2);
-                
+
                 Animal animalEst2 = new Animal(est2, rodeo2);
                 animalEst2.setAlias("Vaca Est 2");
                 animalEst2.setEstadoActual(EstadoAnimal.ACTIVO);
@@ -1230,7 +1297,7 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$[?(@.id == " + animalEst2.getId() + ")]").isEmpty());
-                                
+
                 // El productor intenta consultar mapa del est2 directamente
                 mockMvc.perform(get("/api/v1/animales/mapa")
                                 .param("establecimientoId", est2.getId().toString())
@@ -1262,7 +1329,7 @@ class AnimalControllerTest {
                 // 3. Animal con múltiples alertas
                 Long animal3Id = crearAnimal("Animal Multi Alertas", establecimientoId, rodeoLoteId);
                 Animal animal3 = animalRepository.findById(animal3Id).orElseThrow();
-                
+
                 // Alerta Sanitaria (Severidad ALTA)
                 Alerta alertaSalud = new Alerta();
                 alertaSalud.setAnimal(animal3);
@@ -1295,14 +1362,20 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$[?(@.id == " + animal1Id + ")].alertasAnimal.length()").value(0))
                                 // Animal 2: 1 alerta
                                 .andExpect(jsonPath("$[?(@.id == " + animal2Id + ")].alertasAnimal.length()").value(1))
-                                .andExpect(jsonPath("$[?(@.id == " + animal2Id + ")].alertasAnimal[0].tipo").value("ABIGEATO"))
-                                .andExpect(jsonPath("$[?(@.id == " + animal2Id + ")].alertasAnimal[0].severidad").value("MEDIA"))
+                                .andExpect(jsonPath("$[?(@.id == " + animal2Id + ")].alertasAnimal[0].tipo")
+                                                .value("ABIGEATO"))
+                                .andExpect(jsonPath("$[?(@.id == " + animal2Id + ")].alertasAnimal[0].severidad")
+                                                .value("MEDIA"))
                                 // Animal 3: 2 alertas, ordenadas por severidad (ALTA primero)
                                 .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal.length()").value(2))
-                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[0].severidad").value("ALTA"))
-                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[0].tipo").value("SALUD"))
-                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].severidad").value("BAJA"))
-                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].tipo").value("CELO"));
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[0].severidad")
+                                                .value("ALTA"))
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[0].tipo")
+                                                .value("SALUD"))
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].severidad")
+                                                .value("BAJA"))
+                                .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].tipo")
+                                                .value("CELO"));
         }
         // =========================================================================
         // GET /api/v1/animales/{id}/metricas
@@ -1314,16 +1387,17 @@ class AnimalControllerTest {
         void getMetricasAnimal_historialCompleto() throws Exception {
                 Long animalId = crearAnimal("Vaca Metricas Completa", establecimientoId, rodeoLoteId);
                 Animal animal = animalRepository.findById(animalId).orElseThrow();
-                
+
                 Caravana caravana = new Caravana();
                 caravana.setCodigo("CAR-MET-001");
                 caravana.setFechaAsignacion(LocalDate.now().minusDays(10));
                 caravana.setFechaAlta(LocalDate.now().minusDays(10));
+                caravana.setDevEui("DEV-MET-001");
                 caravanaRepository.save(caravana);
-                
+
                 animal.setCaravana(caravana);
                 animalRepository.save(animal);
-                
+
                 LocalDate hoy = LocalDate.now();
                 for (int i = 0; i < 7; i++) {
                         Telemetria t = new Telemetria();
@@ -1334,7 +1408,7 @@ class AnimalControllerTest {
                         t.setMoveState(100 + i * 10);
                         telemetriaRepository.save(t);
                 }
-                
+
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
@@ -1349,16 +1423,17 @@ class AnimalControllerTest {
         void getMetricasAnimal_diasSinDatos() throws Exception {
                 Long animalId = crearAnimal("Vaca Metricas Incompleta", establecimientoId, rodeoLoteId);
                 Animal animal = animalRepository.findById(animalId).orElseThrow();
-                
+
                 Caravana caravana = new Caravana();
                 caravana.setCodigo("CAR-MET-002");
                 caravana.setFechaAsignacion(LocalDate.now().minusDays(10));
                 caravana.setFechaAlta(LocalDate.now().minusDays(10));
+                caravana.setDevEui("DEV-MET-002");
                 caravanaRepository.save(caravana);
-                
+
                 animal.setCaravana(caravana);
                 animalRepository.save(animal);
-                
+
                 // Agregamos telemetría solo hace 1 día y hace 2 días (el resto sin datos)
                 LocalDate hoy = LocalDate.now();
                 for (int i = 1; i <= 2; i++) {
@@ -1370,7 +1445,7 @@ class AnimalControllerTest {
                         t.setMoveState(50);
                         telemetriaRepository.save(t);
                 }
-                
+
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
@@ -1408,7 +1483,8 @@ class AnimalControllerTest {
 
                 Long animalId = crearAnimal("Toro Establecimiento Ajeno", establecimientoId, rodeoLoteId);
 
-                // Intento acceder a métricas de animalId (que es del establecimientoId) usando el otroToken (que pertenece a otroEst)
+                // Intento acceder a métricas de animalId (que es del establecimientoId) usando
+                // el otroToken (que pertenece a otroEst)
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
                                 .header("Authorization", "Bearer " + otroToken))
                                 .andExpect(status().isForbidden());
@@ -1419,12 +1495,13 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void getMetricasAnimal_rechazoPorRolIncorrecto() throws Exception {
                 Long animalId = crearAnimal("Vaca Rol Incorrecto", establecimientoId, rodeoLoteId);
-                
+
                 // Campero no tiene acceso a métricas
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
                                 .header("Authorization", "Bearer " + camperoToken))
                                 .andExpect(status().isForbidden());
         }
+
         @Test
         @DisplayName("POST /api/v1/animales/{id}/estado-salud - Éxito (Productor)")
         @SuppressWarnings("null")
@@ -1492,7 +1569,8 @@ class AnimalControllerTest {
                 dev.vigia.backend.dto.EstadoSaludRequest request = new dev.vigia.backend.dto.EstadoSaludRequest();
                 request.setEstado(dev.vigia.backend.model.TipoEstadoSalud.SANO);
 
-                // Intento registrar estado de salud de animalId (del establecimientoId) usando el otroToken (de otroEst)
+                // Intento registrar estado de salud de animalId (del establecimientoId) usando
+                // el otroToken (de otroEst)
                 mockMvc.perform(post("/api/v1/animales/" + animalId + "/estado-salud")
                                 .header("Authorization", "Bearer " + otroToken)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -1595,5 +1673,272 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.estadoSalud").value("ENFERMO"));
+        }
+
+        // =========================================================================
+        // GET /api/v1/animales/{id}/indicadores-salud
+        // =========================================================================
+
+        /**
+         * Crea caravana + telemetría con el moveState indicado, vinculada a un perfil de referencia (mean=100, std=10).
+         * Recibe el id (no la entidad) y limpia el persistence context al final: el animal pudo haberse
+         * cargado antes de crear el PerfilReferencia, y la asociación mappedBy quedaría cacheada en null.
+         */
+        @SuppressWarnings("null")
+        private void asignarCollarConMoveState(Long animalId, int moveState) {
+                asignarCollarConMoveState(animalId, moveState, LocalDateTime.now());
+        }
+
+        /** Igual que {@link #asignarCollarConMoveState(Long, int)} pero permite fijar la fecha de la última telemetría. */
+        @SuppressWarnings("null")
+        private void asignarCollarConMoveState(Long animalId, int moveState, LocalDateTime fechaHoraTelemetria) {
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+
+                Caravana caravana = new Caravana();
+                caravana.setCodigo("CAR-IND-" + UUID.randomUUID());
+                caravana.setFechaAsignacion(LocalDate.now().minusDays(5));
+                caravana.setFechaAlta(LocalDate.now().minusDays(5));
+                caravana.setDevEui("DEV-IND-" + UUID.randomUUID());
+                caravanaRepository.save(caravana);
+
+                animal.setCaravana(caravana);
+                animalRepository.save(animal);
+
+                Telemetria telemetria = new Telemetria();
+                telemetria.setCaravana(caravana);
+                telemetria.setFechaHora(fechaHoraTelemetria);
+                telemetria.setMoveState(moveState);
+                telemetriaRepository.save(telemetria);
+
+                PerfilReferencia perfil = new PerfilReferencia();
+                perfil.setAnimal(animal);
+                perfil.setPerfilJson("{\"mean_moveState_mean\": 100.0, \"mean_moveState_std\": 10.0}");
+                perfil.setFechaCalculo(LocalDateTime.now());
+                perfilReferenciaRepository.save(perfil);
+
+                entityManager.flush();
+                entityManager.clear();
+        }
+
+        @SuppressWarnings("null")
+        private void asignarEstadoReproductivo(Long animalId, TipoReproductivo tipo) {
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                EstadoReproductivo estado = new EstadoReproductivo();
+                estado.setAnimal(animal);
+                estado.setEstado(tipo);
+                estado.setOrigen(dev.vigia.backend.model.OrigenEstado.MANUAL);
+                estado.setFechaRegistro(LocalDateTime.now());
+                estadoReproductivoRepository.save(estado);
+
+                entityManager.flush();
+                entityManager.clear();
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Devuelve movimiento y estado reproductivo en verde")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_verde() throws Exception {
+                Long animalId = crearAnimal("Vaca Indicadores Verde", establecimientoId, rodeoLoteId);
+
+                asignarCollarConMoveState(animalId, 100); // igual a la media -> VERDE
+                asignarEstadoReproductivo(animalId, TipoReproductivo.GESTANTE);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.animalId").value(animalId))
+                                .andExpect(jsonPath("$.indicadores.length()").value(2))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("VERDE"))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].descripcion")
+                                                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.emptyOrNullString())))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado").value("VERDE"))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].descripcion")
+                                                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.emptyOrNullString())));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Movimiento en amarillo y rojo según desvío respecto al perfil")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_movimientoAmarilloYRojo() throws Exception {
+                Long animalAmarilloId = crearAnimal("Vaca Indicadores Amarillo", establecimientoId, rodeoLoteId);
+                asignarCollarConMoveState(animalAmarilloId, 115); // 1.5 std por encima de la media -> AMARILLO
+
+                Long animalRojoId = crearAnimal("Vaca Indicadores Rojo", establecimientoId, rodeoLoteId);
+                asignarCollarConMoveState(animalRojoId, 200); // muy por encima de la media -> ROJO
+
+                mockMvc.perform(get("/api/v1/animales/" + animalAmarilloId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("AMARILLO"));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalRojoId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("ROJO"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Estado reproductivo en amarillo (posible celo) y rojo (anestro)")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_reproductivoAmarilloYRojo() throws Exception {
+                Long animalAmarilloId = crearAnimal("Vaca Reproductivo Amarillo", establecimientoId, rodeoLoteId);
+                asignarEstadoReproductivo(animalAmarilloId, TipoReproductivo.POSIBLE_CELO);
+
+                Long animalRojoId = crearAnimal("Vaca Reproductivo Rojo", establecimientoId, rodeoLoteId);
+                asignarEstadoReproductivo(animalRojoId, TipoReproductivo.ANESTRO);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalAmarilloId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado").value("AMARILLO"));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalRojoId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado").value("ROJO"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Animal sin caravana ni estado reproductivo devuelve SIN DATOS (no 500)")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_sinDatos() throws Exception {
+                Long animalId = crearAnimal("Vaca Sin Collar", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.caravana").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado").value("SIN DATOS"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Caravana con telemetría pero sin perfil de referencia devuelve SIN DATOS")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_sinPerfilReferencia() throws Exception {
+                Long animalId = crearAnimal("Vaca Sin Perfil", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+
+                Caravana caravana = new Caravana();
+                caravana.setCodigo("CAR-SIN-PERFIL");
+                caravana.setFechaAsignacion(LocalDate.now());
+                caravana.setFechaAlta(LocalDate.now());
+                caravana.setDevEui("DEV-SIN-PERFIL");
+                caravanaRepository.save(caravana);
+                animal.setCaravana(caravana);
+                animalRepository.save(animal);
+
+                Telemetria telemetria = new Telemetria();
+                telemetria.setCaravana(caravana);
+                telemetria.setFechaHora(LocalDateTime.now());
+                telemetria.setMoveState(100);
+                telemetriaRepository.save(telemetria);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Telemetría a menos de 6hs conserva el color calculado (caso límite)")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_telemetriaJustoDentroDeLas6Horas_mantieneColor() throws Exception {
+                Long animalId = crearAnimal("Vaca Telemetria Reciente", establecimientoId, rodeoLoteId);
+                // 5h59m de antigüedad: todavía dentro de la ventana de 6hs -> se calcula el color normalmente.
+                asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).plusMinutes(1));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("VERDE"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Telemetría a más de 6hs pasa a SIN DATOS y no conserva el color previo (caso límite)")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_telemetriaSuperaLas6Horas_pasaASinDatos() throws Exception {
+                Long animalId = crearAnimal("Vaca Telemetria Vieja", establecimientoId, rodeoLoteId);
+                // 6h01m de antigüedad: supera la ventana de 6hs -> SIN DATOS, aunque el moveState sea "normal" (VERDE).
+                asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).minusMinutes(1));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Telemetría vieja no conserva un estado ROJO previo")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_telemetriaViejaConValorAnomalo_noConservaRojo() throws Exception {
+                Long animalId = crearAnimal("Vaca Telemetria Vieja Rojo", establecimientoId, rodeoLoteId);
+                // moveState muy alejado de la media (daría ROJO), pero la telemetría es de hace más de 6hs.
+                asignarCollarConMoveState(animalId, 500, LocalDateTime.now().minusHours(7));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"))
+                                .andExpect(jsonPath("$.indicadores[0].nombre").value("Estado de movimiento"))
+                                .andExpect(jsonPath("$.indicadores[0].descripcion",
+                                                org.hamcrest.Matchers.containsString("6 horas")));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - RBAC: CAMPERO no tiene acceso (403)")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_rbacCampero_forbidden() throws Exception {
+                Long animalId = crearAnimal("Vaca RBAC Campero", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + camperoToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Veterinario y Administrador tienen acceso")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_veterinarioYAdmin_ok() throws Exception {
+                Long animalId = crearAnimal("Vaca RBAC Vet Admin", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + veterinarioToken))
+                                .andExpect(status().isOk());
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Aislamiento por establecimiento (403 para empleado ajeno)")
+        @SuppressWarnings("null")
+        void getIndicadoresSalud_aislamientoEstablecimiento() throws Exception {
+                Usuario otroProductor = new Usuario();
+                otroProductor.setEmail("otroprod.indicadores@vigia.dev");
+                otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroProductor.setNombre("Otro Productor Indicadores");
+                otroProductor.setRol(Rol.PRODUCTOR);
+                otroProductor.setActivo(true);
+                usuarioRepository.save(otroProductor);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Indicadores");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+                establecimientoRepository.save(otroEst);
+
+                String otroToken = getTokenFor("otroprod.indicadores@vigia.dev", "otro123");
+
+                Long animalId = crearAnimal("Vaca Ajena Indicadores", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
+                                .header("Authorization", "Bearer " + otroToken))
+                                .andExpect(status().isForbidden());
         }
 }
