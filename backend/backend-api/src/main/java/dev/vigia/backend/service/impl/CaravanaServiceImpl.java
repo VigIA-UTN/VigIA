@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 
 import dev.vigia.backend.dto.CaravanaRequest;
 import dev.vigia.backend.dto.CaravanaResponse;
+import dev.vigia.backend.exception.DevEuiDuplicadoException;
+import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoSensor;
@@ -28,47 +30,53 @@ public class CaravanaServiceImpl implements CaravanaService {
     private final EstablecimientoRepository establecimientoRepository;
 
     @Override
-    @SuppressWarnings("null")
-    public CaravanaResponse crearCaravana(CaravanaRequest caravanaRequest, String email) {
-
-        Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-
+    public CaravanaResponse crearCaravana(CaravanaRequest caravanaRequest) {
         Establecimiento establecimiento = establecimientoRepository.findById(caravanaRequest.getEstablecimientoId())
-                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado"));
-
-        validarAccesoEstablecimiento(usuario, establecimiento);
-
-        caravanaRepository.findByCodigo(caravanaRequest.getIdCaravanaOficial())
-                .ifPresent(c -> {
-                    throw new IllegalArgumentException("Ya existe una caravana con este codigo");
-                });
+                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
 
         caravanaRepository.findByDevEui(caravanaRequest.getDev_eui())
                 .ifPresent(c -> {
-                    throw new IllegalArgumentException("Ya existe una caravana con este devEUI");
+                    throw new DevEuiDuplicadoException(
+                            "Ya existe una caravana registrada con el dev_eui " + caravanaRequest.getDev_eui());
                 });
 
-        Caravana caravana = new Caravana();
-        caravana.setCodigo(caravanaRequest.getIdCaravanaOficial());
-        caravana.setFechaAsignacion(LocalDate.now());
-        caravana.setFechaAlta(LocalDate.now());
-        caravana.setDevEui(caravanaRequest.getDev_eui());
+        String codigo = caravanaRequest.getIdCaravanaOficial();
+        if (codigo != null) {
+            caravanaRepository.findByCodigo(codigo)
+                    .ifPresent(c -> {
+                        throw new IllegalArgumentException("Ya existe una caravana con este codigo");
+                    });
+        }
 
+        Caravana caravana = new Caravana();
+        caravana.setCodigo(codigo);
+        caravana.setAlias(caravanaRequest.getAlias());
+        caravana.setDevEui(caravanaRequest.getDev_eui());
+        caravana.setEstablecimiento(establecimiento);
+        caravana.setFechaAlta(LocalDate.now());
+        caravana.setFechaAsignacion(codigo != null ? LocalDate.now() : null);
         caravana.setActivo(false);
         caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
 
-        Caravana newCaravana = caravanaRepository.save(caravana);
+        Caravana guardada = caravanaRepository.save(caravana);
 
-        return CaravanaResponse.builder()
-                .id(newCaravana.getId())
-                .codigo(newCaravana.getCodigo())
-                .fechaAsignacion(newCaravana.getFechaAsignacion())
-                .fechaAlta(newCaravana.getFechaAlta())
-                .devEui(newCaravana.getDevEui())
-                .activo(newCaravana.isActivo())
-                .estadoSensor(newCaravana.getEstadoSensor())
-                .build();
+        return toResponse(guardada);
+    }
+
+    @Override
+    public List<CaravanaResponse> listarCaravanas(String email, Long establecimientoId) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+
+        validarAccesoEstablecimiento(usuario, establecimiento);
+
+        return caravanaRepository.findAllByEstablecimientoId(establecimientoId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     private void validarAccesoEstablecimiento(Usuario usuario, Establecimiento establecimiento) {
@@ -80,27 +88,20 @@ public class CaravanaServiceImpl implements CaravanaService {
         }
     }
 
-    @Override
-    public List<CaravanaResponse> obtenerSensores(String email, Long establecimientoId) {
-
-        Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-
-        Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
-                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado"));
-
-        validarAccesoEstablecimiento(usuario, establecimiento);
-
-        return caravanaRepository.findAllByAnimalEstablecimientoId(establecimientoId)
-                .stream().map(c -> CaravanaResponse.builder()
-                        .id(c.getId())
-                        .codigo(c.getCodigo())
-                        .fechaAsignacion(c.getFechaAsignacion())
-                        .fechaAlta(c.getFechaAlta())
-                        .devEui(c.getDevEui())
-                        .activo(c.isActivo())
-                        .estadoSensor(c.getEstadoSensor())
-                        .build())
-                .toList();
+    private CaravanaResponse toResponse(Caravana caravana) {
+        Animal animal = caravana.getAnimal();
+        return CaravanaResponse.builder()
+                .id(caravana.getId())
+                .codigo(caravana.getCodigo())
+                .alias(caravana.getAlias())
+                .fechaAsignacion(caravana.getFechaAsignacion())
+                .fechaAlta(caravana.getFechaAlta())
+                .devEui(caravana.getDevEui())
+                .activo(caravana.isActivo())
+                .estadoSensor(caravana.getEstadoSensor())
+                .establecimientoId(caravana.getEstablecimiento() != null ? caravana.getEstablecimiento().getId() : null)
+                .animalId(animal != null ? animal.getId() : null)
+                .animalAlias(animal != null ? animal.getAlias() : null)
+                .build();
     }
 }
