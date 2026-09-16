@@ -15,9 +15,13 @@ import lombok.NoArgsConstructor;
 public class CaravanaResponse {
     private Long id;
     private String codigo;
+    private String alias;
     private LocalDate fechaAsignacion;
     private LocalDate fechaAlta;
     private String devEui;
     private Boolean activo;
     private EstadoSensor estadoSensor;
+    private Long establecimientoId;
+    private Long animalId;
+    private String animalAlias;
 }

@@ -2,8 +2,11 @@ package dev.vigia.backend.controller;
 
 import dev.vigia.backend.dto.CaravanaRequest;
 import dev.vigia.backend.dto.CaravanaResponse;
+import dev.vigia.backend.exception.DevEuiDuplicadoException;
 import dev.vigia.backend.service.CaravanaService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,37 +26,34 @@ public class CaravanaController {
     private final CaravanaService caravanaService;
 
     @PostMapping
-    @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<?> crearCaravana(
-            @RequestBody CaravanaRequest caravanaRequest,
-            Authentication authentication) {
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<?> crearCaravana(@Valid @RequestBody CaravanaRequest caravanaRequest) {
         try {
-            String email = authentication.getName();
-            CaravanaResponse caravanaResponse = caravanaService.crearCaravana(caravanaRequest, email);
-            return ResponseEntity.ok(caravanaResponse);
-        } catch (AccessDeniedException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            CaravanaResponse caravanaResponse = caravanaService.crearCaravana(caravanaRequest);
+            return ResponseEntity.status(HttpStatus.CREATED).body(caravanaResponse);
+        } catch (DevEuiDuplicadoException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             if ("Establecimiento no encontrado.".equals(e.getMessage())) {
-                return ResponseEntity.status(404).body(e.getMessage());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
             }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('PRODUCTOR')")
-    public ResponseEntity<?> obtenerSensores(
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'PRODUCTOR', 'CAMPERO')")
+    public ResponseEntity<?> listarCaravanas(
             @RequestParam(name = "establecimientoId") Long establecimientoId,
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            return ResponseEntity.ok(caravanaService.obtenerSensores(email, establecimientoId));
+            return ResponseEntity.ok(caravanaService.listarCaravanas(email, establecimientoId));
         } catch (AccessDeniedException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             if ("Establecimiento no encontrado.".equals(e.getMessage())) {
-                return ResponseEntity.status(404).body(e.getMessage());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
             }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
