@@ -1,0 +1,305 @@
+{
+    "dev_eui_ok": {
+        "name": "as.up.data.forward",
+        "time": "2026-07-31T18:39:30.262588422Z",
+        "identifiers": [
+            {
+                "device_ids": {
+                    "device_id": "collar-0097",
+                    "application_ids": {
+                        "application_id": "sensor-test"
+                    },
+                    "dev_eui": "70B3D5A4D2150097",
+                    "join_eui": "70B3D5A4D0160001",
+                    "dev_addr": "27FAA36B"
+                }
+            }
+        ],
+        "data": {
+            "@type": "type.googleapis.com/ttn.lorawan.v3.ApplicationUp",
+            "end_device_ids": {
+                "device_id": "collar-0097",
+                "application_ids": {
+                    "application_id": "sensor-test"
+                },
+                "dev_eui": "VIGIA-ARG-001",
+                "join_eui": "70B3D5A4D0160001",
+                "dev_addr": "27FAA36B"
+            },
+            "correlation_ids": [
+                "gs:uplink:01KYWQJTFR3DJGDZF7XTN9HF7Z"
+            ],
+            "received_at": "2026-07-31T18:39:30.256016857Z",
+            "uplink_message": {
+                "session_key_id": "AZ+ovOjgY4cjpPRjH7gvFA==",
+                "f_port": 34,
+                "f_cnt": 117,
+                "frm_payload": "MMJqADPCCgffamzr3w==",
+                "decoded_payload": {
+                    "latitude": -34.50768691392981,
+                    "longitude": -58.50019770863029,
+                    "time": "2026-08-01 02:39:27",
+                    "type": "GNSSPosition"
+                },
+                "rx_metadata": [
+                    {
+                        "gateway_ids": {
+                            "gateway_id": "gateway-testing",
+                            "eui": "AC1F09FFFE291CA7"
+                        },
+                        "timestamp": 2028258186,
+                        "rssi": -73,
+                        "channel_rssi": -73,
+                        "snr": 16,
+                        "frequency_offset": "436",
+                        "uplink_token": "Ch0KGwoPZ2F0ZXdheS10ZXN0aW5nEgisHwn//ikcpxCKh5PHBxoMCOHXs9MGEKDa8/UCIJCm7+yD+D8=",
+                        "received_at": "2026-07-31T18:39:29.784133408Z"
+                    }
+                ],
+                "settings": {
+                    "data_rate": {
+                        "lora": {
+                            "bandwidth": 125000,
+                            "spreading_factor": 8,
+                            "coding_rate": "4/5"
+                        }
+                    },
+                    "frequency": "916800000",
+                    "timestamp": 2028258186
+                },
+                "received_at": "2026-07-31T18:39:29.917053519Z",
+                "consumed_airtime": "0.113152s",
+                "locations": {
+                    "frm-payload": {
+                        "latitude": -34.50768691392981,
+                        "longitude": -58.50019770863029,
+                        "source": "SOURCE_GPS"
+                    }
+                },
+                "network_ids": {
+                    "net_id": "000013",
+                    "ns_id": "EC656E00001051C4",
+                    "tenant_id": "vigia",
+                    "cluster_id": "nam1",
+                    "cluster_address": "nam1.cloud.thethings.industries",
+                    "tenant_address": "vigia.nam1.cloud.thethings.industries"
+                }
+            }
+        },
+        "correlation_ids": [
+            "gs:uplink:01KYWQJTFR3DJGDZF7XTN9HF7Z"
+        ],
+        "origin": "ip-10-22-7-98.us-west-1.compute.internal",
+        "context": {
+            "tenant-id": "CgV2aWdpYQ=="
+        },
+        "visibility": {
+            "rights": [
+                "RIGHT_APPLICATION_TRAFFIC_READ"
+            ]
+        },
+        "unique_id": "01KYWQJTYPPV1BXD4HNNPDQVE8"
+    },
+    "no_dev_eui": {
+        "name": "as.up.data.forward",
+        "time": "2026-07-31T18:39:30.262588422Z",
+        "identifiers": [
+            {
+                "device_ids": {
+                    "device_id": "collar-0097",
+                    "application_ids": {
+                        "application_id": "sensor-test"
+                    },
+                    "dev_eui": "70B3D5A4D2150097",
+                    "join_eui": "70B3D5A4D0160001",
+                    "dev_addr": "27FAA36B"
+                }
+            }
+        ],
+        "data": {
+            "@type": "type.googleapis.com/ttn.lorawan.v3.ApplicationUp",
+            "end_device_ids": {
+                "device_id": "collar-0097",
+                "application_ids": {
+                    "application_id": "sensor-test"
+                },
+                "dev_eui": "",
+                "join_eui": "70B3D5A4D0160001",
+                "dev_addr": "27FAA36B"
+            },
+            "correlation_ids": [
+                "gs:uplink:01KYWQJTFR3DJGDZF7XTN9HF7Z"
+            ],
+            "received_at": "2026-07-31T18:39:30.256016857Z",
+            "uplink_message": {
+                "session_key_id": "AZ+ovOjgY4cjpPRjH7gvFA==",
+                "f_port": 34,
+                "f_cnt": 117,
+                "frm_payload": "MMJqADPCCgffamzr3w==",
+                "decoded_payload": {
+                    "latitude": -34.50768691392981,
+                    "longitude": -58.50019770863029,
+                    "time": "2026-08-01 02:39:27",
+                    "type": "GNSSPosition"
+                },
+                "rx_metadata": [
+                    {
+                        "gateway_ids": {
+                            "gateway_id": "gateway-testing",
+                            "eui": "AC1F09FFFE291CA7"
+                        },
+                        "timestamp": 2028258186,
+                        "rssi": -73,
+                        "channel_rssi": -73,
+                        "snr": 16,
+                        "frequency_offset": "436",
+                        "uplink_token": "Ch0KGwoPZ2F0ZXdheS10ZXN0aW5nEgisHwn//ikcpxCKh5PHBxoMCOHXs9MGEKDa8/UCIJCm7+yD+D8=",
+                        "received_at": "2026-07-31T18:39:29.784133408Z"
+                    }
+                ],
+                "settings": {
+                    "data_rate": {
+                        "lora": {
+                            "bandwidth": 125000,
+                            "spreading_factor": 8,
+                            "coding_rate": "4/5"
+                        }
+                    },
+                    "frequency": "916800000",
+                    "timestamp": 2028258186
+                },
+                "received_at": "2026-07-31T18:39:29.917053519Z",
+                "consumed_airtime": "0.113152s",
+                "locations": {
+                    "frm-payload": {
+                        "latitude": -34.50768691392981,
+                        "longitude": -58.50019770863029,
+                        "source": "SOURCE_GPS"
+                    }
+                },
+                "network_ids": {
+                    "net_id": "000013",
+                    "ns_id": "EC656E00001051C4",
+                    "tenant_id": "vigia",
+                    "cluster_id": "nam1",
+                    "cluster_address": "nam1.cloud.thethings.industries",
+                    "tenant_address": "vigia.nam1.cloud.thethings.industries"
+                }
+            }
+        },
+        "correlation_ids": [
+            "gs:uplink:01KYWQJTFR3DJGDZF7XTN9HF7Z"
+        ],
+        "origin": "ip-10-22-7-98.us-west-1.compute.internal",
+        "context": {
+            "tenant-id": "CgV2aWdpYQ=="
+        },
+        "visibility": {
+            "rights": [
+                "RIGHT_APPLICATION_TRAFFIC_READ"
+            ]
+        },
+        "unique_id": "01KYWQJTYPPV1BXD4HNNPDQVE8"
+    }
+    "dev_eui_desconocido": {
+        "name": "as.up.data.forward",
+        "time": "2026-07-31T18:39:30.262588422Z",
+        "identifiers": [
+            {
+                "device_ids": {
+                    "device_id": "collar-0097",
+                    "application_ids": {
+                        "application_id": "sensor-test"
+                    },
+                    "dev_eui": "70B3D5A4D2150097",
+                    "join_eui": "70B3D5A4D0160001",
+                    "dev_addr": "27FAA36B"
+                }
+            }
+        ],
+        "data": {
+            "@type": "type.googleapis.com/ttn.lorawan.v3.ApplicationUp",
+            "end_device_ids": {
+                "device_id": "collar-0097",
+                "application_ids": {
+                    "application_id": "sensor-test"
+                },
+                "dev_eui": "VIGIA-ARG-DESCONOCIDO",
+                "join_eui": "70B3D5A4D0160001",
+                "dev_addr": "27FAA36B"
+            },
+            "correlation_ids": [
+                "gs:uplink:01KYWQJTFR3DJGDZF7XTN9HF7Z"
+            ],
+            "received_at": "2026-07-31T18:39:30.256016857Z",
+            "uplink_message": {
+                "session_key_id": "AZ+ovOjgY4cjpPRjH7gvFA==",
+                "f_port": 34,
+                "f_cnt": 117,
+                "frm_payload": "MMJqADPCCgffamzr3w==",
+                "decoded_payload": {
+                    "latitude": -34.50768691392981,
+                    "longitude": -58.50019770863029,
+                    "time": "2026-08-01 02:39:27",
+                    "type": "GNSSPosition"
+                },
+                "rx_metadata": [
+                    {
+                        "gateway_ids": {
+                            "gateway_id": "gateway-testing",
+                            "eui": "AC1F09FFFE291CA7"
+                        },
+                        "timestamp": 2028258186,
+                        "rssi": -73,
+                        "channel_rssi": -73,
+                        "snr": 16,
+                        "frequency_offset": "436",
+                        "uplink_token": "Ch0KGwoPZ2F0ZXdheS10ZXN0aW5nEgisHwn//ikcpxCKh5PHBxoMCOHXs9MGEKDa8/UCIJCm7+yD+D8=",
+                        "received_at": "2026-07-31T18:39:29.784133408Z"
+                    }
+                ],
+                "settings": {
+                    "data_rate": {
+                        "lora": {
+                            "bandwidth": 125000,
+                            "spreading_factor": 8,
+                            "coding_rate": "4/5"
+                        }
+                    },
+                    "frequency": "916800000",
+                    "timestamp": 2028258186
+                },
+                "received_at": "2026-07-31T18:39:29.917053519Z",
+                "consumed_airtime": "0.113152s",
+                "locations": {
+                    "frm-payload": {
+                        "latitude": -34.50768691392981,
+                        "longitude": -58.50019770863029,
+                        "source": "SOURCE_GPS"
+                    }
+                },
+                "network_ids": {
+                    "net_id": "000013",
+                    "ns_id": "EC656E00001051C4",
+                    "tenant_id": "vigia",
+                    "cluster_id": "nam1",
+                    "cluster_address": "nam1.cloud.thethings.industries",
+                    "tenant_address": "vigia.nam1.cloud.thethings.industries"
+                }
+            }
+        },
+        "correlation_ids": [
+            "gs:uplink:01KYWQJTFR3DJGDZF7XTN9HF7Z"
+        ],
+        "origin": "ip-10-22-7-98.us-west-1.compute.internal",
+        "context": {
+            "tenant-id": "CgV2aWdpYQ=="
+        },
+        "visibility": {
+            "rights": [
+                "RIGHT_APPLICATION_TRAFFIC_READ"
+            ]
+        },
+        "unique_id": "01KYWQJTYPPV1BXD4HNNPDQVE8"
+    }
+}

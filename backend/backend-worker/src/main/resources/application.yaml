@@ -48,6 +48,9 @@ vigia:
   salud:
     calibracion-dias: ${VIGIA_SALUD_CALIBRACION_DIAS:7}
     recalibracion-dias: ${VIGIA_SALUD_RECALIBRACION_DIAS:30}
+  ttn:
+    webhook:
+      api-key: ${TTN_WEBHOOK_API_KEY:apiKey}
 
 cors:
   allowed-origins: ${CORS_ORIGINS}
