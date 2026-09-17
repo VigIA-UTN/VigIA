@@ -595,6 +595,18 @@ export default function AnimalDetailPage() {
                                             </Form.Group>
                                             <ul className="list-unstyled detail-list mt-4">
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
+                                                <li>
+                                                    <strong>Collar vinculado:</strong>{' '}
+                                                    {animal.caravanaId ? (
+                                                        <>
+                                                            {animal.caravanaAlias || animal.caravanaDevEui} ({animal.caravanaEstado})
+                                                        </>
+                                                    ) : '—'}
+                                                    {' '}
+                                                    <Button variant="link" className="p-0 align-baseline" onClick={() => navigate('/animales')}>
+                                                        Gestionar en Animales
+                                                    </Button>
+                                                </li>
                                             </ul>
                                         </Col>
                                     </Row>
@@ -618,6 +630,18 @@ export default function AnimalDetailPage() {
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
                                                 <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
                                                 <li><strong>Estado de Salud:</strong> {estadoSaludBadge(saludHistorial[0]?.estado ?? animal.estadoSalud)}</li>
+                                                <li>
+                                                    <strong>Collar vinculado:</strong>{' '}
+                                                    {animal.caravanaId ? (
+                                                        <>
+                                                            {animal.caravanaAlias || animal.caravanaDevEui} ({animal.caravanaEstado})
+                                                        </>
+                                                    ) : '—'}
+                                                    {' '}
+                                                    <Button variant="link" className="p-0 align-baseline" onClick={() => navigate('/animales')}>
+                                                        Gestionar en Animales
+                                                    </Button>
+                                                </li>
                                             </ul>
                                         </Col>
                                     </Row>

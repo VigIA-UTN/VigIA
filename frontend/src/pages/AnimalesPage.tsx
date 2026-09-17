@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
-import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
+import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, vincularCaravana, desvincularCaravana, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
+import { getCaravanasDisponibles } from '../api/caravanasApi';
+import type { CaravanaResponse } from '../api/caravanasApi';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
@@ -65,6 +67,13 @@ export default function AnimalesPage() {
 
     const [sortField, setSortField] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    const [vincularModalAnimal, setVincularModalAnimal] = useState<AnimalResponse | null>(null);
+    const [collaresDisponibles, setCollaresDisponibles] = useState<CaravanaResponse[]>([]);
+    const [selectedCollarId, setSelectedCollarId] = useState<number | null>(null);
+    const [submittingCollar, setSubmittingCollar] = useState(false);
+    const [formErrorCollar, setFormErrorCollar] = useState<string | null>(null);
+    const [desvinculandoId, setDesvinculandoId] = useState<number | null>(null);
 
     // Alert detail overlay
     const [selectedAlertaForAnimal, setSelectedAlertaForAnimal] = useState<AlertaResponse | null>(null);
@@ -129,6 +138,52 @@ export default function AnimalesPage() {
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } } };
             alert(e.response?.data?.message || 'Error al dar de baja el animal.');
+        }
+    };
+
+    const openVincularModal = async (animal: AnimalResponse) => {
+        setVincularModalAnimal(animal);
+        setSelectedCollarId(null);
+        setFormErrorCollar(null);
+        try {
+            const disponibles = await getCaravanasDisponibles(selectedId || animal.establecimientoId);
+            setCollaresDisponibles(disponibles);
+        } catch {
+            setCollaresDisponibles([]);
+        }
+    };
+
+    const handleVincularSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!vincularModalAnimal || !selectedCollarId) {
+            setFormErrorCollar('Seleccioná un collar disponible.');
+            return;
+        }
+        setFormErrorCollar(null);
+        setSubmittingCollar(true);
+        try {
+            const actualizado = await vincularCaravana(vincularModalAnimal.id, selectedCollarId);
+            setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
+            setVincularModalAnimal(null);
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setFormErrorCollar(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al vincular el collar.');
+        } finally {
+            setSubmittingCollar(false);
+        }
+    };
+
+    const handleDesvincular = async (animal: AnimalResponse) => {
+        if (!window.confirm(`¿Desvincular el collar de ${animal.alias || animal.idCaravanaOficial || 'este animal'}?`)) return;
+        setDesvinculandoId(animal.id);
+        try {
+            const actualizado = await desvincularCaravana(animal.id);
+            setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } } };
+            alert(e.response?.data?.message || 'Error al desvincular el collar.');
+        } finally {
+            setDesvinculandoId(null);
         }
     };
 
@@ -388,6 +443,7 @@ export default function AnimalesPage() {
                                                 Nombre <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'alias' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                             </div>
                                         </th>
+                                        <th className="col-mobile-hide">Collar</th>
                                         {activeTab === 'celo' ? (
                                             <>
                                                 <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }}>
@@ -448,7 +504,7 @@ export default function AnimalesPage() {
                                 <tbody>
                                     {sortedAnimales.length === 0 ? (
                                         <tr>
-                                            <td colSpan={9} className="text-center py-4 text-muted">
+                                            <td colSpan={10} className="text-center py-4 text-muted">
                                                 No se encontraron animales.
                                             </td>
                                         </tr >
@@ -457,6 +513,28 @@ export default function AnimalesPage() {
                                             <tr key={a.id} className="animal-row">
                                                 <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
                                                 <td>{a.alias || '—'}</td>
+                                                <td className="col-mobile-hide">
+                                                    {a.caravanaId ? (
+                                                        <div className="d-flex align-items-center gap-2">
+                                                            <span>{a.caravanaAlias || a.caravanaDevEui}</span>
+                                                            <Button
+                                                                variant="outline-danger"
+                                                                size="sm"
+                                                                disabled={desvinculandoId === a.id}
+                                                                onClick={() => handleDesvincular(a)}
+                                                            >
+                                                                {desvinculandoId === a.id ? <Spinner as="span" animation="border" size="sm" /> : 'Desvincular'}
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="d-flex align-items-center gap-2">
+                                                            <span className="text-muted">Sin vincular</span>
+                                                            <Button variant="outline-primary" size="sm" onClick={() => openVincularModal(a)}>
+                                                                Vincular
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 {activeTab === 'celo' ? (
                                                     <>
                                                         <td className="text-center">
@@ -735,6 +813,39 @@ export default function AnimalesPage() {
                             {submittingUploadEstados ? <Spinner as="span" animation="border" size="sm" /> : 'Subir Archivo'}
                         </Button>
                     )}
+                </Modal.Footer>
+            </Modal>
+
+            <Modal show={!!vincularModalAnimal} onHide={() => setVincularModalAnimal(null)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Vincular collar</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {formErrorCollar && <Alert variant="danger">{formErrorCollar}</Alert>}
+                    <Form onSubmit={handleVincularSubmit} id="form-vincular-collar">
+                        <Form.Group className="mb-3">
+                            <Form.Label>Collar disponible*</Form.Label>
+                            <Form.Select
+                                value={selectedCollarId ?? ''}
+                                onChange={(e) => setSelectedCollarId(e.target.value ? Number(e.target.value) : null)}
+                            >
+                                <option value="">Seleccioná una opción</option>
+                                {collaresDisponibles.map(c => (
+                                    <option key={c.id} value={c.id}>{c.alias || c.codigo || c.devEui}</option>
+                                ))}
+                            </Form.Select>
+                            {collaresDisponibles.length === 0 && (
+                                <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>
+                                    No hay collares disponibles en este establecimiento.
+                                </div>
+                            )}
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button type="submit" form="form-vincular-collar" disabled={submittingCollar || collaresDisponibles.length === 0} className="btn-guardar-animal">
+                        {submittingCollar ? <Spinner as="span" animation="border" size="sm" /> : 'Vincular'}
+                    </Button>
                 </Modal.Footer>
             </Modal>
         </div>
