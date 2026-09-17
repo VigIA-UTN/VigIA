@@ -134,8 +134,8 @@ function NavScroll() {
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/usuarios')}>
                                 <i className="bi bi-people me-2" />Usuarios
                             </button>
-                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/collares')}>
-                                <i className="bi bi-broadcast me-2" />Collares
+                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/caravanas')}>
+                                <i className="bi bi-broadcast me-2" />Caravanas
                             </button>
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/invitaciones')}>
                                 <i className="bi bi-envelope me-2" />Invitaciones
@@ -253,7 +253,7 @@ function NavScroll() {
                                 <>
                                     <Nav.Link as={Link} to="/establecimientos" className="mx-2 fw-semibold">Establecimientos</Nav.Link>
                                     <Nav.Link as={Link} to="/usuarios" className="mx-2 fw-semibold">Usuarios</Nav.Link>
-                                    <Nav.Link as={Link} to="/collares" className="mx-2 fw-semibold">Collares</Nav.Link>
+                                    <Nav.Link as={Link} to="/caravanas" className="mx-2 fw-semibold">Caravanas</Nav.Link>
                                 </>
                             ) : rol === 'PENDIENTE' ? (
                                 <>

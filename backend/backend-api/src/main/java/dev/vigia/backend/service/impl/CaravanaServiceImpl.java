@@ -15,6 +15,7 @@ import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -28,6 +29,7 @@ public class CaravanaServiceImpl implements CaravanaService {
     private final CaravanaRepository caravanaRepository;
     private final UsuarioRepository usuarioRepository;
     private final EstablecimientoRepository establecimientoRepository;
+    private final AnimalRepository animalRepository;
 
     @Override
     public CaravanaResponse crearCaravana(CaravanaRequest caravanaRequest) {
@@ -65,6 +67,12 @@ public class CaravanaServiceImpl implements CaravanaService {
 
     @Override
     public List<CaravanaResponse> listarCaravanas(String email, Long establecimientoId) {
+        return listarCaravanas(email, establecimientoId, null, null);
+    }
+
+    @Override
+    public List<CaravanaResponse> listarCaravanas(String email, Long establecimientoId, EstadoSensor estado,
+            String codigo) {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
@@ -73,8 +81,20 @@ public class CaravanaServiceImpl implements CaravanaService {
 
         validarAccesoEstablecimiento(usuario, establecimiento);
 
-        return caravanaRepository.findAllByEstablecimientoId(establecimientoId)
-                .stream()
+        List<Caravana> caravanas;
+        if (estado != null && codigo != null) {
+            caravanas = caravanaRepository.findAllByEstablecimientoIdAndEstadoSensorAndCodigoContainingIgnoreCase(
+                    establecimientoId, estado, codigo);
+        } else if (estado != null) {
+            caravanas = caravanaRepository.findAllByEstablecimientoIdAndEstadoSensor(establecimientoId, estado);
+        } else if (codigo != null) {
+            caravanas = caravanaRepository.findAllByEstablecimientoIdAndCodigoContainingIgnoreCase(establecimientoId,
+                    codigo);
+        } else {
+            caravanas = caravanaRepository.findAllByEstablecimientoId(establecimientoId);
+        }
+
+        return caravanas.stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -97,6 +117,57 @@ public class CaravanaServiceImpl implements CaravanaService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Override
+    public CaravanaResponse darDeBajaCaravana(Long caravanaId, String motivo, String email) {
+        Caravana caravana = cargarCaravanaConAcceso(caravanaId, email);
+
+        if (caravana.getEstadoSensor() == EstadoSensor.INACTIVO) {
+            throw new IllegalArgumentException("La caravana ya se encuentra dada de baja.");
+        }
+
+        if (caravana.getEstadoSensor() == EstadoSensor.VINCULADO) {
+            Animal animal = caravana.getAnimal();
+            if (animal != null) {
+                animal.setCaravana(null);
+                animalRepository.save(animal);
+                caravana.setAnimal(null);
+            }
+        }
+
+        caravana.setEstadoSensor(EstadoSensor.INACTIVO);
+        caravana.setActivo(false);
+
+        Caravana guardada = caravanaRepository.save(caravana);
+        return toResponse(guardada);
+    }
+
+    @Override
+    public CaravanaResponse reactivarCaravana(Long caravanaId, String email) {
+        Caravana caravana = cargarCaravanaConAcceso(caravanaId, email);
+
+        if (caravana.getEstadoSensor() != EstadoSensor.INACTIVO) {
+            throw new IllegalArgumentException("Solo se puede reactivar una caravana que esté dada de baja.");
+        }
+
+        caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
+        caravana.setActivo(false);
+
+        Caravana guardada = caravanaRepository.save(caravana);
+        return toResponse(guardada);
+    }
+
+    private Caravana cargarCaravanaConAcceso(Long caravanaId, String email) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        Caravana caravana = caravanaRepository.findById(caravanaId)
+                .orElseThrow(() -> new IllegalArgumentException("Caravana no encontrada."));
+
+        validarAccesoEstablecimiento(usuario, caravana.getEstablecimiento());
+
+        return caravana;
     }
 
     private void validarAccesoEstablecimiento(Usuario usuario, Establecimiento establecimiento) {
@@ -122,6 +193,8 @@ public class CaravanaServiceImpl implements CaravanaService {
                 .establecimientoId(caravana.getEstablecimiento() != null ? caravana.getEstablecimiento().getId() : null)
                 .animalId(animal != null ? animal.getId() : null)
                 .animalAlias(animal != null ? animal.getAlias() : null)
+                .bateria(caravana.getBateria())
+                .ultimaSenial(caravana.getUltimaSenial())
                 .build();
     }
 }

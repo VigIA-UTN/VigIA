@@ -4,12 +4,12 @@ import { crearCaravana, getCaravanas } from '../api/caravanasApi';
 import type { CaravanaRequest, CaravanaResponse } from '../api/caravanasApi';
 import { getEstablecimientos } from '../api/establecimientosApi';
 import type { EstablecimientoResponse } from '../api/establecimientosApi';
-import './CollaresPage.css';
+import './CaravanasPage.css';
 
 function estadoBadgeClass(estado: string) {
-    if (estado === 'DISPONIBLE') return 'estado-collar-disponible';
-    if (estado === 'VINCULADO') return 'estado-collar-vinculado';
-    return 'estado-collar-inactivo';
+    if (estado === 'DISPONIBLE') return 'estado-caravana-disponible';
+    if (estado === 'VINCULADO') return 'estado-caravana-vinculado';
+    return 'estado-caravana-inactivo';
 }
 
 function formatFecha(iso: string | null) {
@@ -18,11 +18,11 @@ function formatFecha(iso: string | null) {
     return `${d}/${m}/${y}`;
 }
 
-export default function CollaresPage() {
+export default function CaravanasPage() {
     const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
     const [establecimientoId, setEstablecimientoId] = useState<number | null>(null);
 
-    const [collares, setCollares] = useState<CaravanaResponse[]>([]);
+    const [caravanas, setCaravanas] = useState<CaravanaResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -52,22 +52,21 @@ export default function CollaresPage() {
         })();
     }, []);
 
-    const fetchCollares = async (estId: number) => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await getCaravanas(estId);
-            setCollares(data);
-        } catch (err) {
-            const e = err as { response?: { data?: { message?: string } } };
-            setError(e.response?.data?.message || 'Error al cargar los collares.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        if (establecimientoId) fetchCollares(establecimientoId);
+        if (!establecimientoId) return;
+        (async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                const data = await getCaravanas(establecimientoId);
+                setCaravanas(data);
+            } catch (err) {
+                const e = err as { response?: { data?: { message?: string } } };
+                setError(e.response?.data?.message || 'Error al cargar las caravanas.');
+            } finally {
+                setLoading(false);
+            }
+        })();
     }, [establecimientoId]);
 
     const openModal = () => {
@@ -97,21 +96,21 @@ export default function CollaresPage() {
         setSubmitting(true);
         try {
             const nuevo = await crearCaravana({ ...form, dev_eui: form.dev_eui, establecimientoId } as CaravanaRequest);
-            setCollares(prev => [nuevo, ...prev]);
-            setFormSuccess('Collar registrado exitosamente.');
+            setCaravanas(prev => [nuevo, ...prev]);
+            setFormSuccess('Caravana registrada exitosamente.');
             setTimeout(() => {
                 setShowModal(false);
                 setFormSuccess(null);
             }, 1200);
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } | string } };
-            setFormError(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al registrar el collar.');
+            setFormError(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al registrar la caravana.');
         } finally {
             setSubmitting(false);
         }
     };
 
-    const filteredCollares = collares.filter(c => {
+    const filteredCaravanas = caravanas.filter(c => {
         if (!searchTerm) return true;
         const q = searchTerm.toLowerCase();
         return (
@@ -125,9 +124,9 @@ export default function CollaresPage() {
         <div className="vigia-page-container">
             <Container>
                 <div className="vigia-page-header">
-                    <h2 className="vigia-page-title">Collares</h2>
+                    <h2 className="vigia-page-title">Caravanas</h2>
                     <Button className="btn-vigia-success text-nowrap" onClick={openModal}>
-                        <i className="bi bi-plus-lg me-2" /> Nuevo collar
+                        <i className="bi bi-plus-lg me-2" /> Nueva caravana
                     </Button>
                 </div>
 
@@ -170,20 +169,20 @@ export default function CollaresPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredCollares.length === 0 ? (
+                                {filteredCaravanas.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="text-center py-4 text-muted">
-                                            No se encontraron collares para este establecimiento.
+                                            No se encontraron caravanas para este establecimiento.
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredCollares.map(c => (
+                                    filteredCaravanas.map(c => (
                                         <tr key={c.id}>
                                             <td className="fw-medium">{c.codigo || '—'}</td>
                                             <td>{c.alias || '—'}</td>
                                             <td className="col-mobile-hide">{c.devEui}</td>
                                             <td className="text-center">
-                                                <span className={`estado-badge-collar ${estadoBadgeClass(c.estadoSensor)}`}>{c.estadoSensor}</span>
+                                                <span className={`estado-badge-caravana ${estadoBadgeClass(c.estadoSensor)}`}>{c.estadoSensor}</span>
                                             </td>
                                             <td className="col-mobile-hide">{formatFecha(c.fechaAlta)}</td>
                                             <td>{c.animalAlias || '—'}</td>
@@ -198,12 +197,12 @@ export default function CollaresPage() {
 
             <Modal show={showModal} onHide={() => setShowModal(false)} centered dialogClassName="modal-nuevo-animal">
                 <Modal.Header closeButton>
-                    <Modal.Title>Nuevo Collar</Modal.Title>
+                    <Modal.Title>Nueva Caravana</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     {formError && <Alert variant="danger">{formError}</Alert>}
                     {formSuccess && <Alert variant="success">{formSuccess}</Alert>}
-                    <Form onSubmit={handleSubmit} id="form-nuevo-collar">
+                    <Form onSubmit={handleSubmit} id="form-nueva-caravana">
                         <Form.Group className="mb-3">
                             <Form.Label>Dev EUI*</Form.Label>
                             <Form.Control name="dev_eui" type="text" placeholder="Ej: 0004A30B00C1F5E2" value={form.dev_eui ?? ''} onChange={handleChange} required />
@@ -230,7 +229,7 @@ export default function CollaresPage() {
                     </Form>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button type="submit" form="form-nuevo-collar" disabled={submitting} className="btn-guardar-animal">
+                    <Button type="submit" form="form-nueva-caravana" disabled={submitting} className="btn-guardar-animal">
                         {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
                     </Button>
                 </Modal.Footer>

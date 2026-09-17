@@ -1,4 +1,4 @@
-/* ── Modal "Nuevo Collar" — mismo estilo navy que modal-nuevo-animal ── */
+/* ── Modal "Nueva Caravana" — mismo estilo navy que modal-nuevo-animal ── */
 .modal-nuevo-animal .modal-content {
     background-color: #1E3A5F;
     border: 2px solid #4DD0E1;
@@ -92,17 +92,17 @@
     border-color: #7ab332 !important;
 }
 
-/* Estado del collar (estadoSensor crudo del backend) */
-.estado-badge-collar {
+/* Estado de la caravana (estadoSensor crudo del backend) */
+.estado-badge-caravana {
     font-weight: 700;
     font-size: 0.8rem;
     letter-spacing: 0.03em;
     display: inline-block;
 }
 
-.estado-collar-disponible { color: #2f7d3b; }
-.estado-collar-vinculado  { color: #1E3A5F; }
-.estado-collar-inactivo   { color: #c94b4b; }
+.estado-caravana-disponible { color: #2f7d3b; }
+.estado-caravana-vinculado  { color: #1E3A5F; }
+.estado-caravana-inactivo   { color: #c94b4b; }
 
 @media (max-width: 640px) {
     .col-mobile-hide {

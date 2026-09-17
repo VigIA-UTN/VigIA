@@ -516,7 +516,7 @@ export default function AnimalDetailPage() {
                                 {animal.diasRestantesCalibracion === 0
                                     ? <>La calibración <strong>finaliza hoy</strong>.</>
                                     : <>Faltan <strong>{animal.diasRestantesCalibracion} días</strong> para finalizar.</>
-                                } Durante esta etapa el collar está recolectando datos base del comportamiento del animal, por lo tanto <strong>no se generarán alertas sanitarias</strong> temporariamente.
+                                } Durante esta etapa la caravana está recolectando datos base del comportamiento del animal, por lo tanto <strong>no se generarán alertas sanitarias</strong> temporariamente.
                             </p>
                         </div>
                     </Alert>
@@ -596,7 +596,7 @@ export default function AnimalDetailPage() {
                                             <ul className="list-unstyled detail-list mt-4">
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
                                                 <li>
-                                                    <strong>Collar vinculado:</strong>{' '}
+                                                    <strong>Caravana vinculada:</strong>{' '}
                                                     {animal.caravanaId ? (
                                                         <>
                                                             {animal.caravanaAlias || animal.caravanaDevEui} ({animal.caravanaEstado})
@@ -631,7 +631,7 @@ export default function AnimalDetailPage() {
                                                 <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
                                                 <li><strong>Estado de Salud:</strong> {estadoSaludBadge(saludHistorial[0]?.estado ?? animal.estadoSalud)}</li>
                                                 <li>
-                                                    <strong>Collar vinculado:</strong>{' '}
+                                                    <strong>Caravana vinculada:</strong>{' '}
                                                     {animal.caravanaId ? (
                                                         <>
                                                             {animal.caravanaAlias || animal.caravanaDevEui} ({animal.caravanaEstado})

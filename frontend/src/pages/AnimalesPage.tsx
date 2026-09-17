@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
+import { Container, Spinner, Alert, Modal, Form, Button, Toast } from 'react-bootstrap';
 import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, vincularCaravana, desvincularCaravana, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
@@ -69,11 +69,13 @@ export default function AnimalesPage() {
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
     const [vincularModalAnimal, setVincularModalAnimal] = useState<AnimalResponse | null>(null);
-    const [collaresDisponibles, setCollaresDisponibles] = useState<CaravanaResponse[]>([]);
-    const [selectedCollarId, setSelectedCollarId] = useState<number | null>(null);
-    const [submittingCollar, setSubmittingCollar] = useState(false);
-    const [formErrorCollar, setFormErrorCollar] = useState<string | null>(null);
+    const [caravanasDisponibles, setCaravanasDisponibles] = useState<CaravanaResponse[]>([]);
+    const [selectedCaravanaId, setSelectedCaravanaId] = useState<number | null>(null);
+    const [submittingCaravana, setSubmittingCaravana] = useState(false);
+    const [formErrorCaravana, setFormErrorCaravana] = useState<string | null>(null);
     const [desvinculandoId, setDesvinculandoId] = useState<number | null>(null);
+    const [desvincularModalAnimal, setDesvincularModalAnimal] = useState<AnimalResponse | null>(null);
+    const [undoToast, setUndoToast] = useState<{ animalId: number; caravanaId: number; alias: string } | null>(null);
 
     // Alert detail overlay
     const [selectedAlertaForAnimal, setSelectedAlertaForAnimal] = useState<AlertaResponse | null>(null);
@@ -143,47 +145,67 @@ export default function AnimalesPage() {
 
     const openVincularModal = async (animal: AnimalResponse) => {
         setVincularModalAnimal(animal);
-        setSelectedCollarId(null);
-        setFormErrorCollar(null);
+        setSelectedCaravanaId(null);
+        setFormErrorCaravana(null);
         try {
             const disponibles = await getCaravanasDisponibles(selectedId || animal.establecimientoId);
-            setCollaresDisponibles(disponibles);
+            setCaravanasDisponibles(disponibles);
         } catch {
-            setCollaresDisponibles([]);
+            setCaravanasDisponibles([]);
         }
     };
 
     const handleVincularSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!vincularModalAnimal || !selectedCollarId) {
-            setFormErrorCollar('Seleccioná un collar disponible.');
+        if (!vincularModalAnimal || !selectedCaravanaId) {
+            setFormErrorCaravana('Seleccioná una caravana disponible.');
             return;
         }
-        setFormErrorCollar(null);
-        setSubmittingCollar(true);
+        setFormErrorCaravana(null);
+        setSubmittingCaravana(true);
         try {
-            const actualizado = await vincularCaravana(vincularModalAnimal.id, selectedCollarId);
+            const actualizado = await vincularCaravana(vincularModalAnimal.id, selectedCaravanaId);
             setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
             setVincularModalAnimal(null);
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } | string } };
-            setFormErrorCollar(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al vincular el collar.');
+            setFormErrorCaravana(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al vincular la caravana.');
         } finally {
-            setSubmittingCollar(false);
+            setSubmittingCaravana(false);
         }
     };
 
-    const handleDesvincular = async (animal: AnimalResponse) => {
-        if (!window.confirm(`¿Desvincular el collar de ${animal.alias || animal.idCaravanaOficial || 'este animal'}?`)) return;
+    const openDesvincularModal = (animal: AnimalResponse) => {
+        setDesvincularModalAnimal(animal);
+    };
+
+    const handleConfirmDesvincular = async () => {
+        const animal = desvincularModalAnimal;
+        if (!animal || !animal.caravanaId) return;
+        const caravanaId = animal.caravanaId;
         setDesvinculandoId(animal.id);
         try {
             const actualizado = await desvincularCaravana(animal.id);
             setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
+            setDesvincularModalAnimal(null);
+            setUndoToast({ animalId: animal.id, caravanaId, alias: animal.alias || animal.idCaravanaOficial || 'el animal' });
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } } };
-            alert(e.response?.data?.message || 'Error al desvincular el collar.');
+            alert(e.response?.data?.message || 'Error al desvincular la caravana.');
         } finally {
             setDesvinculandoId(null);
+        }
+    };
+
+    const handleUndoDesvincular = async () => {
+        if (!undoToast) return;
+        const { animalId, caravanaId } = undoToast;
+        setUndoToast(null);
+        try {
+            const actualizado = await vincularCaravana(animalId, caravanaId);
+            setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
+        } catch {
+            alert('No se pudo deshacer la acción. La caravana ya podría estar vinculada a otro animal.');
         }
     };
 
@@ -429,55 +451,45 @@ export default function AnimalesPage() {
                             <Spinner animation="border" style={{ color: '#1E3A5F' }} />
                         </div>
                     ) : (
-                        <div className="vigia-table-wrapper">
+                        <div className="vigia-table-wrapper animales-table-wrapper">
                             <table className="vigia-table">
                                 <thead>
                                     <tr>
                                         <th onClick={() => handleSort('idCaravanaOficial')} style={{ cursor: 'pointer' }}>
-                                            <div className="d-flex align-items-center justify-content-start">
-                                                Identificador <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'idCaravanaOficial' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                            <div className="d-flex align-items-center justify-content-center">
+                                                ID <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'idCaravanaOficial' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                             </div>
                                         </th>
                                         <th onClick={() => handleSort('alias')} style={{ cursor: 'pointer' }}>
-                                            <div className="d-flex align-items-center justify-content-start">
+                                            <div className="d-flex align-items-center justify-content-center">
                                                 Nombre <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'alias' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                             </div>
                                         </th>
-                                        <th className="col-mobile-hide">Collar</th>
+                                        <th className="col-mobile-hide text-center">Caravana</th>
                                         {activeTab === 'celo' ? (
                                             <>
                                                 <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }}>
-                                                    <div className="d-flex align-items-center justify-content-start">
+                                                    <div className="d-flex align-items-center justify-content-center">
                                                         <span className="d-none d-sm-inline">Estado Reproductivo</span>
                                                         <span className="d-sm-none">Reproductivo</span>
                                                         <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
                                                 <th onClick={() => handleSort('fechaUltimoParto')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
+                                                    <div className="d-flex align-items-center justify-content-center">
                                                         Fecha Último Parto <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimoParto' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
                                                 <th onClick={() => handleSort('fechaUltimaInseminacion')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
+                                                    <div className="d-flex align-items-center justify-content-center">
                                                         Fecha Última Inseminación <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimaInseminacion' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
                                             </>
                                         ) : (
                                             <>
-                                                <th onClick={() => handleSort('fechaNacimiento')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
-                                                        Fecha Nacimiento <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'fechaNacimiento' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
-                                                <th onClick={() => handleSort('raza')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
-                                                        Raza <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'raza' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
                                                 <th onClick={() => handleSort('rodeoLoteNombre')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
+                                                    <div className="d-flex align-items-center justify-content-center">
                                                         Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteNombre' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
@@ -504,7 +516,7 @@ export default function AnimalesPage() {
                                 <tbody>
                                     {sortedAnimales.length === 0 ? (
                                         <tr>
-                                            <td colSpan={10} className="text-center py-4 text-muted">
+                                            <td colSpan={8} className="text-center py-4 text-muted">
                                                 No se encontraron animales.
                                             </td>
                                         </tr >
@@ -515,21 +527,23 @@ export default function AnimalesPage() {
                                                 <td>{a.alias || '—'}</td>
                                                 <td className="col-mobile-hide">
                                                     {a.caravanaId ? (
-                                                        <div className="d-flex align-items-center gap-2">
-                                                            <span>{a.caravanaAlias || a.caravanaDevEui}</span>
+                                                        <div className="d-flex align-items-center justify-content-between gap-2">
+                                                            <span className="text-truncate" style={{ minWidth: 0 }}>{a.caravanaAlias || a.caravanaDevEui}</span>
                                                             <Button
-                                                                variant="outline-danger"
+                                                                variant="outline-secondary"
                                                                 size="sm"
+                                                                className="flex-shrink-0"
                                                                 disabled={desvinculandoId === a.id}
-                                                                onClick={() => handleDesvincular(a)}
+                                                                onClick={() => openDesvincularModal(a)}
+                                                                title="Desvincular"
                                                             >
-                                                                {desvinculandoId === a.id ? <Spinner as="span" animation="border" size="sm" /> : 'Desvincular'}
+                                                                {desvinculandoId === a.id ? <Spinner as="span" animation="border" size="sm" /> : <i className="bi bi-x-lg"></i>}
                                                             </Button>
                                                         </div>
                                                     ) : (
-                                                        <div className="d-flex align-items-center gap-2">
+                                                        <div className="d-flex align-items-center justify-content-between gap-2">
                                                             <span className="text-muted">Sin vincular</span>
-                                                            <Button variant="outline-primary" size="sm" onClick={() => openVincularModal(a)}>
+                                                            <Button variant="outline-primary" size="sm" className="flex-shrink-0" onClick={() => openVincularModal(a)}>
                                                                 Vincular
                                                             </Button>
                                                         </div>
@@ -550,8 +564,6 @@ export default function AnimalesPage() {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="col-mobile-hide">{formatFecha(a.fechaNacimiento)}</td>
-                                                        <td className="col-mobile-hide">{a.raza || '—'}</td>
                                                         <td className="col-mobile-hide">{a.rodeoLoteNombre || '—'}</td>
                                                         <td className="text-center"><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
                                                         <td className="text-center col-mobile-hide">
@@ -818,33 +830,65 @@ export default function AnimalesPage() {
 
             <Modal show={!!vincularModalAnimal} onHide={() => setVincularModalAnimal(null)} centered dialogClassName="modal-nuevo-animal">
                 <Modal.Header closeButton>
-                    <Modal.Title>Vincular collar</Modal.Title>
+                    <Modal.Title>Vincular caravana</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    {formErrorCollar && <Alert variant="danger">{formErrorCollar}</Alert>}
-                    <Form onSubmit={handleVincularSubmit} id="form-vincular-collar">
+                    {formErrorCaravana && <Alert variant="danger">{formErrorCaravana}</Alert>}
+                    <Form onSubmit={handleVincularSubmit} id="form-vincular-caravana">
                         <Form.Group className="mb-3">
-                            <Form.Label>Collar disponible*</Form.Label>
+                            <Form.Label>Caravana disponible*</Form.Label>
                             <Form.Select
-                                value={selectedCollarId ?? ''}
-                                onChange={(e) => setSelectedCollarId(e.target.value ? Number(e.target.value) : null)}
+                                value={selectedCaravanaId ?? ''}
+                                onChange={(e) => setSelectedCaravanaId(e.target.value ? Number(e.target.value) : null)}
                             >
                                 <option value="">Seleccioná una opción</option>
-                                {collaresDisponibles.map(c => (
+                                {caravanasDisponibles.map(c => (
                                     <option key={c.id} value={c.id}>{c.alias || c.codigo || c.devEui}</option>
                                 ))}
                             </Form.Select>
-                            {collaresDisponibles.length === 0 && (
+                            {caravanasDisponibles.length === 0 && (
                                 <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>
-                                    No hay collares disponibles en este establecimiento.
+                                    No hay caravanas disponibles en este establecimiento.
                                 </div>
                             )}
                         </Form.Group>
                     </Form>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button type="submit" form="form-vincular-collar" disabled={submittingCollar || collaresDisponibles.length === 0} className="btn-guardar-animal">
-                        {submittingCollar ? <Spinner as="span" animation="border" size="sm" /> : 'Vincular'}
+                    <Button type="submit" form="form-vincular-caravana" disabled={submittingCaravana || caravanasDisponibles.length === 0} className="btn-guardar-animal">
+                        {submittingCaravana ? <Spinner as="span" animation="border" size="sm" /> : 'Vincular'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Modal show={!!desvincularModalAnimal} onHide={() => setDesvincularModalAnimal(null)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Desvincular caravana</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <p className="text-center mb-0" style={{ color: '#cde' }}>
+                        ¿Estás seguro de que querés desvincular la caravana de{' '}
+                        <strong style={{ color: 'white' }}>
+                            {desvincularModalAnimal?.alias || desvincularModalAnimal?.idCaravanaOficial || 'este animal'}
+                        </strong>?
+                    </p>
+                </Modal.Body>
+                <Modal.Footer className="gap-3">
+                    <Button
+                        className="btn-guardar-animal"
+                        style={{ flex: 1 }}
+                        onClick={() => setDesvincularModalAnimal(null)}
+                        disabled={desvinculandoId === desvincularModalAnimal?.id}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        className="btn-confirmar-desvincular"
+                        style={{ flex: 1 }}
+                        onClick={handleConfirmDesvincular}
+                        disabled={desvinculandoId === desvincularModalAnimal?.id}
+                    >
+                        {desvinculandoId === desvincularModalAnimal?.id ? <Spinner as="span" animation="border" size="sm" /> : 'Sí, desvincular'}
                     </Button>
                 </Modal.Footer>
             </Modal>
@@ -875,6 +919,24 @@ export default function AnimalesPage() {
                 }}
             />
         )}
+
+        {/* Undo toast — estilo snackbar de Gmail, disponible 5s tras desvincular */}
+        <div className="undo-toast-container">
+            <Toast
+                show={!!undoToast}
+                onClose={() => setUndoToast(null)}
+                delay={5000}
+                autohide
+                className="undo-toast"
+            >
+                <Toast.Body className="d-flex align-items-center justify-content-between gap-3">
+                    <span>Caravana desvinculada de {undoToast?.alias}</span>
+                    <Button variant="link" className="undo-toast-btn p-0" onClick={handleUndoDesvincular}>
+                        Deshacer
+                    </Button>
+                </Toast.Body>
+            </Toast>
+        </div>
     </>
     );
 }

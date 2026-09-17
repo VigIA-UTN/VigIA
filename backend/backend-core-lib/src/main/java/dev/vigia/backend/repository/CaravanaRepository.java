@@ -22,4 +22,9 @@ public interface CaravanaRepository extends JpaRepository<Caravana, Long> {
     List<Caravana> findAllByEstablecimientoId(Long establecimientoId);
 
     List<Caravana> findAllByEstablecimientoIdAndEstadoSensor(Long establecimientoId, EstadoSensor estadoSensor);
+
+    List<Caravana> findAllByEstablecimientoIdAndEstadoSensorAndCodigoContainingIgnoreCase(
+            Long establecimientoId, EstadoSensor estadoSensor, String codigo);
+
+    List<Caravana> findAllByEstablecimientoIdAndCodigoContainingIgnoreCase(Long establecimientoId, String codigo);
 }
