@@ -33,6 +33,14 @@ export async function getAlertasCelo(establecimientoId: number, estado?: string)
   return response.data;
 }
 
+export async function getAlertasSalud(establecimientoId: number, estado?: string): Promise<AlertaResponse[]> {
+  const url = estado
+    ? `/alertas/salud?establecimientoId=${establecimientoId}&estado=${estado}`
+    : `/alertas/salud?establecimientoId=${establecimientoId}`;
+  const response = await axiosClient.get<AlertaResponse[]>(url);
+  return response.data;
+}
+
 /**
  * Returns the most recent PENDIENTE alert for a specific animal,
  * by fetching the full establishment alert list and filtering client-side.
@@ -137,14 +145,14 @@ export async function getAlertaDetalle(alertaId: number, establecimientoId: numb
 /**
  * Alertas sanitarias (tipo SALUD) de un animal concreto, más recientes primero.
  * El backend no expone un listado por animal, así que se trae el del
- * establecimiento filtrado por tipo y se filtra por animalId en el cliente
- * (mismo criterio que {@link getAlertaParaAnimal} para celo).
+ * establecimiento vía el endpoint dedicado y se filtra por animalId en el
+ * cliente (mismo criterio que {@link getAlertaParaAnimal} para celo).
  */
 export async function getAlertasSanitariasAnimal(
   establecimientoId: number,
   animalId: number
 ): Promise<AlertaResponse[]> {
-  const todas = await getAlertas(establecimientoId, 'SALUD');
+  const todas = await getAlertasSalud(establecimientoId);
   return todas
     .filter((a) => a.animalId === animalId)
     .sort((a, b) => new Date(b.tsGeneracion).getTime() - new Date(a.tsGeneracion).getTime());

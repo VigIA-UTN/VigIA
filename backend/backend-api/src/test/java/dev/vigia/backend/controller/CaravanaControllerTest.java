@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -365,6 +366,209 @@ class CaravanaControllerTest {
     void listarCaravanas_establecimientoInexistente_notFound() throws Exception {
         mockMvc.perform(get("/api/v1/caravana")
                 .param("establecimientoId", "999999")
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/caravana - Filtra por estado y codigo cuando se pasan como query params")
+    void listarCaravanas_filtraPorEstadoYCodigo() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+        Caravana disponibleConCodigo = new Caravana();
+        disponibleConCodigo.setDevEui("SENSOR-FILTRO-1");
+        disponibleConCodigo.setCodigo("CAR-100");
+        disponibleConCodigo.setEstablecimiento(est);
+        disponibleConCodigo.setEstadoSensor(EstadoSensor.DISPONIBLE);
+        caravanaRepository.save(disponibleConCodigo);
+
+        Caravana vinculadaConCodigo = new Caravana();
+        vinculadaConCodigo.setDevEui("SENSOR-FILTRO-2");
+        vinculadaConCodigo.setCodigo("CAR-200");
+        vinculadaConCodigo.setEstablecimiento(est);
+        vinculadaConCodigo.setEstadoSensor(EstadoSensor.VINCULADO);
+        caravanaRepository.save(vinculadaConCodigo);
+
+        mockMvc.perform(get("/api/v1/caravana")
+                .param("establecimientoId", establecimientoId.toString())
+                .param("estado", "DISPONIBLE")
+                .param("codigo", "CAR-100")
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].devEui").value("SENSOR-FILTRO-1"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/caravana/disponibles debe retornar únicamente las caravanas en estado DISPONIBLE")
+    void listarCaravanasDisponibles_retornaSoloDisponibles() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+        Caravana disponible = new Caravana();
+        disponible.setDevEui("SENSOR-SOLO-DISPONIBLE");
+        disponible.setEstablecimiento(est);
+        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+        caravanaRepository.save(disponible);
+
+        Caravana vinculada = new Caravana();
+        vinculada.setDevEui("SENSOR-YA-VINCULADO");
+        vinculada.setEstablecimiento(est);
+        vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
+        caravanaRepository.save(vinculada);
+
+        mockMvc.perform(get("/api/v1/caravana/disponibles")
+                .param("establecimientoId", establecimientoId.toString())
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-SOLO-DISPONIBLE')].estadoSensor").value("DISPONIBLE"))
+                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-YA-VINCULADO')]").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/caravana/disponibles - Veterinario recibe 403")
+    void listarCaravanasDisponibles_veterinario_forbidden() throws Exception {
+        Usuario vet = new Usuario();
+        vet.setEmail("vet.disponibles@vigia.dev");
+        vet.setPasswordHash(passwordEncoder.encode("vet123"));
+        vet.setNombre("Veterinario");
+        vet.setRol(Rol.VETERINARIO);
+        vet.setActivo(true);
+        usuarioRepository.save(vet);
+        String vetToken = getTokenFor("vet.disponibles@vigia.dev", "vet123");
+
+        mockMvc.perform(get("/api/v1/caravana/disponibles")
+                .param("establecimientoId", establecimientoId.toString())
+                .header("Authorization", "Bearer " + vetToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Admin da de baja una caravana DISPONIBLE")
+    void darDeBajaCaravana_asAdmin_disponible_success() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        Caravana disponible = new Caravana();
+        disponible.setDevEui("SENSOR-BAJA-1");
+        disponible.setEstablecimiento(est);
+        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+        disponible = caravanaRepository.save(disponible);
+
+        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", disponible.getId())
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("motivo", "Collar dañado"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoSensor").value("INACTIVO"))
+                .andExpect(jsonPath("$.activo").value(false));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Da de baja una caravana VINCULADO y desvincula el animal")
+    void darDeBajaCaravana_vinculada_desvinculaAnimal() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        Caravana vinculada = new Caravana();
+        vinculada.setDevEui("SENSOR-BAJA-2");
+        vinculada.setEstablecimiento(est);
+        vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
+        vinculada.setActivo(true);
+        vinculada = caravanaRepository.save(vinculada);
+
+        Animal animal = new Animal(est, null);
+        animal.setAlias("Lola");
+        animal.setEstadoActual(dev.vigia.backend.model.EstadoAnimal.ACTIVO);
+        animal.setCaravana(vinculada);
+        animal = animalRepository.save(animal);
+
+        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", vinculada.getId())
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoSensor").value("INACTIVO"))
+                .andExpect(jsonPath("$.animalId").doesNotExist());
+
+        Animal animalActualizado = animalRepository.findById(animal.getId()).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(animalActualizado.getCaravana()).isNull();
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Ya INACTIVO responde 400")
+    void darDeBajaCaravana_yaInactiva_badRequest() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        Caravana inactiva = new Caravana();
+        inactiva.setDevEui("SENSOR-BAJA-3");
+        inactiva.setEstablecimiento(est);
+        inactiva.setEstadoSensor(EstadoSensor.INACTIVO);
+        inactiva = caravanaRepository.save(inactiva);
+
+        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", inactiva.getId())
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Usuario no-Admin recibe 403 Forbidden")
+    void darDeBajaCaravana_asProductor_forbidden() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        Caravana disponible = new Caravana();
+        disponible.setDevEui("SENSOR-BAJA-4");
+        disponible.setEstablecimiento(est);
+        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+        disponible = caravanaRepository.save(disponible);
+
+        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", disponible.getId())
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/caravana/{id}/reactivar - Admin reactiva una caravana INACTIVO")
+    void reactivarCaravana_asAdmin_success() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        Caravana inactiva = new Caravana();
+        inactiva.setDevEui("SENSOR-REACT-1");
+        inactiva.setEstablecimiento(est);
+        inactiva.setEstadoSensor(EstadoSensor.INACTIVO);
+        inactiva = caravanaRepository.save(inactiva);
+
+        mockMvc.perform(patch("/api/v1/caravana/{id}/reactivar", inactiva.getId())
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoSensor").value("DISPONIBLE"))
+                .andExpect(jsonPath("$.activo").value(false));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/caravana/{id}/reactivar - No INACTIVO responde 400")
+    void reactivarCaravana_noInactiva_badRequest() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        Caravana disponible = new Caravana();
+        disponible.setDevEui("SENSOR-REACT-2");
+        disponible.setEstablecimiento(est);
+        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+        disponible = caravanaRepository.save(disponible);
+
+        mockMvc.perform(patch("/api/v1/caravana/{id}/reactivar", disponible.getId())
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/caravana/{id}/reactivar - Usuario no-Admin recibe 403 Forbidden")
+    void reactivarCaravana_asProductor_forbidden() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        Caravana inactiva = new Caravana();
+        inactiva.setDevEui("SENSOR-REACT-3");
+        inactiva.setEstablecimiento(est);
+        inactiva.setEstadoSensor(EstadoSensor.INACTIVO);
+        inactiva = caravanaRepository.save(inactiva);
+
+        mockMvc.perform(patch("/api/v1/caravana/{id}/reactivar", inactiva.getId())
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Caravana inexistente responde 404")
+    void darDeBajaCaravana_inexistente_notFound() throws Exception {
+        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", 999999L)
                 .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }

@@ -18,11 +18,10 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    // 256-bit secret key
     @Value("${jwt.secret:defaultSecretKeyForVigiaApplicationWhichNeedsToBeAtLeast256BitsLong123}")
     private String secret;
 
-    @Value("${jwt.expiration:86400000}") // Default: 24 hours in ms
+    @Value("${jwt.expiration:86400000}")
     private Long jwtExpirationInMs;
 
     private Key getSigningKey() {

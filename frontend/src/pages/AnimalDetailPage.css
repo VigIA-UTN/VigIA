@@ -3,6 +3,15 @@
     margin: 0 auto;
 }
 
+.bateria-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #FFC700;
+    margin-right: 4px;
+}
+
 .animal-card {
     border-radius: 12px;
 }

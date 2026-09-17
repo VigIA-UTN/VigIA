@@ -1,8 +1,10 @@
 package dev.vigia.backend.dto;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import dev.vigia.backend.model.EstadoAnimal;
+import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.TipoEstadoSalud;
 import dev.vigia.backend.model.TipoReproductivo;
 import lombok.Builder;
@@ -28,4 +30,12 @@ public class AnimalResponse {
 
     private Boolean enCalibracion;
     private Integer diasRestantesCalibracion;
+
+    private Long caravanaId;
+    private String caravanaDevEui;
+    private String caravanaAlias;
+    private EstadoSensor caravanaEstado;
+    private LocalDateTime caravanaUltimaSenial;
+    private Double caravanaBateria;
 }
+

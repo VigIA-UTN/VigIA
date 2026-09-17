@@ -23,10 +23,12 @@ import {
 } from '../api/animalesApi';
 import { getRodeoLotes, type RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { useAuthStore } from '../store/authStore';
+import { formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
 import './AnimalDetailPage.css';
 import './AnimalesPage.css';
 import ActividadTab from './ActividadTab';
 import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
+import AnimalIndicadoresSalud from '../components/AnimalIndicadoresSalud';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import type { AlertaResponse } from '../api/alertaApi';
 import LineaTiempoAlertas from '../components/LineaTiempoAlertas';
@@ -103,6 +105,23 @@ function formatDateTime(dt: string | null | undefined) {
     if (!dt) return '—';
     const date = new Date(dt);
     return date.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function CaravanaVinculadaInfo({ animal }: { animal: AnimalResponse }) {
+    if (!animal.caravanaId) return <>—</>;
+    const bateria = formatBateria(animal.caravanaBateria);
+    const senial = formatUltimaSenial(animal.caravanaUltimaSenial);
+    return (
+        <>
+            {animal.caravanaAlias || animal.caravanaDevEui} ({animal.caravanaEstado}){' '}
+            <span style={{ color: bateria.amber ? '#8a6a00' : '#2f7d3b' }}>
+                {bateria.amber && <span className="bateria-dot" />}
+                {bateria.text}
+            </span>
+            {' · '}
+            <span title={senial.title} style={{ color: senial.amber ? '#8a6a00' : undefined }}>señal {senial.text}</span>
+        </>
+    );
 }
 
 const EMPTY_ESTADO_FORM: EstadoReproductivoRequest = {
@@ -516,7 +535,7 @@ export default function AnimalDetailPage() {
                                 {animal.diasRestantesCalibracion === 0
                                     ? <>La calibración <strong>finaliza hoy</strong>.</>
                                     : <>Faltan <strong>{animal.diasRestantesCalibracion} días</strong> para finalizar.</>
-                                } Durante esta etapa el collar está recolectando datos base del comportamiento del animal, por lo tanto <strong>no se generarán alertas sanitarias</strong> temporariamente.
+                                } Durante esta etapa la caravana está recolectando datos base del comportamiento del animal, por lo tanto <strong>no se generarán alertas sanitarias</strong> temporariamente.
                             </p>
                         </div>
                     </Alert>
@@ -595,6 +614,14 @@ export default function AnimalDetailPage() {
                                             </Form.Group>
                                             <ul className="list-unstyled detail-list mt-4">
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
+                                                <li>
+                                                    <strong>Caravana vinculada:</strong>{' '}
+                                                    <CaravanaVinculadaInfo animal={animal} />
+                                                    {' '}
+                                                    <Button variant="link" className="p-0 align-baseline" onClick={() => navigate('/animales')}>
+                                                        Gestionar en Animales
+                                                    </Button>
+                                                </li>
                                             </ul>
                                         </Col>
                                     </Row>
@@ -618,6 +645,14 @@ export default function AnimalDetailPage() {
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
                                                 <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
                                                 <li><strong>Estado de Salud:</strong> {estadoSaludBadge(saludHistorial[0]?.estado ?? animal.estadoSalud)}</li>
+                                                <li>
+                                                    <strong>Caravana vinculada:</strong>{' '}
+                                                    <CaravanaVinculadaInfo animal={animal} />
+                                                    {' '}
+                                                    <Button variant="link" className="p-0 align-baseline" onClick={() => navigate('/animales')}>
+                                                        Gestionar en Animales
+                                                    </Button>
+                                                </li>
                                             </ul>
                                         </Col>
                                     </Row>
@@ -625,6 +660,9 @@ export default function AnimalDetailPage() {
                             )}
                         </Card.Body>
                     </Card>
+
+                    {/* ── Indicadores de Salud ── */}
+                    <AnimalIndicadoresSalud animalId={animal.id} />
 
                     {/* ── Línea de Tiempo de Alertas ── */}
                     <LineaTiempoAlertas animalId={animal.id} />

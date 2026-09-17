@@ -67,6 +67,9 @@ import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
+import dev.vigia.backend.model.Caravana;
+import dev.vigia.backend.model.EstadoSensor;
+import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.RegistroPesoRepository;
@@ -90,6 +93,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final TelemetriaRepository telemetriaRepository;
         private final EstadoSaludRepository estadoSaludRepository;
         private final RegistroPesoRepository registroPesoRepository;
+        private final CaravanaRepository caravanaRepository;
 
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
@@ -154,6 +158,11 @@ public class AnimalServiceImpl implements AnimalService {
                         registroInicial.setFecha(LocalDate.now());
                         registroInicial.setFechaRegistro(java.time.LocalDateTime.now());
                         registroPesoRepository.save(registroInicial);
+                }
+
+                if (request.getCaravanaId() != null) {
+                        asignarCaravanaInterna(savedAnimal, request.getCaravanaId());
+                        savedAnimal = animalRepository.save(savedAnimal);
                 }
 
                 return mapToResponse(savedAnimal);
@@ -225,6 +234,12 @@ public class AnimalServiceImpl implements AnimalService {
                 animal.setFechaNacimiento(request.getFechaNacimiento());
                 animal.setRaza(request.getRaza());
 
+                if (request.getCaravanaId() != null) {
+                        if (animal.getCaravana() == null || !animal.getCaravana().getId().equals(request.getCaravanaId())) {
+                                asignarCaravanaInterna(animal, request.getCaravanaId());
+                        }
+                }
+
                 Animal savedAnimal = animalRepository.save(animal);
                 return mapToResponse(savedAnimal);
         }
@@ -250,6 +265,14 @@ public class AnimalServiceImpl implements AnimalService {
 
                 if (animal.getEstadoActual().equals(EstadoAnimal.INACTIVO)) {
                         throw new IllegalArgumentException("El animal no está activo.");
+                }
+
+                if (animal.getCaravana() != null) {
+                        Caravana caravana = animal.getCaravana();
+                        caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                        caravana.setActivo(false);
+                        caravanaRepository.save(caravana);
+                        animal.setCaravana(null);
                 }
 
                 animal.setEstadoActual(EstadoAnimal.INACTIVO);
@@ -353,6 +376,16 @@ public class AnimalServiceImpl implements AnimalService {
                                 .fechaUltimaInseminacion(
                                                 ultimoEstado != null ? ultimoEstado.getFechaUltInseminacion() : null)
                                 .estadoSalud(ultimoEstadoSalud != null ? ultimoEstadoSalud.getEstado() : null);
+
+                if (animal.getCaravana() != null) {
+                        Caravana c = animal.getCaravana();
+                        builder.caravanaId(c.getId())
+                                        .caravanaDevEui(c.getDevEui())
+                                        .caravanaAlias(c.getAlias())
+                                        .caravanaEstado(c.getEstadoSensor())
+                                        .caravanaUltimaSenial(c.getUltimaSenial())
+                                        .caravanaBateria(c.getBateria());
+                }
 
                 calcularCalibracion(animal, builder);
                 return builder.build();
@@ -1151,6 +1184,7 @@ public class AnimalServiceImpl implements AnimalService {
                 List<IndicadorResponse> indicadores = new ArrayList<>();
                 indicadores.add(calcularIndicadorMovimiento(animal));
                 indicadores.add(calcularIndicadorReproductivo(animal));
+                indicadores.add(calcularIndicadorEstadoSalud(animal));
 
                 return AnimalIndicadoresSaludResponse.builder()
                                 .animalId(animal.getId())
@@ -1201,7 +1235,6 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
-        /** El collar se considera desactualizado si su última transmisión supera {@link #HORAS_SIN_DATOS_MOVIMIENTO}. */
         private boolean telemetriaDesactualizada(Telemetria telemetria) {
                 Duration antiguedad = Duration.between(telemetria.getFechaHora(), LocalDateTime.now());
                 return antiguedad.compareTo(Duration.ofHours(HORAS_SIN_DATOS_MOVIMIENTO)) > 0;
@@ -1236,6 +1269,30 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
+        private IndicadorResponse calcularIndicadorEstadoSalud(Animal animal) {
+                Optional<EstadoSalud> estadoSalud = estadoSaludRepository
+                                .findFirstByAnimalIdOrderByFechaRegistroDesc(animal.getId());
+
+                if (estadoSalud.isEmpty()) {
+                        return IndicadorResponse.builder()
+                                        .nombre("Estado de salud")
+                                        .descripcion(descripcionEstadoSaludRegistrado("SIN DATOS"))
+                                        .valor("SIN DATOS")
+                                        .estado("SIN DATOS")
+                                        .build();
+                }
+
+                EstadoSalud es = estadoSalud.get();
+                String estado = getEstadoSaludRegistrado(es);
+
+                return IndicadorResponse.builder()
+                                .nombre("Estado de salud")
+                                .descripcion(descripcionEstadoSaludRegistrado(estado))
+                                .valor(es.getEstado().name())
+                                .estado(estado)
+                                .build();
+        }
+
         private String getEstadoSalud(Integer valor, Float mean, Float std) {
                 if ((mean - SIGMA_AMARILLO_MOVIMIENTO * std) < valor && valor < (mean + SIGMA_AMARILLO_MOVIMIENTO * std)) {
                         return "VERDE";
@@ -1257,6 +1314,17 @@ public class AnimalServiceImpl implements AnimalService {
                         return "AMARILLO";
                 } else {
                         return "ROJO";
+                }
+        }
+
+        private String getEstadoSaludRegistrado(EstadoSalud estadoSalud) {
+                switch (estadoSalud.getEstado()) {
+                        case SANO:
+                                return "VERDE";
+                        case EN_OBSERVACION:
+                                return "AMARILLO";
+                        default:
+                                return "ROJO";
                 }
         }
 
@@ -1283,6 +1351,122 @@ public class AnimalServiceImpl implements AnimalService {
                                 return "Estado reproductivo que requiere atención.";
                         default:
                                 return "No hay registros de estado reproductivo cargados para este animal.";
+                }
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public AnimalResponse vincularCaravana(Long animalId, Long caravanaId, String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarPermisoGestionCaravana(usuario, animal.getEstablecimiento());
+
+                if (animal.getEstadoActual().equals(EstadoAnimal.INACTIVO)) {
+                        throw new IllegalArgumentException("No se puede vincular una caravana a un animal inactivo.");
+                }
+
+                asignarCaravanaInterna(animal, caravanaId);
+                Animal savedAnimal = animalRepository.save(animal);
+                return mapToResponse(savedAnimal);
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public AnimalResponse desvincularCaravana(Long animalId, String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarPermisoGestionCaravana(usuario, animal.getEstablecimiento());
+
+                if (animal.getCaravana() != null) {
+                        Caravana caravana = animal.getCaravana();
+                        caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                        caravana.setActivo(false);
+                        caravanaRepository.save(caravana);
+
+                        animal.setCaravana(null);
+                        animal = animalRepository.save(animal);
+                }
+
+                return mapToResponse(animal);
+        }
+
+        private void asignarCaravanaInterna(Animal animal, Long caravanaId) {
+                Caravana nuevaCaravana = caravanaRepository.findById(caravanaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Caravana no encontrada."));
+
+                if (nuevaCaravana.getEstablecimiento() == null ||
+                                !nuevaCaravana.getEstablecimiento().getId().equals(animal.getEstablecimiento().getId())) {
+                        throw new IllegalArgumentException("La caravana no pertenece al mismo establecimiento que el animal.");
+                }
+
+                if (nuevaCaravana.getEstadoSensor() != null && nuevaCaravana.getEstadoSensor().equals(EstadoSensor.INACTIVO)) {
+                        throw new IllegalArgumentException("La caravana se encuentra inactiva y no puede ser vinculada.");
+                }
+
+                Optional<Animal> animalVinculado = animalRepository.findByCaravanaId(nuevaCaravana.getId());
+                if (animalVinculado.isPresent() && !animalVinculado.get().getId().equals(animal.getId())) {
+                        Animal otroAnimal = animalVinculado.get();
+                        throw new IllegalArgumentException("La caravana ya se encuentra vinculada a otro animal ("
+                                        + (otroAnimal.getAlias() != null ? otroAnimal.getAlias()
+                                                        : otroAnimal.getIdCaravanaOficial())
+                                        + "). Debe desvincularla antes de asignarla a otro animal.");
+                }
+
+                if (nuevaCaravana.getEstadoSensor() == EstadoSensor.VINCULADO
+                                && (animalVinculado.isEmpty() || !animalVinculado.get().getId().equals(animal.getId()))) {
+                        throw new IllegalArgumentException(
+                                        "La caravana ya se encuentra vinculada. Debe desvincularla antes de asignarla nuevamente.");
+                }
+
+                if (animal.getCaravana() != null && !animal.getCaravana().getId().equals(nuevaCaravana.getId())) {
+                        Caravana caravanaAnterior = animal.getCaravana();
+                        caravanaAnterior.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                        caravanaAnterior.setActivo(false);
+                        caravanaRepository.save(caravanaAnterior);
+                }
+
+                animal.setCaravana(nuevaCaravana);
+                nuevaCaravana.setEstadoSensor(EstadoSensor.VINCULADO);
+                nuevaCaravana.setActivo(true);
+                nuevaCaravana.setFechaAsignacion(LocalDate.now());
+
+                caravanaRepository.save(nuevaCaravana);
+        }
+
+        private void validarPermisoGestionCaravana(Usuario usuario, Establecimiento establecimiento) {
+                if (usuario.getRol().equals(Rol.VETERINARIO)) {
+                        throw new AccessDeniedException("El rol VETERINARIO no tiene permisos para asignar o desvincular caravanas.");
+                }
+
+                boolean tieneAcceso = usuario.getRol().equals(Rol.ADMINISTRADOR) ||
+                                (establecimiento != null && establecimiento.getEmpleados().stream()
+                                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo()));
+
+                if (!tieneAcceso) {
+                        throw new AccessDeniedException("No tiene permisos sobre este establecimiento.");
+                }
+        }
+
+        private String descripcionEstadoSaludRegistrado(String estado) {
+                switch (estado) {
+                        case "VERDE":
+                                return "Última revisión veterinaria: animal sano.";
+                        case "AMARILLO":
+                                return "Última revisión veterinaria: animal en observación.";
+                        case "ROJO":
+                                return "Última revisión veterinaria: animal enfermo.";
+                        default:
+                                return "No hay revisiones de estado de salud cargadas para este animal.";
                 }
         }
 }

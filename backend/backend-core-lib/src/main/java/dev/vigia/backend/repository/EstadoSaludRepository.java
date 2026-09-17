@@ -1,6 +1,7 @@
 package dev.vigia.backend.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -11,4 +12,6 @@ import dev.vigia.backend.model.EstadoSalud;
 public interface EstadoSaludRepository extends JpaRepository<EstadoSalud, Long> {
 
     List<EstadoSalud> findByAnimalIdOrderByFechaRegistroDesc(Long animalId);
+
+    Optional<EstadoSalud> findFirstByAnimalIdOrderByFechaRegistroDesc(Long animalId);
 }

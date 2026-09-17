@@ -27,15 +27,6 @@ public class GeofenceVerificationService {
     @Value("${vigia.geofence.cooldown-hours:6}")
     private int cooldownHours = 6;
 
-    /**
-     * Verifica si el animal se encuentra dentro de los perímetros configurados para su lote.
-     * Si se encuentra fuera, genera una alerta y la publica en RabbitMQ.
-     *
-     * @param animal animal que reporta posición
-     * @param latitud latitud del reporte GPS
-     * @param longitud longitud del reporte GPS
-     * @param fechaHora timestamp de la captura de telemetría
-     */
     @Transactional
     public void verificarPosicion(Animal animal, Double latitud, Double longitud, LocalDateTime fechaHora) {
         if (animal == null || latitud == null || longitud == null) {

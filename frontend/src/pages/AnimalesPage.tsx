@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Spinner, Alert, Modal, Form, Button } from 'react-bootstrap';
-import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
+import { Container, Spinner, Alert, Modal, Form, Button, Toast } from 'react-bootstrap';
+import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, vincularCaravana, desvincularCaravana, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
+import { getCaravanasDisponibles } from '../api/caravanasApi';
+import type { CaravanaResponse } from '../api/caravanasApi';
+import { formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { useAuthStore } from '../store/authStore';
 import { getAlertaParaAnimal } from '../api/alertaApi';
 import type { AlertaResponse } from '../api/alertaApi';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
@@ -31,6 +35,8 @@ function estadoClass(e: string) {
 
 export default function AnimalesPage() {
     const navigate = useNavigate();
+    const rol = useAuthStore((s) => s.rol);
+    const puedeGestionarCaravanas = rol !== 'VETERINARIO';
     const selectedId = useEstablecimientoStore((s) => s.selectedId);
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
     const [loading, setLoading] = useState(true);
@@ -65,6 +71,16 @@ export default function AnimalesPage() {
 
     const [sortField, setSortField] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    const [vincularModalAnimal, setVincularModalAnimal] = useState<AnimalResponse | null>(null);
+    const [caravanasDisponibles, setCaravanasDisponibles] = useState<CaravanaResponse[]>([]);
+    const [selectedCaravanaId, setSelectedCaravanaId] = useState<number | null>(null);
+    const [submittingCaravana, setSubmittingCaravana] = useState(false);
+    const [formErrorCaravana, setFormErrorCaravana] = useState<string | null>(null);
+    const [desvinculandoId, setDesvinculandoId] = useState<number | null>(null);
+    const [desvincularModalAnimal, setDesvincularModalAnimal] = useState<AnimalResponse | null>(null);
+    const [formErrorDesvincular, setFormErrorDesvincular] = useState<string | null>(null);
+    const [undoToast, setUndoToast] = useState<{ animalId: number; caravanaId: number; alias: string } | null>(null);
 
     // Alert detail overlay
     const [selectedAlertaForAnimal, setSelectedAlertaForAnimal] = useState<AlertaResponse | null>(null);
@@ -129,6 +145,74 @@ export default function AnimalesPage() {
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } } };
             alert(e.response?.data?.message || 'Error al dar de baja el animal.');
+        }
+    };
+
+    const openVincularModal = async (animal: AnimalResponse) => {
+        setVincularModalAnimal(animal);
+        setSelectedCaravanaId(null);
+        setFormErrorCaravana(null);
+        try {
+            const disponibles = await getCaravanasDisponibles(selectedId || animal.establecimientoId);
+            setCaravanasDisponibles(disponibles);
+        } catch {
+            setCaravanasDisponibles([]);
+        }
+    };
+
+    const handleVincularSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!vincularModalAnimal || !selectedCaravanaId) {
+            setFormErrorCaravana('Seleccioná una caravana disponible.');
+            return;
+        }
+        setFormErrorCaravana(null);
+        setSubmittingCaravana(true);
+        try {
+            const actualizado = await vincularCaravana(vincularModalAnimal.id, selectedCaravanaId);
+            setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
+            setVincularModalAnimal(null);
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setFormErrorCaravana(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al vincular la caravana.');
+        } finally {
+            setSubmittingCaravana(false);
+        }
+    };
+
+    const openDesvincularModal = (animal: AnimalResponse) => {
+        setFormErrorDesvincular(null);
+        setDesvincularModalAnimal(animal);
+    };
+
+    const handleConfirmDesvincular = async () => {
+        const animal = desvincularModalAnimal;
+        if (!animal || !animal.caravanaId) return;
+        const caravanaId = animal.caravanaId;
+        setDesvinculandoId(animal.id);
+        setFormErrorDesvincular(null);
+        try {
+            const actualizado = await desvincularCaravana(animal.id);
+            setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
+            setDesvincularModalAnimal(null);
+            setUndoToast({ animalId: animal.id, caravanaId, alias: animal.alias || animal.idCaravanaOficial || 'el animal' });
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setFormErrorDesvincular(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al desvincular la caravana.');
+        } finally {
+            setDesvinculandoId(null);
+        }
+    };
+
+    const handleUndoDesvincular = async () => {
+        if (!undoToast) return;
+        const { animalId, caravanaId } = undoToast;
+        setUndoToast(null);
+        try {
+            const actualizado = await vincularCaravana(animalId, caravanaId);
+            setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
+        } catch {
+            alert('No se pudo deshacer la acción. La caravana ya podría estar vinculada a otro animal.');
         }
     };
 
@@ -374,54 +458,45 @@ export default function AnimalesPage() {
                             <Spinner animation="border" style={{ color: '#1E3A5F' }} />
                         </div>
                     ) : (
-                        <div className="vigia-table-wrapper">
+                        <div className="vigia-table-wrapper animales-table-wrapper">
                             <table className="vigia-table">
                                 <thead>
                                     <tr>
                                         <th onClick={() => handleSort('idCaravanaOficial')} style={{ cursor: 'pointer' }}>
-                                            <div className="d-flex align-items-center justify-content-start">
-                                                Identificador <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'idCaravanaOficial' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                            <div className="d-flex align-items-center justify-content-center">
+                                                ID <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'idCaravanaOficial' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                             </div>
                                         </th>
                                         <th onClick={() => handleSort('alias')} style={{ cursor: 'pointer' }}>
-                                            <div className="d-flex align-items-center justify-content-start">
+                                            <div className="d-flex align-items-center justify-content-center">
                                                 Nombre <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'alias' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                             </div>
                                         </th>
+                                        <th className="col-mobile-hide text-center">Caravana</th>
                                         {activeTab === 'celo' ? (
                                             <>
                                                 <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }}>
-                                                    <div className="d-flex align-items-center justify-content-start">
+                                                    <div className="d-flex align-items-center justify-content-center">
                                                         <span className="d-none d-sm-inline">Estado Reproductivo</span>
                                                         <span className="d-sm-none">Reproductivo</span>
                                                         <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
                                                 <th onClick={() => handleSort('fechaUltimoParto')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
+                                                    <div className="d-flex align-items-center justify-content-center">
                                                         Fecha Último Parto <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimoParto' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
                                                 <th onClick={() => handleSort('fechaUltimaInseminacion')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
+                                                    <div className="d-flex align-items-center justify-content-center">
                                                         Fecha Última Inseminación <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimaInseminacion' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
                                             </>
                                         ) : (
                                             <>
-                                                <th onClick={() => handleSort('fechaNacimiento')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
-                                                        Fecha Nacimiento <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'fechaNacimiento' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
-                                                <th onClick={() => handleSort('raza')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
-                                                        Raza <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'raza' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
                                                 <th onClick={() => handleSort('rodeoLoteNombre')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-start">
+                                                    <div className="d-flex align-items-center justify-content-center">
                                                         Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteNombre' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                     </div>
                                                 </th>
@@ -448,7 +523,7 @@ export default function AnimalesPage() {
                                 <tbody>
                                     {sortedAnimales.length === 0 ? (
                                         <tr>
-                                            <td colSpan={9} className="text-center py-4 text-muted">
+                                            <td colSpan={8} className="text-center py-4 text-muted">
                                                 No se encontraron animales.
                                             </td>
                                         </tr >
@@ -457,6 +532,55 @@ export default function AnimalesPage() {
                                             <tr key={a.id} className="animal-row">
                                                 <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
                                                 <td>{a.alias || '—'}</td>
+                                                <td className="col-mobile-hide">
+                                                    {a.caravanaId ? (
+                                                        <div className="d-flex align-items-center justify-content-between gap-2">
+                                                            <div className="text-truncate" style={{ minWidth: 0 }}>
+                                                                <div className="d-flex align-items-center gap-2">
+                                                                    <span className="text-truncate">{a.caravanaAlias || a.caravanaDevEui}</span>
+                                                                    {(() => {
+                                                                        const bateria = formatBateria(a.caravanaBateria);
+                                                                        return (
+                                                                            <span style={{ fontSize: '0.75rem', color: bateria.amber ? '#8a6a00' : '#2f7d3b', flexShrink: 0 }}>
+                                                                                {bateria.amber && <span className="bateria-dot" />}
+                                                                                {bateria.text}
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                                {(() => {
+                                                                    const senial = formatUltimaSenial(a.caravanaUltimaSenial);
+                                                                    return (
+                                                                        <div title={senial.title} style={{ fontSize: '0.7rem', color: senial.amber ? '#8a6a00' : '#9aa5b1' }}>
+                                                                            señal {senial.text}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                            {puedeGestionarCaravanas && (
+                                                                <Button
+                                                                    variant="outline-secondary"
+                                                                    size="sm"
+                                                                    className="flex-shrink-0"
+                                                                    disabled={desvinculandoId === a.id}
+                                                                    onClick={() => openDesvincularModal(a)}
+                                                                    title="Desvincular"
+                                                                >
+                                                                    {desvinculandoId === a.id ? <Spinner as="span" animation="border" size="sm" /> : <i className="bi bi-x-lg"></i>}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="d-flex align-items-center justify-content-between gap-2">
+                                                            <span className="text-muted">Sin vincular</span>
+                                                            {puedeGestionarCaravanas && (
+                                                                <Button variant="outline-primary" size="sm" className="flex-shrink-0" onClick={() => openVincularModal(a)}>
+                                                                    Vincular
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 {activeTab === 'celo' ? (
                                                     <>
                                                         <td className="text-center">
@@ -472,8 +596,6 @@ export default function AnimalesPage() {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="col-mobile-hide">{formatFecha(a.fechaNacimiento)}</td>
-                                                        <td className="col-mobile-hide">{a.raza || '—'}</td>
                                                         <td className="col-mobile-hide">{a.rodeoLoteNombre || '—'}</td>
                                                         <td className="text-center"><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
                                                         <td className="text-center col-mobile-hide">
@@ -737,6 +859,78 @@ export default function AnimalesPage() {
                     )}
                 </Modal.Footer>
             </Modal>
+
+            <Modal show={!!vincularModalAnimal} onHide={() => setVincularModalAnimal(null)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Vincular caravana</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {formErrorCaravana && <Alert variant="danger">{formErrorCaravana}</Alert>}
+                    <Form onSubmit={handleVincularSubmit} id="form-vincular-caravana">
+                        <Form.Group className="mb-3">
+                            <Form.Label>Caravana disponible*</Form.Label>
+                            <Form.Select
+                                value={selectedCaravanaId ?? ''}
+                                onChange={(e) => setSelectedCaravanaId(e.target.value ? Number(e.target.value) : null)}
+                            >
+                                <option value="">Seleccioná una opción</option>
+                                {caravanasDisponibles.map(c => {
+                                    const bateria = formatBateria(c.bateria);
+                                    const senial = formatUltimaSenial(c.ultimaSenial);
+                                    return (
+                                        <option key={c.id} value={c.id}>
+                                            {c.alias || c.codigo || c.devEui} · {bateria.text} · {senial.text}
+                                        </option>
+                                    );
+                                })}
+                            </Form.Select>
+                            {caravanasDisponibles.length === 0 && (
+                                <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>
+                                    No hay caravanas disponibles en este establecimiento.
+                                </div>
+                            )}
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button type="submit" form="form-vincular-caravana" disabled={submittingCaravana || caravanasDisponibles.length === 0} className="btn-guardar-animal">
+                        {submittingCaravana ? <Spinner as="span" animation="border" size="sm" /> : 'Vincular'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Modal show={!!desvincularModalAnimal} onHide={() => { setDesvincularModalAnimal(null); setFormErrorDesvincular(null); }} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Desvincular caravana</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {formErrorDesvincular && <Alert variant="danger">{formErrorDesvincular}</Alert>}
+                    <p className="text-center mb-0" style={{ color: '#cde' }}>
+                        ¿Estás seguro de que querés desvincular la caravana de{' '}
+                        <strong style={{ color: 'white' }}>
+                            {desvincularModalAnimal?.alias || desvincularModalAnimal?.idCaravanaOficial || 'este animal'}
+                        </strong>?
+                    </p>
+                </Modal.Body>
+                <Modal.Footer className="gap-3">
+                    <Button
+                        className="btn-guardar-animal"
+                        style={{ flex: 1 }}
+                        onClick={() => setDesvincularModalAnimal(null)}
+                        disabled={desvinculandoId === desvincularModalAnimal?.id}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        className="btn-confirmar-desvincular"
+                        style={{ flex: 1 }}
+                        onClick={handleConfirmDesvincular}
+                        disabled={desvinculandoId === desvincularModalAnimal?.id}
+                    >
+                        {desvinculandoId === desvincularModalAnimal?.id ? <Spinner as="span" animation="border" size="sm" /> : 'Sí, desvincular'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </div>
 
         {/* Alert detail overlay — rendered at page root so position:fixed works correctly */}
@@ -764,6 +958,24 @@ export default function AnimalesPage() {
                 }}
             />
         )}
+
+        {/* Undo toast — estilo snackbar de Gmail, disponible 5s tras desvincular */}
+        <div className="undo-toast-container">
+            <Toast
+                show={!!undoToast}
+                onClose={() => setUndoToast(null)}
+                delay={5000}
+                autohide
+                className="undo-toast"
+            >
+                <Toast.Body className="d-flex align-items-center justify-content-between gap-3">
+                    <span>Caravana desvinculada de {undoToast?.alias}</span>
+                    <Button variant="link" className="undo-toast-btn p-0" onClick={handleUndoDesvincular}>
+                        Deshacer
+                    </Button>
+                </Toast.Body>
+            </Toast>
+        </div>
     </>
     );
 }

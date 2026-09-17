@@ -29,6 +29,12 @@ export interface AnimalResponse {
   estadoSalud?: TipoEstadoSalud | null;
   enCalibracion?: boolean;
   diasRestantesCalibracion?: number;
+  caravanaId: number | null;
+  caravanaDevEui: string | null;
+  caravanaAlias: string | null;
+  caravanaEstado: 'DISPONIBLE' | 'VINCULADO' | 'INACTIVO' | null;
+  caravanaUltimaSenial: string | null;
+  caravanaBateria: number | null;
 }
 
 export interface CargaMasivaResponse {
@@ -61,6 +67,7 @@ export interface AnimalRequest {
   establecimientoId: number;
   /** Peso inicial en kg (opcional). Si se provee, se crea el primer registro de peso. */
   pesoInicial?: number | null;
+  caravanaId?: number | null;
 }
 
 export async function getAnimales(establecimientoId?: number): Promise<AnimalResponse[]> {
@@ -106,6 +113,16 @@ export async function desactivarAnimal(id: number): Promise<void> {
 
 export async function updateAnimal(id: number, data: AnimalRequest): Promise<AnimalResponse> {
   const response = await axiosClient.put<AnimalResponse>(`/animales/${id}`, data);
+  return response.data;
+}
+
+export async function vincularCaravana(animalId: number, caravanaId: number): Promise<AnimalResponse> {
+  const response = await axiosClient.post<AnimalResponse>(`/animales/${animalId}/vincular-caravana`, { caravanaId });
+  return response.data;
+}
+
+export async function desvincularCaravana(animalId: number): Promise<AnimalResponse> {
+  const response = await axiosClient.delete<AnimalResponse>(`/animales/${animalId}/desvincular-caravana`);
   return response.data;
 }
 
@@ -351,5 +368,29 @@ export async function getLineaTiempoAlertas(
   const query = params.toString();
   const url = `/animales/${animalId}/linea-tiempo-alertas${query ? `?${query}` : ''}`;
   const response = await axiosClient.get<LineaTiempoEventoResponse[]>(url);
+  return response.data;
+}
+
+// ─── Indicadores de salud ──────────────────────────────────────────────────
+
+export type EstadoIndicador = 'VERDE' | 'AMARILLO' | 'ROJO' | 'SIN DATOS';
+
+export interface IndicadorSaludResponse {
+  nombre: string;
+  descripcion: string;
+  valor: string;
+  estado: EstadoIndicador;
+}
+
+export interface AnimalIndicadoresSaludResponse {
+  animalId: number;
+  caravana: string | null;
+  indicadores: IndicadorSaludResponse[];
+}
+
+export async function getIndicadoresSalud(animalId: number): Promise<AnimalIndicadoresSaludResponse> {
+  const response = await axiosClient.get<AnimalIndicadoresSaludResponse>(
+    `/animales/${animalId}/indicadores-salud`
+  );
   return response.data;
 }

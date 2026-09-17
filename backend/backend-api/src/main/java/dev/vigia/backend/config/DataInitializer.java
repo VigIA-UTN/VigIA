@@ -51,16 +51,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-/**
- * Siembra datos de prueba en cada arranque, LIMPIANDO antes toda la base.
- *
- * <p>Solo se activa con el perfil {@code dev}. El default de la aplicación es
- * {@code prod} (ver {@code application.yaml}), así que un despliegue sin
- * {@code SPRING_PROFILES_ACTIVE} nunca ejecuta este runner ni borra datos. El
- * entorno de <b>develop</b> setea {@code SPRING_PROFILES_ACTIVE=dev} a propósito;
- * <b>producción</b> nunca debe hacerlo. Para poblar producción, usar el script
- * manual {@code infra/prod/seed_prod.sql}.
- */
 @Slf4j
 @Component
 @Profile("dev")
@@ -297,11 +287,6 @@ public class DataInitializer implements CommandLineRunner {
         estadoReproductivoRepository.save(e);
     }
 
-    /**
-     * Siembra una inseminación como lo hace {@code AlertaServiceImpl.intervenirAlerta}:
-     * una alerta de celo confirmada + la intervención (acto) + el
-     * {@code EstadoReproductivo{INSEMINADA}} que ese acto genera.
-     */
     private void sembrarInseminacionDesdeIntervencion(Animal animal, Usuario interventor, LocalDateTime fechaHora) {
         Alerta alerta = new Alerta();
         alerta.setAnimal(animal);
@@ -338,10 +323,6 @@ public class DataInitializer implements CommandLineRunner {
         estadoReproductivoRepository.save(estado);
     }
 
-    /**
-     * Siembra una revisión veterinaria que concluye con un estado de salud:
-     * alerta sanitaria confirmada + la intervención + el {@code EstadoSalud} asociado.
-     */
     private void sembrarRevisionConEstadoSalud(Animal animal, Usuario vet, TipoEstadoSalud estadoSalud,
                                                LocalDateTime fechaHora) {
         String notas = "Revisión clínica: leve cojera en miembro posterior, se deja en observación.";
@@ -502,7 +483,6 @@ public class DataInitializer implements CommandLineRunner {
     // Helpers para las alertas sanitarias de demo (Acto 4).
     // ---------------------------------------------------------------------------
 
-    /** Perfil de referencia individual sintético (arrays de 4 "quarters" de 6 h). */
     private Map<String, Object> perfilDemo(double[] moveStateMean, double[] moveStateStd,
                                            double[] distanciaMean, double[] distanciaStd) {
         Map<String, Object> perfil = new LinkedHashMap<>();
@@ -522,12 +502,6 @@ public class DataInitializer implements CommandLineRunner {
         return list;
     }
 
-    /**
-     * Ventana de 288 puntos (24 h, 1 cada 5 min) terminando en {@code hasta},
-     * con {@code moveState} constante y un paso de latitud fijo por tick (para
-     * que la distancia GPS agregada sea determinística). NO se persiste: solo
-     * alimenta a {@link SerieComparativaBuilder}.
-     */
     private List<Telemetria> ventanaSanitaria(Caravana caravana, LocalDateTime hasta, int moveState, double pasoLat) {
         final int muestras = 288;
         final int tickSegundos = 300;
@@ -549,16 +523,6 @@ public class DataInitializer implements CommandLineRunner {
         return puntos;
     }
 
-    /**
-     * Crea y persiste una alerta sanitaria de demo con su snapshot de serie
-     * comparativa ya calculado (mismo camino que el worker en producción).
-     *
-     * @param ventana            puntos evaluados; lista vacía => alerta sin serie
-     * @param perfil             perfil de referencia; null => serie sin referencia
-     * @param perfilCalculadoEn  fecha del perfil (null si no hay perfil)
-     * @param tsConfirmacion     null => alerta PENDIENTE recién generada
-     * @param usuarioConfirmacion quién resolvió la alerta (si aplica)
-     */
     private void crearAlertaSanitaria(Animal animal, SeveridadAlerta severidad, EstadoAlerta estado,
                                       float confianza, String posibleCausa, List<Telemetria> ventana,
                                       Map<String, Object> perfil, LocalDateTime perfilCalculadoEn,

@@ -1,6 +1,7 @@
 package dev.vigia.backend.dto;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import dev.vigia.backend.model.EstadoSensor;
 import lombok.AllArgsConstructor;
@@ -22,6 +23,9 @@ public class CaravanaResponse {
     private Boolean activo;
     private EstadoSensor estadoSensor;
     private Long establecimientoId;
+    private String establecimientoNombre;
     private Long animalId;
     private String animalAlias;
+    private Double bateria;
+    private LocalDateTime ultimaSenial;
 }

@@ -21,7 +21,6 @@ class SerieComparativaBuilderTest {
 
     private static final LocalDateTime BASE = LocalDateTime.of(2026, 1, 15, 0, 0);
 
-    /** 288 puntos (1 cada 5 min = 24hs); primer bloque de 6hs con actividad baja, resto alta. */
     private List<Telemetria> ventana288() {
         List<Telemetria> lista = new ArrayList<>();
         for (int i = 0; i < 288; i++) {
