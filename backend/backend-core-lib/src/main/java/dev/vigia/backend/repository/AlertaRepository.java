@@ -42,6 +42,29 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("estado") EstadoAlerta estado);
 
        /**
+        * Lista alertas sanitarias (disparador = SALUD) de un establecimiento
+        * concreto, ordenadas por tsGeneracion descendente.
+        */
+       @Query("SELECT a FROM Alerta a " +
+                     "WHERE a.animal.establecimiento.id = :establecimientoId " +
+                     "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.SALUD " +
+                     "ORDER BY a.tsGeneracion DESC")
+       List<Alerta> findSaludByEstablecimiento(@Param("establecimientoId") Long establecimientoId);
+
+       /**
+        * Lista alertas sanitarias filtradas por estado, ordenadas por
+        * tsGeneracion descendente.
+        */
+       @Query("SELECT a FROM Alerta a " +
+                     "WHERE a.animal.establecimiento.id = :establecimientoId " +
+                     "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.SALUD " +
+                     "AND a.estado = :estado " +
+                     "ORDER BY a.tsGeneracion DESC")
+       List<Alerta> findSaludByEstablecimientoAndEstado(
+                     @Param("establecimientoId") Long establecimientoId,
+                     @Param("estado") EstadoAlerta estado);
+
+       /**
         * Busca una alerta verificando que pertenece al establecimiento indicado.
         * Útil para validar aislamiento antes de operar sobre ella.
         */

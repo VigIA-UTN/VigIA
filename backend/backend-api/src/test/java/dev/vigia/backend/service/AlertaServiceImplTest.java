@@ -156,6 +156,50 @@ public class AlertaServiceImplTest {
                                 () -> alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null));
         }
 
+        // --- Tests para listarAlertasSalud ---
+
+        @Test
+        void listarAlertasSalud_Success() {
+                // Arrange
+                mockAlerta.setDisparador(DisparadorAlerta.SALUD);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findSaludByEstablecimiento(ESTABLECIMIENTO_ID))
+                                .thenReturn(List.of(mockAlerta));
+
+                // Act
+                List<AlertaResponse> result = alertaService.listarAlertasSalud(EMAIL, ESTABLECIMIENTO_ID, null);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals(1, result.size());
+                assertEquals(ALERTA_ID, result.get(0).getId());
+                verify(alertaRepository, times(1)).findSaludByEstablecimiento(ESTABLECIMIENTO_ID);
+        }
+
+        @Test
+        void listarAlertasSalud_ThrowsIllegalArgumentException_WhenUsuarioNotFound() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+
+                // Act & Assert
+                assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.listarAlertasSalud(EMAIL, ESTABLECIMIENTO_ID, null));
+        }
+
+        @Test
+        void listarAlertasSalud_ThrowsAccessDeniedException_WhenUserNotBelongsToEstablecimiento() {
+                // Arrange
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(Collections.emptyList()); // Usuario no está en ningún establecimiento
+
+                // Act & Assert
+                assertThrows(AccessDeniedException.class,
+                                () -> alertaService.listarAlertasSalud(EMAIL, ESTABLECIMIENTO_ID, null));
+        }
+
         // --- Tests para obtenerDetalleAlerta ---
 
         @Test

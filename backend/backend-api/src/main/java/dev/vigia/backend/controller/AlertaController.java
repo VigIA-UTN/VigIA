@@ -129,6 +129,38 @@ public class AlertaController {
     }
 
     /**
+     * GET /api/v1/alertas/salud?establecimientoId={id}&estado={estado}
+     * <p>
+     * Lista las alertas sanitarias (disparador SALUD) del establecimiento
+     * seleccionado por el usuario, opcionalmente filtradas por estado.
+     *
+     * @param establecimientoId ID del establecimiento actualmente seleccionado
+     *                          (obligatorio)
+     * @param estado            (opcional) filtro por estado: PENDIENTE, CONFIRMADA
+     *                          o DESCARTADA
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de alertas, 400 si el usuario no existe, 403 si no
+     *         pertenece
+     */
+    @GetMapping("/salud")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarAlertasSalud(
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            @RequestParam(name = "estado", required = false) EstadoAlerta estado,
+            Authentication authentication) {
+
+        try {
+            String email = authentication.getName();
+            List<AlertaResponse> response = alertaService.listarAlertasSalud(email, establecimientoId, estado);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
      * GET /api/v1/alertas/{id}?establecimientoId={id}
      * <p>
      * Obtiene el detalle completo de una alerta.
@@ -159,6 +191,7 @@ public class AlertaController {
         }
     }
 
+    
     @GetMapping("/{id}/ventana-inseminacion")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> obtenerEstadoVentanaInseminacion(
