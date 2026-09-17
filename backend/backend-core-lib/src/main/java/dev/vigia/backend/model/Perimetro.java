@@ -34,17 +34,10 @@ public class Perimetro {
     @Column(length = 500)
     private String descripcion;
 
-    /**
-     * Se desactiva la conversión global a Smallint para respetar la columna nativa
-     * PostgreSQL BOOLEAN e interoperar directamente con queries espaciales PostGIS.
-     */
     @Convert(disableConversion = true)
     @Column(nullable = false)
     private boolean activo = true;
 
-    /**
-     * Mapeo del polígono JTS a geometry(Polygon, 4326) de PostGIS.
-     */
     @Column(columnDefinition = "geometry(Polygon,4326)", nullable = false)
     private Polygon area;
 
@@ -62,9 +55,6 @@ public class Perimetro {
     @Column(name = "fecha_modificacion")
     private LocalDateTime fechaModificacion;
 
-    /**
-     * Control de concurrencia optimista para edición concurrente del perímetro.
-     */
     @Version
     @Column(nullable = false)
     private Long version;
@@ -102,28 +92,16 @@ public class Perimetro {
         this.fechaModificacion = LocalDateTime.now();
     }
 
-    /**
-     * Activación explícita del perímetro con fines de auditoría.
-     */
     public void activar() {
         this.activo = true;
         this.fechaModificacion = LocalDateTime.now();
     }
 
-    /**
-     * Desactivación explícita del perímetro con fines de auditoría.
-     */
     public void desactivar() {
         this.activo = false;
         this.fechaModificacion = LocalDateTime.now();
     }
 
-    /**
-     * Reemplazo del polígono completo. Los polígonos JTS son inmutables, por lo que
-     * ante cambios en los vértices se debe construir un nuevo Polygon validado.
-     *
-     * @param nuevoArea nuevo polígono validado
-     */
     public void actualizarArea(Polygon nuevoArea) {
         GeometryUtils.validarPoligono(nuevoArea);
         this.area = nuevoArea;

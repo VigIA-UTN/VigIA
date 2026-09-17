@@ -28,13 +28,8 @@ public class SseAlertaPublisher {
 
     private final AnimalRepository animalRepository;
 
-    // Map: establecimientoId -> list of active SseEmitters
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
-    /**
-     * Registers a new SSE client for a specific establecimiento.
-     * If lastEventId is provided, fetches and sends missed alerts immediately.
-     */
     public SseEmitter registrarClienteSse(Long establecimientoId, Long lastEventId) {
         // Timeout of 30 minutes. Spring Boot will keep the connection open.
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
@@ -86,10 +81,6 @@ public class SseAlertaPublisher {
         return emitter;
     }
 
-    /**
-     * Listens to the fanout exchange using the auto-delete queue defined in
-     * RabbitMQConfig.
-     */
     @RabbitListener(queues = "#{alertasQueue.name}")
     @SuppressWarnings({ "null" })
     public void handleAlertaEvent(AlertaEventDTO alertaEvent) {
@@ -135,9 +126,6 @@ public class SseAlertaPublisher {
         }
     }
 
-    /**
-     * Enviar evento construido
-     */
     @SuppressWarnings("null")
     private void sendToEmitter(SseEmitter emitter, Long id, Long animalId, String tipo, String severidad, EstadoAlerta estado, java.time.LocalDateTime tsGeneracion) throws IOException {
         AlertaResponse response = AlertaResponse.builder()

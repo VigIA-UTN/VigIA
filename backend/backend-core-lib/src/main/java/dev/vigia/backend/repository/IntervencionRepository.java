@@ -16,15 +16,6 @@ public interface IntervencionRepository extends JpaRepository<Intervencion, Long
 
     boolean existsByAlertaId(Long alertaId);
 
-    /**
-     * Lista intervenciones de un animal en un rango de fechas opcional.
-     * Ordenadas cronológicamente (fechaHora ASC).
-     * Utilizada por el endpoint de línea de tiempo de la ficha del animal.
-     *
-     * @param animalId ID del animal
-     * @param desde    inicio del rango, inclusive (null = sin límite inferior)
-     * @param hasta    fin del rango, inclusive (null = sin límite superior)
-     */
     @Query("SELECT i FROM Intervencion i " +
            "WHERE i.animal.id = :animalId " +
            "AND (cast(:desde as timestamp) IS NULL OR i.fechaHora >= :desde) " +

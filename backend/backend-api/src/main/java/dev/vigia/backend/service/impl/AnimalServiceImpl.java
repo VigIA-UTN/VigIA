@@ -1184,6 +1184,7 @@ public class AnimalServiceImpl implements AnimalService {
                 List<IndicadorResponse> indicadores = new ArrayList<>();
                 indicadores.add(calcularIndicadorMovimiento(animal));
                 indicadores.add(calcularIndicadorReproductivo(animal));
+                indicadores.add(calcularIndicadorEstadoSalud(animal));
 
                 return AnimalIndicadoresSaludResponse.builder()
                                 .animalId(animal.getId())
@@ -1234,7 +1235,6 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
-        /** El collar se considera desactualizado si su última transmisión supera {@link #HORAS_SIN_DATOS_MOVIMIENTO}. */
         private boolean telemetriaDesactualizada(Telemetria telemetria) {
                 Duration antiguedad = Duration.between(telemetria.getFechaHora(), LocalDateTime.now());
                 return antiguedad.compareTo(Duration.ofHours(HORAS_SIN_DATOS_MOVIMIENTO)) > 0;
@@ -1269,6 +1269,30 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
+        private IndicadorResponse calcularIndicadorEstadoSalud(Animal animal) {
+                Optional<EstadoSalud> estadoSalud = estadoSaludRepository
+                                .findFirstByAnimalIdOrderByFechaRegistroDesc(animal.getId());
+
+                if (estadoSalud.isEmpty()) {
+                        return IndicadorResponse.builder()
+                                        .nombre("Estado de salud")
+                                        .descripcion(descripcionEstadoSaludRegistrado("SIN DATOS"))
+                                        .valor("SIN DATOS")
+                                        .estado("SIN DATOS")
+                                        .build();
+                }
+
+                EstadoSalud es = estadoSalud.get();
+                String estado = getEstadoSaludRegistrado(es);
+
+                return IndicadorResponse.builder()
+                                .nombre("Estado de salud")
+                                .descripcion(descripcionEstadoSaludRegistrado(estado))
+                                .valor(es.getEstado().name())
+                                .estado(estado)
+                                .build();
+        }
+
         private String getEstadoSalud(Integer valor, Float mean, Float std) {
                 if ((mean - SIGMA_AMARILLO_MOVIMIENTO * std) < valor && valor < (mean + SIGMA_AMARILLO_MOVIMIENTO * std)) {
                         return "VERDE";
@@ -1290,6 +1314,17 @@ public class AnimalServiceImpl implements AnimalService {
                         return "AMARILLO";
                 } else {
                         return "ROJO";
+                }
+        }
+
+        private String getEstadoSaludRegistrado(EstadoSalud estadoSalud) {
+                switch (estadoSalud.getEstado()) {
+                        case SANO:
+                                return "VERDE";
+                        case EN_OBSERVACION:
+                                return "AMARILLO";
+                        default:
+                                return "ROJO";
                 }
         }
 
@@ -1413,6 +1448,19 @@ public class AnimalServiceImpl implements AnimalService {
 
                 if (!tieneAcceso) {
                         throw new AccessDeniedException("No tiene permisos sobre este establecimiento.");
+                }
+        }
+
+        private String descripcionEstadoSaludRegistrado(String estado) {
+                switch (estado) {
+                        case "VERDE":
+                                return "Última revisión veterinaria: animal sano.";
+                        case "AMARILLO":
+                                return "Última revisión veterinaria: animal en observación.";
+                        case "ROJO":
+                                return "Última revisión veterinaria: animal enfermo.";
+                        default:
+                                return "No hay revisiones de estado de salud cargadas para este animal.";
                 }
         }
 }

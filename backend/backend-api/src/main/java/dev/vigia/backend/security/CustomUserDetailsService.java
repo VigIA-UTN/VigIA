@@ -23,8 +23,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado con email: " + email));
 
-        // PENDIENTE como fallback: usuario registrado sin rol asignado (no compró el
-        // producto)
         String roleName = usuario.getRol() != null ? usuario.getRol().name() : "PENDIENTE";
 
         return new User(

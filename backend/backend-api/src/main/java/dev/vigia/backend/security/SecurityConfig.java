@@ -52,9 +52,6 @@ public class SecurityConfig {
                                                 .requestMatchers("/actuator/**").permitAll()
                                                 .anyRequest().authenticated())
                                 .sessionManagement(session -> session
-                                                // IF_REQUIRED: permite sesión temporal para el handshake OAuth2
-                                                // (el estado "state" entre redirect y callback).
-                                                // Las APIs REST siguen siendo stateless gracias al JWT filter.
                                                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                                 .exceptionHandling(exceptions -> exceptions
                                                 .authenticationEntryPoint(

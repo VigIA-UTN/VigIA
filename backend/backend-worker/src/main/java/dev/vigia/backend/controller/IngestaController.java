@@ -43,6 +43,20 @@ public class IngestaController {
         this.geofenceVerificationService = geofenceVerificationService;
     }
 
+    /**
+     * POST /api/v1/ingesta/uplink
+     * <p>
+     * Recibe el webhook de uplink de The Things Network (TTN) con la telemetría
+     * cruda de una caravana (posición GNSS o heartbeat), la persiste, publica el
+     * evento en RabbitMQ para los consumidores de inferencia y dispara la
+     * verificación de perímetro. Es idempotente por frame counter (fCnt).
+     *
+     * @param requestRaw payload del webhook TTN (puede venir envuelto en
+     *                   {@code data} o directo)
+     * @return 200 siempre; el cuerpo indica si se procesó o el motivo por el que
+     *         se ignoró (sin dev_eui, dispositivo no registrado, sin animal
+     *         asociado, frame duplicado, tipo desconocido)
+     */
     @PostMapping("/uplink")
     @SuppressWarnings("null")
     public ResponseEntity<String> receiveUplink(@RequestBody TTNWebhookRequestDTO requestRaw) {
@@ -202,16 +216,23 @@ public class IngestaController {
         return ResponseEntity.ok("OK");
     }
 
-    // ---------------------------------------------------------------------------
-    // Usado por el simulador (ver simulador/simulador_demo.py) para arrancar
-    // continuando la ultima posicion/bateria real que ya tiene el animal en
-    // la base -sembrada por DataInitializer o dejada por una corrida
-    // anterior del propio simulador- en vez de coordenadas hardcodeadas que
-    // pueden desincronizarse (ver el BUGFIX documentado en simulador.py: un
-    // salto de posicion desconectado de la ultima fila real dispara una
-    // alerta de celo falsa por la distancia anomala entre el punto sembrado
-    // y el primer paquete en vivo).
-    // ---------------------------------------------------------------------------
+    /**
+     * GET /api/v1/ingesta/ultima-posicion/{deviceId}
+     * <p>
+     * Devuelve la última posición/batería conocida de una caravana. Usado por el
+     * simulador (ver {@code simulador/simulador_demo.py}) para arrancar
+     * continuando la última posición real que ya tiene el animal en la base
+     * -sembrada por {@code DataInitializer} o dejada por una corrida anterior del
+     * propio simulador- en vez de coordenadas hardcodeadas que pueden
+     * desincronizarse (ver el BUGFIX documentado en simulador.py: un salto de
+     * posición desconectado de la última fila real dispara una alerta de celo
+     * falsa por la distancia anómala entre el punto sembrado y el primer paquete
+     * en vivo).
+     *
+     * @param deviceId código de la caravana
+     * @return 200 con la última posición, 404 si la caravana o su telemetría no
+     *         existen
+     */
     @GetMapping("/ultima-posicion/{deviceId}")
     public ResponseEntity<?> getUltimaPosicion(@PathVariable("deviceId") String deviceId) {
         Optional<Caravana> caravanaOpt = caravanaRepository.findByCodigo(deviceId);

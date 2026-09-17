@@ -31,6 +31,15 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final AuthService authService;
 
+    /**
+     * POST /api/v1/auth/register
+     * <p>
+     * Registra un nuevo usuario y dispara el envío del código de validación
+     * a su email.
+     *
+     * @param request datos de registro del usuario
+     * @return 201 con el resultado del registro, 400 si hay error de validación
+     */
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
@@ -40,6 +49,15 @@ public class AuthController {
         }
     }
 
+    /**
+     * POST /api/v1/auth/validate-code
+     * <p>
+     * Valida el código enviado por email para activar la cuenta registrada.
+     *
+     * @param request email y código a validar
+     * @return 200 con el resultado de la validación, 400 si el código es
+     *         inválido o expiró
+     */
     @PostMapping("/validate-code")
     public ResponseEntity<?> validateCode(@RequestBody ValidateCodeRequest request) {
         try {
@@ -49,6 +67,16 @@ public class AuthController {
         }
     }
 
+    /**
+     * POST /api/v1/auth/login
+     * <p>
+     * Autentica al usuario con email y contraseña y devuelve un JWT.
+     * Bloquea la cuenta temporalmente tras varios intentos fallidos.
+     *
+     * @param request email y contraseña
+     * @return 200 con el token JWT, 401 si las credenciales son incorrectas,
+     *         403 si la cuenta no está activa, 423 si la cuenta está bloqueada
+     */
     @PostMapping("/login")
     @SuppressWarnings("null")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
@@ -85,6 +113,14 @@ public class AuthController {
         }
     }
 
+    /**
+     * POST /api/v1/auth/oauth2/google
+     * <p>
+     * Autentica o registra un usuario a partir de datos de Google OAuth2.
+     *
+     * @param request email, nombre, apellido y proveedor (GOOGLE por defecto)
+     * @return 200 con el token JWT, 400 si hay error de validación
+     */
     @PostMapping("/oauth2/google")
     public ResponseEntity<?> oauth2Google(@RequestBody dev.vigia.backend.dto.OAuth2Request request) {
         try {
@@ -96,6 +132,15 @@ public class AuthController {
         }
     }
 
+    /**
+     * POST /api/v1/auth/oauth2
+     * <p>
+     * Autentica o registra un usuario a partir de datos OAuth2 de un
+     * proveedor genérico.
+     *
+     * @param request email, nombre, apellido y proveedor OAuth2
+     * @return 200 con el token JWT, 400 si hay error de validación
+     */
     @PostMapping("/oauth2")
     public ResponseEntity<?> oauth2Login(@RequestBody dev.vigia.backend.dto.OAuth2Request request) {
         try {

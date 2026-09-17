@@ -26,6 +26,17 @@ public class RodeoLoteController {
 
     private final RodeoLoteService rodeoLoteService;
 
+    /**
+     * GET /api/v1/rodeo-lotes?establecimientoId={id}
+     * <p>
+     * Lista rodeos/lotes. Un ADMINISTRADOR ve todos los rodeos del sistema; el
+     * resto de roles ve los suyos, opcionalmente filtrados por establecimiento.
+     *
+     * @param establecimientoId (opcional) ID del establecimiento a filtrar
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de rodeos/lotes, 403 si acceso denegado, 400 si
+     *         hay error
+     */
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getAllRodeoLotes(
@@ -45,6 +56,15 @@ public class RodeoLoteController {
         }
     }
 
+    /**
+     * POST /api/v1/rodeo-lotes
+     * <p>
+     * Crea un nuevo rodeo/lote para el productor autenticado.
+     *
+     * @param request        datos del rodeo/lote a crear
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 201 con el rodeo/lote creado, 400 si hay error de validación
+     */
     @PostMapping
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> generarRodeoLote(
@@ -60,6 +80,15 @@ public class RodeoLoteController {
         }
     }
 
+    /**
+     * DELETE /api/v1/rodeo-lotes/{id}
+     * <p>
+     * Desactiva (baja lógica) un rodeo/lote del productor autenticado.
+     *
+     * @param rodeoId        ID del rodeo/lote a desactivar
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 si se desactivó correctamente, 400 si hay error
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> desactivarRodeoLote(
@@ -75,6 +104,15 @@ public class RodeoLoteController {
         }
     }
 
+    /**
+     * GET /api/v1/rodeo-lotes/{id}
+     * <p>
+     * Obtiene el detalle de un rodeo/lote del productor autenticado.
+     *
+     * @param rodeoId        ID del rodeo/lote
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con el rodeo/lote, 400 si hay error
+     */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> getRodeoLoteById(

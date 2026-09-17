@@ -370,3 +370,27 @@ export async function getLineaTiempoAlertas(
   const response = await axiosClient.get<LineaTiempoEventoResponse[]>(url);
   return response.data;
 }
+
+// ─── Indicadores de salud ──────────────────────────────────────────────────
+
+export type EstadoIndicador = 'VERDE' | 'AMARILLO' | 'ROJO' | 'SIN DATOS';
+
+export interface IndicadorSaludResponse {
+  nombre: string;
+  descripcion: string;
+  valor: string;
+  estado: EstadoIndicador;
+}
+
+export interface AnimalIndicadoresSaludResponse {
+  animalId: number;
+  caravana: string | null;
+  indicadores: IndicadorSaludResponse[];
+}
+
+export async function getIndicadoresSalud(animalId: number): Promise<AnimalIndicadoresSaludResponse> {
+  const response = await axiosClient.get<AnimalIndicadoresSaludResponse>(
+    `/animales/${animalId}/indicadores-salud`
+  );
+  return response.data;
+}
