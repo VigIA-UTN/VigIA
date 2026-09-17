@@ -150,6 +150,40 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         @Override
+        public List<AlertaResponse> listarAlertasSalud(
+                        String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
+
+                // 1. Validar que el usuario existe
+                usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                // 2. Verificar que el usuario realmente pertenece al establecimiento
+                // seleccionado.
+                // Esto garantiza el aislamiento multi-tenant: un usuario no puede consultar
+                // datos de un establecimiento ajeno aunque conozca su ID.
+                List<Establecimiento> establecimientos = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+                boolean perteneceAlEstablecimiento = establecimientos.stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento indicado o no está activo.");
+                }
+
+                // 3. Consultar alertas del establecimiento seleccionado según filtro
+                List<Alerta> alertas = (estado == null)
+                                ? alertaRepository.findSaludByEstablecimiento(establecimientoId)
+                                : alertaRepository.findSaludByEstablecimientoAndEstado(establecimientoId, estado);
+
+                // 4. Mapear a DTO
+                return alertas.stream()
+                                .map(this::toResponse)
+                                .collect(Collectors.toList());
+        }
+
+        @Override
         public AlertaResumenResponse obtenerResumenAlertas(String emailUsuario, Long establecimientoId) {
                 // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
