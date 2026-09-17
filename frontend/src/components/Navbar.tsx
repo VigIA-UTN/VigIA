@@ -131,11 +131,11 @@ function NavScroll() {
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/establecimientos')}>
                                 <i className="bi bi-building me-2" />Establecimientos
                             </button>
-                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/usuarios')}>
-                                <i className="bi bi-people me-2" />Usuarios
-                            </button>
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/caravanas')}>
                                 <i className="bi bi-broadcast me-2" />Caravanas
+                            </button>
+                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/usuarios')}>
+                                <i className="bi bi-people me-2" />Usuarios
                             </button>
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/invitaciones')}>
                                 <i className="bi bi-envelope me-2" />Invitaciones
@@ -252,7 +252,6 @@ function NavScroll() {
                             {isAdmin ? (
                                 <>
                                     <Nav.Link as={Link} to="/establecimientos" className="mx-2 fw-semibold">Establecimientos</Nav.Link>
-                                    <Nav.Link as={Link} to="/usuarios" className="mx-2 fw-semibold">Usuarios</Nav.Link>
                                     <Nav.Link as={Link} to="/caravanas" className="mx-2 fw-semibold">Caravanas</Nav.Link>
                                 </>
                             ) : rol === 'PENDIENTE' ? (
@@ -280,6 +279,7 @@ function NavScroll() {
                         <Nav className="ms-auto align-items-center flex-grow-1 justify-content-lg-start ps-lg-4 mb-3 mb-lg-0" style={{ flexBasis: 0 }}>
                             {isAdmin ? (
                                 <>
+                                    <Nav.Link as={Link} to="/usuarios" className="mx-2 fw-semibold">Usuarios</Nav.Link>
                                     <Nav.Link as={Link} to="/invitaciones" className="mx-2 fw-semibold">Invitaciones</Nav.Link>
                                 </>
                             ) : rol === 'PENDIENTE' ? (
