@@ -1202,7 +1202,6 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
-        /** El collar se considera desactualizado si su última transmisión supera {@link #HORAS_SIN_DATOS_MOVIMIENTO}. */
         private boolean telemetriaDesactualizada(Telemetria telemetria) {
                 Duration antiguedad = Duration.between(telemetria.getFechaHora(), LocalDateTime.now());
                 return antiguedad.compareTo(Duration.ofHours(HORAS_SIN_DATOS_MOVIMIENTO)) > 0;

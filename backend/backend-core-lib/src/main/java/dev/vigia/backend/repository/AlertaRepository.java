@@ -18,20 +18,12 @@ import dev.vigia.backend.model.SeveridadAlerta;
 @Repository
 public interface AlertaRepository extends JpaRepository<Alerta, Long> {
 
-       /**
-        * Lista alertas de celo (disparador = CELO) de un establecimiento concreto,
-        * ordenadas por tsGeneracion descendente.
-        */
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
                      "ORDER BY a.tsGeneracion DESC")
        List<Alerta> findCeloByEstablecimiento(@Param("establecimientoId") Long establecimientoId);
 
-       /**
-        * Lista alertas de celo filtradas por estado, ordenadas por tsGeneracion
-        * descendente.
-        */
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +
@@ -41,20 +33,12 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("establecimientoId") Long establecimientoId,
                      @Param("estado") EstadoAlerta estado);
 
-       /**
-        * Lista alertas sanitarias (disparador = SALUD) de un establecimiento
-        * concreto, ordenadas por tsGeneracion descendente.
-        */
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.SALUD " +
                      "ORDER BY a.tsGeneracion DESC")
        List<Alerta> findSaludByEstablecimiento(@Param("establecimientoId") Long establecimientoId);
 
-       /**
-        * Lista alertas sanitarias filtradas por estado, ordenadas por
-        * tsGeneracion descendente.
-        */
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.SALUD " +
@@ -64,10 +48,6 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("establecimientoId") Long establecimientoId,
                      @Param("estado") EstadoAlerta estado);
 
-       /**
-        * Busca una alerta verificando que pertenece al establecimiento indicado.
-        * Útil para validar aislamiento antes de operar sobre ella.
-        */
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.id = :id " +
                      "AND a.animal.establecimiento.id = :establecimientoId")
@@ -75,10 +55,6 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("id") Long id,
                      @Param("establecimientoId") Long establecimientoId);
 
-       /**
-        * Lista alertas de cualquier tipo para recuperar mensajes perdidos mediante
-        * Last-Event-ID.
-        */
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND a.id > :lastId " +
@@ -87,21 +63,11 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("establecimientoId") Long establecimientoId,
                      @Param("lastId") Long lastId);
 
-       /**
-        * Verifica si existe una alerta reciente para un animal y un disparador en
-        * particular.
-        * Útil para implementar períodos de enfriamiento (cooldown) y no repetir
-        * alertas.
-        */
        boolean existsByAnimalAndDisparadorAndTsGeneracionAfter(
                      Animal animal,
                      DisparadorAlerta disparador,
                      LocalDateTime tsGeneracion);
 
-       /**
-        * Cuenta las alertas activas (estado PENDIENTE) agrupadas por tipo (disparador)
-        * para un establecimiento específico.
-        */
        @Query("SELECT a.disparador, COUNT(a) FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND a.estado = dev.vigia.backend.model.EstadoAlerta.PENDIENTE " +
@@ -111,9 +77,6 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
        @Query("SELECT a FROM Alerta a WHERE a.animal.id = :animalId AND a.estado = 'PENDIENTE' ORDER BY CASE WHEN a.severidad = 'ALTA' THEN 1 WHEN a.severidad = 'MEDIA' THEN 2 ELSE 3 END ASC")
        List<Alerta> alertasAnimalActivas(@Param("animalId") Long animalId);
 
-       /**
-        * Lista las alertas de un animal concreto aplicando filtros opcionales.
-        */
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.id = :animalId " +
                      "AND (:disparador IS NULL OR a.disparador = :disparador) " +
@@ -126,11 +89,6 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("desde") LocalDateTime desde,
                      @Param("hasta") LocalDateTime hasta);
 
-       /**
-        * Lista las alertas de un establecimiento concreto aplicando filtros
-        * opcionales.
-        * Ordena por severidad descendente (ALTA, MEDIA, BAJA) y luego por fecha.
-        */
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND (:estado IS NULL OR a.estado = :estado) " +
@@ -148,9 +106,6 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("disparador") DisparadorAlerta disparador,
                      @Param("severidad") SeveridadAlerta severidad);
 
-       /**
-        * Obtiene las alertas de celo pendientes cuya ventana de inseminación ya finalizó.
-        */
        @Query("SELECT a FROM Alerta a " +
               "WHERE a.estado = dev.vigia.backend.model.EstadoAlerta.PENDIENTE " +
               "AND a.disparador = dev.vigia.backend.model.DisparadorAlerta.CELO " +

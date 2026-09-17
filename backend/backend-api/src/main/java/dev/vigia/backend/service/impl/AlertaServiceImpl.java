@@ -757,11 +757,6 @@ public class AlertaServiceImpl implements AlertaService {
                 return eventos;
         }
 
-        /**
-         * Traduce el parámetro {@code tipo} (string del query param) al enum
-         * {@link DisparadorAlerta} correspondiente. Devuelve {@code null} si el
-         * valor es nulo, vacío o no reconocido (sin filtro).
-         */
         @SuppressWarnings("null")
         private DisparadorAlerta resolverDisparador(String tipo) {
                 if (tipo == null || tipo.isBlank()) {
@@ -776,16 +771,6 @@ public class AlertaServiceImpl implements AlertaService {
                 };
         }
 
-        /**
-         * Determina el estado de resolución legible para la ficha del animal a partir
-         * del {@link EstadoAlerta} interno.
-         *
-         * <ul>
-         *   <li>{@code CONFIRMADA} → {@code "CONFIRMADA"}</li>
-         *   <li>{@code DESCARTADA} → {@code "DESCARTADA"}</li>
-         *   <li>Cualquier otro estado → {@code "SIN_ATENDER"}</li>
-         * </ul>
-         */
         private String resolverEstadoResolucion(EstadoAlerta estado) {
                 if (estado == null) return "SIN_ATENDER";
                 return switch (estado) {

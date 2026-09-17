@@ -13,11 +13,6 @@ import java.util.Optional;
 @Repository
 public interface PerimetroRepository extends JpaRepository<Perimetro, Long> {
 
-    /**
-     * Resuelve el chequeo point-in-polygon en la base de datos mediante ST_Contains
-     * con índice espacial GIST, filtrando por lote y activo = true.
-     * Orden de coordenadas: ST_MakePoint(:lon, :lat) con SRID 4326.
-     */
     @Query(value = """
         SELECT p.* FROM perimetro p
         JOIN perimetro_lote pl ON pl.perimetro_id = p.id

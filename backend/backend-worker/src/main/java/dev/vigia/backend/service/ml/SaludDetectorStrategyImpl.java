@@ -38,31 +38,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/**
- * Detección de desvíos sanitarios por PERFIL INDIVIDUAL (RF03).
- *
- * A diferencia de {@link CeloDetectorStrategyImpl} (evento puntual,
- * comparado contra la población general, un solo endpoint), este
- * detector trabaja en dos pasos porque el modelo de salud compara a
- * cada animal contra SU PROPIO perfil de referencia:
- *
- * 1. Si el animal todavía no completó los 7 días de calibración (RF03),
- * no se genera ninguna predicción ni alerta -- se marca la
- * telemetría pendiente como procesada y se espera al próximo ciclo.
- * 2. Si el animal ya calibró pero no tiene un perfil persistido (o el
- * que tiene quedó viejo, ver RECALIBRACION_DIAS), se llama a
- * POST /api/internal/ml/salud/perfil UNA vez con la telemetría cruda
- * de calibración, y el resultado (un puñado de números, no la serie
- * completa) se persiste en una entidad PerfilReferencia propia (1:1 con el
- * animal). Esto evita
- * reenviar y recalcular miles de puntos de calibración en cada
- * corrida del batch -- ver la justificación completa en
- * ml-training/salud/features_salud.py.
- * 3. Con un perfil válido y fresco, se llama a
- * POST /api/internal/ml/salud/predict con la ventana de telemetría a
- * evaluar MÁS el perfil ya calculado (no telemetría cruda de
- * calibración).
- */
 @Slf4j
 @Service
 public class SaludDetectorStrategyImpl implements DetectorStrategy {

@@ -20,7 +20,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     @SuppressWarnings("null")
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Permitimos peticiones CORS desde el frontend
         registry.addEndpoint("/ws-alertas")
                 .setAllowedOriginPatterns("*");
     }

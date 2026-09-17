@@ -11,6 +11,14 @@ public class RootRedirectController {
     @Value("${app.oauth2.redirect-uri}")
     private String redirectUri;
 
+    /**
+     * GET /, /login, /login/**
+     * <p>
+     * Redirige cualquier acceso a la raíz o a rutas de login del backend hacia
+     * la pantalla de login del frontend.
+     *
+     * @return redirección a la URL de login del frontend
+     */
     @SuppressWarnings("null")
     @GetMapping({ "/", "/login", "/login/**" })
     public RedirectView redirectToFrontend() {

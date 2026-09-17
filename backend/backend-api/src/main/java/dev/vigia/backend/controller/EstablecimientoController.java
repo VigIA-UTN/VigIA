@@ -19,6 +19,16 @@ public class EstablecimientoController {
 
     private final EstablecimientoService establecimientoService;
 
+    /**
+     * POST /api/v1/establecimientos
+     * <p>
+     * Crea un nuevo establecimiento.
+     *
+     * @param request datos del establecimiento (nombre, latitud y longitud
+     *                obligatorios)
+     * @return 201 con el establecimiento creado, 400 si faltan datos
+     *         obligatorios
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<EstablecimientoResponse> createEstablecimiento(@RequestBody EstablecimientoRequest request) {
@@ -28,6 +38,15 @@ public class EstablecimientoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(establecimientoService.createEstablecimiento(request));
     }
 
+    /**
+     * GET /api/v1/establecimientos
+     * <p>
+     * Lista establecimientos. Un ADMINISTRADOR ve todos los establecimientos del
+     * sistema; el resto de roles ve únicamente los suyos.
+     *
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de establecimientos
+     */
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<List<EstablecimientoResponse>> getAllEstablecimientos(Authentication authentication) {
@@ -38,24 +57,57 @@ public class EstablecimientoController {
         }
     }
 
+    /**
+     * GET /api/v1/establecimientos/{id}
+     * <p>
+     * Obtiene el detalle de un establecimiento por su ID.
+     *
+     * @param id ID del establecimiento
+     * @return 200 con el establecimiento
+     */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<EstablecimientoResponse> getEstablecimientoById(@PathVariable Long id) {
         return ResponseEntity.ok(establecimientoService.getEstablecimientoById(id));
     }
 
+    /**
+     * PUT /api/v1/establecimientos/{id}
+     * <p>
+     * Edita los datos de un establecimiento existente.
+     *
+     * @param id      ID del establecimiento a editar
+     * @param request nuevos datos del establecimiento
+     * @return 200 con el establecimiento actualizado
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<EstablecimientoResponse> updateEstablecimiento(@PathVariable Long id, @RequestBody EstablecimientoRequest request) {
         return ResponseEntity.ok(establecimientoService.updateEstablecimiento(id, request));
     }
 
+    /**
+     * DELETE /api/v1/establecimientos/{id}
+     * <p>
+     * Desactiva (baja lógica) un establecimiento.
+     *
+     * @param id ID del establecimiento a desactivar
+     * @return 200 con el establecimiento desactivado
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<EstablecimientoResponse> desactivarEstablecimiento(@PathVariable Long id) {
         return ResponseEntity.ok(establecimientoService.desactivarEstablecimiento(id));
     }
 
+    /**
+     * PUT /api/v1/establecimientos/activar/{id}
+     * <p>
+     * Reactiva un establecimiento previamente desactivado.
+     *
+     * @param id ID del establecimiento a activar
+     * @return 200 con el establecimiento activado
+     */
     @PutMapping("/activar/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<EstablecimientoResponse> activarEstablecimiento(@PathVariable Long id) {

@@ -48,6 +48,17 @@ public class AnimalController {
     private final AlertaService alertaService;
     private final dev.vigia.backend.service.SseTelemetriaPublisher sseTelemetriaPublisher;
 
+    /**
+     * GET /api/v1/animales?establecimientoId={id}
+     * <p>
+     * Lista los animales del establecimiento indicado (o de todos los
+     * establecimientos del usuario si no se especifica).
+     *
+     * @param establecimientoId (opcional) ID del establecimiento a filtrar
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de animales, 400 si hay error, 403 si acceso
+     *         denegado
+     */
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> listarAnimales(
@@ -64,6 +75,17 @@ public class AnimalController {
         }
     }
 
+    /**
+     * GET /api/v1/animales/mapa?establecimientoId={id}
+     * <p>
+     * Devuelve la última posición conocida de cada animal del establecimiento,
+     * para pintarlos en el mapa.
+     *
+     * @param establecimientoId (opcional) ID del establecimiento a filtrar
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con las posiciones de los animales, 400 si hay error, 403 si
+     *         acceso denegado
+     */
     @GetMapping("/mapa")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getPosicionesMapa(
@@ -80,6 +102,15 @@ public class AnimalController {
         }
     }
 
+    /**
+     * GET /api/v1/animales/mapa/stream?establecimientoId={id}
+     * <p>
+     * Abre un stream Server-Sent Events (SSE) que publica en tiempo real las
+     * actualizaciones de posición de los animales del establecimiento indicado.
+     *
+     * @param establecimientoId ID del establecimiento a suscribir
+     * @return emisor SSE registrado para el establecimiento indicado
+     */
     @GetMapping(value = "/mapa/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
     public org.springframework.web.servlet.mvc.method.annotation.SseEmitter streamPosicionesMapa(
             @RequestParam(name = "establecimientoId") Long establecimientoId) {
@@ -90,6 +121,16 @@ public class AnimalController {
         return sseTelemetriaPublisher.registrarClienteSse(establecimientoId);
     }
 
+    /**
+     * GET /api/v1/animales/{id}
+     * <p>
+     * Obtiene el detalle de un animal por su ID.
+     *
+     * @param animalId       ID del animal
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con el detalle del animal, 400 si el animal no existe o no
+     *         pertenece al usuario
+     */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<AnimalResponse> getAnimalById(
@@ -105,6 +146,15 @@ public class AnimalController {
         }
     }
 
+    /**
+     * POST /api/v1/animales
+     * <p>
+     * Registra un nuevo animal en el establecimiento del productor autenticado.
+     *
+     * @param request        datos del animal a crear
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 201 con el animal creado, 400 si hay error de validación
+     */
     @PostMapping
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> cargarAnimal(
@@ -120,6 +170,15 @@ public class AnimalController {
         }
     }
 
+    /**
+     * DELETE /api/v1/animales/{id}
+     * <p>
+     * Desactiva (baja lógica) un animal.
+     *
+     * @param animalId       ID del animal a desactivar
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 si se desactivó correctamente, 400 si hay error
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> desactivarAnimal(
@@ -135,6 +194,16 @@ public class AnimalController {
         }
     }
 
+    /**
+     * PUT /api/v1/animales/{id}
+     * <p>
+     * Edita los datos de un animal existente.
+     *
+     * @param animalId       ID del animal a editar
+     * @param request        nuevos datos del animal
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con el animal actualizado, 400 si hay error
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> editarAnimal(
@@ -151,6 +220,16 @@ public class AnimalController {
         }
     }
 
+    /**
+     * GET /api/v1/animales/{id}/estado-reproductivo
+     * <p>
+     * Lista el historial de estados reproductivos registrados para un animal.
+     *
+     * @param animalId       ID del animal
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de estados reproductivos, 400 si hay error, 403 si
+     *         acceso denegado
+     */
     @GetMapping("/{id}/estado-reproductivo")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> listarEstadosReproductivos(
@@ -169,6 +248,16 @@ public class AnimalController {
         }
     }
 
+    /**
+     * POST /api/v1/animales/{id}/estado-reproductivo
+     * <p>
+     * Registra un nuevo estado reproductivo para un animal.
+     *
+     * @param animalId       ID del animal
+     * @param request        datos del estado reproductivo a registrar
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 201 con el estado reproductivo creado, 400 si hay error
+     */
     @PostMapping("/{id}/estado-reproductivo")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> registrarEstadoReproductivo(
@@ -186,6 +275,17 @@ public class AnimalController {
         }
     }
 
+    /**
+     * PUT /api/v1/animales/{id}/estado-reproductivo/{estadoId}
+     * <p>
+     * Edita un estado reproductivo existente de un animal.
+     *
+     * @param animalId       ID del animal
+     * @param estadoId       ID del estado reproductivo a editar
+     * @param request        nuevos datos del estado reproductivo
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con el estado reproductivo actualizado, 400 si hay error
+     */
     @PutMapping("/{id}/estado-reproductivo/{estadoId}")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> editarEstadoReproductivo(
@@ -204,6 +304,16 @@ public class AnimalController {
         }
     }
 
+    /**
+     * GET /api/v1/animales/{id}/intervenciones
+     * <p>
+     * Lista las intervenciones (tratamientos, vacunaciones, revisiones,
+     * inseminaciones, etc.) registradas para un animal.
+     *
+     * @param animalId       ID del animal
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de intervenciones, 400 si hay error
+     */
     @GetMapping("/{id}/intervenciones")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> listarIntervenciones(
@@ -219,6 +329,17 @@ public class AnimalController {
         }
     }
 
+    /**
+     * POST /api/v1/animales/csv?establecimientoId={id}
+     * <p>
+     * Carga masiva de animales a partir de un archivo (CSV/Excel).
+     *
+     * @param file               archivo con los animales a cargar
+     * @param establecimientoId  ID del establecimiento destino
+     * @param authentication     contexto de seguridad inyectado por Spring Security
+     * @return 201 con el resumen de la carga, 400 si hay error de validación o de
+     *         lectura del archivo
+     */
     @PostMapping("/csv")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> cargarAnimalesExcel(
@@ -237,6 +358,17 @@ public class AnimalController {
         }
     }
 
+    /**
+     * POST /api/v1/animales/estado-reproductivo/csv?establecimientoId={id}
+     * <p>
+     * Carga masiva de estados reproductivos a partir de un archivo (CSV/Excel).
+     *
+     * @param file               archivo con los estados reproductivos a cargar
+     * @param establecimientoId  ID del establecimiento destino
+     * @param authentication     contexto de seguridad inyectado por Spring Security
+     * @return 201 con el resumen de la carga, 400 si hay error de validación o de
+     *         lectura del archivo
+     */
     @PostMapping("/estado-reproductivo/csv")
     @PreAuthorize("hasRole('PRODUCTOR')")
     public ResponseEntity<?> cargarEstadosMasivo(
@@ -256,6 +388,17 @@ public class AnimalController {
         }
     }
 
+    /**
+     * GET /api/v1/animales/{id}/metricas
+     * <p>
+     * Devuelve las métricas calculadas para un animal (actividad, desplazamiento,
+     * etc.).
+     *
+     * @param animalId       ID del animal
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de métricas, 400 si hay error, 403 si acceso
+     *         denegado
+     */
     @GetMapping("/{id}/metricas")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> getMetricasAnimal(
@@ -273,6 +416,18 @@ public class AnimalController {
         }
     }
 
+    /**
+     * POST /api/v1/animales/{id}/estado-salud
+     * <p>
+     * Registra un nuevo estado de salud (SANO, EN_OBSERVACION, ENFERMO) para un
+     * animal.
+     *
+     * @param animalId       ID del animal
+     * @param request        datos del estado de salud a registrar
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 201 con el estado de salud creado, 400 si hay error, 403 si acceso
+     *         denegado
+     */
     @PostMapping("/{id}/estado-salud")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> registrarEstadoSalud(
@@ -291,6 +446,16 @@ public class AnimalController {
         }
     }
 
+    /**
+     * GET /api/v1/animales/{id}/estado-salud
+     * <p>
+     * Lista el historial de estados de salud registrados para un animal.
+     *
+     * @param animalId       ID del animal
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de estados de salud, 400 si hay error, 403 si
+     *         acceso denegado
+     */
     @GetMapping("/{id}/estado-salud")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> listarEstadosSalud(
@@ -310,6 +475,16 @@ public class AnimalController {
 
     // ── Historial de pesos ──────────────────────────────────────────────────────
 
+    /**
+     * GET /api/v1/animales/{id}/historial-pesos
+     * <p>
+     * Lista el historial de pesos registrados para un animal.
+     *
+     * @param animalId       ID del animal
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista de registros de peso, 400 si hay error, 403 si
+     *         acceso denegado
+     */
     @GetMapping("/{id}/historial-pesos")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> listarHistorialPesos(
@@ -327,6 +502,17 @@ public class AnimalController {
         }
     }
 
+    /**
+     * POST /api/v1/animales/{id}/historial-pesos
+     * <p>
+     * Registra un nuevo peso para un animal.
+     *
+     * @param animalId       ID del animal
+     * @param request        datos del registro de peso
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 201 con el registro de peso creado, 400 si hay error, 403 si acceso
+     *         denegado
+     */
     @PostMapping("/{id}/historial-pesos")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> registrarPeso(
@@ -345,6 +531,18 @@ public class AnimalController {
         }
     }
 
+    /**
+     * PUT /api/v1/animales/{id}/historial-pesos/{pesoId}
+     * <p>
+     * Edita un registro de peso existente de un animal.
+     *
+     * @param animalId       ID del animal
+     * @param pesoId         ID del registro de peso a editar
+     * @param request        nuevos datos del registro de peso
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con el registro de peso actualizado, 400 si hay error, 403 si
+     *         acceso denegado
+     */
     @PutMapping("/{id}/historial-pesos/{pesoId}")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> editarPeso(
@@ -364,6 +562,17 @@ public class AnimalController {
         }
     }
 
+    /**
+     * DELETE /api/v1/animales/{id}/historial-pesos/{pesoId}
+     * <p>
+     * Elimina un registro de peso de un animal.
+     *
+     * @param animalId       ID del animal
+     * @param pesoId         ID del registro de peso a eliminar
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 si se eliminó correctamente, 400 si hay error, 403 si acceso
+     *         denegado
+     */
     @DeleteMapping("/{id}/historial-pesos/{pesoId}")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> eliminarPeso(
@@ -384,6 +593,17 @@ public class AnimalController {
 
     // ── Indicadores de salud ────────────────────────────────────────────────────
 
+    /**
+     * GET /api/v1/animales/{id}/indicadores-salud
+     * <p>
+     * Devuelve los indicadores de salud calculados para un animal (movimiento,
+     * reproductivo y estado de salud registrado por el veterinario).
+     *
+     * @param animalId       ID del animal
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con los indicadores de salud, 400 si hay error, 403 si acceso
+     *         denegado
+     */
     @GetMapping("/{id}/indicadores-salud")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> getIndicadoresSalud(
@@ -401,6 +621,21 @@ public class AnimalController {
     }
 
     // ── Línea de tiempo de alertas ────────────────────────────────────────────────────
+    /**
+     * GET /api/v1/animales/{id}/linea-tiempo-alertas?tipo={tipo}&desde={desde}&hasta={hasta}
+     * <p>
+     * Devuelve la línea de tiempo unificada de alertas e intervenciones de un
+     * animal, ordenada cronológicamente.
+     *
+     * @param animalId       ID del animal
+     * @param tipo           (opcional) filtro por tipo de alerta: celo, sanitario,
+     *                       geoespacial, perimetro (no filtra las intervenciones)
+     * @param desde          (opcional) inicio del rango de fechas, inclusive
+     * @param hasta          (opcional) fin del rango de fechas, inclusive
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la línea de tiempo de eventos, 400 si hay error, 403 si
+     *         acceso denegado
+     */
     @GetMapping("/{id}/linea-tiempo-alertas")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getLineaTiempoAlertas(

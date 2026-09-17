@@ -208,13 +208,11 @@ class AnimalControllerTest {
                 return objectMapper.readTree(result.getResponse().getContentAsString()).get("token").asText();
         }
 
-        /** Crea un animal ACTIVO via API (como productor) y devuelve su id. */
         @SuppressWarnings("null")
         private Long crearAnimal(String nombre, Long estId, Long rodeoId) throws Exception {
                 return crearAnimalConToken(nombre, estId, rodeoId, productorToken);
         }
 
-        /** Crea un animal ACTIVO via API con el token indicado y devuelve su id. */
         @SuppressWarnings("null")
         private Long crearAnimalConToken(String nombre, Long estId, Long rodeoId, String token) throws Exception {
                 AnimalRequest req = new AnimalRequest();
@@ -1685,17 +1683,11 @@ class AnimalControllerTest {
         // GET /api/v1/animales/{id}/indicadores-salud
         // =========================================================================
 
-        /**
-         * Crea caravana + telemetría con el moveState indicado, vinculada a un perfil de referencia (mean=100, std=10).
-         * Recibe el id (no la entidad) y limpia el persistence context al final: el animal pudo haberse
-         * cargado antes de crear el PerfilReferencia, y la asociación mappedBy quedaría cacheada en null.
-         */
         @SuppressWarnings("null")
         private void asignarCollarConMoveState(Long animalId, int moveState) {
                 asignarCollarConMoveState(animalId, moveState, LocalDateTime.now());
         }
 
-        /** Igual que {@link #asignarCollarConMoveState(Long, int)} pero permite fijar la fecha de la última telemetría. */
         @SuppressWarnings("null")
         private void asignarCollarConMoveState(Long animalId, int moveState, LocalDateTime fechaHoraTelemetria) {
                 Animal animal = animalRepository.findById(animalId).orElseThrow();

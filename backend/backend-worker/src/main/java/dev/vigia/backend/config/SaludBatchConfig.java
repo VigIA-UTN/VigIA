@@ -26,16 +26,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Job de batch para el modelo de salud. Estructuralmente igual a
- * {@link CeloBatchConfig} (mismo patrón de reader/processor/writer/step/
- * job), pero la ventana de telemetría que se junta y se pasa al
- * detector es la MISMA independientemente de si el animal está
- * calibrando, prediciendo, o recalibrando -- esa decisión la toma
- * {@code SaludDetectorStrategyImpl} internamente, no este config. Acá
- * solo se decide CUÁNDO vale la pena llamar al detector (hay
- * telemetría pendiente en las últimas 24hs), igual que celo.
- */
 @Configuration
 public class SaludBatchConfig {
 

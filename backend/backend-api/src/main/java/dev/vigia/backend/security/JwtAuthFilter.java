@@ -38,7 +38,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             jwt = authHeader.substring(7);
         } else if (request.getParameter("token") != null) {
-            // Soporte para WebSockets (ws://.../?token=...)
             jwt = request.getParameter("token");
         }
 
@@ -49,9 +48,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         try {
             userEmail = jwtUtil.extractUsername(jwt);
             if (userEmail != null) {
-                // JWT siempre toma precedencia sobre cualquier sesión existente.
-                // Esto evita que una sesión de OAuth2 anterior interfiera con la
-                // autenticación JWT en requests posteriores.
                 UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(userEmail);
                 if (jwtUtil.validateToken(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(

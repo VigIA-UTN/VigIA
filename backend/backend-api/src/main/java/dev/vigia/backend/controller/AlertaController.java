@@ -191,7 +191,19 @@ public class AlertaController {
         }
     }
 
-    
+    /**
+     * GET /api/v1/alertas/{id}/ventana-inseminacion?establecimientoId={id}
+     * <p>
+     * Alias histórico de {@code GET /api/v1/alertas/{id}/ventana}: devuelve el
+     * estado actual de la ventana óptima de inseminación de una alerta de celo.
+     *
+     * @param alertaId          ID de la alerta
+     * @param establecimientoId ID del establecimiento actualmente seleccionado
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con el estado de la ventana, 403 si acceso denegado,
+     *         404 si la alerta no existe, 400 si la alerta no pertenece al
+     *         establecimiento
+     */
     @GetMapping("/{id}/ventana-inseminacion")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> obtenerEstadoVentanaInseminacion(
@@ -213,6 +225,18 @@ public class AlertaController {
         }
     }
 
+    /**
+     * PUT /api/v1/alertas/{id}/archivar?establecimientoId={id}
+     * <p>
+     * Archiva una alerta de celo cuya ventana de inseminación venció, quedando
+     * fuera del listado de alertas activas.
+     *
+     * @param alertaId          ID de la alerta a archivar
+     * @param establecimientoId ID del establecimiento actualmente seleccionado
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con la alerta archivada, 400 si hay error, 403 si acceso
+     *         denegado
+     */
     @PutMapping("/{id}/archivar")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> archivarAlertaPorVencimiento(
@@ -230,6 +254,19 @@ public class AlertaController {
         }
     }
 
+    /**
+     * PUT /api/v1/alertas/estado/{id}?estado={estado}&notas={notas}
+     * <p>
+     * Cambia el estado de una alerta (por ejemplo de PENDIENTE a CONFIRMADA o
+     * DESCARTADA), sin importar su tipo (celo, salud, etc.).
+     *
+     * @param alertaId       ID de la alerta
+     * @param nuevoEstado    nuevo estado: PENDIENTE, CONFIRMADA o DESCARTADA
+     * @param notas          (opcional) notas asociadas al cambio de estado
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la alerta actualizada, 400 si hay error, 403 si acceso
+     *         denegado
+     */
     @PutMapping("/estado/{id}")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
     public ResponseEntity<?> actualizarEstadoAlerta(
@@ -248,6 +285,20 @@ public class AlertaController {
         }
     }
 
+    /**
+     * POST /api/v1/alertas/intervenir/{id}
+     * <p>
+     * Registra una intervención (tratamiento, vacunación, revisión veterinaria,
+     * inseminación u otro) asociada a una alerta.
+     *
+     * @param request        datos de la intervención (tipo, fecha/hora, descripción
+     *                       y, para REVISION_VETERINARIA, el estado de salud
+     *                       resultante)
+     * @param alertaId       ID de la alerta sobre la que se interviene
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con la alerta actualizada, 400 si hay error, 403 si acceso
+     *         denegado, 404 si la alerta no existe
+     */
     @PostMapping("/intervenir/{id}")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> intervenirAlerta(
@@ -268,6 +319,19 @@ public class AlertaController {
         }
     }
 
+    /**
+     * GET /api/v1/alertas/stream?establecimientoId={id}&lastEventId={id}
+     * <p>
+     * Abre un stream Server-Sent Events (SSE) que publica en tiempo real las
+     * nuevas alertas generadas para el establecimiento indicado.
+     *
+     * @param establecimientoId ID del establecimiento a suscribir
+     * @param lastEventId       (opcional) ID del último evento recibido por el
+     *                          cliente, usado para reanudar el stream tras una
+     *                          reconexión sin perder eventos
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return emisor SSE registrado para el establecimiento indicado
+     */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamAlertas(
             @RequestParam(name = "establecimientoId") Long establecimientoId,

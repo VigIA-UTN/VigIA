@@ -20,7 +20,6 @@ public class AnimalRequest {
     @NotNull(message = "El establecimiento es obligatorio")
     private Long establecimientoId;
 
-    /** Peso inicial del animal en kg (opcional). Si se provee, se crea el primer registro de peso. */
     @Positive(message = "El peso inicial debe ser un valor positivo")
     private Double pesoInicial;
 }

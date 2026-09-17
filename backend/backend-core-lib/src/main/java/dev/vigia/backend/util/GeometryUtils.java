@@ -21,15 +21,6 @@ public final class GeometryUtils {
         return GEOMETRY_FACTORY;
     }
 
-    /**
-     * Construye y valida un Polígono JTS a partir de una lista de coordenadas.
-     * Respeta rigurosamente el orden JTS (longitud = x, latitud = y).
-     * Cierra el anillo exterior si el cliente no repitió el primer punto al final.
-     *
-     * @param coordenadas lista ordenada de vértices
-     * @return Polygon JTS con SRID 4326
-     * @throws PoligonoInvalidoException si la geometría no es válida o tiene autointersecciones
-     */
     public static Polygon crearPoligono(List<CoordenadaDTO> coordenadas) {
         if (coordenadas == null || coordenadas.size() < 3) {
             throw new PoligonoInvalidoException("Un perímetro requiere al menos 3 coordenadas para formar un área.");
@@ -69,12 +60,6 @@ public final class GeometryUtils {
         return polygon;
     }
 
-    /**
-     * Valida que el polígono sea topológicamente válido (sin autointersecciones, etc.).
-     *
-     * @param polygon polígono a validar
-     * @throws PoligonoInvalidoException si no es válido
-     */
     public static void validarPoligono(Polygon polygon) {
         if (polygon == null) {
             throw new PoligonoInvalidoException("El área del perímetro no puede ser nula.");
@@ -90,12 +75,6 @@ public final class GeometryUtils {
         }
     }
 
-    /**
-     * Convierte un Polygon JTS a una lista de CoordenadaDTO (lat, lon) para exponer en APIs REST.
-     *
-     * @param polygon polígono JTS
-     * @return lista de coordenadas
-     */
     public static List<CoordenadaDTO> extraerCoordenadas(Polygon polygon) {
         if (polygon == null) {
             return new ArrayList<>();
@@ -110,13 +89,6 @@ public final class GeometryUtils {
         return dtoList;
     }
 
-    /**
-     * Crea un punto geométrico JTS con SRID 4326.
-     *
-     * @param latitud latitud en grados
-     * @param longitud longitud en grados
-     * @return Point JTS
-     */
     public static Point crearPunto(double latitud, double longitud) {
         return GEOMETRY_FACTORY.createPoint(new Coordinate(longitud, latitud));
     }
