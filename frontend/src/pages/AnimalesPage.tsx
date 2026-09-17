@@ -7,6 +7,7 @@ import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { getCaravanasDisponibles } from '../api/caravanasApi';
 import type { CaravanaResponse } from '../api/caravanasApi';
+import { formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
@@ -528,7 +529,28 @@ export default function AnimalesPage() {
                                                 <td className="col-mobile-hide">
                                                     {a.caravanaId ? (
                                                         <div className="d-flex align-items-center justify-content-between gap-2">
-                                                            <span className="text-truncate" style={{ minWidth: 0 }}>{a.caravanaAlias || a.caravanaDevEui}</span>
+                                                            <div className="text-truncate" style={{ minWidth: 0 }}>
+                                                                <div className="d-flex align-items-center gap-2">
+                                                                    <span className="text-truncate">{a.caravanaAlias || a.caravanaDevEui}</span>
+                                                                    {(() => {
+                                                                        const bateria = formatBateria(a.caravanaBateria);
+                                                                        return (
+                                                                            <span style={{ fontSize: '0.75rem', color: bateria.amber ? '#8a6a00' : '#2f7d3b', flexShrink: 0 }}>
+                                                                                {bateria.amber && <span className="bateria-dot" />}
+                                                                                {bateria.text}
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                                {(() => {
+                                                                    const senial = formatUltimaSenial(a.caravanaUltimaSenial);
+                                                                    return (
+                                                                        <div title={senial.title} style={{ fontSize: '0.7rem', color: senial.amber ? '#8a6a00' : '#9aa5b1' }}>
+                                                                            señal {senial.text}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
                                                             <Button
                                                                 variant="outline-secondary"
                                                                 size="sm"
@@ -842,9 +864,15 @@ export default function AnimalesPage() {
                                 onChange={(e) => setSelectedCaravanaId(e.target.value ? Number(e.target.value) : null)}
                             >
                                 <option value="">Seleccioná una opción</option>
-                                {caravanasDisponibles.map(c => (
-                                    <option key={c.id} value={c.id}>{c.alias || c.codigo || c.devEui}</option>
-                                ))}
+                                {caravanasDisponibles.map(c => {
+                                    const bateria = formatBateria(c.bateria);
+                                    const senial = formatUltimaSenial(c.ultimaSenial);
+                                    return (
+                                        <option key={c.id} value={c.id}>
+                                            {c.alias || c.codigo || c.devEui} · {bateria.text} · {senial.text}
+                                        </option>
+                                    );
+                                })}
                             </Form.Select>
                             {caravanasDisponibles.length === 0 && (
                                 <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>

@@ -34,6 +34,7 @@ export interface AnimalResponse {
   caravanaAlias: string | null;
   caravanaEstado: 'DISPONIBLE' | 'VINCULADO' | 'INACTIVO' | null;
   caravanaUltimaSenial: string | null;
+  caravanaBateria: number | null;
 }
 
 export interface CargaMasivaResponse {

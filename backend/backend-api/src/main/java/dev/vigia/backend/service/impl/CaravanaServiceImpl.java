@@ -76,27 +76,45 @@ public class CaravanaServiceImpl implements CaravanaService {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
-                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
-
-        validarAccesoEstablecimiento(usuario, establecimiento);
-
         List<Caravana> caravanas;
-        if (estado != null && codigo != null) {
-            caravanas = caravanaRepository.findAllByEstablecimientoIdAndEstadoSensorAndCodigoContainingIgnoreCase(
-                    establecimientoId, estado, codigo);
-        } else if (estado != null) {
-            caravanas = caravanaRepository.findAllByEstablecimientoIdAndEstadoSensor(establecimientoId, estado);
-        } else if (codigo != null) {
-            caravanas = caravanaRepository.findAllByEstablecimientoIdAndCodigoContainingIgnoreCase(establecimientoId,
-                    codigo);
+        if (establecimientoId == null) {
+            if (!usuario.getRol().equals(Rol.ADMINISTRADOR)) {
+                throw new AccessDeniedException("Sólo un ADMINISTRADOR puede listar caravanas de todos los establecimientos.");
+            }
+            caravanas = listarCaravanasDeTodosLosEstablecimientos(estado, codigo);
         } else {
-            caravanas = caravanaRepository.findAllByEstablecimientoId(establecimientoId);
+            Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                    .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+
+            validarAccesoEstablecimiento(usuario, establecimiento);
+
+            if (estado != null && codigo != null) {
+                caravanas = caravanaRepository.findAllByEstablecimientoIdAndEstadoSensorAndCodigoContainingIgnoreCase(
+                        establecimientoId, estado, codigo);
+            } else if (estado != null) {
+                caravanas = caravanaRepository.findAllByEstablecimientoIdAndEstadoSensor(establecimientoId, estado);
+            } else if (codigo != null) {
+                caravanas = caravanaRepository.findAllByEstablecimientoIdAndCodigoContainingIgnoreCase(
+                        establecimientoId, codigo);
+            } else {
+                caravanas = caravanaRepository.findAllByEstablecimientoId(establecimientoId);
+            }
         }
 
         return caravanas.stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private List<Caravana> listarCaravanasDeTodosLosEstablecimientos(EstadoSensor estado, String codigo) {
+        if (estado != null && codigo != null) {
+            return caravanaRepository.findAllByEstadoSensorAndCodigoContainingIgnoreCase(estado, codigo);
+        } else if (estado != null) {
+            return caravanaRepository.findAllByEstadoSensor(estado);
+        } else if (codigo != null) {
+            return caravanaRepository.findAllByCodigoContainingIgnoreCase(codigo);
+        }
+        return caravanaRepository.findAll();
     }
 
     @Override
@@ -191,6 +209,7 @@ public class CaravanaServiceImpl implements CaravanaService {
                 .activo(caravana.isActivo())
                 .estadoSensor(caravana.getEstadoSensor())
                 .establecimientoId(caravana.getEstablecimiento() != null ? caravana.getEstablecimiento().getId() : null)
+                .establecimientoNombre(caravana.getEstablecimiento() != null ? caravana.getEstablecimiento().getNombre() : null)
                 .animalId(animal != null ? animal.getId() : null)
                 .animalAlias(animal != null ? animal.getAlias() : null)
                 .bateria(caravana.getBateria())

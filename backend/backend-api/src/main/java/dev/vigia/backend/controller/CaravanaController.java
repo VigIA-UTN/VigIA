@@ -48,7 +48,7 @@ public class CaravanaController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'PRODUCTOR', 'CAMPERO')")
     public ResponseEntity<?> listarCaravanas(
-            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            @RequestParam(name = "establecimientoId", required = false) Long establecimientoId,
             @RequestParam(name = "estado", required = false) EstadoSensor estado,
             @RequestParam(name = "codigo", required = false) String codigo,
             Authentication authentication) {

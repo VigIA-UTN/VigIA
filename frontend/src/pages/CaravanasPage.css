@@ -104,6 +104,83 @@
 .estado-caravana-vinculado  { color: #1E3A5F; }
 .estado-caravana-inactivo   { color: #c94b4b; }
 
+.bateria-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #FFC700;
+    margin-right: 5px;
+}
+
+.btn-accion-caravana {
+    border-radius: 12px !important;
+    font-size: 0.75rem !important;
+    padding: 5px 10px !important;
+    font-weight: 600 !important;
+}
+
+.btn-accion-baja {
+    background: transparent !important;
+    border: 1.2px solid #D50000 !important;
+    color: #D50000 !important;
+}
+
+.btn-accion-baja:hover {
+    background: rgba(213, 0, 0, 0.08) !important;
+}
+
+.btn-accion-reactivar {
+    background: transparent !important;
+    border: 1.2px solid #00BA4A !important;
+    color: #2f7d3b !important;
+}
+
+.btn-accion-reactivar:hover {
+    background: rgba(0, 186, 74, 0.08) !important;
+}
+
+/* Botones de confirmación de los modales de baja/reactivar, mismo patrón que btn-confirmar-desvincular */
+.btn-confirmar-desvincular {
+    background-color: #D50000 !important;
+    border: none !important;
+    border-radius: 10px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    padding: 12px !important;
+    transition: background 0.2s !important;
+}
+
+.btn-confirmar-desvincular:hover {
+    background-color: #b30000 !important;
+}
+
+.btn-confirmar-reactivar {
+    background-color: #94C11E !important;
+    border: none !important;
+    border-radius: 10px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    padding: 12px !important;
+    transition: background 0.2s !important;
+}
+
+.btn-confirmar-reactivar:hover {
+    background-color: #7ab332 !important;
+}
+
+.modal-nota-baja {
+    background: rgba(19, 212, 251, .12);
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px rgba(19, 212, 251, .4);
+    padding: 12px;
+    font-size: 0.8rem;
+    color: #dbe8f2;
+    line-height: 1.5;
+}
+
 @media (max-width: 640px) {
     .col-mobile-hide {
         display: none !important;

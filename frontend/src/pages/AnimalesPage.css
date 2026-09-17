@@ -187,6 +187,15 @@
     background-color: #bb2d3b !important;
 }
 
+.bateria-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #FFC700;
+    margin-right: 4px;
+}
+
 /* ── Undo toast (snackbar estilo Gmail) ── */
 .undo-toast-container {
     position: fixed;

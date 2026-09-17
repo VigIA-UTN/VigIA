@@ -23,6 +23,7 @@ import {
 } from '../api/animalesApi';
 import { getRodeoLotes, type RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { useAuthStore } from '../store/authStore';
+import { formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
 import './AnimalDetailPage.css';
 import './AnimalesPage.css';
 import ActividadTab from './ActividadTab';
@@ -103,6 +104,23 @@ function formatDateTime(dt: string | null | undefined) {
     if (!dt) return '—';
     const date = new Date(dt);
     return date.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function CaravanaVinculadaInfo({ animal }: { animal: AnimalResponse }) {
+    if (!animal.caravanaId) return <>—</>;
+    const bateria = formatBateria(animal.caravanaBateria);
+    const senial = formatUltimaSenial(animal.caravanaUltimaSenial);
+    return (
+        <>
+            {animal.caravanaAlias || animal.caravanaDevEui} ({animal.caravanaEstado}){' '}
+            <span style={{ color: bateria.amber ? '#8a6a00' : '#2f7d3b' }}>
+                {bateria.amber && <span className="bateria-dot" />}
+                {bateria.text}
+            </span>
+            {' · '}
+            <span title={senial.title} style={{ color: senial.amber ? '#8a6a00' : undefined }}>señal {senial.text}</span>
+        </>
+    );
 }
 
 const EMPTY_ESTADO_FORM: EstadoReproductivoRequest = {
@@ -597,11 +615,7 @@ export default function AnimalDetailPage() {
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
                                                 <li>
                                                     <strong>Caravana vinculada:</strong>{' '}
-                                                    {animal.caravanaId ? (
-                                                        <>
-                                                            {animal.caravanaAlias || animal.caravanaDevEui} ({animal.caravanaEstado})
-                                                        </>
-                                                    ) : '—'}
+                                                    <CaravanaVinculadaInfo animal={animal} />
                                                     {' '}
                                                     <Button variant="link" className="p-0 align-baseline" onClick={() => navigate('/animales')}>
                                                         Gestionar en Animales
@@ -632,11 +646,7 @@ export default function AnimalDetailPage() {
                                                 <li><strong>Estado de Salud:</strong> {estadoSaludBadge(saludHistorial[0]?.estado ?? animal.estadoSalud)}</li>
                                                 <li>
                                                     <strong>Caravana vinculada:</strong>{' '}
-                                                    {animal.caravanaId ? (
-                                                        <>
-                                                            {animal.caravanaAlias || animal.caravanaDevEui} ({animal.caravanaEstado})
-                                                        </>
-                                                    ) : '—'}
+                                                    <CaravanaVinculadaInfo animal={animal} />
                                                     {' '}
                                                     <Button variant="link" className="p-0 align-baseline" onClick={() => navigate('/animales')}>
                                                         Gestionar en Animales

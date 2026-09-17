@@ -36,5 +36,6 @@ public class AnimalResponse {
     private String caravanaAlias;
     private EstadoSensor caravanaEstado;
     private LocalDateTime caravanaUltimaSenial;
+    private Double caravanaBateria;
 }
 

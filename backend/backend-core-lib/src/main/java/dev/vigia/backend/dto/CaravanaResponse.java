@@ -23,6 +23,7 @@ public class CaravanaResponse {
     private Boolean activo;
     private EstadoSensor estadoSensor;
     private Long establecimientoId;
+    private String establecimientoNombre;
     private Long animalId;
     private String animalAlias;
     private Double bateria;

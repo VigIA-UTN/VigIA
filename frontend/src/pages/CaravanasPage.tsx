@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Container, Spinner, Alert, Button, Form, Modal } from 'react-bootstrap';
-import { crearCaravana, getCaravanas } from '../api/caravanasApi';
-import type { CaravanaRequest, CaravanaResponse } from '../api/caravanasApi';
+import { crearCaravana, getCaravanas, darDeBajaCaravana, reactivarCaravana } from '../api/caravanasApi';
+import type { CaravanaRequest, CaravanaResponse, EstadoSensor } from '../api/caravanasApi';
 import { getEstablecimientos } from '../api/establecimientosApi';
 import type { EstablecimientoResponse } from '../api/establecimientosApi';
+import { ESTADO_SENSOR_LABEL, formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
 import './CaravanasPage.css';
 
 function estadoBadgeClass(estado: string) {
@@ -12,26 +13,28 @@ function estadoBadgeClass(estado: string) {
     return 'estado-caravana-inactivo';
 }
 
-function formatFecha(iso: string | null) {
-    if (!iso) return '—';
-    const [y, m, d] = iso.split('-');
-    return `${d}/${m}/${y}`;
-}
-
 export default function CaravanasPage() {
     const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
     const [establecimientoId, setEstablecimientoId] = useState<number | null>(null);
+    const [verTodosLosEstablecimientos, setVerTodosLosEstablecimientos] = useState(false);
 
     const [caravanas, setCaravanas] = useState<CaravanaResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [codigoFiltro, setCodigoFiltro] = useState('');
+    const [estadoFiltro, setEstadoFiltro] = useState<EstadoSensor | ''>('');
 
     const [showModal, setShowModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [formSuccess, setFormSuccess] = useState<string | null>(null);
     const [form, setForm] = useState<Partial<CaravanaRequest>>({ dev_eui: '', idCaravanaOficial: '', alias: '' });
+
+    const [bajaTarget, setBajaTarget] = useState<CaravanaResponse | null>(null);
+    const [reactivarTarget, setReactivarTarget] = useState<CaravanaResponse | null>(null);
+    const [accionSubmitting, setAccionSubmitting] = useState(false);
+    const [accionError, setAccionError] = useState<string | null>(null);
 
     useEffect(() => {
         (async () => {
@@ -52,13 +55,23 @@ export default function CaravanasPage() {
         })();
     }, []);
 
+    // Debounce del buscador por código antes de pegarle al server.
     useEffect(() => {
-        if (!establecimientoId) return;
+        const timeout = setTimeout(() => setCodigoFiltro(searchTerm.trim()), 350);
+        return () => clearTimeout(timeout);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        if (!verTodosLosEstablecimientos && !establecimientoId) return;
         (async () => {
             try {
                 setLoading(true);
                 setError(null);
-                const data = await getCaravanas(establecimientoId);
+                const data = await getCaravanas(
+                    verTodosLosEstablecimientos ? null : establecimientoId,
+                    estadoFiltro || undefined,
+                    codigoFiltro || undefined,
+                );
                 setCaravanas(data);
             } catch (err) {
                 const e = err as { response?: { data?: { message?: string } } };
@@ -67,7 +80,7 @@ export default function CaravanasPage() {
                 setLoading(false);
             }
         })();
-    }, [establecimientoId]);
+    }, [establecimientoId, verTodosLosEstablecimientos, estadoFiltro, codigoFiltro]);
 
     const openModal = () => {
         setForm({ dev_eui: '', idCaravanaOficial: '', alias: '' });
@@ -110,15 +123,42 @@ export default function CaravanasPage() {
         }
     };
 
-    const filteredCaravanas = caravanas.filter(c => {
-        if (!searchTerm) return true;
-        const q = searchTerm.toLowerCase();
-        return (
-            (c.codigo?.toLowerCase().includes(q) ?? false) ||
-            (c.alias?.toLowerCase().includes(q) ?? false) ||
-            c.devEui.toLowerCase().includes(q)
-        );
-    });
+    const handleConfirmBaja = async () => {
+        if (!bajaTarget) return;
+        setAccionSubmitting(true);
+        setAccionError(null);
+        try {
+            const actualizada = await darDeBajaCaravana(bajaTarget.id);
+            setCaravanas(prev => prev.map(c => c.id === actualizada.id ? actualizada : c));
+            setBajaTarget(null);
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setAccionError(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al dar de baja la caravana.');
+        } finally {
+            setAccionSubmitting(false);
+        }
+    };
+
+    const handleConfirmReactivar = async () => {
+        if (!reactivarTarget) return;
+        setAccionSubmitting(true);
+        setAccionError(null);
+        try {
+            const actualizada = await reactivarCaravana(reactivarTarget.id);
+            setCaravanas(prev => prev.map(c => c.id === actualizada.id ? actualizada : c));
+            setReactivarTarget(null);
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setAccionError(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al reactivar la caravana.');
+        } finally {
+            setAccionSubmitting(false);
+        }
+    };
+
+    const totalPorEstado = caravanas.reduce<Record<EstadoSensor, number>>((acc, c) => {
+        acc[c.estadoSensor] = (acc[c.estadoSensor] ?? 0) + 1;
+        return acc;
+    }, { DISPONIBLE: 0, VINCULADO: 0, INACTIVO: 0 });
 
     return (
         <div className="vigia-page-container">
@@ -130,23 +170,47 @@ export default function CaravanasPage() {
                     </Button>
                 </div>
 
-                <div className="d-flex flex-column flex-md-row justify-content-between mb-4 gap-3">
+                <div className="d-flex flex-column flex-md-row justify-content-between mb-2 gap-3">
                     <Form.Control
                         type="text"
-                        placeholder="Buscar por código, alias o Dev EUI..."
+                        placeholder="Buscar por código..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         style={{ maxWidth: '350px' }}
                     />
-                    <Form.Select
-                        value={establecimientoId ?? ''}
-                        onChange={(e) => setEstablecimientoId(Number(e.target.value))}
-                        style={{ maxWidth: '280px' }}
-                    >
-                        {establecimientos.map(e => (
-                            <option key={e.id} value={e.id}>{e.nombre}</option>
-                        ))}
-                    </Form.Select>
+                    <div className="d-flex gap-3">
+                        <Form.Select
+                            value={estadoFiltro}
+                            onChange={(e) => setEstadoFiltro(e.target.value as EstadoSensor | '')}
+                            style={{ maxWidth: '200px' }}
+                        >
+                            <option value="">Estado: Todos</option>
+                            <option value="DISPONIBLE">LIBRE</option>
+                            <option value="VINCULADO">ASIGNADA</option>
+                            <option value="INACTIVO">BAJA</option>
+                        </Form.Select>
+                        <Form.Select
+                            value={verTodosLosEstablecimientos ? 'ALL' : (establecimientoId ?? '')}
+                            onChange={(e) => {
+                                if (e.target.value === 'ALL') {
+                                    setVerTodosLosEstablecimientos(true);
+                                } else {
+                                    setVerTodosLosEstablecimientos(false);
+                                    setEstablecimientoId(Number(e.target.value));
+                                }
+                            }}
+                            style={{ maxWidth: '280px' }}
+                        >
+                            <option value="ALL">Todos los establecimientos</option>
+                            {establecimientos.map(e => (
+                                <option key={e.id} value={e.id}>{e.nombre}</option>
+                            ))}
+                        </Form.Select>
+                    </div>
+                </div>
+
+                <div className="mb-4 text-muted" style={{ fontSize: '0.85rem' }}>
+                    {caravanas.length} caravanas · {totalPorEstado.DISPONIBLE} LIBRE · {totalPorEstado.VINCULADO} ASIGNADA · {totalPorEstado.INACTIVO} BAJA
                 </div>
 
                 {error && <Alert variant="danger">{error}</Alert>}
@@ -162,32 +226,57 @@ export default function CaravanasPage() {
                                 <tr>
                                     <th>Código</th>
                                     <th>Alias</th>
-                                    <th className="col-mobile-hide">Dev EUI</th>
+                                    <th className="col-mobile-hide">Establecimiento</th>
                                     <th className="text-center">Estado</th>
-                                    <th className="col-mobile-hide">Fecha de alta</th>
+                                    <th>Batería</th>
+                                    <th className="col-mobile-hide">Última señal</th>
                                     <th>Animal vinculado</th>
+                                    <th className="text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredCaravanas.length === 0 ? (
+                                {caravanas.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-4 text-muted">
+                                        <td colSpan={8} className="text-center py-4 text-muted">
                                             No se encontraron caravanas para este establecimiento.
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredCaravanas.map(c => (
-                                        <tr key={c.id}>
-                                            <td className="fw-medium">{c.codigo || '—'}</td>
-                                            <td>{c.alias || '—'}</td>
-                                            <td className="col-mobile-hide">{c.devEui}</td>
-                                            <td className="text-center">
-                                                <span className={`estado-badge-caravana ${estadoBadgeClass(c.estadoSensor)}`}>{c.estadoSensor}</span>
-                                            </td>
-                                            <td className="col-mobile-hide">{formatFecha(c.fechaAlta)}</td>
-                                            <td>{c.animalAlias || '—'}</td>
-                                        </tr>
-                                    ))
+                                    caravanas.map(c => {
+                                        const bateria = formatBateria(c.bateria);
+                                        const senial = formatUltimaSenial(c.ultimaSenial);
+                                        const establecimientoNombre = c.establecimientoNombre ?? '—';
+                                        return (
+                                            <tr key={c.id}>
+                                                <td className="fw-medium" style={{ textDecoration: c.estadoSensor === 'INACTIVO' ? 'line-through' : 'none' }}>{c.codigo || '—'}</td>
+                                                <td>{c.alias || '—'}</td>
+                                                <td className="col-mobile-hide">{establecimientoNombre}</td>
+                                                <td className="text-center">
+                                                    <div className={`estado-badge-caravana ${estadoBadgeClass(c.estadoSensor)}`}>{ESTADO_SENSOR_LABEL[c.estadoSensor]}</div>
+                                                    <div style={{ fontSize: '0.7rem', color: '#9aa5b1' }}>{c.estadoSensor}</div>
+                                                </td>
+                                                <td style={{ color: bateria.amber ? '#8a6a00' : undefined }}>
+                                                    {bateria.amber && <span className="bateria-dot" />}
+                                                    {bateria.text}
+                                                </td>
+                                                <td className="col-mobile-hide" title={senial.title} style={{ color: senial.amber ? '#8a6a00' : undefined }}>
+                                                    {senial.text}
+                                                </td>
+                                                <td>{c.animalAlias || '—'}</td>
+                                                <td className="text-center">
+                                                    {c.estadoSensor === 'INACTIVO' ? (
+                                                        <Button size="sm" className="btn-accion-caravana btn-accion-reactivar" onClick={() => { setAccionError(null); setReactivarTarget(c); }}>
+                                                            Reactivar
+                                                        </Button>
+                                                    ) : (
+                                                        <Button size="sm" className="btn-accion-caravana btn-accion-baja" onClick={() => { setAccionError(null); setBajaTarget(c); }}>
+                                                            Dar de baja
+                                                        </Button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -231,6 +320,55 @@ export default function CaravanasPage() {
                 <Modal.Footer>
                     <Button type="submit" form="form-nueva-caravana" disabled={submitting} className="btn-guardar-animal">
                         {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Modal show={!!bajaTarget} onHide={() => setBajaTarget(null)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Dar de baja la caravana</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {accionError && <Alert variant="danger">{accionError}</Alert>}
+                    <p className="text-center mb-2" style={{ color: '#9fb6cf', fontSize: '0.85rem' }}>
+                        {bajaTarget?.codigo}{bajaTarget?.animalAlias ? ` · vinculada a ${bajaTarget.animalAlias}` : ''}
+                    </p>
+                    {bajaTarget?.estadoSensor === 'VINCULADO' && (
+                        <div className="modal-nota-baja mb-3">
+                            Se va a <strong>desvincular automáticamente de {bajaTarget.animalAlias}</strong>. El animal queda sin caravana y deja de generar alertas hasta que le vinculés otra.
+                        </div>
+                    )}
+                    <p className="text-center mb-0" style={{ color: '#9fb6cf', fontSize: '0.75rem' }}>
+                        No hay campo de motivo: el backend lo acepta pero no lo persiste.
+                    </p>
+                </Modal.Body>
+                <Modal.Footer className="gap-3">
+                    <Button className="btn-guardar-animal" style={{ flex: 1 }} onClick={() => setBajaTarget(null)} disabled={accionSubmitting}>
+                        Cancelar
+                    </Button>
+                    <Button className="btn-confirmar-desvincular" style={{ flex: 1 }} onClick={handleConfirmBaja} disabled={accionSubmitting}>
+                        {accionSubmitting ? <Spinner as="span" animation="border" size="sm" /> : 'Dar de baja'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Modal show={!!reactivarTarget} onHide={() => setReactivarTarget(null)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton>
+                    <Modal.Title>Reactivar la caravana</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {accionError && <Alert variant="danger">{accionError}</Alert>}
+                    <p className="text-center mb-2" style={{ color: '#9fb6cf', fontSize: '0.85rem' }}>{reactivarTarget?.codigo}</p>
+                    <div className="modal-nota-baja mb-0">
+                        La caravana vuelve a <strong>LIBRE</strong> y queda lista para vincular. <strong>No</strong> se restaura el animal que tenía antes de la baja: eso se hace de nuevo desde Animales.
+                    </div>
+                </Modal.Body>
+                <Modal.Footer className="gap-3">
+                    <Button className="btn-guardar-animal" style={{ flex: 1 }} onClick={() => setReactivarTarget(null)} disabled={accionSubmitting}>
+                        Cancelar
+                    </Button>
+                    <Button className="btn-confirmar-reactivar" style={{ flex: 1 }} onClick={handleConfirmReactivar} disabled={accionSubmitting}>
+                        {accionSubmitting ? <Spinner as="span" animation="border" size="sm" /> : 'Reactivar'}
                     </Button>
                 </Modal.Footer>
             </Modal>

@@ -383,7 +383,8 @@ public class AnimalServiceImpl implements AnimalService {
                                         .caravanaDevEui(c.getDevEui())
                                         .caravanaAlias(c.getAlias())
                                         .caravanaEstado(c.getEstadoSensor())
-                                        .caravanaUltimaSenial(c.getUltimaSenial());
+                                        .caravanaUltimaSenial(c.getUltimaSenial())
+                                        .caravanaBateria(c.getBateria());
                 }
 
                 calcularCalibracion(animal, builder);
