@@ -41,6 +41,18 @@
 
 /* Table migrada a index.css (.vigia-table) */
 
+/* Permite scroll horizontal cuando la tabla excede el ancho de pantalla */
+.animales-table-wrapper {
+    overflow-x: auto;
+}
+
+/* Columna Caravana con ancho fijo: el botón de acción queda siempre en la misma posición */
+.animales-table-wrapper .vigia-table th:nth-child(3),
+.animales-table-wrapper .vigia-table td:nth-child(3) {
+    width: 220px;
+    max-width: 220px;
+}
+
 /* Estado badge */
 .estado-badge {
     font-weight: 700;
@@ -157,6 +169,65 @@
 
 .btn-guardar-animal:hover {
     background-color: #7ab332 !important;
+}
+
+/* Botón rojo de confirmación destructiva, mismo estilo que btn-guardar-animal */
+.btn-confirmar-desvincular {
+    background-color: #dc3545 !important;
+    border: none !important;
+    border-radius: 10px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    padding: 12px !important;
+    transition: background 0.2s !important;
+}
+
+.btn-confirmar-desvincular:hover {
+    background-color: #bb2d3b !important;
+}
+
+.bateria-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #FFC700;
+    margin-right: 4px;
+}
+
+/* ── Undo toast (snackbar estilo Gmail) ── */
+.undo-toast-container {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 2000;
+}
+
+.undo-toast {
+    background-color: #1E3A5F !important;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    min-width: 320px;
+}
+
+.undo-toast .toast-body {
+    color: white;
+    font-size: 0.92rem;
+}
+
+.undo-toast-btn {
+    color: #8CC63F !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    white-space: nowrap;
+}
+
+.undo-toast-btn:hover {
+    color: #a6dc5f !important;
 }
 
 .btn-vigia-success {

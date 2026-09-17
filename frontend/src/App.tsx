@@ -10,6 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import AcceptInvitationPage from './pages/AcceptInvitationPage';
 import OAuth2CallbackPage from './pages/OAuth2CallbackPage';
 import UsuariosAdminPage from './pages/UsuariosAdminPage';
+import CaravanasPage from './pages/CaravanasPage';
 import { useAuthStore } from './store/authStore';
 import EmpleadosPage from './pages/EmpleadosPage';
 import AnimalesPage from './pages/AnimalesPage';
@@ -86,6 +87,14 @@ function App() {
           element={
             <ProtectedRoute roles={['ADMINISTRADOR']}>
               <UsuariosAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/caravanas"
+          element={
+            <ProtectedRoute roles={['ADMINISTRADOR']}>
+              <CaravanasPage />
             </ProtectedRoute>
           }
         />

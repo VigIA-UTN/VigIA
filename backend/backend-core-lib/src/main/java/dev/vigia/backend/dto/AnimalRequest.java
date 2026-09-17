@@ -22,4 +22,7 @@ public class AnimalRequest {
 
     @Positive(message = "El peso inicial debe ser un valor positivo")
     private Double pesoInicial;
+
+    /** Id de la caravana LoRaWAN a vincular (opcional). */
+    private Long caravanaId;
 }

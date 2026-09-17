@@ -24,6 +24,7 @@ import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AnimalResponse;
+import dev.vigia.backend.dto.VincularCaravanaRequest;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
@@ -658,6 +659,45 @@ public class AnimalController {
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/vincular-caravana")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('CAMPERO')")
+    public ResponseEntity<?> vincularCaravana(
+            @PathVariable("id") Long animalId,
+            @Valid @RequestBody VincularCaravanaRequest request,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            AnimalResponse response = animalService.vincularCaravana(animalId, request.getCaravanaId(), email);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Animal no encontrado.".equals(e.getMessage()) || "Caravana no encontrada.".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{id}/desvincular-caravana")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('CAMPERO')")
+    public ResponseEntity<?> desvincularCaravana(
+            @PathVariable("id") Long animalId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            AnimalResponse response = animalService.desvincularCaravana(animalId, email);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Animal no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

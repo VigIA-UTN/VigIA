@@ -67,4 +67,8 @@ public interface AnimalService {
         List<RegistroPesoResponse> listarHistorialPesos(Long animalId, String email);
 
         AnimalIndicadoresSaludResponse getIndicadoresSalud(Long animalId, String emailProductor);
+
+        AnimalResponse vincularCaravana(Long animalId, Long caravanaId, String emailUsuario);
+
+        AnimalResponse desvincularCaravana(Long animalId, String emailUsuario);
 }

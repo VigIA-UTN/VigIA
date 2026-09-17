@@ -188,6 +188,10 @@ public class IngestaController {
 
         if (frameCounter != null) {
             caravana.setUltimoFrameCounter(frameCounter);
+            caravana.setUltimaSenial(telemetria.getFechaHora());
+            if (telemetria.getBateria() != null) {
+                caravana.setBateria(telemetria.getBateria());
+            }
             caravanaRepository.save(caravana);
         }
 

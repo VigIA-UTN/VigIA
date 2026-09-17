@@ -1,0 +1,188 @@
+/* ── Modal "Nueva Caravana" — mismo estilo navy que modal-nuevo-animal ── */
+.modal-nuevo-animal .modal-content {
+    background-color: #1E3A5F;
+    border: 2px solid #4DD0E1;
+    border-radius: 16px;
+    color: white;
+}
+
+.modal-nuevo-animal .modal-title {
+    color: white;
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    width: 100%;
+}
+
+.modal-nuevo-animal .modal-header {
+    border-bottom: none;
+    padding-bottom: 0;
+    justify-content: center;
+}
+
+.modal-nuevo-animal .btn-close {
+    filter: invert(1);
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+}
+
+.modal-nuevo-animal .modal-body {
+    padding: 16px 28px 8px;
+}
+
+.modal-nuevo-animal .modal-footer {
+    border-top: none;
+    padding: 8px 28px 24px;
+    justify-content: center;
+}
+
+.modal-nuevo-animal .form-label {
+    color: #cde;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.modal-nuevo-animal .form-control,
+.modal-nuevo-animal .form-select {
+    background-color: white;
+    color: #1E3A5F;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+}
+
+.modal-nuevo-animal .form-control:focus,
+.modal-nuevo-animal .form-select:focus {
+    border: 2px solid #4DD0E1;
+    box-shadow: none;
+    outline: none;
+}
+
+.modal-nuevo-animal .form-control::placeholder {
+    color: #aaa;
+}
+
+.btn-guardar-animal {
+    background-color: #8CC63F !important;
+    border: none !important;
+    border-radius: 10px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    width: 100%;
+    padding: 12px !important;
+    transition: background 0.2s !important;
+}
+
+.btn-guardar-animal:hover {
+    background-color: #7ab332 !important;
+}
+
+.btn-vigia-success {
+    background-color: #8CC63F !important;
+    border-color: #8CC63F !important;
+    color: white !important;
+}
+
+.btn-vigia-success:hover {
+    background-color: #7ab332 !important;
+    border-color: #7ab332 !important;
+}
+
+/* Estado de la caravana (estadoSensor crudo del backend) */
+.estado-badge-caravana {
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+    display: inline-block;
+}
+
+.estado-caravana-disponible { color: #2f7d3b; }
+.estado-caravana-vinculado  { color: #1E3A5F; }
+.estado-caravana-inactivo   { color: #c94b4b; }
+
+.bateria-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #FFC700;
+    margin-right: 5px;
+}
+
+.btn-accion-caravana {
+    border-radius: 12px !important;
+    font-size: 0.75rem !important;
+    padding: 5px 10px !important;
+    font-weight: 600 !important;
+}
+
+.btn-accion-baja {
+    background: transparent !important;
+    border: 1.2px solid #D50000 !important;
+    color: #D50000 !important;
+}
+
+.btn-accion-baja:hover {
+    background: rgba(213, 0, 0, 0.08) !important;
+}
+
+.btn-accion-reactivar {
+    background: transparent !important;
+    border: 1.2px solid #00BA4A !important;
+    color: #2f7d3b !important;
+}
+
+.btn-accion-reactivar:hover {
+    background: rgba(0, 186, 74, 0.08) !important;
+}
+
+/* Botones de confirmación de los modales de baja/reactivar, mismo patrón que btn-confirmar-desvincular */
+.btn-confirmar-desvincular {
+    background-color: #D50000 !important;
+    border: none !important;
+    border-radius: 10px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    padding: 12px !important;
+    transition: background 0.2s !important;
+}
+
+.btn-confirmar-desvincular:hover {
+    background-color: #b30000 !important;
+}
+
+.btn-confirmar-reactivar {
+    background-color: #94C11E !important;
+    border: none !important;
+    border-radius: 10px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    padding: 12px !important;
+    transition: background 0.2s !important;
+}
+
+.btn-confirmar-reactivar:hover {
+    background-color: #7ab332 !important;
+}
+
+.modal-nota-baja {
+    background: rgba(19, 212, 251, .12);
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px rgba(19, 212, 251, .4);
+    padding: 12px;
+    font-size: 0.8rem;
+    color: #dbe8f2;
+    line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+    .col-mobile-hide {
+        display: none !important;
+    }
+}

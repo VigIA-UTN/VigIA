@@ -1,8 +1,10 @@
 package dev.vigia.backend.controller;
 
+import dev.vigia.backend.dto.CaravanaBajaRequest;
 import dev.vigia.backend.dto.CaravanaRequest;
 import dev.vigia.backend.dto.CaravanaResponse;
 import dev.vigia.backend.exception.DevEuiDuplicadoException;
+import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.service.CaravanaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -65,15 +69,71 @@ public class CaravanaController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'PRODUCTOR', 'CAMPERO')")
     public ResponseEntity<?> listarCaravanas(
-            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            @RequestParam(name = "establecimientoId", required = false) Long establecimientoId,
+            @RequestParam(name = "estado", required = false) EstadoSensor estado,
+            @RequestParam(name = "codigo", required = false) String codigo,
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            return ResponseEntity.ok(caravanaService.listarCaravanas(email, establecimientoId));
+            return ResponseEntity.ok(caravanaService.listarCaravanas(email, establecimientoId, estado, codigo));
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             if ("Establecimiento no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/disponibles")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarCaravanasDisponibles(
+            @RequestParam("establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            return ResponseEntity.ok(caravanaService.listarCaravanasDisponibles(establecimientoId, email));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Establecimiento no encontrado.".equals(e.getMessage()) || "Usuario no encontrado".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PatchMapping("/{id}/baja")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<?> darDeBajaCaravana(
+            @PathVariable Long id,
+            @RequestBody(required = false) CaravanaBajaRequest request,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            String motivo = request != null ? request.getMotivo() : null;
+            return ResponseEntity.ok(caravanaService.darDeBajaCaravana(id, motivo, email));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Caravana no encontrada.".equals(e.getMessage()) || "Usuario no encontrado".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PatchMapping("/{id}/reactivar")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<?> reactivarCaravana(@PathVariable Long id, Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            return ResponseEntity.ok(caravanaService.reactivarCaravana(id, email));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Caravana no encontrada.".equals(e.getMessage()) || "Usuario no encontrado".equals(e.getMessage())) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
             }
             return ResponseEntity.badRequest().body(e.getMessage());

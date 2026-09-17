@@ -52,4 +52,6 @@ public class Caravana {
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_sensor")
     private EstadoSensor estadoSensor;
+
+    private Double bateria;
 }

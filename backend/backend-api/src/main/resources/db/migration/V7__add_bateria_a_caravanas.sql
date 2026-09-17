@@ -1,0 +1,2 @@
+ALTER TABLE caravanas
+    ADD COLUMN bateria DOUBLE PRECISION;

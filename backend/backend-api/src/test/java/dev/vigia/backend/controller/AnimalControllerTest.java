@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.AuthRequest;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
+import dev.vigia.backend.dto.VincularCaravanaRequest;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
+import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.EstadoSalud;
@@ -1978,5 +1980,134 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + otroToken))
                                 .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/vincular-caravana - Vinculación exitosa por un productor")
+        void vincularCaravana_exitoso() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+                Caravana caravana = new Caravana();
+                caravana.setDevEui("TEST-DEV-EUI-01");
+                caravana.setAlias("Sensor Collar 01");
+                caravana.setEstablecimiento(est);
+                caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                caravana.setActivo(false);
+                caravana = caravanaRepository.save(caravana);
+
+                Long animalId = crearAnimal("Vaca Para Sensor", establecimientoId, rodeoLoteId);
+
+                VincularCaravanaRequest request = new VincularCaravanaRequest(caravana.getId());
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/vincular-caravana")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.caravanaId").value(caravana.getId()))
+                                .andExpect(jsonPath("$.caravanaDevEui").value("TEST-DEV-EUI-01"))
+                                .andExpect(jsonPath("$.caravanaAlias").value("Sensor Collar 01"))
+                                .andExpect(jsonPath("$.caravanaEstado").value("VINCULADO"));
+
+                Caravana enDb = caravanaRepository.findById(caravana.getId()).orElseThrow();
+                assertThat(enDb.getEstadoSensor()).isEqualTo(EstadoSensor.VINCULADO);
+                assertThat(enDb.isActivo()).isTrue();
+                assertThat(enDb.getFechaAsignacion()).isNotNull();
+
+                Animal animalEnDb = animalRepository.findById(animalId).orElseThrow();
+                assertThat(animalEnDb.getCaravana()).isNotNull();
+                assertThat(animalEnDb.getCaravana().getId()).isEqualTo(caravana.getId());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/vincular-caravana - Falla con 400 si la caravana ya está vinculada a otro animal")
+        void vincularCaravana_yaVinculada_retornaBadRequest() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+                Caravana caravana = new Caravana();
+                caravana.setDevEui("TEST-DEV-EUI-OCUPADO");
+                caravana.setEstablecimiento(est);
+                caravana.setEstadoSensor(EstadoSensor.VINCULADO);
+                caravana.setActivo(true);
+                caravana = caravanaRepository.save(caravana);
+
+                Long animal1Id = crearAnimal("Vaca Dueña", establecimientoId, rodeoLoteId);
+                Animal animal1 = animalRepository.findById(animal1Id).orElseThrow();
+                animal1.setCaravana(caravana);
+                animalRepository.save(animal1);
+
+                Long animal2Id = crearAnimal("Vaca Intruso", establecimientoId, rodeoLoteId);
+
+                VincularCaravanaRequest request = new VincularCaravanaRequest(caravana.getId());
+
+                mockMvc.perform(post("/api/v1/animales/" + animal2Id + "/vincular-caravana")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/vincular-caravana - Falla con 403 para rol VETERINARIO")
+        void vincularCaravana_veterinario_retornaForbidden() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+                Usuario vet = new Usuario();
+                vet.setEmail("vet.sensores@vigia.dev");
+                vet.setPasswordHash(passwordEncoder.encode("vet123"));
+                vet.setNombre("Veterinario Sensores");
+                vet.setRol(Rol.VETERINARIO);
+                vet.setActivo(true);
+                usuarioRepository.save(vet);
+                est.getEmpleados().add(new Empleado(est, vet));
+                establecimientoRepository.save(est);
+
+                String vetToken = getTokenFor("vet.sensores@vigia.dev", "vet123");
+
+                Caravana caravana = new Caravana();
+                caravana.setDevEui("TEST-DEV-EUI-VET");
+                caravana.setEstablecimiento(est);
+                caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                caravana = caravanaRepository.save(caravana);
+
+                Long animalId = crearAnimal("Vaca Vet Test", establecimientoId, rodeoLoteId);
+
+                VincularCaravanaRequest request = new VincularCaravanaRequest(caravana.getId());
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/vincular-caravana")
+                                .header("Authorization", "Bearer " + vetToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("DELETE /api/v1/animales/{id}/desvincular-caravana - Desvinculación exitosa por productor")
+        void desvincularCaravana_exitoso() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+                Caravana caravana = new Caravana();
+                caravana.setDevEui("TEST-DEV-EUI-DESV");
+                caravana.setEstablecimiento(est);
+                caravana.setEstadoSensor(EstadoSensor.VINCULADO);
+                caravana.setActivo(true);
+                caravana = caravanaRepository.save(caravana);
+
+                Long animalId = crearAnimal("Vaca Con Sensor Desv", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                animal.setCaravana(caravana);
+                animalRepository.save(animal);
+
+                mockMvc.perform(delete("/api/v1/animales/" + animalId + "/desvincular-caravana")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.caravanaId").doesNotExist());
+
+                Caravana enDb = caravanaRepository.findById(caravana.getId()).orElseThrow();
+                assertThat(enDb.getEstadoSensor()).isEqualTo(EstadoSensor.DISPONIBLE);
+                assertThat(enDb.isActivo()).isFalse();
+
+                Animal animalEnDb = animalRepository.findById(animalId).orElseThrow();
+                assertThat(animalEnDb.getCaravana()).isNull();
         }
 }

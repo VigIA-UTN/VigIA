@@ -315,4 +315,41 @@ class IngestaControllerTest {
         assertThat(response.getBody()).isEqualTo("OK");
         assertThat(previa.getBateria()).isEqualTo(90.0);
     }
+
+    @Test
+    @DisplayName("Heartbeat con batería, escribe bateria y ultimaSenial en la Caravana")
+    void heartbeatConBateria_actualizaCaravana() {
+        when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
+        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
+
+        ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, "75%", 0));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+
+        ArgumentCaptor<Caravana> caravanaCaptor = ArgumentCaptor.forClass(Caravana.class);
+        verify(caravanaRepository, times(1)).save(caravanaCaptor.capture());
+        assertThat(caravanaCaptor.getValue().getBateria()).isEqualTo(75.0);
+        assertThat(caravanaCaptor.getValue().getUltimaSenial()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Heartbeat sin batería en el payload pero con valor previo en Telemetria, la Caravana conserva el último valor conocido")
+    void heartbeatSinBateriaEnPayload_caravanaConservaUltimoValor() {
+        Telemetria previa = new Telemetria();
+        previa.setCaravana(caravana);
+        previa.setBateria(90.0);
+
+        when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
+        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.of(previa));
+
+        ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, null, 1));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+
+        ArgumentCaptor<Caravana> caravanaCaptor = ArgumentCaptor.forClass(Caravana.class);
+        verify(caravanaRepository, times(1)).save(caravanaCaptor.capture());
+        assertThat(caravanaCaptor.getValue().getBateria()).isEqualTo(90.0);
+    }
 }

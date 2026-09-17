@@ -10,6 +10,7 @@ import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -41,6 +42,8 @@ class CaravanaServiceImplTest {
     private UsuarioRepository usuarioRepository;
     @Mock
     private EstablecimientoRepository establecimientoRepository;
+    @Mock
+    private AnimalRepository animalRepository;
 
     @InjectMocks
     private CaravanaServiceImpl caravanaService;
@@ -249,5 +252,240 @@ class CaravanaServiceImplTest {
                 .hasMessageContaining("Establecimiento no encontrado");
 
         verify(caravanaRepository, never()).findAllByEstablecimientoId(any());
+    }
+
+    @Test
+    @DisplayName("Debe listar únicamente las caravanas disponibles para un usuario autorizado")
+    void listarCaravanasDisponiblesExitoso() {
+        Caravana libre = new Caravana();
+        libre.setId(1L);
+        libre.setDevEui("DISPO-1");
+        libre.setAlias("Caravana Libre");
+        libre.setEstadoSensor(EstadoSensor.DISPONIBLE);
+        libre.setEstablecimiento(establecimiento);
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+        establecimiento.setEmpleados(List.of(new Empleado(establecimiento, productor)));
+        when(caravanaRepository.findAllByEstablecimientoIdAndEstadoSensor(10L, EstadoSensor.DISPONIBLE))
+                .thenReturn(List.of(libre));
+
+        List<CaravanaResponse> result = caravanaService.listarCaravanasDisponibles(10L, "productor@vigia.dev");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getEstadoSensor()).isEqualTo(EstadoSensor.DISPONIBLE);
+        assertThat(result.get(0).getDevEui()).isEqualTo("DISPO-1");
+    }
+
+    @Test
+    @DisplayName("Debe denegar listar caravanas disponibles a un veterinario")
+    void listarCaravanasDisponiblesVeterinarioDenegado() {
+        Usuario vet = new Usuario();
+        vet.setEmail("vet@vigia.dev");
+        vet.setRol(Rol.VETERINARIO);
+
+        when(usuarioRepository.findByEmail("vet@vigia.dev")).thenReturn(Optional.of(vet));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+
+        assertThatThrownBy(() -> caravanaService.listarCaravanasDisponibles(10L, "vet@vigia.dev"))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("VETERINARIO no tiene acceso");
+
+        verify(caravanaRepository, never()).findAllByEstablecimientoIdAndEstadoSensor(any(), any());
+    }
+
+    @Test
+    @DisplayName("darDeBajaCaravana debe marcar INACTIVO/no-activo una caravana DISPONIBLE")
+    void darDeBajaCaravanaDisponibleExitoso() {
+        Caravana caravana = new Caravana();
+        caravana.setId(1L);
+        caravana.setEstablecimiento(establecimiento);
+        caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
+
+        Usuario admin = new Usuario();
+        admin.setEmail("admin@vigia.dev");
+        admin.setRol(Rol.ADMINISTRADOR);
+
+        when(usuarioRepository.findByEmail("admin@vigia.dev")).thenReturn(Optional.of(admin));
+        when(caravanaRepository.findById(1L)).thenReturn(Optional.of(caravana));
+        when(caravanaRepository.save(any(Caravana.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CaravanaResponse response = caravanaService.darDeBajaCaravana(1L, "Collar dañado", "admin@vigia.dev");
+
+        assertThat(response.getEstadoSensor()).isEqualTo(EstadoSensor.INACTIVO);
+        assertThat(response.getActivo()).isFalse();
+        verify(animalRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("darDeBajaCaravana debe desvincular el animal cuando la caravana está VINCULADO")
+    void darDeBajaCaravanaVinculadaDesvinculaAnimal() {
+        Animal animal = new Animal();
+        animal.setId(5L);
+
+        Caravana caravana = new Caravana();
+        caravana.setId(2L);
+        caravana.setEstablecimiento(establecimiento);
+        caravana.setEstadoSensor(EstadoSensor.VINCULADO);
+        caravana.setAnimal(animal);
+
+        Usuario admin = new Usuario();
+        admin.setEmail("admin@vigia.dev");
+        admin.setRol(Rol.ADMINISTRADOR);
+
+        when(usuarioRepository.findByEmail("admin@vigia.dev")).thenReturn(Optional.of(admin));
+        when(caravanaRepository.findById(2L)).thenReturn(Optional.of(caravana));
+        when(caravanaRepository.save(any(Caravana.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CaravanaResponse response = caravanaService.darDeBajaCaravana(2L, null, "admin@vigia.dev");
+
+        assertThat(animal.getCaravana()).isNull();
+        assertThat(response.getAnimalId()).isNull();
+        verify(animalRepository, times(1)).save(animal);
+    }
+
+    @Test
+    @DisplayName("darDeBajaCaravana debe rechazar una caravana ya INACTIVO con 400")
+    void darDeBajaCaravanaYaInactivaRechazada() {
+        Caravana caravana = new Caravana();
+        caravana.setId(3L);
+        caravana.setEstablecimiento(establecimiento);
+        caravana.setEstadoSensor(EstadoSensor.INACTIVO);
+
+        Usuario admin = new Usuario();
+        admin.setEmail("admin@vigia.dev");
+        admin.setRol(Rol.ADMINISTRADOR);
+
+        when(usuarioRepository.findByEmail("admin@vigia.dev")).thenReturn(Optional.of(admin));
+        when(caravanaRepository.findById(3L)).thenReturn(Optional.of(caravana));
+
+        assertThatThrownBy(() -> caravanaService.darDeBajaCaravana(3L, null, "admin@vigia.dev"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(caravanaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("darDeBajaCaravana debe rechazar el acceso de un usuario ajeno al establecimiento")
+    void darDeBajaCaravanaUsuarioSinAcceso() {
+        establecimiento.setEmpleados(List.of());
+
+        Caravana caravana = new Caravana();
+        caravana.setId(4L);
+        caravana.setEstablecimiento(establecimiento);
+        caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(caravanaRepository.findById(4L)).thenReturn(Optional.of(caravana));
+
+        assertThatThrownBy(() -> caravanaService.darDeBajaCaravana(4L, null, "productor@vigia.dev"))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(caravanaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("reactivarCaravana debe marcar DISPONIBLE una caravana INACTIVO")
+    void reactivarCaravanaExitoso() {
+        Caravana caravana = new Caravana();
+        caravana.setId(6L);
+        caravana.setEstablecimiento(establecimiento);
+        caravana.setEstadoSensor(EstadoSensor.INACTIVO);
+
+        Usuario admin = new Usuario();
+        admin.setEmail("admin@vigia.dev");
+        admin.setRol(Rol.ADMINISTRADOR);
+
+        when(usuarioRepository.findByEmail("admin@vigia.dev")).thenReturn(Optional.of(admin));
+        when(caravanaRepository.findById(6L)).thenReturn(Optional.of(caravana));
+        when(caravanaRepository.save(any(Caravana.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CaravanaResponse response = caravanaService.reactivarCaravana(6L, "admin@vigia.dev");
+
+        assertThat(response.getEstadoSensor()).isEqualTo(EstadoSensor.DISPONIBLE);
+        assertThat(response.getActivo()).isFalse();
+    }
+
+    @Test
+    @DisplayName("listarCaravanas debe filtrar por estado cuando se indica")
+    void listarCaravanasFiltraPorEstado() {
+        establecimiento.setEmpleados(List.of(new Empleado(establecimiento, productor)));
+
+        Caravana disponible = new Caravana();
+        disponible.setId(1L);
+        disponible.setEstablecimiento(establecimiento);
+        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+        when(caravanaRepository.findAllByEstablecimientoIdAndEstadoSensor(10L, EstadoSensor.DISPONIBLE))
+                .thenReturn(List.of(disponible));
+
+        List<CaravanaResponse> result = caravanaService.listarCaravanas("productor@vigia.dev", 10L,
+                EstadoSensor.DISPONIBLE, null);
+
+        assertThat(result).hasSize(1);
+        verify(caravanaRepository, never()).findAllByEstablecimientoId(any());
+    }
+
+    @Test
+    @DisplayName("listarCaravanas debe filtrar por codigo cuando se indica")
+    void listarCaravanasFiltraPorCodigo() {
+        establecimiento.setEmpleados(List.of(new Empleado(establecimiento, productor)));
+
+        Caravana conCodigo = new Caravana();
+        conCodigo.setId(1L);
+        conCodigo.setCodigo("CAR-001");
+        conCodigo.setEstablecimiento(establecimiento);
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+        when(caravanaRepository.findAllByEstablecimientoIdAndCodigoContainingIgnoreCase(10L, "CAR"))
+                .thenReturn(List.of(conCodigo));
+
+        List<CaravanaResponse> result = caravanaService.listarCaravanas("productor@vigia.dev", 10L, null, "CAR");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getCodigo()).isEqualTo("CAR-001");
+    }
+
+    @Test
+    @DisplayName("listarCaravanas debe filtrar por estado y codigo combinados")
+    void listarCaravanasFiltraPorEstadoYCodigo() {
+        establecimiento.setEmpleados(List.of(new Empleado(establecimiento, productor)));
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+        when(caravanaRepository.findAllByEstablecimientoIdAndEstadoSensorAndCodigoContainingIgnoreCase(10L,
+                EstadoSensor.DISPONIBLE, "CAR")).thenReturn(List.of());
+
+        List<CaravanaResponse> result = caravanaService.listarCaravanas("productor@vigia.dev", 10L,
+                EstadoSensor.DISPONIBLE, "CAR");
+
+        assertThat(result).isEmpty();
+        verify(caravanaRepository, times(1))
+                .findAllByEstablecimientoIdAndEstadoSensorAndCodigoContainingIgnoreCase(10L, EstadoSensor.DISPONIBLE,
+                        "CAR");
+    }
+
+    @Test
+    @DisplayName("reactivarCaravana debe rechazar una caravana que no está INACTIVO con 400")
+    void reactivarCaravanaNoInactivaRechazada() {
+        Caravana caravana = new Caravana();
+        caravana.setId(7L);
+        caravana.setEstablecimiento(establecimiento);
+        caravana.setEstadoSensor(EstadoSensor.VINCULADO);
+
+        Usuario admin = new Usuario();
+        admin.setEmail("admin@vigia.dev");
+        admin.setRol(Rol.ADMINISTRADOR);
+
+        when(usuarioRepository.findByEmail("admin@vigia.dev")).thenReturn(Optional.of(admin));
+        when(caravanaRepository.findById(7L)).thenReturn(Optional.of(caravana));
+
+        assertThatThrownBy(() -> caravanaService.reactivarCaravana(7L, "admin@vigia.dev"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(caravanaRepository, never()).save(any());
     }
 }
