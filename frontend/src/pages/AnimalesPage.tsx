@@ -12,6 +12,7 @@ import './AnimalesPage.css';
 import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { useAuthStore } from '../store/authStore';
 import { getAlertaParaAnimal } from '../api/alertaApi';
 import type { AlertaResponse } from '../api/alertaApi';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
@@ -34,6 +35,8 @@ function estadoClass(e: string) {
 
 export default function AnimalesPage() {
     const navigate = useNavigate();
+    const rol = useAuthStore((s) => s.rol);
+    const puedeGestionarCaravanas = rol !== 'VETERINARIO';
     const selectedId = useEstablecimientoStore((s) => s.selectedId);
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
     const [loading, setLoading] = useState(true);
@@ -76,6 +79,7 @@ export default function AnimalesPage() {
     const [formErrorCaravana, setFormErrorCaravana] = useState<string | null>(null);
     const [desvinculandoId, setDesvinculandoId] = useState<number | null>(null);
     const [desvincularModalAnimal, setDesvincularModalAnimal] = useState<AnimalResponse | null>(null);
+    const [formErrorDesvincular, setFormErrorDesvincular] = useState<string | null>(null);
     const [undoToast, setUndoToast] = useState<{ animalId: number; caravanaId: number; alias: string } | null>(null);
 
     // Alert detail overlay
@@ -177,6 +181,7 @@ export default function AnimalesPage() {
     };
 
     const openDesvincularModal = (animal: AnimalResponse) => {
+        setFormErrorDesvincular(null);
         setDesvincularModalAnimal(animal);
     };
 
@@ -185,14 +190,15 @@ export default function AnimalesPage() {
         if (!animal || !animal.caravanaId) return;
         const caravanaId = animal.caravanaId;
         setDesvinculandoId(animal.id);
+        setFormErrorDesvincular(null);
         try {
             const actualizado = await desvincularCaravana(animal.id);
             setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
             setDesvincularModalAnimal(null);
             setUndoToast({ animalId: animal.id, caravanaId, alias: animal.alias || animal.idCaravanaOficial || 'el animal' });
         } catch (err) {
-            const e = err as { response?: { data?: { message?: string } } };
-            alert(e.response?.data?.message || 'Error al desvincular la caravana.');
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setFormErrorDesvincular(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al desvincular la caravana.');
         } finally {
             setDesvinculandoId(null);
         }
@@ -551,23 +557,27 @@ export default function AnimalesPage() {
                                                                     );
                                                                 })()}
                                                             </div>
-                                                            <Button
-                                                                variant="outline-secondary"
-                                                                size="sm"
-                                                                className="flex-shrink-0"
-                                                                disabled={desvinculandoId === a.id}
-                                                                onClick={() => openDesvincularModal(a)}
-                                                                title="Desvincular"
-                                                            >
-                                                                {desvinculandoId === a.id ? <Spinner as="span" animation="border" size="sm" /> : <i className="bi bi-x-lg"></i>}
-                                                            </Button>
+                                                            {puedeGestionarCaravanas && (
+                                                                <Button
+                                                                    variant="outline-secondary"
+                                                                    size="sm"
+                                                                    className="flex-shrink-0"
+                                                                    disabled={desvinculandoId === a.id}
+                                                                    onClick={() => openDesvincularModal(a)}
+                                                                    title="Desvincular"
+                                                                >
+                                                                    {desvinculandoId === a.id ? <Spinner as="span" animation="border" size="sm" /> : <i className="bi bi-x-lg"></i>}
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between gap-2">
                                                             <span className="text-muted">Sin vincular</span>
-                                                            <Button variant="outline-primary" size="sm" className="flex-shrink-0" onClick={() => openVincularModal(a)}>
-                                                                Vincular
-                                                            </Button>
+                                                            {puedeGestionarCaravanas && (
+                                                                <Button variant="outline-primary" size="sm" className="flex-shrink-0" onClick={() => openVincularModal(a)}>
+                                                                    Vincular
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </td>
@@ -889,11 +899,12 @@ export default function AnimalesPage() {
                 </Modal.Footer>
             </Modal>
 
-            <Modal show={!!desvincularModalAnimal} onHide={() => setDesvincularModalAnimal(null)} centered dialogClassName="modal-nuevo-animal">
+            <Modal show={!!desvincularModalAnimal} onHide={() => { setDesvincularModalAnimal(null); setFormErrorDesvincular(null); }} centered dialogClassName="modal-nuevo-animal">
                 <Modal.Header closeButton>
                     <Modal.Title>Desvincular caravana</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
+                    {formErrorDesvincular && <Alert variant="danger">{formErrorDesvincular}</Alert>}
                     <p className="text-center mb-0" style={{ color: '#cde' }}>
                         ¿Estás seguro de que querés desvincular la caravana de{' '}
                         <strong style={{ color: 'white' }}>
