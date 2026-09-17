@@ -1419,7 +1419,13 @@ public class AnimalServiceImpl implements AnimalService {
                         throw new IllegalArgumentException("La caravana ya se encuentra vinculada a otro animal ("
                                         + (otroAnimal.getAlias() != null ? otroAnimal.getAlias()
                                                         : otroAnimal.getIdCaravanaOficial())
-                                        + ").");
+                                        + "). Debe desvincularla antes de asignarla a otro animal.");
+                }
+
+                if (nuevaCaravana.getEstadoSensor() == EstadoSensor.VINCULADO
+                                && (animalVinculado.isEmpty() || !animalVinculado.get().getId().equals(animal.getId()))) {
+                        throw new IllegalArgumentException(
+                                        "La caravana ya se encuentra vinculada. Debe desvincularla antes de asignarla nuevamente.");
                 }
 
                 if (animal.getCaravana() != null && !animal.getCaravana().getId().equals(nuevaCaravana.getId())) {
