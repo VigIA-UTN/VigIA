@@ -333,14 +333,6 @@ export default function CaravanasPage() {
                     <p className="text-center mb-2" style={{ color: '#9fb6cf', fontSize: '0.85rem' }}>
                         {bajaTarget?.codigo}{bajaTarget?.animalAlias ? ` · vinculada a ${bajaTarget.animalAlias}` : ''}
                     </p>
-                    {bajaTarget?.estadoSensor === 'VINCULADO' && (
-                        <div className="modal-nota-baja mb-3">
-                            Se va a <strong>desvincular automáticamente de {bajaTarget.animalAlias}</strong>. El animal queda sin caravana y deja de generar alertas hasta que le vinculés otra.
-                        </div>
-                    )}
-                    <p className="text-center mb-0" style={{ color: '#9fb6cf', fontSize: '0.75rem' }}>
-                        No hay campo de motivo: el backend lo acepta pero no lo persiste.
-                    </p>
                 </Modal.Body>
                 <Modal.Footer className="gap-3">
                     <Button className="btn-guardar-animal" style={{ flex: 1 }} onClick={() => setBajaTarget(null)} disabled={accionSubmitting}>

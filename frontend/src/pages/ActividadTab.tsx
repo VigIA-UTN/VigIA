@@ -1,4 +1,4 @@
-import * as L from 'leaflet';
+import 'leaflet'; // sets window.L, which leaflet.heat patches
 import axios from 'axios';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import {
@@ -22,7 +22,7 @@ import 'leaflet.heat';
 // leaflet.heat patches L globally — no named exports
 type HeatLatLngTuple = [number, number, number?];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createHeatLayer = (points: HeatLatLngTuple[], opts: object) => (L as any).heatLayer(points, opts);
+const createHeatLayer = (points: HeatLatLngTuple[], opts: object) => (window as any).L.heatLayer(points, opts);
 
 // ─── Custom Tooltip ──────────────────────────────────────────────────────────
 
