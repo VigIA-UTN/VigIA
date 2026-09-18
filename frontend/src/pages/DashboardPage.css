@@ -1,287 +1,608 @@
-/* ── Dashboard Power BI Style ───────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   Dashboard — VigIA  (fondo navy en todas las cards)
+   ═══════════════════════════════════════════════════════════════ */
 
-/* La página usa el fondo claro estándar de VigIA */
-.dashboard-pbi-page {
-    padding: 40px 24px 48px;
+.dashboard-page {
+    padding: 32px 24px 56px;
     background: #F4F6F9;
     min-height: calc(100vh - 60px);
 }
 
-/* ── Header ─────────────────────────────────────────────────────── */
-.dashboard-pbi-header {
+/* ── Header ──────────────────────────────────────────────────────────── */
+.dash-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 20px;
-    max-width: 1100px;
-    margin-left: auto;
-    margin-right: auto;
+    max-width: 1200px;
+    margin: 0 auto 24px;
 }
 
-.dashboard-pbi-title {
-    color: #1E3A5F;
-    font-weight: 700;
-    font-size: 1.6rem;
-    margin: 0;
-    letter-spacing: -0.02em;
-}
-
-.pbi-timestamp {
-    color: #9CA3AF;
-    font-size: 0.75rem;
-    margin: 3px 0 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.pbi-refresh-btn {
-    background: #1E3A5F !important;
-    border: none !important;
-    color: #fff !important;
-    font-size: 0.82rem !important;
-    border-radius: 8px !important;
-    padding: 7px 16px !important;
-    transition: background 0.18s ease !important;
-}
-
-.pbi-refresh-btn:hover {
-    background: #2B5080 !important;
-}
-
-/* ── Contenedor principal: el "panelito" navy ───────────────────── */
-.pbi-widget {
+/* ── Base card — fondo navy oscuro ────────────────────────────────────  */
+.dash-card {
     background: #1A3558;
-    border-radius: 20px;
-    padding: 32px 32px 36px;
-    max-width: 1100px;
+    border-radius: 16px;
+    padding: 24px 28px;
+    box-shadow: 0 4px 18px rgba(26, 53, 88, 0.35);
+}
+
+.dash-card-full {
+    max-width: 1200px;
     margin: 0 auto 20px;
-    box-shadow: 0 6px 32px rgba(0,0,0,0.2);
 }
 
-/* ── Fila principal (hero + alertas) ───────────────────────────── */
-.pbi-main-row {
-    display: flex;
-    gap: 14px;
-    align-items: stretch;
-    flex-wrap: wrap;
-}
-
-/* ── Hero card ──────────────────────────────────────────────────── */
-.pbi-kpi-hero {
-    background: #2B5080;
-    border-radius: 14px;
-    padding: 26px 36px;
-    min-width: 190px;
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    text-align: center;
-    transition: background 0.18s;
-}
-
-.pbi-kpi-hero:hover { background: #34608F; }
-
-.pbi-kpi-hero .pbi-val {
-    font-size: 4rem;
-    font-weight: 800;
-    color: #ffffff;
-    line-height: 1;
-    letter-spacing: -0.03em;
-    display: block;
-}
-
-.pbi-kpi-hero .pbi-lbl {
-    font-size: 0.92rem;
-    font-weight: 600;
-    color: #A8C8E8;
-    margin: 0;
-}
-
-/* ── Separador vertical ─────────────────────────────────────────── */
-.pbi-divider {
-    width: 1px;
-    background: rgba(255,255,255,0.1);
-    flex-shrink: 0;
-    align-self: stretch;
-    margin: 0 2px;
-}
-
-/* ── Grupo de alertas (título + row de sub-cards) ───────────────── */
-.pbi-alertas-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    flex: 1 1 280px;
-}
-
-.pbi-alertas-group-title {
-    color: #C5D8EE;
-    font-size: 0.75rem;
+/* ── Section title ───────────────────────────────────────────────────── */
+.dash-section-title {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.74rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0;
+    letter-spacing: 0.1em;
+    margin: 0 0 18px;
 }
 
-.pbi-alertas-row {
+/* ══════════════════════════════════════════════════════════════
+   KPI CHIPS ROW — también fondo navy
+   ══════════════════════════════════════════════════════════════ */
+.dash-kpi-row {
     display: flex;
-    gap: 10px;
+    gap: 14px;
+    max-width: 1200px;
+    margin: 0 auto 20px;
     flex-wrap: wrap;
 }
 
-/* Sub-card de alerta */
-.pbi-alerta-card {
-    background: #243F62;
-    border-radius: 13px;
-    padding: 18px 22px;
-    flex: 1 1 100px;
+.dash-kpi-chip {
+    background: #1A3558;
+    border-radius: 14px;
+    border-left: 5px solid transparent;
+    padding: 20px 24px;
+    flex: 1 1 160px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 4px 14px rgba(26, 53, 88, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s;
+}
+
+.dash-kpi-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(26, 53, 88, 0.45);
+    background: #1E3A5F;
+}
+
+.dash-kpi-chip-icon {
+    font-size: 1.7rem;
+    flex-shrink: 0;
+    line-height: 1;
+    opacity: 0.9;
+}
+
+.dash-kpi-chip-body {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    text-align: center;
-    transition: background 0.18s;
-}
-
-.pbi-alerta-card:hover { background: #2E4E77; }
-
-.pbi-alerta-card .pbi-val {
-    font-size: 2.6rem;
-    font-weight: 800;
-    color: #ffffff;
-    line-height: 1;
-    display: block;
-}
-
-.pbi-alerta-card .pbi-lbl {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #A8C8E8;
-    margin: 0;
-    display: flex;
-    align-items: center;
     gap: 4px;
 }
 
-/* ── Dots de color ──────────────────────────────────────────────── */
-.pbi-dot {
-    width: 7px;
-    height: 7px;
+.dash-kpi-chip-val {
+    font-size: 2.4rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    /* color viene por inline style */
+}
+
+.dash-kpi-chip-lbl {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.55);
+    font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PANELS ROW (2-column grid)
+   ══════════════════════════════════════════════════════════════ */
+.dash-panels-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto 20px;
+}
+
+/* ── Reproductive distribution bars ─────────────────────────────────── */
+.dash-repro-dist {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dash-dist-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dash-dist-label {
+    width: 90px;
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.dash-dist-bar-track {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.dash-dist-bar {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.5s ease;
+    min-width: 4px;
+}
+
+/* Colores por estado reproductivo */
+.dash-repro-gestante    { background: #38A169; }
+.dash-repro-celo        { background: #E53E3E; }
+.dash-repro-posible_celo { background: #D69E2E; }
+.dash-repro-vacia       { background: rgba(255,255,255,0.35); }
+.dash-repro-inseminada  { background: #13D4FB; }
+.dash-repro-anestro     { background: #3B8D99; }
+.dash-repro-parida      { background: #38A169; }
+
+.dash-dist-count {
+    width: 24px;
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    flex-shrink: 0;
+}
+
+/* ── Celo mini KPIs ─────────────────────────────────────────────────── */
+.dash-celo-kpis {
+    display: flex;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dash-celo-kpi {
+    flex: 1;
+    padding: 14px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+}
+
+.dash-celo-kpi:last-child {
+    border-right: none;
+}
+
+.dash-celo-kpi-val {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+}
+
+.dash-celo-kpi-lbl {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.45);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+}
+
+/* ── Health segmented bar ────────────────────────────────────────────── */
+.dash-salud-bar-wrap {
+    display: flex;
+    height: 14px;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    gap: 2px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.dash-salud-seg {
+    border-radius: 999px;
+    transition: flex 0.4s ease;
+}
+
+.dash-salud-sano    { background: #38A169; }
+.dash-salud-obs     { background: #D69E2E; }
+.dash-salud-enfermo { background: #E53E3E; }
+
+.dash-salud-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+}
+
+.dash-leg-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.dash-leg-item strong {
+    color: #ffffff;
+}
+
+/* ── Dots ────────────────────────────────────────────────────────────── */
+.dash-dot {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     display: inline-block;
     flex-shrink: 0;
 }
-.pbi-dot-repro    { background: #F472B6; }
-.pbi-dot-salud    { background: #FBBF24; }
-.pbi-dot-abigeato { background: #60A5FA; }
-.pbi-dot-total    { background: #34D399; }
 
-/* ── Panel 2: KPIs de celo ──────────────────────────────────────── */
-.pbi-panel-title {
-    color: #C5D8EE;
+.dash-dot-sano    { background: #38A169; }
+.dash-dot-obs     { background: #D69E2E; }
+.dash-dot-enfermo { background: #E53E3E; }
+
+/* ── Animal lists ────────────────────────────────────────────────────── */
+.dash-animal-list {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dash-animal-list-title {
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    margin: 0 0 12px;
+    color: rgba(255, 255, 255, 0.45);
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-.pbi-celo-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+.dash-animal-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 0.9rem;
+}
+
+.dash-animal-row:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.dash-animal-nombre {
+    font-weight: 600;
+    color: #ffffff;
+    flex: 1;
+}
+
+.dash-animal-rodeo {
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    padding: 2px 8px;
+    white-space: nowrap;
+}
+
+.dash-ok-text {
+    font-size: 0.87rem;
+    color: rgba(255, 255, 255, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+}
+
+/* ── Health badges ───────────────────────────────────────────────────── */
+.dash-salud-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.dash-salud-badge-obs {
+    background: rgba(214, 158, 46, 0.25);
+    color: #ECC94B;
+    border: 1px solid rgba(214, 158, 46, 0.4);
+}
+
+.dash-salud-badge-enfermo {
+    background: rgba(229, 62, 62, 0.25);
+    color: #FC8181;
+    border: 1px solid rgba(229, 62, 62, 0.4);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ALERTAS RECIENTES
+   ══════════════════════════════════════════════════════════════ */
+.dash-card-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.dash-card-header-row .dash-section-title {
+    margin-bottom: 0;
+}
+
+.dash-ver-todas-btn {
+    background: none;
+    border: none;
+    color: #13D4FB;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 6px;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dash-ver-todas-btn:hover {
+    background: rgba(19, 212, 251, 0.1);
+}
+
+.dash-alertas-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dash-alerta-row {
+    display: flex;
+    align-items: center;
     gap: 10px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: border-color 0.15s;
+    flex-wrap: wrap;
 }
 
-.pbi-kpi-card {
-    background: #243F62;
-    border-radius: 13px;
-    padding: 20px 18px;
+.dash-alerta-row:hover {
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* Tipo chips */
+.dash-tipo-chip {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border: 1.5px solid;
+}
+
+/* Celo: cyan del sistema */
+.dash-tipo-celo {
+    background: rgba(19, 212, 251, 0.12);
+    color: #13D4FB;
+    border-color: rgba(19, 212, 251, 0.4);
+}
+
+/* Salud: ámbar MEDIA */
+.dash-tipo-salud {
+    background: rgba(214, 158, 46, 0.15);
+    color: #ECC94B;
+    border-color: rgba(214, 158, 46, 0.4);
+}
+
+/* Posición/Abigeato: rojo ALTA */
+.dash-tipo-geoespacial,
+.dash-tipo-abigeato {
+    background: rgba(229, 62, 62, 0.15);
+    color: #FC8181;
+    border-color: rgba(229, 62, 62, 0.4);
+}
+
+.dash-alerta-animal {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: color 0.15s;
+}
+
+.dash-alerta-animal:hover {
+    color: #13D4FB;
+}
+
+/* Severity chips */
+.dash-sev-chip {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+/* Exactamente los mismos colores que AlertNotificationCard — versión sobre dark */
+.dash-sev-alta   { background: rgba(229, 62, 62, 0.25);   color: #FC8181; }
+.dash-sev-media  { background: rgba(214, 158, 46, 0.25);  color: #ECC94B; }
+.dash-sev-baja   { background: rgba(56, 161, 105, 0.25);  color: #68D391; }
+
+.dash-alerta-tiempo {
+    font-size: 0.77rem;
+    color: rgba(255, 255, 255, 0.35);
+    flex-shrink: 0;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RODEOS / LOTES
+   ══════════════════════════════════════════════════════════════ */
+.dash-rodeos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+}
+
+.dash-rodeo-card {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 18px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background 0.15s, transform 0.15s;
+}
+
+.dash-rodeo-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.dash-rodeo-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0 0 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-rodeo-kpis {
+    display: flex;
+    gap: 8px;
+}
+
+.dash-rodeo-kpi {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     text-align: center;
-    gap: 5px;
-    transition: background 0.18s;
 }
 
-.pbi-kpi-card:hover { background: #2E4E77; }
-
-.pbi-kpi-card .pbi-val {
-    font-size: 2.6rem;
+.dash-rodeo-val {
+    font-size: 1.6rem;
     font-weight: 800;
     color: #ffffff;
     line-height: 1;
-    display: block;
 }
 
-.pbi-kpi-card .pbi-lbl {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #A8C8E8;
-    margin: 0;
-}
-
-.pbi-kpi-card .pbi-sub {
+.dash-rodeo-lbl {
     font-size: 0.65rem;
-    color: #506882;
+    color: rgba(255, 255, 255, 0.45);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 3px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MISC
+   ══════════════════════════════════════════════════════════════ */
+.dash-loading-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+}
+
+.dash-no-items {
+    font-size: 0.87rem;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 8px 0 0;
     margin: 0;
-}
-
-/* ── Separador interno entre paneles ────────────────────────────── */
-.pbi-inner-sep {
-    height: 1px;
-    background: rgba(255,255,255,0.08);
-    margin: 20px 0;
-}
-
-/* ── Spinner inline ─────────────────────────────────────────────── */
-.pbi-spinner-val {
-    height: 1em;
     display: flex;
     align-items: center;
-    justify-content: center;
-    min-height: 2.2rem;
+    gap: 6px;
 }
 
-/* ── Empty state ────────────────────────────────────────────────── */
-.pbi-empty {
+.dash-empty {
     background: #1A3558;
     border-radius: 18px;
     padding: 40px 24px;
     text-align: center;
-    color: #7A9CC0;
+    color: rgba(255, 255, 255, 0.45);
     font-size: 0.9rem;
     max-width: 860px;
     margin: 0 auto;
 }
 
-/* ── Responsive ─────────────────────────────────────────────────── */
-@media (max-width: 640px) {
-    .pbi-kpi-hero .pbi-val { font-size: 2.4rem; }
-    .pbi-kpi-card .pbi-val  { font-size: 1.6rem; }
-    .pbi-alerta-card .pbi-val { font-size: 1.6rem; }
-    .pbi-widget { padding: 18px 14px 22px; }
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+    .dash-panels-row {
+        grid-template-columns: 1fr;
+    }
+}
 
-    /* Centrar el hero card y ocultar el divisor en mobile */
-    .pbi-main-row {
+@media (max-width: 640px) {
+    .dashboard-page {
+        padding: 20px 14px 40px;
+    }
+
+    .dash-kpi-chip {
+        flex: 1 1 130px;
+        padding: 14px 16px;
+    }
+
+    .dash-kpi-chip-val {
+        font-size: 1.8rem;
+    }
+
+    .dash-rodeos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .dash-kpi-row {
+        gap: 10px;
+    }
+
+    .dash-kpi-chip {
+        flex: 1 1 100%;
+    }
+
+    .dash-alerta-row {
         flex-direction: column;
-        align-items: center;
+        align-items: flex-start;
+        gap: 6px;
     }
-    .pbi-kpi-hero {
-        width: 100%;
-        align-items: center;
-    }
-    .pbi-divider {
-        display: none;
-    }
-    .pbi-alertas-group {
-        width: 100%;
-        flex: none;
+
+    .dash-alerta-tiempo {
+        margin-left: 0;
     }
 }
