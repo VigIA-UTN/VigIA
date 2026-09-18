@@ -188,6 +188,40 @@ class IngestaControllerTest {
     }
 
     @Test
+    @DisplayName("Frame counter menor al último persistido (llegada fuera de orden), ignora por idempotencia")
+    void frameCounterMenorAlUltimo_llegadaFueraDeOrden_ignorado() {
+        caravana.setUltimoFrameCounter(5);
+        when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
+        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+
+        ResponseEntity<String> response = controller.receiveUplink(payloadCon(3));
+
+        assertThat(response.getBody()).isEqualTo("Ignorado: frame duplicado (idempotencia)");
+        verifyNoInteractions(telemetriaRepository, rabbitTemplate, geofenceVerificationService, eventPublisher);
+        verify(caravanaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Reintento de TTN con el mismo f_cnt luego de un procesamiento exitoso, se descarta en el segundo envío")
+    void reintentoConMismoFCnt_segundoEnvioSeDescarta() {
+        when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
+        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
+
+        ResponseEntity<String> primeraRespuesta = controller.receiveUplink(payloadCon(6));
+        assertThat(primeraRespuesta.getBody()).isEqualTo("OK");
+        assertThat(caravana.getUltimoFrameCounter()).isEqualTo(6);
+
+        reset(telemetriaRepository, rabbitTemplate, geofenceVerificationService, eventPublisher);
+
+        // TTN reenvía el mismo paquete (reintento por gateway o duplicado de red)
+        ResponseEntity<String> segundaRespuesta = controller.receiveUplink(payloadCon(6));
+
+        assertThat(segundaRespuesta.getBody()).isEqualTo("Ignorado: frame duplicado (idempotencia)");
+        verifyNoInteractions(telemetriaRepository, rabbitTemplate, geofenceVerificationService, eventPublisher);
+    }
+
+    @Test
     @DisplayName("Primer uplink sin ultimoFrameCounter previo, procesa y guarda el contador")
     void sinFrameCounterPrevio_procesaYGuardaContador() {
         caravana.setUltimoFrameCounter(null);
