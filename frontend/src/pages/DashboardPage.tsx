@@ -219,13 +219,19 @@ export default function DashboardPage() {
     // ── Idea 2: Ventanas de inseminación ─────────────────────────────────────
     const ventanaItems: VentanaItem[] = useMemo(() => {
         return alertasFiltradas
-            .filter(a => a.tipo === 'CELO' && ventanas.has(a.id) && ventanas.get(a.id)!.estado === 'ACTIVA')
+            .filter(a => a.tipo === 'CELO' && ventanas.has(a.id) && (ventanas.get(a.id)!.estado === 'ACTIVA' || ventanas.get(a.id)!.estado === 'FUTURA'))
             .map(a => ({
                 alerta: a,
                 animal: animalMap.get(a.animalId),
                 ventana: ventanas.get(a.id)!,
             }))
-            .sort((a, b) => a.ventana.tiempoRestanteSegundos - b.ventana.tiempoRestanteSegundos);
+            .sort((a, b) => {
+                const aFutura = a.ventana.estado === 'FUTURA';
+                const bFutura = b.ventana.estado === 'FUTURA';
+                if (!aFutura && bFutura) return -1;
+                if (aFutura && !bFutura) return 1;
+                return a.ventana.tiempoRestanteSegundos - b.ventana.tiempoRestanteSegundos;
+            });
     }, [alertasFiltradas, animalMap, ventanas]);
 
     const celoArchivadasRecientes = useMemo(() => {
@@ -553,13 +559,20 @@ export default function DashboardPage() {
                             </p>
                         ) : (
                             ventanaItems.map(({ alerta, animal, ventana }) => {
-                                const vc = ventanaClass(ventana.tiempoRestanteSegundos);
-                                const pct = Math.min(100, Math.max(0, ventana.porcentajeTranscurrido * 100));
-                                const restanteClass = vc === 'critica'
-                                    ? 'dash-ventana-restante-urgente'
-                                    : vc === 'venciendo'
-                                        ? 'dash-ventana-restante-warning'
-                                        : 'dash-ventana-restante-ok';
+                                const isFutura = ventana.estado === 'FUTURA';
+                                const vc = isFutura ? 'futura' : ventanaClass(ventana.tiempoRestanteSegundos);
+                                const pct = isFutura ? 0 : Math.min(100, Math.max(0, ventana.porcentajeTranscurrido * 100));
+                                const restanteClass = isFutura 
+                                    ? 'dash-ventana-restante-futura' 
+                                    : vc === 'critica'
+                                        ? 'dash-ventana-restante-urgente'
+                                        : vc === 'venciendo'
+                                            ? 'dash-ventana-restante-warning'
+                                            : 'dash-ventana-restante-ok';
+
+                                const timeLabel = isFutura
+                                    ? `Abre en ${formatHorasRestantes(ventana.tiempoRestanteSegundos).replace(' restantes', '')}`
+                                    : formatHorasRestantes(ventana.tiempoRestanteSegundos);
 
                                 return (
                                     <div
@@ -576,7 +589,7 @@ export default function DashboardPage() {
                                             />
                                         </div>
                                         <div className={`dash-ventana-restante ${restanteClass}`}>
-                                            {formatHorasRestantes(ventana.tiempoRestanteSegundos)}
+                                            {timeLabel}
                                         </div>
                                     </div>
                                 );
