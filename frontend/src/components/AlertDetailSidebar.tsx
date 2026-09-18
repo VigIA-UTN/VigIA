@@ -235,7 +235,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             </div>
 
-            {detalle.accionRecomendada && (<div>
+            {detalle?.accionRecomendada && (<div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                 <i className="bi bi-info-circle"></i> Acción recomendada
               </h6>
