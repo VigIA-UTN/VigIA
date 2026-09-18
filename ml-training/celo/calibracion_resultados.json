@@ -1,0 +1,14 @@
+{
+  "gps_noise_floor": {
+    "n_real": 11,
+    "n_simulado": 581113,
+    "media_real": 24.726363636363637,
+    "media_simulada": 24.716228485107422,
+    "sigma_implicito_real": 13.953929817360969,
+    "sigma_implicito_simulado": 13.948210206042562,
+    "ratio_sim_over_real": 0.9995901074899137,
+    "ks_stat": 0.165921257999735,
+    "ks_p_value": 0.8751043840421151,
+    "ok": true
+  }
+}

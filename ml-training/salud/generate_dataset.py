@@ -29,10 +29,19 @@ Severidades (igual que antes):
 
 import argparse
 import json
+import sys
 from pathlib import Path
 # pyrefly: ignore [missing-import]
 import numpy as np
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from gps_noise_common import (  # noqa: E402
+    inject_gps_noise,
+    quantize_movestate,
+    DEFAULT_GPS_NOISE_STD_M,
+    DEFAULT_HEARTBEAT_INTERVAL_TICKS,
+)
 
 SAMPLES_PER_DAY = 288  # 1 lectura cada 5 minutos
 MINUTES_PER_SAMPLE = 5
@@ -40,7 +49,9 @@ CALIB_DIAS = 7  # RF03: período de calibración de referencia individual
 CALIB_TICKS = CALIB_DIAS * SAMPLES_PER_DAY
 
 
-def build_dataset(n_animales: int, dias_evaluacion: int, seed: int):
+def build_dataset(n_animales: int, dias_evaluacion: int, seed: int,
+                   gps_noise_std_m: float = DEFAULT_GPS_NOISE_STD_M,
+                   heartbeat_interval_ticks: int = DEFAULT_HEARTBEAT_INTERVAL_TICKS):
     rng = np.random.default_rng(seed)
     dias_totales = CALIB_DIAS + dias_evaluacion
     T = dias_totales * SAMPLES_PER_DAY
@@ -174,6 +185,13 @@ def build_dataset(n_animales: int, dias_evaluacion: int, seed: int):
         lat[:, t] = lat[:, t - 1] + step_lat + pull_lat
         lon[:, t] = lon[:, t - 1] + step_lon + pull_lon
 
+    # Trayectoria "verdadera" (determina severidad/tipo_alto, ya calculados
+    # más arriba y ajenos a lat/lon) vs. observada: un collar real, aunque
+    # esté quieto, mide con ruido GNSS -- ver gps_noise_common.py para la
+    # derivación empírica de gps_noise_std_m.
+    lat_true, lon_true = lat, lon
+    lat, lon = inject_gps_noise(lat_true, lon_true, gps_noise_std_m, rng)
+
     # Estado de Movimiento (MOVESTATE)
     print("Generando estados de movimiento (MOVESTATE)...")
     hours_of_day = (np.arange(T) * MINUTES_PER_SAMPLE / 60.0) % 24.0
@@ -203,6 +221,12 @@ def build_dataset(n_animales: int, dias_evaluacion: int, seed: int):
     high_move_mask = rng.random((n_animales, T)) < prob_high_move
     move_state[high_move_mask] = rng.integers(7, 10, high_move_mask.sum())
 
+    # En producción moveState solo puede cambiar cuando llega un Heartbeat
+    # real (ver gps_noise_common.quantize_movestate): un valor fresco cada
+    # tick de 5 min, como se generó arriba, no es lo que el modelo va a
+    # ver en inferencia.
+    move_state = quantize_movestate(move_state, heartbeat_interval_ticks)
+
     print("Simulando batería...")
     bateria = np.zeros((n_animales, T), dtype=np.float32)
     bateria[:, 0] = rng.uniform(85, 100, n_animales)
@@ -219,6 +243,8 @@ def build_dataset(n_animales: int, dias_evaluacion: int, seed: int):
         "fecha_hora": fecha_hora,
         "latitud": np.round(lat.flatten(), 6),
         "longitud": np.round(lon.flatten(), 6),
+        "latitud_true": np.round(lat_true.flatten(), 6),
+        "longitud_true": np.round(lon_true.flatten(), 6),
         "moveState": move_state.flatten(),
         "bateria": np.round(bateria.flatten().astype(np.float32), 2),
         "severidad": severidad.flatten(),
@@ -233,14 +259,24 @@ def build_dataset(n_animales: int, dias_evaluacion: int, seed: int):
 
 def main():
     parser = argparse.ArgumentParser(description="Generador sintético VigIA - Salud (perfil individual)")
-    parser.add_argument("--n-animales", type=int, default=120)
+    parser.add_argument("--n-animales", type=int, default=300,
+                         help="120 animales daba una muestra de severidad 1/2/3 demasiado chica "
+                              "para estimar precisión/recall de forma confiable (ver README.md); "
+                              "300 la estabiliza sin diluir el balance de clases")
     parser.add_argument("--dias-evaluacion", type=int, default=90,
                          help="Días de evaluación POST-calibración por animal (además de los 7 de calibración fijos por RF03)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--out-dir", type=str, default="dataset")
+    parser.add_argument("--gps-noise-std-m", type=float, default=DEFAULT_GPS_NOISE_STD_M,
+                         help="Desvío estándar (metros, por eje) del ruido de medición GNSS "
+                              "inyectado sobre la trayectoria simulada, ver gps_noise_common.py")
+    parser.add_argument("--heartbeat-interval-ticks", type=int, default=DEFAULT_HEARTBEAT_INTERVAL_TICKS,
+                         help="Cada cuántos ticks de 5 min cambia moveState (cadencia real de Heartbeat)")
     args = parser.parse_args()
 
-    df, metadata = build_dataset(args.n_animales, args.dias_evaluacion, args.seed)
+    df, metadata = build_dataset(args.n_animales, args.dias_evaluacion, args.seed,
+                                  gps_noise_std_m=args.gps_noise_std_m,
+                                  heartbeat_interval_ticks=args.heartbeat_interval_ticks)
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -253,6 +289,8 @@ def main():
             "calib_dias": CALIB_DIAS,
             "calib_ticks": CALIB_TICKS,
             "samples_per_day": SAMPLES_PER_DAY,
+            "gps_noise_std_m": args.gps_noise_std_m,
+            "heartbeat_interval_ticks": args.heartbeat_interval_ticks,
             "animales": metadata,
         }, f, indent=2, ensure_ascii=False)
 
