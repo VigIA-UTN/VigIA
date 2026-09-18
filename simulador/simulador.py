@@ -64,7 +64,9 @@ SPEED_MULT_CELO_MAX = 4.0
 # componentes casi se cancelan, a veces se suman al máximo, así que la misma
 # "intensidad de celo" produce probabilidades muy dispares corrida a corrida
 # (medido: 0.27 a 0.93 con el generador viejo, promedio 0.74 — por debajo del
-# CELO_THRESHOLD=0.892 configurado en .env la mayoría de las veces). Usando un
+# CELO_THRESHOLD=0.892 configurado en .env en ese momento la mayoría de las
+# veces; el valor actual de CELO_THRESHOLD es otro, ver infra/.env.example).
+# Usando un
 # rumbo que persiste entre ticks y un paso de magnitud fija (speed*cos/sin),
 # igual que en entrenamiento, la probabilidad queda estable en ~0.996-0.998.
 # ---------------------------------------------------------------------------

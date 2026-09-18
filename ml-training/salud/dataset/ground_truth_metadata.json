@@ -2,40 +2,26 @@
   "calib_dias": 7,
   "calib_ticks": 2016,
   "samples_per_day": 288,
+  "gps_noise_std_m": 15.5,
+  "heartbeat_interval_ticks": 6,
   "animales": [
     {
       "caravana_id": 1,
-      "eventos_salud": [
-        {
-          "start_tick": 25689,
-          "end_tick": 27016,
-          "severidad_maxima": 1,
-          "progresiva": true,
-          "duracion_dias": 4.61
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 2,
-      "eventos_salud": [
-        {
-          "start_tick": 23256,
-          "end_tick": 24691,
-          "severidad_maxima": 1,
-          "progresiva": false,
-          "duracion_dias": 4.98
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 3,
       "eventos_salud": [
         {
-          "start_tick": 10840,
-          "end_tick": 12100,
-          "severidad_maxima": 1,
+          "start_tick": 8514,
+          "end_tick": 10013,
+          "severidad_maxima": 2,
           "progresiva": false,
-          "duracion_dias": 4.38
+          "duracion_dias": 5.21
         }
       ]
     },
@@ -43,61 +29,29 @@
       "caravana_id": 4,
       "eventos_salud": [
         {
-          "start_tick": 5565,
-          "end_tick": 7201,
+          "start_tick": 25399,
+          "end_tick": 26031,
           "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 5.68
+          "duracion_dias": 2.19
         }
       ]
     },
     {
       "caravana_id": 5,
-      "eventos_salud": [
-        {
-          "start_tick": 15637,
-          "end_tick": 16346,
-          "severidad_maxima": 1,
-          "progresiva": true,
-          "duracion_dias": 2.46
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 6,
-      "eventos_salud": [
-        {
-          "start_tick": 2537,
-          "end_tick": 3793,
-          "severidad_maxima": 1,
-          "progresiva": true,
-          "duracion_dias": 4.36
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 7,
-      "eventos_salud": [
-        {
-          "start_tick": 20241,
-          "end_tick": 21398,
-          "severidad_maxima": 1,
-          "progresiva": false,
-          "duracion_dias": 4.02
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 8,
-      "eventos_salud": [
-        {
-          "start_tick": 23954,
-          "end_tick": 24802,
-          "severidad_maxima": 1,
-          "progresiva": true,
-          "duracion_dias": 2.95
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 9,
@@ -111,25 +65,17 @@
       "caravana_id": 11,
       "eventos_salud": [
         {
-          "start_tick": 24123,
-          "end_tick": 25302,
+          "start_tick": 7770,
+          "end_tick": 9062,
           "severidad_maxima": 1,
-          "progresiva": false,
-          "duracion_dias": 4.1
+          "progresiva": true,
+          "duracion_dias": 4.49
         }
       ]
     },
     {
       "caravana_id": 12,
-      "eventos_salud": [
-        {
-          "start_tick": 4581,
-          "end_tick": 5271,
-          "severidad_maxima": 3,
-          "progresiva": false,
-          "duracion_dias": 2.4
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 13,
@@ -137,43 +83,67 @@
     },
     {
       "caravana_id": 14,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 22879,
+          "end_tick": 24486,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.58
+        }
+      ]
     },
     {
       "caravana_id": 15,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 21462,
+          "end_tick": 22438,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 3.39
+        }
+      ]
     },
     {
       "caravana_id": 16,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 22771,
+          "end_tick": 24368,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.55
+        }
+      ]
     },
     {
       "caravana_id": 17,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 12433,
+          "end_tick": 13835,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 4.87
+        }
+      ]
     },
     {
       "caravana_id": 18,
       "eventos_salud": [
         {
-          "start_tick": 25950,
-          "end_tick": 27118,
-          "severidad_maxima": 2,
+          "start_tick": 22352,
+          "end_tick": 23085,
+          "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 4.06
+          "duracion_dias": 2.55
         }
       ]
     },
     {
       "caravana_id": 19,
-      "eventos_salud": [
-        {
-          "start_tick": 23487,
-          "end_tick": 24369,
-          "severidad_maxima": 2,
-          "progresiva": true,
-          "duracion_dias": 3.07
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 20,
@@ -187,33 +157,49 @@
       "caravana_id": 22,
       "eventos_salud": [
         {
-          "start_tick": 20382,
-          "end_tick": 21380,
-          "severidad_maxima": 1,
+          "start_tick": 10539,
+          "end_tick": 11687,
+          "severidad_maxima": 3,
           "progresiva": true,
-          "duracion_dias": 3.47
+          "duracion_dias": 3.99
         }
       ]
     },
     {
       "caravana_id": 23,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 5351,
+          "end_tick": 6449,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 3.81
+        }
+      ]
     },
     {
       "caravana_id": 24,
       "eventos_salud": [
         {
-          "start_tick": 9970,
-          "end_tick": 11601,
-          "severidad_maxima": 3,
+          "start_tick": 25342,
+          "end_tick": 27023,
+          "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 5.67
+          "duracion_dias": 5.84
         }
       ]
     },
     {
       "caravana_id": 25,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 20870,
+          "end_tick": 21716,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 2.94
+        }
+      ]
     },
     {
       "caravana_id": 26,
@@ -233,43 +219,35 @@
     },
     {
       "caravana_id": 30,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 6445,
+          "end_tick": 7392,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 3.29
+        }
+      ]
     },
     {
       "caravana_id": 31,
       "eventos_salud": [
         {
-          "start_tick": 17018,
-          "end_tick": 17827,
+          "start_tick": 5813,
+          "end_tick": 7301,
           "severidad_maxima": 2,
           "progresiva": false,
-          "duracion_dias": 2.81
+          "duracion_dias": 5.17
         }
       ]
     },
     {
       "caravana_id": 32,
-      "eventos_salud": [
-        {
-          "start_tick": 19549,
-          "end_tick": 20234,
-          "severidad_maxima": 2,
-          "progresiva": false,
-          "duracion_dias": 2.38
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 33,
-      "eventos_salud": [
-        {
-          "start_tick": 26193,
-          "end_tick": 26927,
-          "severidad_maxima": 3,
-          "progresiva": false,
-          "duracion_dias": 2.55
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 34,
@@ -285,31 +263,23 @@
     },
     {
       "caravana_id": 37,
-      "eventos_salud": [
-        {
-          "start_tick": 26213,
-          "end_tick": 26898,
-          "severidad_maxima": 2,
-          "progresiva": true,
-          "duracion_dias": 2.38
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 38,
-      "eventos_salud": [
-        {
-          "start_tick": 13764,
-          "end_tick": 14999,
-          "severidad_maxima": 2,
-          "progresiva": true,
-          "duracion_dias": 4.29
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 39,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 12791,
+          "end_tick": 13484,
+          "severidad_maxima": 2,
+          "progresiva": false,
+          "duracion_dias": 2.41
+        }
+      ]
     },
     {
       "caravana_id": 40,
@@ -321,45 +291,85 @@
     },
     {
       "caravana_id": 42,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 18486,
+          "end_tick": 19180,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 2.41
+        }
+      ]
     },
     {
       "caravana_id": 43,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 21572,
+          "end_tick": 22742,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.06
+        }
+      ]
     },
     {
       "caravana_id": 44,
       "eventos_salud": [
         {
-          "start_tick": 13778,
-          "end_tick": 14455,
+          "start_tick": 9916,
+          "end_tick": 10561,
           "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 2.35
+          "duracion_dias": 2.24
         }
       ]
     },
     {
       "caravana_id": 45,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 7754,
+          "end_tick": 8784,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 3.58
+        }
+      ]
     },
     {
       "caravana_id": 46,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 12574,
+          "end_tick": 13151,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 2.0
+        }
+      ]
     },
     {
       "caravana_id": 47,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 13437,
+          "end_tick": 14912,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.12
+        }
+      ]
     },
     {
       "caravana_id": 48,
       "eventos_salud": [
         {
-          "start_tick": 17539,
-          "end_tick": 18993,
-          "severidad_maxima": 3,
+          "start_tick": 22871,
+          "end_tick": 23999,
+          "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 5.05
+          "duracion_dias": 3.92
         }
       ]
     },
@@ -367,81 +377,113 @@
       "caravana_id": 49,
       "eventos_salud": [
         {
-          "start_tick": 8580,
-          "end_tick": 10234,
+          "start_tick": 13730,
+          "end_tick": 15377,
           "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 5.74
+          "duracion_dias": 5.72
         }
       ]
     },
     {
       "caravana_id": 50,
-      "eventos_salud": [
-        {
-          "start_tick": 25464,
-          "end_tick": 26677,
-          "severidad_maxima": 2,
-          "progresiva": false,
-          "duracion_dias": 4.21
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 51,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 3239,
+          "end_tick": 3974,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 2.55
+        }
+      ]
     },
     {
       "caravana_id": 52,
       "eventos_salud": [
         {
-          "start_tick": 24968,
-          "end_tick": 26370,
-          "severidad_maxima": 3,
-          "progresiva": false,
-          "duracion_dias": 4.87
+          "start_tick": 5902,
+          "end_tick": 6514,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 2.13
         }
       ]
     },
     {
       "caravana_id": 53,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 4744,
+          "end_tick": 5999,
+          "severidad_maxima": 2,
+          "progresiva": false,
+          "duracion_dias": 4.36
+        }
+      ]
     },
     {
       "caravana_id": 54,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 13292,
+          "end_tick": 14581,
+          "severidad_maxima": 3,
+          "progresiva": false,
+          "duracion_dias": 4.48
+        }
+      ]
     },
     {
       "caravana_id": 55,
       "eventos_salud": [
         {
-          "start_tick": 15385,
-          "end_tick": 16751,
-          "severidad_maxima": 2,
+          "start_tick": 6055,
+          "end_tick": 7154,
+          "severidad_maxima": 3,
           "progresiva": true,
-          "duracion_dias": 4.74
+          "duracion_dias": 3.82
         }
       ]
     },
     {
       "caravana_id": 56,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 15708,
+          "end_tick": 16650,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 3.27
+        }
+      ]
     },
     {
       "caravana_id": 57,
       "eventos_salud": [
         {
-          "start_tick": 2321,
-          "end_tick": 3406,
+          "start_tick": 21979,
+          "end_tick": 22920,
           "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 3.77
+          "duracion_dias": 3.27
         }
       ]
     },
     {
       "caravana_id": 58,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 19795,
+          "end_tick": 20392,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 2.08
+        }
+      ]
     },
     {
       "caravana_id": 59,
@@ -449,19 +491,19 @@
     },
     {
       "caravana_id": 60,
-      "eventos_salud": [
-        {
-          "start_tick": 18671,
-          "end_tick": 20259,
-          "severidad_maxima": 3,
-          "progresiva": false,
-          "duracion_dias": 5.52
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 61,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 6096,
+          "end_tick": 7356,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 4.38
+        }
+      ]
     },
     {
       "caravana_id": 62,
@@ -469,19 +511,19 @@
     },
     {
       "caravana_id": 63,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 8429,
+          "end_tick": 10147,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 5.97
+        }
+      ]
     },
     {
       "caravana_id": 64,
-      "eventos_salud": [
-        {
-          "start_tick": 9202,
-          "end_tick": 9811,
-          "severidad_maxima": 3,
-          "progresiva": true,
-          "duracion_dias": 2.12
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 65,
@@ -491,17 +533,25 @@
       "caravana_id": 66,
       "eventos_salud": [
         {
-          "start_tick": 24377,
-          "end_tick": 25709,
+          "start_tick": 2113,
+          "end_tick": 3703,
           "severidad_maxima": 3,
           "progresiva": true,
-          "duracion_dias": 4.63
+          "duracion_dias": 5.52
         }
       ]
     },
     {
       "caravana_id": 67,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 5271,
+          "end_tick": 6531,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.38
+        }
+      ]
     },
     {
       "caravana_id": 68,
@@ -511,17 +561,25 @@
       "caravana_id": 69,
       "eventos_salud": [
         {
-          "start_tick": 2930,
-          "end_tick": 3571,
+          "start_tick": 9407,
+          "end_tick": 10249,
           "severidad_maxima": 2,
           "progresiva": false,
-          "duracion_dias": 2.23
+          "duracion_dias": 2.93
         }
       ]
     },
     {
       "caravana_id": 70,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 14993,
+          "end_tick": 16206,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 4.21
+        }
+      ]
     },
     {
       "caravana_id": 71,
@@ -537,15 +595,7 @@
     },
     {
       "caravana_id": 74,
-      "eventos_salud": [
-        {
-          "start_tick": 19590,
-          "end_tick": 20309,
-          "severidad_maxima": 1,
-          "progresiva": false,
-          "duracion_dias": 2.5
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 75,
@@ -559,49 +609,57 @@
       "caravana_id": 77,
       "eventos_salud": [
         {
-          "start_tick": 14690,
-          "end_tick": 15488,
+          "start_tick": 11819,
+          "end_tick": 12994,
           "severidad_maxima": 2,
           "progresiva": true,
-          "duracion_dias": 2.77
+          "duracion_dias": 4.08
         }
       ]
     },
     {
       "caravana_id": 78,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 5998,
+          "end_tick": 7029,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 3.58
+        }
+      ]
     },
     {
       "caravana_id": 79,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 18640,
+          "end_tick": 20205,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 5.44
+        }
+      ]
     },
     {
       "caravana_id": 80,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 17804,
+          "end_tick": 19224,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.93
+        }
+      ]
     },
     {
       "caravana_id": 81,
-      "eventos_salud": [
-        {
-          "start_tick": 7559,
-          "end_tick": 8183,
-          "severidad_maxima": 2,
-          "progresiva": false,
-          "duracion_dias": 2.17
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 82,
-      "eventos_salud": [
-        {
-          "start_tick": 24237,
-          "end_tick": 25024,
-          "severidad_maxima": 1,
-          "progresiva": false,
-          "duracion_dias": 2.73
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 83,
@@ -617,17 +675,25 @@
     },
     {
       "caravana_id": 86,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 23401,
+          "end_tick": 24974,
+          "severidad_maxima": 3,
+          "progresiva": false,
+          "duracion_dias": 5.46
+        }
+      ]
     },
     {
       "caravana_id": 87,
       "eventos_salud": [
         {
-          "start_tick": 12473,
-          "end_tick": 13396,
-          "severidad_maxima": 3,
+          "start_tick": 7341,
+          "end_tick": 7943,
+          "severidad_maxima": 2,
           "progresiva": true,
-          "duracion_dias": 3.21
+          "duracion_dias": 2.09
         }
       ]
     },
@@ -637,25 +703,17 @@
     },
     {
       "caravana_id": 89,
-      "eventos_salud": [
-        {
-          "start_tick": 16396,
-          "end_tick": 17437,
-          "severidad_maxima": 2,
-          "progresiva": true,
-          "duracion_dias": 3.62
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 90,
       "eventos_salud": [
         {
-          "start_tick": 4353,
-          "end_tick": 5249,
+          "start_tick": 26147,
+          "end_tick": 27424,
           "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 3.11
+          "duracion_dias": 4.43
         }
       ]
     },
@@ -679,11 +737,11 @@
       "caravana_id": 95,
       "eventos_salud": [
         {
-          "start_tick": 9627,
-          "end_tick": 10568,
-          "severidad_maxima": 2,
+          "start_tick": 21154,
+          "end_tick": 22184,
+          "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 3.27
+          "duracion_dias": 3.58
         }
       ]
     },
@@ -693,33 +751,41 @@
     },
     {
       "caravana_id": 97,
-      "eventos_salud": []
-    },
-    {
-      "caravana_id": 98,
       "eventos_salud": [
         {
-          "start_tick": 16577,
-          "end_tick": 17804,
-          "severidad_maxima": 2,
+          "start_tick": 5302,
+          "end_tick": 6158,
+          "severidad_maxima": 3,
           "progresiva": true,
-          "duracion_dias": 4.26
+          "duracion_dias": 2.97
         }
       ]
     },
     {
-      "caravana_id": 99,
+      "caravana_id": 98,
       "eventos_salud": []
+    },
+    {
+      "caravana_id": 99,
+      "eventos_salud": [
+        {
+          "start_tick": 14049,
+          "end_tick": 14839,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 2.74
+        }
+      ]
     },
     {
       "caravana_id": 100,
       "eventos_salud": [
         {
-          "start_tick": 19363,
-          "end_tick": 20571,
-          "severidad_maxima": 2,
-          "progresiva": true,
-          "duracion_dias": 4.2
+          "start_tick": 14956,
+          "end_tick": 16086,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 3.93
         }
       ]
     },
@@ -729,19 +795,19 @@
     },
     {
       "caravana_id": 102,
-      "eventos_salud": [
-        {
-          "start_tick": 15692,
-          "end_tick": 17116,
-          "severidad_maxima": 2,
-          "progresiva": false,
-          "duracion_dias": 4.95
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 103,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 9834,
+          "end_tick": 10749,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 3.18
+        }
+      ]
     },
     {
       "caravana_id": 104,
@@ -753,99 +819,115 @@
     },
     {
       "caravana_id": 106,
-      "eventos_salud": [
-        {
-          "start_tick": 23976,
-          "end_tick": 25121,
-          "severidad_maxima": 2,
-          "progresiva": true,
-          "duracion_dias": 3.98
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 107,
-      "eventos_salud": [
-        {
-          "start_tick": 3978,
-          "end_tick": 4618,
-          "severidad_maxima": 2,
-          "progresiva": true,
-          "duracion_dias": 2.22
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 108,
       "eventos_salud": [
         {
-          "start_tick": 8887,
-          "end_tick": 10318,
+          "start_tick": 21131,
+          "end_tick": 22057,
           "severidad_maxima": 1,
           "progresiva": true,
-          "duracion_dias": 4.97
+          "duracion_dias": 3.22
         }
       ]
     },
     {
       "caravana_id": 109,
-      "eventos_salud": []
-    },
-    {
-      "caravana_id": 110,
-      "eventos_salud": []
-    },
-    {
-      "caravana_id": 111,
       "eventos_salud": [
         {
-          "start_tick": 18494,
-          "end_tick": 19762,
-          "severidad_maxima": 1,
+          "start_tick": 11932,
+          "end_tick": 13218,
+          "severidad_maxima": 2,
           "progresiva": true,
-          "duracion_dias": 4.4
+          "duracion_dias": 4.47
         }
       ]
     },
     {
-      "caravana_id": 112,
+      "caravana_id": 110,
+      "eventos_salud": [
+        {
+          "start_tick": 15229,
+          "end_tick": 16786,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.41
+        }
+      ]
+    },
+    {
+      "caravana_id": 111,
       "eventos_salud": []
+    },
+    {
+      "caravana_id": 112,
+      "eventos_salud": [
+        {
+          "start_tick": 4777,
+          "end_tick": 5819,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 3.62
+        }
+      ]
     },
     {
       "caravana_id": 113,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 21172,
+          "end_tick": 21886,
+          "severidad_maxima": 3,
+          "progresiva": false,
+          "duracion_dias": 2.48
+        }
+      ]
     },
     {
       "caravana_id": 114,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 18373,
+          "end_tick": 19155,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 2.72
+        }
+      ]
     },
     {
       "caravana_id": 115,
       "eventos_salud": [
         {
-          "start_tick": 4951,
-          "end_tick": 6339,
+          "start_tick": 12092,
+          "end_tick": 13648,
           "severidad_maxima": 2,
-          "progresiva": true,
-          "duracion_dias": 4.82
+          "progresiva": false,
+          "duracion_dias": 5.41
         }
       ]
     },
     {
       "caravana_id": 116,
-      "eventos_salud": []
+      "eventos_salud": [
+        {
+          "start_tick": 10362,
+          "end_tick": 11224,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 2.99
+        }
+      ]
     },
     {
       "caravana_id": 117,
-      "eventos_salud": [
-        {
-          "start_tick": 13562,
-          "end_tick": 14742,
-          "severidad_maxima": 1,
-          "progresiva": true,
-          "duracion_dias": 4.1
-        }
-      ]
+      "eventos_salud": []
     },
     {
       "caravana_id": 118,
@@ -857,6 +939,1294 @@
     },
     {
       "caravana_id": 120,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 121,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 122,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 123,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 124,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 125,
+      "eventos_salud": [
+        {
+          "start_tick": 7951,
+          "end_tick": 9623,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.81
+        }
+      ]
+    },
+    {
+      "caravana_id": 126,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 127,
+      "eventos_salud": [
+        {
+          "start_tick": 6143,
+          "end_tick": 6958,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 2.83
+        }
+      ]
+    },
+    {
+      "caravana_id": 128,
+      "eventos_salud": [
+        {
+          "start_tick": 8339,
+          "end_tick": 9285,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 3.29
+        }
+      ]
+    },
+    {
+      "caravana_id": 129,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 130,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 131,
+      "eventos_salud": [
+        {
+          "start_tick": 21950,
+          "end_tick": 23468,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 5.27
+        }
+      ]
+    },
+    {
+      "caravana_id": 132,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 133,
+      "eventos_salud": [
+        {
+          "start_tick": 20519,
+          "end_tick": 21489,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 3.37
+        }
+      ]
+    },
+    {
+      "caravana_id": 134,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 135,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 136,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 137,
+      "eventos_salud": [
+        {
+          "start_tick": 9150,
+          "end_tick": 10230,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 3.75
+        }
+      ]
+    },
+    {
+      "caravana_id": 138,
+      "eventos_salud": [
+        {
+          "start_tick": 17874,
+          "end_tick": 18977,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 3.83
+        }
+      ]
+    },
+    {
+      "caravana_id": 139,
+      "eventos_salud": [
+        {
+          "start_tick": 5828,
+          "end_tick": 6856,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 3.57
+        }
+      ]
+    },
+    {
+      "caravana_id": 140,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 141,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 142,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 143,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 144,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 145,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 146,
+      "eventos_salud": [
+        {
+          "start_tick": 24659,
+          "end_tick": 26016,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 4.71
+        }
+      ]
+    },
+    {
+      "caravana_id": 147,
+      "eventos_salud": [
+        {
+          "start_tick": 20165,
+          "end_tick": 21769,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 5.57
+        }
+      ]
+    },
+    {
+      "caravana_id": 148,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 149,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 150,
+      "eventos_salud": [
+        {
+          "start_tick": 20697,
+          "end_tick": 21695,
+          "severidad_maxima": 3,
+          "progresiva": false,
+          "duracion_dias": 3.47
+        }
+      ]
+    },
+    {
+      "caravana_id": 151,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 152,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 153,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 154,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 155,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 156,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 157,
+      "eventos_salud": [
+        {
+          "start_tick": 8437,
+          "end_tick": 9519,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 3.76
+        }
+      ]
+    },
+    {
+      "caravana_id": 158,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 159,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 160,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 161,
+      "eventos_salud": [
+        {
+          "start_tick": 5175,
+          "end_tick": 5978,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 2.79
+        }
+      ]
+    },
+    {
+      "caravana_id": 162,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 163,
+      "eventos_salud": [
+        {
+          "start_tick": 23964,
+          "end_tick": 24689,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 2.52
+        }
+      ]
+    },
+    {
+      "caravana_id": 164,
+      "eventos_salud": [
+        {
+          "start_tick": 8701,
+          "end_tick": 10325,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 5.64
+        }
+      ]
+    },
+    {
+      "caravana_id": 165,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 166,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 167,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 168,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 169,
+      "eventos_salud": [
+        {
+          "start_tick": 19947,
+          "end_tick": 20892,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 3.28
+        }
+      ]
+    },
+    {
+      "caravana_id": 170,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 171,
+      "eventos_salud": [
+        {
+          "start_tick": 25771,
+          "end_tick": 27355,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.5
+        }
+      ]
+    },
+    {
+      "caravana_id": 172,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 173,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 174,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 175,
+      "eventos_salud": [
+        {
+          "start_tick": 12987,
+          "end_tick": 14127,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 3.96
+        }
+      ]
+    },
+    {
+      "caravana_id": 176,
+      "eventos_salud": [
+        {
+          "start_tick": 17365,
+          "end_tick": 19005,
+          "severidad_maxima": 3,
+          "progresiva": false,
+          "duracion_dias": 5.7
+        }
+      ]
+    },
+    {
+      "caravana_id": 177,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 178,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 179,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 180,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 181,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 182,
+      "eventos_salud": [
+        {
+          "start_tick": 9653,
+          "end_tick": 10562,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 3.16
+        }
+      ]
+    },
+    {
+      "caravana_id": 183,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 184,
+      "eventos_salud": [
+        {
+          "start_tick": 8294,
+          "end_tick": 9861,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 5.44
+        }
+      ]
+    },
+    {
+      "caravana_id": 185,
+      "eventos_salud": [
+        {
+          "start_tick": 5296,
+          "end_tick": 6790,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.19
+        }
+      ]
+    },
+    {
+      "caravana_id": 186,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 187,
+      "eventos_salud": [
+        {
+          "start_tick": 22318,
+          "end_tick": 24044,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.99
+        }
+      ]
+    },
+    {
+      "caravana_id": 188,
+      "eventos_salud": [
+        {
+          "start_tick": 23635,
+          "end_tick": 24924,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 4.48
+        }
+      ]
+    },
+    {
+      "caravana_id": 189,
+      "eventos_salud": [
+        {
+          "start_tick": 24810,
+          "end_tick": 26296,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.16
+        }
+      ]
+    },
+    {
+      "caravana_id": 190,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 191,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 192,
+      "eventos_salud": [
+        {
+          "start_tick": 5931,
+          "end_tick": 6710,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 2.71
+        }
+      ]
+    },
+    {
+      "caravana_id": 193,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 194,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 195,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 196,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 197,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 198,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 199,
+      "eventos_salud": [
+        {
+          "start_tick": 12272,
+          "end_tick": 13973,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 5.91
+        }
+      ]
+    },
+    {
+      "caravana_id": 200,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 201,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 202,
+      "eventos_salud": [
+        {
+          "start_tick": 10089,
+          "end_tick": 11072,
+          "severidad_maxima": 2,
+          "progresiva": false,
+          "duracion_dias": 3.41
+        }
+      ]
+    },
+    {
+      "caravana_id": 203,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 204,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 205,
+      "eventos_salud": [
+        {
+          "start_tick": 21246,
+          "end_tick": 22745,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 5.21
+        }
+      ]
+    },
+    {
+      "caravana_id": 206,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 207,
+      "eventos_salud": [
+        {
+          "start_tick": 10239,
+          "end_tick": 10925,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 2.38
+        }
+      ]
+    },
+    {
+      "caravana_id": 208,
+      "eventos_salud": [
+        {
+          "start_tick": 5829,
+          "end_tick": 6907,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 3.75
+        }
+      ]
+    },
+    {
+      "caravana_id": 209,
+      "eventos_salud": [
+        {
+          "start_tick": 10364,
+          "end_tick": 11888,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 5.29
+        }
+      ]
+    },
+    {
+      "caravana_id": 210,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 211,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 212,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 213,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 214,
+      "eventos_salud": [
+        {
+          "start_tick": 6131,
+          "end_tick": 7556,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.95
+        }
+      ]
+    },
+    {
+      "caravana_id": 215,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 216,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 217,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 218,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 219,
+      "eventos_salud": [
+        {
+          "start_tick": 18300,
+          "end_tick": 19116,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 2.83
+        }
+      ]
+    },
+    {
+      "caravana_id": 220,
+      "eventos_salud": [
+        {
+          "start_tick": 20910,
+          "end_tick": 21687,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 2.7
+        }
+      ]
+    },
+    {
+      "caravana_id": 221,
+      "eventos_salud": [
+        {
+          "start_tick": 26893,
+          "end_tick": 27627,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 2.55
+        }
+      ]
+    },
+    {
+      "caravana_id": 222,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 223,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 224,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 225,
+      "eventos_salud": [
+        {
+          "start_tick": 18085,
+          "end_tick": 19416,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.62
+        }
+      ]
+    },
+    {
+      "caravana_id": 226,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 227,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 228,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 229,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 230,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 231,
+      "eventos_salud": [
+        {
+          "start_tick": 11187,
+          "end_tick": 12455,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.41
+        }
+      ]
+    },
+    {
+      "caravana_id": 232,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 233,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 234,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 235,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 236,
+      "eventos_salud": [
+        {
+          "start_tick": 14045,
+          "end_tick": 15222,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.09
+        }
+      ]
+    },
+    {
+      "caravana_id": 237,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 238,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 239,
+      "eventos_salud": [
+        {
+          "start_tick": 17029,
+          "end_tick": 17849,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 2.85
+        }
+      ]
+    },
+    {
+      "caravana_id": 240,
+      "eventos_salud": [
+        {
+          "start_tick": 24202,
+          "end_tick": 25319,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 3.88
+        }
+      ]
+    },
+    {
+      "caravana_id": 241,
+      "eventos_salud": [
+        {
+          "start_tick": 13460,
+          "end_tick": 14710,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.34
+        }
+      ]
+    },
+    {
+      "caravana_id": 242,
+      "eventos_salud": [
+        {
+          "start_tick": 6923,
+          "end_tick": 7737,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 2.83
+        }
+      ]
+    },
+    {
+      "caravana_id": 243,
+      "eventos_salud": [
+        {
+          "start_tick": 6406,
+          "end_tick": 7973,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.44
+        }
+      ]
+    },
+    {
+      "caravana_id": 244,
+      "eventos_salud": [
+        {
+          "start_tick": 10038,
+          "end_tick": 10919,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 3.06
+        }
+      ]
+    },
+    {
+      "caravana_id": 245,
+      "eventos_salud": [
+        {
+          "start_tick": 18993,
+          "end_tick": 20639,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 5.72
+        }
+      ]
+    },
+    {
+      "caravana_id": 246,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 247,
+      "eventos_salud": [
+        {
+          "start_tick": 4459,
+          "end_tick": 5903,
+          "severidad_maxima": 3,
+          "progresiva": false,
+          "duracion_dias": 5.02
+        }
+      ]
+    },
+    {
+      "caravana_id": 248,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 249,
+      "eventos_salud": [
+        {
+          "start_tick": 13712,
+          "end_tick": 14661,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 3.3
+        }
+      ]
+    },
+    {
+      "caravana_id": 250,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 251,
+      "eventos_salud": [
+        {
+          "start_tick": 25513,
+          "end_tick": 26663,
+          "severidad_maxima": 3,
+          "progresiva": true,
+          "duracion_dias": 3.99
+        }
+      ]
+    },
+    {
+      "caravana_id": 252,
+      "eventos_salud": [
+        {
+          "start_tick": 13615,
+          "end_tick": 14864,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.34
+        }
+      ]
+    },
+    {
+      "caravana_id": 253,
+      "eventos_salud": [
+        {
+          "start_tick": 5133,
+          "end_tick": 6706,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.46
+        }
+      ]
+    },
+    {
+      "caravana_id": 254,
+      "eventos_salud": [
+        {
+          "start_tick": 21910,
+          "end_tick": 22983,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 3.73
+        }
+      ]
+    },
+    {
+      "caravana_id": 255,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 256,
+      "eventos_salud": [
+        {
+          "start_tick": 17733,
+          "end_tick": 18828,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 3.8
+        }
+      ]
+    },
+    {
+      "caravana_id": 257,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 258,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 259,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 260,
+      "eventos_salud": [
+        {
+          "start_tick": 15270,
+          "end_tick": 16282,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 3.51
+        }
+      ]
+    },
+    {
+      "caravana_id": 261,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 262,
+      "eventos_salud": [
+        {
+          "start_tick": 4353,
+          "end_tick": 5577,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 4.25
+        }
+      ]
+    },
+    {
+      "caravana_id": 263,
+      "eventos_salud": [
+        {
+          "start_tick": 6421,
+          "end_tick": 8065,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 5.71
+        }
+      ]
+    },
+    {
+      "caravana_id": 264,
+      "eventos_salud": [
+        {
+          "start_tick": 16886,
+          "end_tick": 17914,
+          "severidad_maxima": 3,
+          "progresiva": false,
+          "duracion_dias": 3.57
+        }
+      ]
+    },
+    {
+      "caravana_id": 265,
+      "eventos_salud": [
+        {
+          "start_tick": 24450,
+          "end_tick": 25809,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.72
+        }
+      ]
+    },
+    {
+      "caravana_id": 266,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 267,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 268,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 269,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 270,
+      "eventos_salud": [
+        {
+          "start_tick": 16062,
+          "end_tick": 17018,
+          "severidad_maxima": 2,
+          "progresiva": false,
+          "duracion_dias": 3.32
+        }
+      ]
+    },
+    {
+      "caravana_id": 271,
+      "eventos_salud": [
+        {
+          "start_tick": 18839,
+          "end_tick": 19726,
+          "severidad_maxima": 2,
+          "progresiva": false,
+          "duracion_dias": 3.08
+        }
+      ]
+    },
+    {
+      "caravana_id": 272,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 273,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 274,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 275,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 276,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 277,
+      "eventos_salud": [
+        {
+          "start_tick": 5923,
+          "end_tick": 7510,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 5.51
+        }
+      ]
+    },
+    {
+      "caravana_id": 278,
+      "eventos_salud": [
+        {
+          "start_tick": 8076,
+          "end_tick": 9206,
+          "severidad_maxima": 2,
+          "progresiva": false,
+          "duracion_dias": 3.93
+        }
+      ]
+    },
+    {
+      "caravana_id": 279,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 280,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 281,
+      "eventos_salud": [
+        {
+          "start_tick": 16243,
+          "end_tick": 16955,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 2.47
+        }
+      ]
+    },
+    {
+      "caravana_id": 282,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 283,
+      "eventos_salud": [
+        {
+          "start_tick": 3623,
+          "end_tick": 5206,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.5
+        }
+      ]
+    },
+    {
+      "caravana_id": 284,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 285,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 286,
+      "eventos_salud": [
+        {
+          "start_tick": 2613,
+          "end_tick": 3622,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 3.51
+        }
+      ]
+    },
+    {
+      "caravana_id": 287,
+      "eventos_salud": [
+        {
+          "start_tick": 25063,
+          "end_tick": 26240,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 4.09
+        }
+      ]
+    },
+    {
+      "caravana_id": 288,
+      "eventos_salud": [
+        {
+          "start_tick": 7424,
+          "end_tick": 8111,
+          "severidad_maxima": 1,
+          "progresiva": false,
+          "duracion_dias": 2.39
+        }
+      ]
+    },
+    {
+      "caravana_id": 289,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 290,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 291,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 292,
+      "eventos_salud": [
+        {
+          "start_tick": 23537,
+          "end_tick": 25116,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 5.49
+        }
+      ]
+    },
+    {
+      "caravana_id": 293,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 294,
+      "eventos_salud": [
+        {
+          "start_tick": 17364,
+          "end_tick": 19084,
+          "severidad_maxima": 2,
+          "progresiva": false,
+          "duracion_dias": 5.97
+        }
+      ]
+    },
+    {
+      "caravana_id": 295,
+      "eventos_salud": [
+        {
+          "start_tick": 15066,
+          "end_tick": 15989,
+          "severidad_maxima": 2,
+          "progresiva": true,
+          "duracion_dias": 3.21
+        }
+      ]
+    },
+    {
+      "caravana_id": 296,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 297,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 298,
+      "eventos_salud": [
+        {
+          "start_tick": 24033,
+          "end_tick": 25570,
+          "severidad_maxima": 1,
+          "progresiva": true,
+          "duracion_dias": 5.34
+        }
+      ]
+    },
+    {
+      "caravana_id": 299,
+      "eventos_salud": []
+    },
+    {
+      "caravana_id": 300,
       "eventos_salud": []
     }
   ]

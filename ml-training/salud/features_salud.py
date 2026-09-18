@@ -54,7 +54,7 @@ que corresponde implementar en el backend (ver RECALIBRACION_DIAS en
 SaludDetectorStrategyImpl), no una validación estricta acá.
 """
 
-FEATURE_VERSION = "v1"
+FEATURE_VERSION = "v2"
 
 import math
 from typing import List, Sequence, Tuple
@@ -67,6 +67,27 @@ CALIB_PUNTOS_MINIMO = CALIB_DIAS_MINIMO * SAMPLES_PER_DAY
 DIST_SCALE_FACTOR = 100000
 N_QUARTERS = 4  # bloques de 6hs dentro de cada ventana de 24hs (72 puntos c/u)
 EPS = 1e-6
+
+# v2: suavizado de posición antes de calcular distancia (ver investigación
+# de causa raíz del falso positivo de celo, y por qué el mismo fix de ruido
+# GPS que arregló celo colapsó este modelo). El ruido de medición GNSS real
+# (~15.5m de desvío estándar por eje entre fixes CONSECUTIVOS) es más grande
+# que el desplazamiento real que distingue un animal sano de uno enfermo
+# (desde ~0.2m/tick en inmovilidad severa hasta ~5m/tick en hiperactividad),
+# así que la distancia cruda punto-a-punto queda dominada por ruido sea cual
+# sea el estado de salud real, y `mean_distancia`/`std_distancia` (agregados
+# sobre esa distancia cruda) perdían casi toda la señal. Promediar la
+# posición en bloques de DIST_SMOOTHING_TICKS antes de calcular la distancia
+# reduce el ruido efectivo por eje en un factor ~sqrt(DIST_SMOOTHING_TICKS)
+# sin destruir el desplazamiento real, que persiste a lo largo de varios
+# ticks. Se barrieron valores de 6 a 48 ticks contra el dataset sintético
+# regenerado (RandomForest de una sola semilla, PR-AUC de "desvío" como
+# métrica): 18 ticks (90 min) dio el mejor resultado empírico (PR-AUC
+# ~0.64 vs. ~0.51 con 6 ticks y ~0.48 con 48 -- ni muy poco ni demasiado
+# suavizado). 18 divide tanto SAMPLES_PER_DAY (288) como el tamaño de
+# cuarto (72), así que los bloques quedan alineados con los días y no
+# rompen la agregación por cuartos.
+DIST_SMOOTHING_TICKS = 18
 
 # Orden fijo del vector de features. Entrenamiento y serving DEBEN
 # recorrer esta misma lista en el mismo orden.
@@ -92,17 +113,44 @@ class ErrorCalibracionInsuficiente(ValueError):
     pass
 
 
+def _block_mean_positions(coord: np.ndarray, window: int) -> np.ndarray:
+    """Promedio de coord en bloques no solapados de `window` ticks (el
+    último bloque puede quedar más corto si len(coord) no es múltiplo
+    exacto). Devuelve un valor por bloque."""
+    n = len(coord)
+    n_blocks = int(np.ceil(n / window))
+    means = np.empty(n_blocks, dtype=np.float64)
+    for b in range(n_blocks):
+        s, e = b * window, min(n, (b + 1) * window)
+        means[b] = coord[s:e].mean()
+    return means
+
+
 def distancias_desde_coords(lat: Sequence[float], lon: Sequence[float]) -> np.ndarray:
-    """Distancia euclídea entre puntos GPS consecutivos, escalada (mismo
-    criterio que el modelo de celo: no es una distancia geodésica real,
-    es un proxy relativo consistente entre calibración y evaluación)."""
+    """Distancia euclídea entre posiciones GPS suavizadas (promedio de
+    bloques de DIST_SMOOTHING_TICKS, ver comentario en esa constante),
+    escalada (mismo criterio que el modelo de celo: no es una distancia
+    geodésica real, es un proxy relativo consistente entre calibración y
+    evaluación). Cada tick hereda la distancia de SU bloque -- el array
+    devuelto tiene el mismo largo que lat/lon de entrada, igual que antes,
+    para no romper el resto de la extracción de features."""
     lat = np.asarray(lat, dtype=np.float64)
     lon = np.asarray(lon, dtype=np.float64)
-    dist = np.zeros(len(lat), dtype=np.float64)
-    if len(lat) > 1:
-        d = np.sqrt(np.diff(lat) ** 2 + np.diff(lon) ** 2) * DIST_SCALE_FACTOR
-        dist[1:] = d
-    return dist
+    n = len(lat)
+    dist = np.zeros(n, dtype=np.float64)
+    if n <= 1:
+        return dist
+
+    lat_blocks = _block_mean_positions(lat, DIST_SMOOTHING_TICKS)
+    lon_blocks = _block_mean_positions(lon, DIST_SMOOTHING_TICKS)
+    block_dist = np.zeros(len(lat_blocks), dtype=np.float64)
+    if len(lat_blocks) > 1:
+        block_dist[1:] = np.sqrt(
+            np.diff(lat_blocks) ** 2 + np.diff(lon_blocks) ** 2
+        ) * DIST_SCALE_FACTOR
+
+    block_idx = np.arange(n) // DIST_SMOOTHING_TICKS
+    return block_dist[block_idx]
 
 
 def _split_full_days(move_state: np.ndarray, dist: np.ndarray) -> List[Tuple[np.ndarray, np.ndarray]]:

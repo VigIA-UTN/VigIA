@@ -160,9 +160,15 @@ def main():
                          help="Semilla fija de partición de datos (GroupShuffleSplit)")
     parser.add_argument("--init-seeds", type=int, nargs="+", default=[42, 43, 44, 45, 46],
                          help="5 semillas del estimador, misma partición")
-    parser.add_argument("--n-estimators", type=int, default=300)
-    parser.add_argument("--max-depth", type=int, default=8)
+    parser.add_argument("--n-estimators", type=int, default=600,
+                         help="Ver justificación del default en README.md (sweep empírico: "
+                              "max_depth=8/n_estimators=300 estaba subajustado)")
+    parser.add_argument("--max-depth", type=int, default=0,
+                         help="0 = sin límite (deja crecer el árbol hasta hojas puras, "
+                              "pasado tal cual a RandomForestClassifier(max_depth=None)); "
+                              "cualquier otro valor limita la profundidad como de costumbre")
     args = parser.parse_args()
+    max_depth = None if args.max_depth == 0 else args.max_depth
 
     d = Path(args.dataset_dir)
     X, y, groups = build_feature_table(d)
@@ -194,7 +200,7 @@ def main():
 
         clf = RandomForestClassifier(
             n_estimators=args.n_estimators,
-            max_depth=args.max_depth,
+            max_depth=max_depth,
             class_weight="balanced",
             random_state=init_seed,
             n_jobs=-1,
@@ -245,7 +251,7 @@ def main():
             "n_train": len(X_train),
             "n_test": len(X_test),
             "n_estimators": args.n_estimators,
-            "max_depth": args.max_depth,
+            "max_depth": max_depth,
             "test_classification_report_multiclase": report_multiclase,
             "test_confusion_matrix_multiclase": cm_multiclase.tolist(),
             "pr_auc_desvio": pr_auc_desvio,
