@@ -116,6 +116,7 @@ export interface AlertaDetalleResponse {
   datoDisparador: string;
   estadoActual: string;
   usuarioAccion?: string;
+  accionRecomendada: string;
   ultimosEstadosReproductivos?: {
     id: number;
     animalId: number;
