@@ -235,6 +235,19 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             </div>
 
+            {detalle.accionRecomendada && (<div>
+              <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
+                <i className="bi bi-info-circle"></i> Acción recomendada
+              </h6>
+              <div className="card border-0 shadow-sm rounded-4">
+                <div className="card-body">
+                  <p className="m-0" style={{ color: '#2D3748', fontSize: '0.95rem' }}>
+                    {detalle.accionRecomendada}
+                  </p>
+                </div>
+              </div>
+            </div>)}
+
             {/* Detalle sanitario (solo alertas de SALUD) */}
             {isSanitaria && detSan && <SanitarioAlertDetail detalle={detSan} />}
 

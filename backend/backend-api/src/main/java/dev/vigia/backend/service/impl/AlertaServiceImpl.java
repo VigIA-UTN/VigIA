@@ -328,6 +328,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 .valorUmbral(alerta.getValorUmbral())
                                 .descripcionDatoOrigen(descripcionDatoOrigen)
                                 .detalleSanitario(detalleSanitario)
+                                .accionRecomendada(alerta.getAccionRecomendada())
                                 .build();
         }
 
@@ -477,7 +478,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 estadoCelo.setEstado(TipoReproductivo.CELO);
                                 estadoCelo.setOrigen(OrigenEstado.MANUAL);
                                 estadoCelo.setFechaRegistro(LocalDateTime.now());
-                                
+
                                 List<EstadoReproductivo> estadosActuales = alerta.getAnimal().getEstadosReproductivos();
                                 if (estadosActuales != null && !estadosActuales.isEmpty()) {
                                         EstadoReproductivo ultimo = estadosActuales.get(0);
@@ -679,7 +680,8 @@ public class AlertaServiceImpl implements AlertaService {
                 intervencion.setAnimal(alerta.getAnimal());
                 intervencion.setInterventor(usuario);
                 intervencion.setDescripcion(request.getDescripcion().trim());
-                intervencion.setFechaHora(request.getFechaHora() != null ? request.getFechaHora() : LocalDateTime.now());
+                intervencion.setFechaHora(
+                                request.getFechaHora() != null ? request.getFechaHora() : LocalDateTime.now());
                 intervencion.setTipo(request.getTipo());
                 intervencionRepository.save(intervencion);
 
@@ -688,7 +690,8 @@ public class AlertaServiceImpl implements AlertaService {
                 return this.toResponse(alerta);
         }
 
-        // ── Línea de tiempo ───────────────────────────────────────────────────────────
+        // ── Línea de tiempo
+        // ───────────────────────────────────────────────────────────
 
         @Override
         @Transactional(readOnly = true)
@@ -709,7 +712,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
 
                 // 3. Verificar aislamiento multi-tenant: el animal debe pertenecer a un
-                //    establecimiento activo del usuario autenticado
+                // establecimiento activo del usuario autenticado
                 Long establecimientoId = animal.getEstablecimiento() != null
                                 ? animal.getEstablecimiento().getId()
                                 : null;
@@ -764,19 +767,20 @@ public class AlertaServiceImpl implements AlertaService {
                 }
                 return switch (tipo.trim().toLowerCase()) {
                         case "celo", "reproductivo" -> DisparadorAlerta.CELO;
-                        case "sanitario"            -> DisparadorAlerta.SALUD;
-                        case "geoespacial"           -> DisparadorAlerta.ABIGEATO;
-                        case "perimetro"             -> DisparadorAlerta.FUERA_DE_PERIMETRO;
-                        default                      -> null;
+                        case "sanitario" -> DisparadorAlerta.SALUD;
+                        case "geoespacial" -> DisparadorAlerta.ABIGEATO;
+                        case "perimetro" -> DisparadorAlerta.FUERA_DE_PERIMETRO;
+                        default -> null;
                 };
         }
 
         private String resolverEstadoResolucion(EstadoAlerta estado) {
-                if (estado == null) return "SIN_ATENDER";
+                if (estado == null)
+                        return "SIN_ATENDER";
                 return switch (estado) {
                         case CONFIRMADA -> "CONFIRMADA";
                         case DESCARTADA -> "DESCARTADA";
-                        default         -> "SIN_ATENDER";
+                        default -> "SIN_ATENDER";
                 };
         }
 
