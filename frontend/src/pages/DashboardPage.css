@@ -1,11 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════
-   Dashboard — VigIA  (fondo navy en todas las cards)
+   Dashboard "Centro de mando diario" — VigIA
    ═══════════════════════════════════════════════════════════════ */
 
 .dashboard-page {
-    padding: 32px 24px 56px;
-    background: #F4F6F9;
+    padding: 28px 24px 60px;
+    background: #F4F6F9; /* Fondo claro de la foto */
     min-height: calc(100vh - 60px);
+    font-family: inherit;
+    color: #1A3558; /* Texto oscuro por defecto */
 }
 
 /* ── Header ──────────────────────────────────────────────────────────── */
@@ -13,547 +15,620 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    max-width: 1200px;
-    margin: 0 auto 24px;
-}
-
-/* ── Base card — fondo navy oscuro ────────────────────────────────────  */
-.dash-card {
-    background: #1A3558;
-    border-radius: 16px;
-    padding: 24px 28px;
-    box-shadow: 0 4px 18px rgba(26, 53, 88, 0.35);
-}
-
-.dash-card-full {
-    max-width: 1200px;
-    margin: 0 auto 20px;
-}
-
-/* ── Section title ───────────────────────────────────────────────────── */
-.dash-section-title {
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 0.74rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin: 0 0 18px;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   KPI CHIPS ROW — también fondo navy
-   ══════════════════════════════════════════════════════════════ */
-.dash-kpi-row {
-    display: flex;
-    gap: 14px;
-    max-width: 1200px;
+    max-width: 1280px;
     margin: 0 auto 20px;
     flex-wrap: wrap;
+    gap: 10px;
 }
 
-.dash-kpi-chip {
-    background: #1A3558;
-    border-radius: 14px;
-    border-left: 5px solid transparent;
-    padding: 20px 24px;
-    flex: 1 1 160px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 4px 14px rgba(26, 53, 88, 0.35);
-    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s;
-}
-
-.dash-kpi-chip:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(26, 53, 88, 0.45);
-    background: #1E3A5F;
-}
-
-.dash-kpi-chip-icon {
-    font-size: 1.7rem;
-    flex-shrink: 0;
-    line-height: 1;
-    opacity: 0.9;
-}
-
-.dash-kpi-chip-body {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.dash-kpi-chip-val {
-    font-size: 2.4rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.03em;
-    /* color viene por inline style */
-}
-
-.dash-kpi-chip-lbl {
-    font-size: 0.82rem;
-    color: rgba(255, 255, 255, 0.55);
+.dash-header-left h2 {
+    font-size: 1.8rem;
     font-weight: 500;
+    color: #1A3558;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   PANELS ROW (2-column grid)
-   ══════════════════════════════════════════════════════════════ */
-.dash-panels-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    max-width: 1200px;
-    margin: 0 auto 20px;
-}
-
-/* ── Reproductive distribution bars ─────────────────────────────────── */
-.dash-repro-dist {
-    margin-bottom: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.dash-dist-row {
+.dash-header-meta {
+    font-size: 0.8rem;
+    color: #64748B;
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-.dash-dist-label {
-    width: 90px;
-    flex-shrink: 0;
-    font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.8);
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.dash-dist-bar-track {
-    flex: 1;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 999px;
-    height: 8px;
-    overflow: hidden;
-}
-
-.dash-dist-bar {
-    height: 100%;
-    border-radius: 999px;
-    transition: width 0.5s ease;
-    min-width: 4px;
-}
-
-/* Colores por estado reproductivo */
-.dash-repro-gestante    { background: #38A169; }
-.dash-repro-celo        { background: #E53E3E; }
-.dash-repro-posible_celo { background: #D69E2E; }
-.dash-repro-vacia       { background: rgba(255,255,255,0.35); }
-.dash-repro-inseminada  { background: #13D4FB; }
-.dash-repro-anestro     { background: #3B8D99; }
-.dash-repro-parida      { background: #38A169; }
-
-.dash-dist-count {
-    width: 24px;
-    text-align: right;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.9);
-    flex-shrink: 0;
-}
-
-/* ── Celo mini KPIs ─────────────────────────────────────────────────── */
-.dash-celo-kpis {
-    display: flex;
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-    overflow: hidden;
-    margin-bottom: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.dash-celo-kpi {
-    flex: 1;
-    padding: 14px 14px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    text-align: center;
-}
-
-.dash-celo-kpi:last-child {
-    border-right: none;
-}
-
-.dash-celo-kpi-val {
-    font-size: 1.8rem;
-    font-weight: 800;
-    color: #ffffff;
-    line-height: 1;
-}
-
-.dash-celo-kpi-lbl {
-    font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.45);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-}
-
-/* ── Health segmented bar ────────────────────────────────────────────── */
-.dash-salud-bar-wrap {
-    display: flex;
-    height: 14px;
-    border-radius: 999px;
-    overflow: hidden;
-    margin-bottom: 12px;
-    gap: 2px;
-    background: rgba(255, 255, 255, 0.08);
-}
-
-.dash-salud-seg {
-    border-radius: 999px;
-    transition: flex 0.4s ease;
-}
-
-.dash-salud-sano    { background: #38A169; }
-.dash-salud-obs     { background: #D69E2E; }
-.dash-salud-enfermo { background: #E53E3E; }
-
-.dash-salud-legend {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-bottom: 18px;
-}
-
-.dash-leg-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.dash-leg-item strong {
-    color: #ffffff;
-}
-
-/* ── Dots ────────────────────────────────────────────────────────────── */
-.dash-dot {
-    width: 8px;
-    height: 8px;
+.dash-live-dot {
+    width: 7px;
+    height: 7px;
+    background: #8CC63F;
     border-radius: 50%;
     display: inline-block;
-    flex-shrink: 0;
+    animation: pulse-green 2s infinite;
 }
 
-.dash-dot-sano    { background: #38A169; }
-.dash-dot-obs     { background: #D69E2E; }
-.dash-dot-enfermo { background: #E53E3E; }
-
-/* ── Animal lists ────────────────────────────────────────────────────── */
-.dash-animal-list {
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-    padding: 14px 16px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+@keyframes pulse-green {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.8); }
 }
 
-.dash-animal-list-title {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: rgba(255, 255, 255, 0.45);
-    margin: 0 0 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.dash-animal-row {
+/* ── Filtro de lote ──────────────────────────────────────────────────── */
+.dash-lote-filter {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 8px;
-    border-radius: 8px;
+    font-size: 0.82rem;
+    color: #64748B;
+}
+
+.dash-lote-select {
+    background: transparent;
+    border: none;
+    color: #64748B;
+    font-size: 0.82rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: background 0.15s;
-    font-size: 0.9rem;
+    outline: none;
 }
 
-.dash-animal-row:hover {
-    background: rgba(255, 255, 255, 0.08);
-}
-
-.dash-animal-nombre {
-    font-weight: 600;
-    color: #ffffff;
-    flex: 1;
-}
-
-.dash-animal-rodeo {
-    font-size: 0.72rem;
-    color: rgba(255, 255, 255, 0.7);
-    background: rgba(255, 255, 255, 0.12);
-    border-radius: 20px;
-    padding: 2px 8px;
-    white-space: nowrap;
-}
-
-.dash-ok-text {
-    font-size: 0.87rem;
-    color: rgba(255, 255, 255, 0.5);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 0;
-}
-
-/* ── Health badges ───────────────────────────────────────────────────── */
-.dash-salud-badge {
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: 20px;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.dash-salud-badge-obs {
-    background: rgba(214, 158, 46, 0.25);
-    color: #ECC94B;
-    border: 1px solid rgba(214, 158, 46, 0.4);
-}
-
-.dash-salud-badge-enfermo {
-    background: rgba(229, 62, 62, 0.25);
-    color: #FC8181;
-    border: 1px solid rgba(229, 62, 62, 0.4);
+.dash-lote-select option {
+    background: #fff;
+    color: #1A3558;
 }
 
 /* ══════════════════════════════════════════════════════════════
-   ALERTAS RECIENTES
+   KPI CHIPS ROW (4 chips)
    ══════════════════════════════════════════════════════════════ */
-.dash-card-header-row {
+.dash-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    max-width: 1280px;
+    margin: 0 auto 18px;
+}
+
+.dash-kpi-chip {
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #E2E8F0;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    cursor: default;
+}
+
+.dash-kpi-chip-label {
+    font-size: 0.8rem;
+    color: #64748B;
+    font-weight: 500;
+}
+
+.dash-kpi-chip-val {
+    font-size: 2.4rem;
+    font-weight: 400;
+    line-height: 1.1;
+    color: #1A3558;
+    letter-spacing: -0.02em;
+}
+
+.dash-kpi-chip-sub {
+    font-size: 0.75rem;
+    color: #94A3B8;
+    font-weight: 400;
+    margin-top: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MAIN GRID (left 2/3 + right 1/3)
+   ══════════════════════════════════════════════════════════════ */
+.dash-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 18px;
+    max-width: 1280px;
+    margin: 0 auto 18px;
+    align-items: start;
+}
+
+.dash-left-col, .dash-right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* ── Card base (blancas) ────────────────────────────────────────────── */
+.dash-card {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    padding: 20px 24px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+}
+
+/* ── Card dark (Solo para idea 4: Cobertura) ────────────────────────── */
+.dash-card-dark {
+    background: #1A3558;
+    border: none;
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(26, 53, 88, 0.28);
+}
+.dash-card-dark .dash-card-title {
+    color: #ffffff;
+}
+
+.dash-card-full {
+    max-width: 1280px;
+    margin: 0 auto 18px;
+}
+
+/* ── Card header ─────────────────────────────────────────────────────── */
+.dash-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 16px;
 }
 
-.dash-card-header-row .dash-section-title {
-    margin-bottom: 0;
+.dash-card-title {
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: #1A3558;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.dash-card-tag {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #94A3B8;
 }
 
 .dash-ver-todas-btn {
     background: none;
     border: none;
-    color: #13D4FB;
-    font-size: 0.85rem;
-    font-weight: 600;
+    color: #64748B;
+    font-size: 0.8rem;
+    font-weight: 500;
     cursor: pointer;
-    padding: 4px 10px;
+    padding: 4px 8px;
     border-radius: 6px;
-    transition: background 0.15s;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    transition: background 0.15s, color 0.15s;
 }
 
 .dash-ver-todas-btn:hover {
-    background: rgba(19, 212, 251, 0.1);
+    background: #F1F5F9;
+    color: #1A3558;
 }
 
-.dash-alertas-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+.dash-card-dark .dash-ver-todas-btn {
+    color: rgba(255,255,255,0.7);
 }
-
-.dash-alerta-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: border-color 0.15s;
-    flex-wrap: wrap;
-}
-
-.dash-alerta-row:hover {
-    border-color: rgba(255, 255, 255, 0.22);
-}
-
-/* Tipo chips */
-.dash-tipo-chip {
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 20px;
-    white-space: nowrap;
-    flex-shrink: 0;
-    border: 1.5px solid;
-}
-
-/* Celo: cyan del sistema */
-.dash-tipo-celo {
-    background: rgba(19, 212, 251, 0.12);
-    color: #13D4FB;
-    border-color: rgba(19, 212, 251, 0.4);
-}
-
-/* Salud: ámbar MEDIA */
-.dash-tipo-salud {
-    background: rgba(214, 158, 46, 0.15);
-    color: #ECC94B;
-    border-color: rgba(214, 158, 46, 0.4);
-}
-
-/* Posición/Abigeato: rojo ALTA */
-.dash-tipo-geoespacial,
-.dash-tipo-abigeato {
-    background: rgba(229, 62, 62, 0.15);
-    color: #FC8181;
-    border-color: rgba(229, 62, 62, 0.4);
-}
-
-.dash-alerta-animal {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.9);
-    cursor: pointer;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    transition: color 0.15s;
-}
-
-.dash-alerta-animal:hover {
-    color: #13D4FB;
-}
-
-/* Severity chips */
-.dash-sev-chip {
-    font-size: 0.68rem;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 20px;
-    white-space: nowrap;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    flex-shrink: 0;
-}
-
-/* Exactamente los mismos colores que AlertNotificationCard — versión sobre dark */
-.dash-sev-alta   { background: rgba(229, 62, 62, 0.25);   color: #FC8181; }
-.dash-sev-media  { background: rgba(214, 158, 46, 0.25);  color: #ECC94B; }
-.dash-sev-baja   { background: rgba(56, 161, 105, 0.25);  color: #68D391; }
-
-.dash-alerta-tiempo {
-    font-size: 0.77rem;
-    color: rgba(255, 255, 255, 0.35);
-    flex-shrink: 0;
-    margin-left: auto;
-    white-space: nowrap;
+.dash-card-dark .dash-ver-todas-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
 }
 
 /* ══════════════════════════════════════════════════════════════
-   RODEOS / LOTES
+   IDEA 1 — COLA DE ATENCIÓN
    ══════════════════════════════════════════════════════════════ */
-.dash-rodeos-grid {
+.dash-cola-header-row {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 14px;
+    grid-template-columns: 24px 1.2fr 1.2fr 1fr 1fr 80px;
+    gap: 8px 10px;
+    padding: 0 4px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #94A3B8;
+    border-bottom: 1px solid #E2E8F0;
+    margin-bottom: 6px;
 }
 
-.dash-rodeo-card {
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 14px;
-    padding: 18px 20px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: background 0.15s, transform 0.15s;
+.dash-cola-row {
+    display: grid;
+    grid-template-columns: 24px 1.2fr 1.2fr 1fr 1fr 80px;
+    gap: 8px 10px;
+    align-items: center;
+    padding: 10px 4px;
+    border-radius: 8px;
+    transition: background 0.15s;
+    cursor: pointer;
 }
 
-.dash-rodeo-card:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
+.dash-cola-row:hover {
+    background: rgba(140, 198, 63, 0.1);
 }
 
-.dash-rodeo-name {
+/* Dot de severidad */
+.dash-sev-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-left: 7px;
+}
+
+.dash-sev-dot-alta   { background: #E53E3E; box-shadow: 0 0 4px rgba(229,62,62,0.4); }
+.dash-sev-dot-media  { background: #D69E2E; }
+.dash-sev-dot-baja   { background: #38A169; }
+.dash-sev-dot-none   { background: #CBD5E1; }
+
+/* Animal nombre */
+.dash-cola-nombre {
     font-size: 1rem;
-    font-weight: 700;
-    color: #ffffff;
-    margin: 0 0 14px;
+    font-weight: 500;
+    color: #475569;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.dash-rodeo-kpis {
+/* Línea de recomendación gris como en la foto */
+.dash-cola-rec-bar {
+    height: 6px;
+    background: #E2E8F0;
+    border-radius: 999px;
+    width: 100%;
+    max-width: 110px;
+}
+
+/* Tipo chip */
+.dash-tipo-chip {
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: 20px;
+    border: 1px solid #CBD5E1;
+    color: #64748B;
+    white-space: nowrap;
+    text-align: center;
+    background: transparent;
+    justify-self: center;
+}
+
+/* Antigüedad / countdown */
+.dash-cola-tiempo {
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    padding: 0 10px;
+    justify-self: center;
+}
+
+.dash-cola-tiempo-urgente {
+    color: #E53E3E;
+}
+
+/* Botón atender */
+.dash-atender-btn {
+    background: #8CC63F;
+    border: 1px solid #8CC63F;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 4px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    white-space: nowrap;
+}
+
+.dash-atender-btn:hover {
+    background: #7ab334;
+    border-color: #7ab334;
+}
+
+.dash-atender-btn-outline {
+    background: #ffffff;
+    border: 1px solid #CBD5E1;
+    color: #64748B;
+}
+
+.dash-atender-btn-outline:hover {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+    color: #1A3558;
+}
+
+.dash-divider {
+    border: none;
+    border-top: 1px solid #F1F5F9;
+    margin: 4px 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 2 — VENTANAS DE INSEMINACIÓN
+   ══════════════════════════════════════════════════════════════ */
+.dash-ventana-row {
     display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.dash-ventana-id {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #475569;
+    width: 60px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.dash-ventana-bar-track {
+    flex: 1;
+    height: 10px;
+    background: #E2E8F0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.dash-ventana-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.5s;
+}
+
+.dash-ventana-bar-optima   { background: #8CC63F; }
+.dash-ventana-bar-venciendo { background: #ECC94B; }
+.dash-ventana-bar-critica  { background: #E53E3E; }
+
+.dash-ventana-restante {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #64748B;
+    width: 80px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 4 — COBERTURA DE COLLARES
+   ══════════════════════════════════════════════════════════════ */
+.dash-coverage-pct {
+    font-size: 3.2rem;
+    font-weight: 500;
+    line-height: 1;
+    margin-bottom: 4px;
+    color: #ffffff;
+}
+
+.dash-coverage-sub {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 18px;
+}
+
+.dash-coverage-bar-wrap {
+    display: flex;
+    height: 12px;
+    border-radius: 999px;
+    overflow: hidden;
+    gap: 2px;
+    background: rgba(255,255,255,0.1);
+    margin-bottom: 18px;
+}
+
+.dash-coverage-seg {
+    border-radius: 999px;
+    transition: flex 0.4s ease;
+}
+
+.dash-coverage-ok        { background: #8CC63F; }
+.dash-coverage-calibrando { background: #13D4FB; }
+.dash-coverage-silencio  { background: #D69E2E; }
+.dash-coverage-bateria   { background: #E53E3E; }
+.dash-coverage-sincollar { background: rgba(255,255,255,0.3); }
+
+.dash-coverage-legend {
+    display: flex;
+    flex-direction: column;
     gap: 8px;
 }
 
-.dash-rodeo-kpi {
-    flex: 1;
+.dash-coverage-leg-row {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    text-align: center;
+    justify-content: space-between;
+    font-size: 0.8rem;
 }
 
-.dash-rodeo-val {
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: #ffffff;
-    line-height: 1;
+.dash-coverage-leg-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255,255,255,0.85);
 }
 
-.dash-rodeo-lbl {
-    font-size: 0.65rem;
-    color: rgba(255, 255, 255, 0.45);
+.dash-coverage-leg-count {
     font-weight: 600;
+    color: #ffffff;
+}
+
+/* ── Dot ─────────────────────────────────────────────────────────────── */
+.dash-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 5 — MAPA VIVO (mini)
+   ══════════════════════════════════════════════════════════════ */
+.dash-map-wrap {
+    border-radius: 8px;
+    overflow: hidden;
+    height: 200px;
+    position: relative;
+    cursor: pointer;
+}
+
+
+
+/* ══════════════════════════════════════════════════════════════
+   BELOW THE FOLD SECTION
+   ══════════════════════════════════════════════════════════════ */
+.dash-fold-label {
+    max-width: 1280px;
+    margin: 0 auto 16px;
+    text-align: center;
+    font-size: 0.75rem;
+    color: #94A3B8;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dash-fold-label::before,
+.dash-fold-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #E2E8F0;
+}
+
+.dash-below-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    max-width: 1280px;
+    margin: 0 auto 18px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 6 — EMBUDO REPRODUCTIVO
+   ══════════════════════════════════════════════════════════════ */
+.dash-embudo-bar-wrap {
+    display: flex;
+    height: 20px;
+    border-radius: 999px;
+    overflow: hidden;
+    gap: 2px;
+    margin-bottom: 14px;
+}
+
+.dash-embudo-seg {
+    border-radius: 999px;
+    transition: flex 0.5s ease;
+    min-width: 3px;
+}
+
+.dash-embudo-vacia       { background: #E2E8F0; } /* Gris claro */
+.dash-embudo-celo        { background: #13D4FB; } /* Cyan */
+.dash-embudo-inseminada  { background: #3B8D99; } /* Teal */
+.dash-embudo-gestante    { background: #8CC63F; } /* Verde brand */
+.dash-embudo-anestro     { background: #94A3B8; } /* Gris medio */
+.dash-embudo-posible_celo { background: #D69E2E; } /* Ambar */
+.dash-embudo-parida      { background: #38A169; } /* Verde oscuro */
+.dash-embudo-sin_estado  { background: #F1F5F9; } /* Gris muy claro */
+
+.dash-embudo-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+}
+
+.dash-embudo-leg-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #64748B;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-top: 3px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+}
+
+.dash-embudo-leg-item strong {
+    display: none; /* Según la foto, solo texto, no hay cantidades */
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 3 — ANIMALES A REVISAR (SANIDAD) -> Adaptado al light theme
+   ══════════════════════════════════════════════════════════════ */
+.dash-revisar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 6px;
+    border-radius: 8px;
+    transition: background 0.15s;
+    cursor: pointer;
+}
+
+.dash-revisar-row:hover {
+    background: #F8FAFC;
+}
+
+.dash-revisar-nombre {
+    flex: 1;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #1A3558;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-revisar-causa {
+    font-size: 0.85rem;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+
+.dash-salud-badge {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 20px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.dash-salud-badge-obs {
+    background: #FEFCBF;
+    color: #B7791F;
+    border: 1px solid #F6E05E;
+}
+
+.dash-salud-badge-enfermo {
+    background: #FED7D7;
+    color: #C53030;
+    border: 1px solid #FC8181;
 }
 
 /* ══════════════════════════════════════════════════════════════
    MISC
    ══════════════════════════════════════════════════════════════ */
+.dash-no-items {
+    font-size: 1rem;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+}
+
 .dash-loading-center {
     display: flex;
     justify-content: center;
-    align-items: center;
-    padding: 24px;
-}
-
-.dash-no-items {
-    font-size: 0.87rem;
-    color: rgba(255, 255, 255, 0.5);
-    padding: 8px 0 0;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    padding: 20px;
 }
 
 .dash-empty {
-    background: #1A3558;
-    border-radius: 18px;
+    background: #ffffff;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
     padding: 40px 24px;
     text-align: center;
-    color: rgba(255, 255, 255, 0.45);
+    color: #64748B;
     font-size: 0.9rem;
     max-width: 860px;
     margin: 0 auto;
@@ -562,8 +637,28 @@
 /* ══════════════════════════════════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════════════════════════════════ */
+@media (max-width: 1100px) {
+    .dash-main-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dash-right-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+    }
+}
+
 @media (max-width: 900px) {
-    .dash-panels-row {
+    .dash-kpi-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .dash-below-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dash-right-col {
         grid-template-columns: 1fr;
     }
 }
@@ -573,36 +668,17 @@
         padding: 20px 14px 40px;
     }
 
-    .dash-kpi-chip {
-        flex: 1 1 130px;
-        padding: 14px 16px;
+    .dash-kpi-row {
+        grid-template-columns: 1fr 1fr;
     }
 
     .dash-kpi-chip-val {
-        font-size: 1.8rem;
-    }
-
-    .dash-rodeos-grid {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        font-size: 2rem;
     }
 }
 
 @media (max-width: 480px) {
     .dash-kpi-row {
-        gap: 10px;
-    }
-
-    .dash-kpi-chip {
-        flex: 1 1 100%;
-    }
-
-    .dash-alerta-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 6px;
-    }
-
-    .dash-alerta-tiempo {
-        margin-left: 0;
+        grid-template-columns: 1fr;
     }
 }
