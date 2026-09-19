@@ -255,6 +255,8 @@ class SaludDetectorStrategyImplTest {
         assertEquals(Boolean.TRUE, guardada.getDesvioDetectado());
         assertEquals("Enfermedad moderada / Cojera clínica", guardada.getPosibleCausa());
         assertEquals("SALUD", guardada.getTipo());
+        assertEquals("Apartar al animal para revisión clínica y evaluar tratamiento. Causa sospechada: Enfermedad moderada / Cojera clínica (riesgo medio).",
+                guardada.getAccionRecomendada());
 
         // La serie comparativa se congela como JSON en la alerta (no se recalcula on-read).
         assertNotNull(guardada.getSerieComparativaJson());
@@ -275,6 +277,8 @@ class SaludDetectorStrategyImplTest {
         dev.vigia.backend.dto.ml.AlertaEventDTO evento = eventCaptor.getValue();
         assertEquals(Boolean.TRUE, evento.getDesvioDetectado());
         assertEquals("Enfermedad moderada / Cojera clínica", evento.getPosibleCausa());
+        assertEquals("Apartar al animal para revisión clínica y evaluar tratamiento. Causa sospechada: Enfermedad moderada / Cojera clínica (riesgo medio).",
+                evento.getAccionRecomendada());
     }
 
     @SuppressWarnings("null")

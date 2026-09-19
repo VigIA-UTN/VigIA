@@ -432,6 +432,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
                                 .estado(alerta.getEstado())
+                                .accionRecomendada(alerta.getAccionRecomendada())
                                 .build();
         }
 

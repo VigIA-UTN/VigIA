@@ -113,15 +113,11 @@ class GeofenceVerificationServiceTest {
         when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(eq(animal), eq(DisparadorAlerta.FUERA_DE_PERIMETRO), any()))
                 .thenReturn(false);
 
-        Alerta alertaGuardada = new Alerta();
-        alertaGuardada.setId(999L);
-        alertaGuardada.setAnimal(animal);
-        alertaGuardada.setTipo("Fuera de Perímetro");
-        alertaGuardada.setDisparador(DisparadorAlerta.FUERA_DE_PERIMETRO);
-        alertaGuardada.setSeveridad(SeveridadAlerta.ALTA);
-        alertaGuardada.setTsGeneracion(LocalDateTime.now());
-
-        when(alertaRepository.save(any(Alerta.class))).thenReturn(alertaGuardada);
+        when(alertaRepository.save(any(Alerta.class))).thenAnswer(inv -> {
+            Alerta a = inv.getArgument(0);
+            a.setId(999L);
+            return a;
+        });
 
         geofenceVerificationService.verificarPosicion(animal, -40.0, -60.0, LocalDateTime.now());
 
@@ -131,8 +127,13 @@ class GeofenceVerificationServiceTest {
         assertThat(capturada.getDisparador()).isEqualTo(DisparadorAlerta.FUERA_DE_PERIMETRO);
         assertThat(capturada.getTipo()).isEqualTo("Fuera de Perímetro");
         assertThat(capturada.getSeveridad()).isEqualTo(SeveridadAlerta.ALTA);
+        assertThat(capturada.getAccionRecomendada())
+                .isEqualTo("Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.");
 
-        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), any(AlertaEventDTO.class));
+        ArgumentCaptor<AlertaEventDTO> eventCaptor = ArgumentCaptor.forClass(AlertaEventDTO.class);
+        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getAccionRecomendada())
+                .isEqualTo("Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.");
     }
 
     @Test

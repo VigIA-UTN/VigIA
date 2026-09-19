@@ -300,6 +300,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         alerta.setPosibleCausa(response.getPosibleCausa());
         alerta.setSerieComparativaJson(serializarSerieComparativa(animal, ventanaEvaluar, perfil, perfilCalculadoEn,
                 severidad.name(), response.getPosibleCausa()));
+        alerta.setAccionRecomendada(buildAccionRecomendada(response.getPosibleCausa(), severidad));
 
         alerta = alertaRepository.save(alerta);
 

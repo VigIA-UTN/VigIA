@@ -7,7 +7,8 @@ export interface AlertaResponse {
   tsGeneracion: string;
   estado: string;
   severidad?: "ALTA" | "MEDIA" | "BAJA";
-  gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';//no entiendo de donde se saca
+  gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';
+  accionRecomendada: string;
 }
 
 export async function getAlertas(
