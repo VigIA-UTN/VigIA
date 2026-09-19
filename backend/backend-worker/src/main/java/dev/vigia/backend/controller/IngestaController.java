@@ -89,8 +89,13 @@ public class IngestaController {
             return ResponseEntity.ok("Ignorado: Sin decoded_payload");
         }
 
-        Integer frameCounter = uplink.getFCnt();
-        if (frameCounter != null && caravana.getUltimoFrameCounter() != null
+        // TTN omite f_cnt cuando vale 0 (p. ej. el Registration posterior a un join).
+        int frameCounter = uplink.getFCnt() != null ? uplink.getFCnt() : 0;
+        // Un rejoin OTAA cambia la session key y reinicia el f_cnt: es una sesión nueva,
+        // no un duplicado, aunque el contador sea menor al último guardado.
+        String sessionKeyId = uplink.getSessionKeyId();
+        boolean sesionNueva = sessionKeyId != null && !sessionKeyId.equals(caravana.getUltimaSessionKeyId());
+        if (!sesionNueva && caravana.getUltimoFrameCounter() != null
                 && frameCounter <= caravana.getUltimoFrameCounter()) {
             log.info(
                     "Frame duplicado o retransmitido para devEui {} (fCnt={}, ultimoFrameCounter={}), ignorado por idempotencia.",
@@ -186,14 +191,15 @@ public class IngestaController {
 
         telemetriaRepository.save(telemetria);
 
-        if (frameCounter != null) {
-            caravana.setUltimoFrameCounter(frameCounter);
-            caravana.setUltimaSenial(telemetria.getFechaHora());
-            if (telemetria.getBateria() != null) {
-                caravana.setBateria(telemetria.getBateria());
-            }
-            caravanaRepository.save(caravana);
+        caravana.setUltimoFrameCounter(frameCounter);
+        if (sessionKeyId != null) {
+            caravana.setUltimaSessionKeyId(sessionKeyId);
         }
+        caravana.setUltimaSenial(telemetria.getFechaHora());
+        if (telemetria.getBateria() != null) {
+            caravana.setBateria(telemetria.getBateria());
+        }
+        caravanaRepository.save(caravana);
 
         if (esNueva) {
             eventPublisher.publishEvent("NUEVA_TELEMETRIA");
