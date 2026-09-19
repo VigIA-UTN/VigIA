@@ -459,4 +459,31 @@ class IngestaControllerTest {
         assertThat(caravana.getUltimoFrameCounter()).isEqualTo(0);
         assertThat(caravana.getUltimaSessionKeyId()).isEqualTo("B");
     }
+
+    @Test
+    @DisplayName("Fix GNSS fallido (coordenadas ~0), ignora sin guardar ni publicar")
+    void fixGnssFallido_ignorado() {
+        stubCaravanaConAnimal();
+        TTNWebhookRequestDTO payload = payloadCon(1);
+        payload.getUplinkMessage().getDecodedPayload().setLatitude(5.877471754111438e-39);
+        payload.getUplinkMessage().getDecodedPayload().setLongitude(5.877471754111438e-39);
+
+        ResponseEntity<String> response = controller.receiveUplink(payload);
+
+        assertThat(response.getBody()).isEqualTo("Ignorado: fix GNSS fallido");
+        verify(telemetriaRepository, never()).save(any());
+        verifyNoInteractions(rabbitTemplate, geofenceVerificationService);
+        verify(caravanaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Fix GNSS real (coordenadas válidas), procesa")
+    void fixGnssReal_procesa() {
+        stubCaravanaConAnimal();
+
+        ResponseEntity<String> response = controller.receiveUplink(payloadCon(1));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+        verify(telemetriaRepository, times(1)).save(any(Telemetria.class));
+    }
 }

@@ -145,6 +145,13 @@ public class IngestaController {
                 esNueva = true;
             }
         } else if ("GNSSPosition".equalsIgnoreCase(decoded.getType())) {
+            // Un fix fallido llega como GNSSPosition con lat/lon ~0 (flag 0x1 en el tag);
+            // no es una posición real y no debe llegar a la serie de tiempo.
+            if (decoded.getLatitude() != null && decoded.getLongitude() != null
+                    && Math.abs(decoded.getLatitude()) < 1e-6 && Math.abs(decoded.getLongitude()) < 1e-6) {
+                log.info("Fix GNSS fallido para devEui {} (coordenadas ~0), ignorado.", devEui);
+                return ResponseEntity.ok("Ignorado: fix GNSS fallido");
+            }
             // GNSSPosition o similar: creamos nueva fila, a menos que la última fila sea un
             // Heartbeat sin coordenadas creado hace instantes (llegó desordenado).
             if (ultimaOpt.isPresent() && ultimaOpt.get().getLatitud() == null &&
