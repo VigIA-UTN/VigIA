@@ -148,7 +148,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
     endPerc = Math.min(100, ((windowEnd.getTime() - grayStart) / totalMs) * 100);
   }
 
-  const textoAccionRecomendada = (detalle: AlertaDetalleResponse) => {
+  const textoAccionRecomendada = (detalle: AlertaDetalleResponse | null) => {
     if (detalle?.accionRecomendada) {
       return detalle.accionRecomendada;
     } else if (isSanitaria) {
