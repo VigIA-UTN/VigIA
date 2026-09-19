@@ -255,10 +255,6 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
         </div>
 
         <style>{`
-        .alerta-clickable:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.15) !important;
-        }
         @keyframes fadeInUp {
           from { opacity: 0; transform: translate(-50%, calc(-100% + 6px)); }
           to   { opacity: 1; transform: translate(-50%, -100%); }
