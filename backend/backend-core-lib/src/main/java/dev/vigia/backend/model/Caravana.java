@@ -49,6 +49,9 @@ public class Caravana {
     @Column(name = "ultimo_frame_counter")
     private Integer ultimoFrameCounter;
 
+    @Column(name = "ultima_session_key_id")
+    private String ultimaSessionKeyId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_sensor")
     private EstadoSensor estadoSensor;

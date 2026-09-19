@@ -37,6 +37,10 @@ public class TTNWebhookRequestDTO {
 
         @JsonProperty("f_cnt")
         private Integer fCnt;
+
+        // Cambia en cada join OTAA; el f_cnt reinicia en 0 cuando cambia.
+        @JsonProperty("session_key_id")
+        private String sessionKeyId;
     }
 
     @Data
