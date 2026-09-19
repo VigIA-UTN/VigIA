@@ -89,8 +89,13 @@ public class IngestaController {
             return ResponseEntity.ok("Ignorado: Sin decoded_payload");
         }
 
-        Integer frameCounter = uplink.getFCnt();
-        if (frameCounter != null && caravana.getUltimoFrameCounter() != null
+        // TTN omite f_cnt cuando vale 0 (p. ej. el Registration posterior a un join).
+        int frameCounter = uplink.getFCnt() != null ? uplink.getFCnt() : 0;
+        // Un rejoin OTAA cambia la session key y reinicia el f_cnt: es una sesión nueva,
+        // no un duplicado, aunque el contador sea menor al último guardado.
+        String sessionKeyId = uplink.getSessionKeyId();
+        boolean sesionNueva = sessionKeyId != null && !sessionKeyId.equals(caravana.getUltimaSessionKeyId());
+        if (!sesionNueva && caravana.getUltimoFrameCounter() != null
                 && frameCounter <= caravana.getUltimoFrameCounter()) {
             log.info(
                     "Frame duplicado o retransmitido para devEui {} (fCnt={}, ultimoFrameCounter={}), ignorado por idempotencia.",
@@ -140,6 +145,13 @@ public class IngestaController {
                 esNueva = true;
             }
         } else if ("GNSSPosition".equalsIgnoreCase(decoded.getType())) {
+            // Un fix fallido llega como GNSSPosition con lat/lon ~0 (flag 0x1 en el tag);
+            // no es una posición real y no debe llegar a la serie de tiempo.
+            if (decoded.getLatitude() != null && decoded.getLongitude() != null
+                    && Math.abs(decoded.getLatitude()) < 1e-6 && Math.abs(decoded.getLongitude()) < 1e-6) {
+                log.info("Fix GNSS fallido para devEui {} (coordenadas ~0), ignorado.", devEui);
+                return ResponseEntity.ok("Ignorado: fix GNSS fallido");
+            }
             // GNSSPosition o similar: creamos nueva fila, a menos que la última fila sea un
             // Heartbeat sin coordenadas creado hace instantes (llegó desordenado).
             if (ultimaOpt.isPresent() && ultimaOpt.get().getLatitud() == null &&
@@ -186,14 +198,15 @@ public class IngestaController {
 
         telemetriaRepository.save(telemetria);
 
-        if (frameCounter != null) {
-            caravana.setUltimoFrameCounter(frameCounter);
-            caravana.setUltimaSenial(telemetria.getFechaHora());
-            if (telemetria.getBateria() != null) {
-                caravana.setBateria(telemetria.getBateria());
-            }
-            caravanaRepository.save(caravana);
+        caravana.setUltimoFrameCounter(frameCounter);
+        if (sessionKeyId != null) {
+            caravana.setUltimaSessionKeyId(sessionKeyId);
         }
+        caravana.setUltimaSenial(telemetria.getFechaHora());
+        if (telemetria.getBateria() != null) {
+            caravana.setBateria(telemetria.getBateria());
+        }
+        caravanaRepository.save(caravana);
 
         if (esNueva) {
             eventPublisher.publishEvent("NUEVA_TELEMETRIA");
