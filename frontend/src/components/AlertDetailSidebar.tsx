@@ -148,6 +148,18 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
     endPerc = Math.min(100, ((windowEnd.getTime() - grayStart) / totalMs) * 100);
   }
 
+  const textoAccionRecomendada = (detalle: AlertaDetalleResponse) => {
+    if (detalle?.accionRecomendada) {
+      return detalle.accionRecomendada;
+    } else if (isSanitaria) {
+      return 'Revisar al animal y realizar seguimiento clínico.';
+    } else if (isCelo) {
+      return 'Realizar inseminación artificial dentro de la ventana óptima.';
+    } else {
+      return 'Revisar al animal y realizar seguimiento.';
+    }
+  }
+
   return (
     <div
       style={{
@@ -235,18 +247,18 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             </div>
 
-            {detalle?.accionRecomendada && (<div>
+            <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                 <i className="bi bi-info-circle"></i> Acción recomendada
               </h6>
               <div className="card border-0 shadow-sm rounded-4">
                 <div className="card-body">
                   <p className="m-0" style={{ color: '#2D3748', fontSize: '0.95rem' }}>
-                    {detalle.accionRecomendada}
+                    {textoAccionRecomendada(detalle)}
                   </p>
                 </div>
               </div>
-            </div>)}
+            </div>
 
             {/* Detalle sanitario (solo alertas de SALUD) */}
             {isSanitaria && detSan && <SanitarioAlertDetail detalle={detSan} />}

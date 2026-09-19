@@ -42,6 +42,13 @@ export default function AlertNotificationCard({
     },
   };
   const sev = severityMap[gravedad] || severityMap['MEDIA'];
+  const iconType = {
+    CELO: 'bi-arrow-through-heart',
+    SALUD: 'bi-heart-pulse',
+    GEOESPACIAL: "bi-globe-americas"
+  };
+
+  const icon = iconType[alerta.tipo] || sev.iconClass;
 
   // Estado resuelto: icono y colores neutrales
   const resolvedIconClass = alerta.estado === 'CONFIRMADA' ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
@@ -80,7 +87,7 @@ export default function AlertNotificationCard({
             }}
           >
             <i
-              className={`bi ${isResolved ? resolvedIconClass : sev.iconClass} fs-4`}
+              className={`bi ${isResolved ? resolvedIconClass : icon} fs-4`}
               style={{ color: isResolved ? resolvedIconColor : sev.iconColor }}
             ></i>
           </div>
