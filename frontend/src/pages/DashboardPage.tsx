@@ -783,9 +783,7 @@ export default function DashboardPage() {
                             </div>
                         </>
                     ) : (
-                        <h2 style={{ fontSize: '1.4rem', fontWeight: 500, color: '#1A3558', margin: 0 }}>
-                            VigIA Dashboard
-                        </h2>
+                        <h2>Resumen del establecimiento</h2>
                     )}
                 </div>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
