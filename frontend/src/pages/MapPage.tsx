@@ -1,12 +1,13 @@
 import { MapContainer, TileLayer, Marker, useMap, ZoomControl, Polygon, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import './MapPage.css';
 import L from 'leaflet';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertSidebar from '../components/AlertSidebar';
 import PerimetroSidebar from '../components/PerimetroSidebar';
-import { type AnimalMapa, getAnimalesMapa } from '../api/animalesApi';
+import { type AnimalMapa, getAnimalesMapa, getAnimales } from '../api/animalesApi';
 import { type AlertaResumenResponse, type AlertaResponse, getResumenAlertas } from '../api/alertaApi';
 import {
   getPerimetros,
@@ -22,6 +23,11 @@ import { insertPointInClosestEdge } from '../utils/mapGeometryUtils';
 import AnimalDetailSidebar from '../components/AnimalDetailSidebar';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
+import HeatmapLayer from '../components/heatmap/HeatmapLayer';
+import HeatmapPanel from '../components/heatmap/HeatmapPanel';
+import { useHeatPoints } from '../components/heatmap/useHeatPoints';
+import { defaultHeatFilter } from '../components/heatmap/heatmapFilters';
+import type { HeatAnimal, HeatFilter } from '../components/heatmap/types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -161,6 +167,12 @@ export default function MapPage() {
   const [coordenadasEditadas, setCoordenadasEditadas] = useState<CoordenadaDTO[]>([]);
   const [isSavingPerimetro, setIsSavingPerimetro] = useState(false);
 
+  // Mapa de calor
+  const [heatEnabled, setHeatEnabled] = useState(false);
+  const [isHeatPanelOpen, setIsHeatPanelOpen] = useState(false);
+  const [heatFilterRaw, setHeatFilterRaw] = useState<HeatFilter>(() => defaultHeatFilter(null));
+  const [heatAnimals, setHeatAnimals] = useState<HeatAnimal[]>([]);
+
   useEffect(() => {
     let isMounted = true;
     const fetchPerimetrosYRodeos = async () => {
@@ -194,6 +206,22 @@ export default function MapPage() {
     return () => {
       isMounted = false;
     };
+  }, [selectedId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    getAnimales(selectedId ?? undefined)
+      .then(list => {
+        if (!isMounted) return;
+        setHeatAnimals(list.map(a => ({
+          id: a.id,
+          caravana: a.idCaravanaOficial ?? `#${a.id}`,
+          alias: a.alias,
+          rodeoId: a.rodeoLoteId,
+        })));
+      })
+      .catch(err => console.error('Error fetching animales para mapa de calor', err));
+    return () => { isMounted = false; };
   }, [selectedId]);
 
   useEffect(() => {
@@ -326,6 +354,23 @@ export default function MapPage() {
       ? [animalConPosicion.latitud!, animalConPosicion.longitud!]
       : CENTRO_CAMPO;
 
+  // El rodeo elegido por defecto (o uno que ya no existe en este establecimiento) cae al primero disponible
+  const heatFilter = useMemo<HeatFilter>(() => {
+    const invalid = heatFilterRaw.rodeoId != null && !rodeos.some(r => r.id === heatFilterRaw.rodeoId);
+    if (invalid || (heatFilterRaw.scope === 'rodeo' && heatFilterRaw.rodeoId == null)) {
+      return { ...heatFilterRaw, rodeoId: rodeos[0]?.id ?? null, animalId: invalid ? null : heatFilterRaw.animalId };
+    }
+    return heatFilterRaw;
+  }, [heatFilterRaw, rodeos]);
+  const heatCenter: [number, number] = activeEstablecimiento?.latitud != null && activeEstablecimiento?.longitud != null
+    ? [activeEstablecimiento.latitud, activeEstablecimiento.longitud]
+    : CENTRO_CAMPO;
+  const { points: heatPoints, loading: heatLoading, error: heatError } = useHeatPoints(
+    heatFilter,
+    { establecimientoId: selectedId ?? null, center: heatCenter, animals: heatAnimals },
+    heatEnabled,
+  );
+
   const handleToggleActivoPerimetro = async (perimetro: PerimetroResponse) => {
     const nuevoEstado = !perimetro.activo;
     setPerimetros(prev =>
@@ -421,6 +466,7 @@ export default function MapPage() {
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
         <MapUpdater center={center} trigger={flyToTrigger} />
+        {heatEnabled && <HeatmapLayer points={heatPoints} />}
 
         {/* Captura de clicks en el mapa para agregar vértices en modo edición */}
         <MapEditorEvents
@@ -557,91 +603,69 @@ export default function MapPage() {
         })}
       </MapContainer>
 
-      {/* Botón de Alertas */}
+      {/* Botones flotantes: Alertas / Perímetros / Mapa de calor */}
       {!isAlertsOpen && !isPerimetrosOpen && (
-        <button
-          onClick={() => {
-            setSelectedAlertaMap(null);
-            setIsPerimetrosOpen(false);
-            setEditingPerimetro(null);
-            setIsAlertsOpen(true);
-          }}
-          className="btn d-flex align-items-center fw-bold"
-          style={{
-            position: 'absolute',
-            top: '20px',
-            left: '20px',
-            zIndex: 1000,
-            width: '170px',
-            backgroundColor: '#1E3A5F',
-            color: 'white',
-            borderColor: '#13D4FB',
-            borderWidth: '2px',
-            borderRadius: '10px',
-            padding: '8px 0',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <i
-            className="bi bi-bell-fill"
-            style={{
-              position: 'absolute',
-              left: '16px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#13D4FB',
-              fontSize: '1rem',
-              lineHeight: 1,
-            }}
-          ></i>
-          <span style={{ width: '100%', textAlign: 'center', paddingLeft: '32px' }}>
-            Alertas
-          </span>
-        </button>
-      )}
-
-      {/* Botón de Perímetros justo debajo del de Alertas */}
-      {!isPerimetrosOpen && !isAlertsOpen && (
-        <button
-          onClick={() => {
-            setSelectedAlertaMap(null);
-            setIsAlertsOpen(false);
-            setIsPerimetrosOpen(true);
-          }}
-          className="btn d-flex align-items-center fw-bold"
-          style={{
-            position: 'absolute',
-            top: '75px',
-            left: '20px',
-            zIndex: 1000,
-            width: '170px',
-            backgroundColor: '#1E3A5F',
-            color: 'white',
-            borderColor: '#13D4FB',
-            borderWidth: '2px',
-            borderRadius: '10px',
-            padding: '8px 0',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <i
-            className="bi bi-bounding-box-circles"
-            style={{
-              position: 'absolute',
-              left: '16px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#13D4FB',
-              fontSize: '1rem',
-              lineHeight: 1,
-            }}
-          ></i>
-          <span style={{ width: '100%', textAlign: 'center', paddingLeft: '32px' }}>
-            Perímetros
-          </span>
-        </button>
+        <>
+          <div className="map-fabs">
+            <button
+              className="map-fab"
+              style={{ '--w': '150px' } as React.CSSProperties}
+              aria-label="Alertas"
+              onClick={() => {
+                setSelectedAlertaMap(null);
+                setIsPerimetrosOpen(false);
+                setEditingPerimetro(null);
+                setIsHeatPanelOpen(false);
+                setIsAlertsOpen(true);
+              }}
+            >
+              <i className="bi bi-bell-fill map-fab-icon"></i>
+              <span className="map-fab-label">Alertas</span>
+            </button>
+            <button
+              className="map-fab"
+              style={{ '--w': '170px' } as React.CSSProperties}
+              aria-label="Perímetros"
+              onClick={() => {
+                setSelectedAlertaMap(null);
+                setIsAlertsOpen(false);
+                setIsHeatPanelOpen(false);
+                setIsPerimetrosOpen(true);
+              }}
+            >
+              <i className="bi bi-bounding-box-circles map-fab-icon"></i>
+              <span className="map-fab-label">Perímetros</span>
+            </button>
+            <button
+              className="map-fab"
+              style={{ '--w': '200px' } as React.CSSProperties}
+              aria-label="Mapa de calor"
+              aria-expanded={isHeatPanelOpen}
+              onClick={() => setIsHeatPanelOpen(open => !open)}
+            >
+              <span className="map-fab-icon"><span className="map-fab-dot" /></span>
+              <span className="map-fab-label">
+                Mapa de calor
+                {heatEnabled && <span className="map-fab-on">ON</span>}
+              </span>
+            </button>
+          </div>
+          {isHeatPanelOpen && (
+            <div style={{ position: 'absolute', top: '80px', bottom: '20px', left: '20px', zIndex: 1000, pointerEvents: 'none' }}>
+              <HeatmapPanel
+                enabled={heatEnabled}
+                onEnabledChange={setHeatEnabled}
+                filter={heatFilter}
+                onFilterChange={setHeatFilterRaw}
+                rodeos={rodeos.map(r => ({ id: r.id, nombre: r.nombre }))}
+                animals={heatAnimals}
+                loading={heatLoading}
+                error={heatError}
+                pointCount={heatPoints.length}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* Resumen de Alertas Cards */}

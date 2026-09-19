@@ -1,0 +1,87 @@
+/* Scoped tokens copied from the VigIA design system (tokens/colors.css et al). */
+.hm-panel {
+    --navy-650: #1A3558; --navy-500: #243F62; --navy-350: #2E4E77;
+    --navy-tint-100: #A8C8E8; --navy-tint-300: #7A9CC0;
+    --cyan-500: #13D4FB; --lime-500: #94C11E; --vigia-navy: #1E3A5F;
+    width: min(462px, calc(100vw - 40px));
+    /* fills at most the host's height (host anchors top/bottom), so the bottom is always visible */
+    max-height: 100%;
+    overflow-y: auto;
+    scrollbar-gutter: stable; /* keep width constant when the scrollbar appears */
+    pointer-events: auto;
+    box-sizing: border-box;
+    background: #1E3A5F;
+    border-radius: 12px;
+    box-shadow: 0 0 0 1px rgba(19, 212, 251, .35), 0 8px 24px rgba(0, 0, 0, .35);
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 18px;
+    color: #fff;
+    font-size: 14px;
+}
+.hm-panel button { font-family: inherit; }
+.hm-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hm-title { font-weight: 600; font-size: 18px; }
+.hm-head { position: sticky; top: -20px; z-index: 2; margin: -20px -20px 0; padding: 20px 20px 0; background: #1E3A5F;
+    display: flex; flex-direction: column; gap: 18px; flex-shrink: 0; }
+.hm-sep { height: 1px; background: rgba(168, 200, 232, .25); }
+.hm-body { display: flex; flex-direction: column; gap: 18px; transition: opacity .2s; }
+.hm-body.off { opacity: .45; pointer-events: none; }
+.hm-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.hm-label { font-weight: 600; font-size: 12px; letter-spacing: .06em; color: var(--navy-tint-100); }
+.hm-hint { font-size: 12px; color: var(--navy-tint-300); }
+
+.hm-switch { position: relative; width: 52px; height: 28px; border: 0; padding: 0; border-radius: 999px; cursor: pointer;
+    background: transparent; box-shadow: inset 0 0 0 2px var(--navy-tint-300); transition: background .2s; flex-shrink: 0; }
+.hm-switch.on { background: var(--lime-500); box-shadow: none; }
+.hm-knob { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--navy-tint-100); transition: left .2s; }
+.hm-switch.on .hm-knob { left: 28px; background: #fff; }
+
+.hm-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 4px; background: var(--navy-650); border-radius: 12px; }
+.hm-tabs button { height: 36px; border: 0; padding: 0 8px; border-radius: 10px; cursor: pointer; background: transparent;
+    color: var(--navy-tint-100); font-weight: 500; font-size: 14px; }
+.hm-tabs button.active { background: var(--cyan-500); color: var(--vigia-navy); font-weight: 600; }
+
+.hm-input { height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--navy-tint-300); background: var(--navy-650); color: #fff; }
+.hm-input::placeholder { font-style: italic; color: var(--navy-tint-300); }
+
+.hm-chip { height: 28px; border: 0; padding: 0 10px; border-radius: 999px; cursor: pointer; color: #fff; font-size: 12px; font-weight: 500;
+    background: rgba(19, 212, 251, .16); box-shadow: inset 0 0 0 1px var(--cyan-500); display: inline-flex; align-items: center; gap: 6px; }
+.hm-presets { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+
+.hm-list { max-height: 214px; overflow-y: auto; scrollbar-gutter: stable; display: flex; flex-direction: column; gap: 6px; }
+.hm-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--navy-500);
+    border: 0; color: #fff; text-align: left; cursor: pointer; width: 100%; }
+.hm-item.sel { background: var(--navy-350); box-shadow: inset 0 0 0 2px var(--cyan-500); }
+.hm-item-btn { flex: 1; min-width: 0; border: 0; background: transparent; padding: 0; color: inherit; text-align: left; cursor: pointer; }
+.hm-item-btn:disabled { cursor: default; }
+.hm-item-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hm-item-main { font-weight: 500; font-size: 13px; }
+.hm-item-sub { font-size: 12px; color: var(--navy-tint-300); }
+
+.hm-icon-btn { width: 28px; height: 28px; flex-shrink: 0; border: 0; padding: 0; border-radius: 8px; background: var(--navy-650);
+    color: var(--navy-tint-100); cursor: pointer; font-size: 18px; line-height: 1; }
+.hm-icon-btn:hover { background: var(--navy-350); color: #fff; }
+
+.hm-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.hm-cal-titles { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; text-align: center; font-weight: 500; font-size: 13px; }
+.hm-cal-months { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.hm-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+.hm-cal-dow { height: 16px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; color: var(--navy-tint-300); }
+.hm-day { height: 28px; border: 0; padding: 0; border-radius: 8px; background: transparent; color: #fff; font-size: 12px; cursor: pointer; }
+.hm-day-in { background: rgba(19, 212, 251, .2); border-radius: 4px; }
+.hm-day-end { background: var(--cyan-500); color: var(--vigia-navy); font-weight: 600; }
+.hm-day-today { box-shadow: inset 0 0 0 1px var(--navy-tint-300); }
+
+.hm-reset { height: 36px; flex-shrink: 0; border: 0; padding: 0 14px; border-radius: 12px; background: transparent; cursor: pointer;
+    box-shadow: inset 0 0 0 2px var(--navy-tint-100); color: #fff; font-size: 13px; font-weight: 500; }
+.hm-reset:hover { background: var(--navy-500); }
+.hm-status { min-height: 16px; font-size: 12px; color: var(--navy-tint-300); }
+.hm-status .err { color: #FB5151; }
+@media (max-width: 520px) { .hm-cal-months, .hm-cal-titles { grid-template-columns: 1fr; } }
+
+/* Minimal light-blue scrollbars (card and inner list) */
+.hm-panel, .hm-list { scrollbar-width: thin; scrollbar-color: rgba(168, 200, 232, .55) transparent; }
+.hm-panel::-webkit-scrollbar, .hm-list::-webkit-scrollbar { width: 6px; }
+.hm-panel::-webkit-scrollbar-track, .hm-list::-webkit-scrollbar-track { background: transparent; }
+.hm-panel::-webkit-scrollbar-thumb, .hm-list::-webkit-scrollbar-thumb { background: rgba(168, 200, 232, .55); border-radius: 999px; }
+.hm-panel::-webkit-scrollbar-thumb:hover, .hm-list::-webkit-scrollbar-thumb:hover { background: #A8C8E8; }
