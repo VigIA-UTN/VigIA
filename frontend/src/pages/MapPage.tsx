@@ -650,8 +650,17 @@ export default function MapPage() {
               </span>
             </button>
           </div>
-          {isHeatPanelOpen && (
-            <div style={{ position: 'absolute', top: '80px', bottom: '20px', left: '20px', zIndex: 1000, pointerEvents: 'none' }}>
+          {/* Siempre montado para poder animar entrada y salida; visibility con delay evita foco/clicks cuando está cerrado */}
+          {(
+            <div
+              style={{
+                position: 'absolute', top: '80px', bottom: '20px', left: '20px', zIndex: 1000, pointerEvents: 'none',
+                opacity: isHeatPanelOpen ? 1 : 0,
+                transform: isHeatPanelOpen ? 'translateX(0)' : 'translateX(-16px)',
+                visibility: isHeatPanelOpen ? 'visible' : 'hidden',
+                transition: `opacity 200ms ease, transform 200ms ease, visibility 0s linear ${isHeatPanelOpen ? '0s' : '200ms'}`,
+              }}
+            >
               <HeatmapPanel
                 enabled={heatEnabled}
                 onEnabledChange={setHeatEnabled}
