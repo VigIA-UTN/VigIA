@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+/* eslint-disable react-hooks/purity, react-hooks/set-state-in-effect */
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Spinner, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
@@ -27,8 +28,6 @@ L.Icon.Default.mergeOptions({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const CELO_WINDOW_HOURS_FROM = 6;   // ventana abre a tsGeneracion + 6h
-const CELO_WINDOW_DURATION_H = 18;  // ventana dura 18h (cierra a +24h)
 const SILENCIO_THRESHOLD_H = 6;     // collar sin señal > 6h = silencioso
 const BATERIA_BAJA_PCT = 20;        // batería ≤ 20% = crítica
 const DIAS_ABIERTOS_URGENTE = 90;   // días abiertos para mostrar en embudo
@@ -577,8 +576,9 @@ export default function DashboardPage() {
     // ── Salud tab: Reincidencia (Idea 13) ────────────────────────────────────
     const reincidencia = useMemo(() => {
         const hace30d = 30 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
         const alertas30d = todasAlertas60d.filter(a =>
-            Date.now() - new Date(a.tsGeneracion).getTime() <= hace30d
+            now - new Date(a.tsGeneracion).getTime() <= hace30d
         );
 
         // Por animal: cantidad de alertas en 30d
@@ -650,9 +650,6 @@ export default function DashboardPage() {
         return sinRevision > 0 ? `${sinRevision} enfermos` : 'en observación';
     })();
 
-    const fuera = animalesMapa.filter(a =>
-        a.alertasAnimal.some(al => al.tipo === 'FUERA_DE_PERIMETRO' && al.estado === 'PENDIENTE')
-    ).length;
 
     // ── SVG line chart helper ─────────────────────────────────────────────
     function TrendChart({ datos, semanas, tipos }: {
@@ -1017,7 +1014,7 @@ export default function DashboardPage() {
                     <div className="dash-salud-kpi">
                         <span className="dash-salud-kpi-label">Días abiertos (promedio)</span>
                         <span className="dash-salud-kpi-val">{embudo.diasAbiertosProm}</span>
-                        <span className="dash-salud-kpi-sub">animales sin gesta confirmada</span>
+                        <span className="dash-salud-kpi-sub">animales sin gesta confirmada</span>
                     </div>
                     <div className="dash-salud-kpi">
                         <span className="dash-salud-kpi-label">Ventanas perdidas (30 d)</span>
@@ -1566,10 +1563,10 @@ export default function DashboardPage() {
             )}
 
             {/* ── TAB: Resumen ejecutivo ───────────────────────────────────── */}
-            {activeTab === 'ejecutivo' && <ResumenEjecutivoView />}
+            {activeTab === 'ejecutivo' && ResumenEjecutivoView()}
 
             {/* ── TAB: Salud y reproducción ─────────────────────────────────── */}
-            {activeTab === 'salud' && <SaludReproduccionView />}
+            {activeTab === 'salud' && SaludReproduccionView()}
 
             {/* ── TAB: Centro de mando ──────────────────────────────────────── */}
             {activeTab === 'mando' && (
