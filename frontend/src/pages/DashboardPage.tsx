@@ -928,6 +928,67 @@ export default function DashboardPage() {
                         </span>
                     </div>
                 </div>
+
+                {/* ══ DEBAJO DEL PLIEGUE ══════════════════════════════════════ */}
+                <div className="dash-below-grid">
+
+                    {/* ── Idea 12: Actividad del rodeo (Placeholder) ──────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-activity" />
+                                Actividad del rodeo
+                            </p>
+                        </div>
+                        <div className="dash-salud-peso-empty" style={{ padding: '40px 16px' }}>
+                            <i className="bi bi-graph-down" style={{ fontSize: '1.6rem', color: '#CBD5E1' }} />
+                            <span className="dash-salud-peso-empty-text">
+                                Disponible próximamente
+                            </span>
+                            <span className="dash-salud-peso-empty-sub">
+                                Módulo de actividad y desvíos en desarrollo
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* ── Idea 15: Dónde ocurren (Placeholder) ────────────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-pin-map" />
+                                Dónde ocurren
+                            </p>
+                        </div>
+                        <div className="dash-salud-peso-empty" style={{ padding: '40px 16px' }}>
+                            <i className="bi bi-map" style={{ fontSize: '1.6rem', color: '#CBD5E1' }} />
+                            <span className="dash-salud-peso-empty-text">
+                                Disponible próximamente
+                            </span>
+                            <span className="dash-salud-peso-empty-sub">
+                                Mapa de calor espacial en desarrollo
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* ── Idea 16: Carga animal (Placeholder) ─────────────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-pie-chart" />
+                                Carga animal
+                            </p>
+                        </div>
+                        <div className="dash-salud-peso-empty" style={{ padding: '40px 16px' }}>
+                            <i className="bi bi-grid-3x3" style={{ fontSize: '1.6rem', color: '#CBD5E1' }} />
+                            <span className="dash-salud-peso-empty-text">
+                                Disponible próximamente
+                            </span>
+                            <span className="dash-salud-peso-empty-sub">
+                                Análisis de uso de parcelas en desarrollo
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </>
         );
     }
@@ -1008,7 +1069,7 @@ export default function DashboardPage() {
                                                 key={estado}
                                                 className={`dash-embudo-seg dash-embudo-${estado.toLowerCase()}`}
                                                 style={{ flex: count }}
-                                                title={`${ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado}: ${count}`}
+                                                title={`${ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado.replace('_', ' ')}: ${count}`}
                                             />
                                         ))}
                                 </div>
@@ -1019,7 +1080,7 @@ export default function DashboardPage() {
                                                 className={`dash-dot dash-embudo-${estado.toLowerCase()}`}
                                                 style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%' }}
                                             />
-                                            {ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado}
+                                            {ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado.replace('_', ' ')}
                                             <strong>{count}</strong>
                                         </span>
                                     ))}
@@ -1896,42 +1957,42 @@ export default function DashboardPage() {
                     )}
                 </div>
 
-                {/* ── Idea 3: Animales a revisar ───────────────────────── */}
+                {/* ── Idea 8: Tendencia 8 semanas (Placeholder) ───────────── */}
                 <div className="dash-card">
                     <div className="dash-card-header">
                         <p className="dash-card-title">
-                            <i className="bi bi-heart-pulse-fill" />
-                            Animales a revisar
+                            <i className="bi bi-graph-up" />
+                            Tendencia 8 semanas
                         </p>
-                        {!loading && animalesARevisar.length > 3 && (
-                            <button className="dash-ver-todas-btn" onClick={() => navigate('/animales')}>
-                                Ver todos <i className="bi bi-arrow-right" />
-                            </button>
-                        )}
                     </div>
+                    <div className="dash-salud-peso-empty" style={{ padding: '40px 16px' }}>
+                        <i className="bi bi-bar-chart-steps" style={{ fontSize: '1.6rem', color: '#CBD5E1' }} />
+                        <span className="dash-salud-peso-empty-text">
+                            Disponible próximamente
+                        </span>
+                        <span className="dash-salud-peso-empty-sub">
+                            Módulo de tendencias en desarrollo
+                        </span>
+                    </div>
+                </div>
 
-                    {loading ? (
-                        <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                    ) : animalesARevisar.length === 0 ? (
-                        <p className="dash-no-items">
-                            <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
-                            Todos los animales sanos
+                {/* ── Idea 10: Comparativa por lote (Placeholder) ─────────── */}
+                <div className="dash-card">
+                    <div className="dash-card-header">
+                        <p className="dash-card-title">
+                            <i className="bi bi-bar-chart-line-fill" />
+                            Comparativa por lote
                         </p>
-                    ) : (
-                        animalesARevisar.slice(0, 6).map(a => (
-                            <div key={a.id} className="dash-revisar-row" onClick={() => navigate(`/animales/${a.id}`)}>
-                                <i
-                                    className="bi bi-arrow-right-circle-fill"
-                                    style={{ color: a.estadoSalud === 'ENFERMO' ? '#E53E3E' : '#D69E2E', flexShrink: 0 }}
-                                />
-                                <span className="dash-revisar-nombre">{nombreAnimal(a)}</span>
-                                <span className="dash-revisar-causa">{a.rodeoLoteNombre ?? ''}</span>
-                                <span className={`dash-salud-badge ${a.estadoSalud === 'ENFERMO' ? 'dash-salud-badge-enfermo' : 'dash-salud-badge-obs'}`}>
-                                    {a.estadoSalud === 'ENFERMO' ? 'Enfermo' : 'Observación'}
-                                </span>
-                            </div>
-                        ))
-                    )}
+                    </div>
+                    <div className="dash-salud-peso-empty" style={{ padding: '40px 16px' }}>
+                        <i className="bi bi-kanban" style={{ fontSize: '1.6rem', color: '#CBD5E1' }} />
+                        <span className="dash-salud-peso-empty-text">
+                            Disponible próximamente
+                        </span>
+                        <span className="dash-salud-peso-empty-sub">
+                            Módulo de analítica por lote en desarrollo
+                        </span>
+                    </div>
                 </div>
             </div>
 
