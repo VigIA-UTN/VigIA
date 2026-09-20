@@ -1,6 +1,5 @@
-import 'leaflet'; // sets window.L, which leaflet.heat patches
 import axios from 'axios';
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
     BarChart, Bar,
     LineChart, Line, ReferenceLine,
@@ -17,12 +16,9 @@ import {
     type RegistroPesoResponse
 } from '../api/animalesApi';
 import 'leaflet/dist/leaflet.css';
-import 'leaflet.heat';
-
-// leaflet.heat patches L globally — no named exports
-type HeatLatLngTuple = [number, number, number?];
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createHeatLayer = (points: HeatLatLngTuple[], opts: object) => (window as any).L.heatLayer(points, opts);
+import HeatmapLayer from '../components/heatmap/HeatmapLayer';
+import HeatmapLegend from '../components/heatmap/HeatmapLegend';
+import type { HeatLatLngTuple } from '../components/heatmap/types';
 
 // ─── Custom Tooltip ──────────────────────────────────────────────────────────
 
@@ -54,33 +50,6 @@ function CustomTooltip({ active, payload, label, unit }: TooltipProps) {
             }
         </div>
     );
-}
-
-// ─── Heatmap Layer Component ─────────────────────────────────────────────────
-
-function HeatmapLayer({ points }: { points: HeatLatLngTuple[] }) {
-    const map = useMap();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const layerRef = useRef<any>(null);
-
-    useEffect(() => {
-        if (!map) return;
-        if (layerRef.current) {
-            map.removeLayer(layerRef.current);
-        }
-        layerRef.current = createHeatLayer(points, {
-            radius: 28,
-            blur: 20,
-            maxZoom: 17,
-            gradient: { 0.2: '#66C6EB', 0.5: '#F6C343', 0.8: '#F28C38', 1.0: '#E53E3E' },
-        }).addTo(map);
-
-        return () => {
-            if (layerRef.current) map.removeLayer(layerRef.current);
-        };
-    }, [map, points]);
-
-    return null;
 }
 
 // invalidate size when tab becomes visible
@@ -343,21 +312,8 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
                 title="Mapa de Calor — Posición"
                 subtitle="Zonas por las que más tiempo estuvo el animal · últimos 7 días"
             >
-                <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#718096' }}>Intensidad:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {[
-                            { color: '#66C6EB', label: 'Baja' },
-                            { color: '#F6C343', label: 'Media' },
-                            { color: '#F28C38', label: 'Alta' },
-                            { color: '#E53E3E', label: 'Muy alta' },
-                        ].map(({ color, label }) => (
-                            <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 10, fontSize: '0.79rem', color: '#718096' }}>
-                                <span style={{ width: 12, height: 12, borderRadius: 2, background: color, display: 'inline-block' }} />
-                                {label}
-                            </span>
-                        ))}
-                    </div>
+                <div style={{ marginBottom: '0.75rem', maxWidth: 260 }}>
+                    <HeatmapLegend />
                 </div>
                 <div style={{ borderRadius: 10, overflow: 'hidden', height: 340, border: '1px solid #E2E8F0' }}>
                     <MapContainer

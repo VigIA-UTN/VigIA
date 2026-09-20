@@ -386,4 +386,138 @@ class IngestaControllerTest {
         verify(caravanaRepository, times(1)).save(caravanaCaptor.capture());
         assertThat(caravanaCaptor.getValue().getBateria()).isEqualTo(90.0);
     }
+
+    private TTNWebhookRequestDTO conSesion(TTNWebhookRequestDTO payload, String sessionKeyId) {
+        payload.getUplinkMessage().setSessionKeyId(sessionKeyId);
+        return payload;
+    }
+
+    private void stubCaravanaConAnimal() {
+        when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
+        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        lenient().when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana))
+                .thenReturn(Optional.empty());
+    }
+
+    @Test
+    @DisplayName("Misma sesión y fCnt <= último, ignora")
+    void mismaSesion_fCntMenorOIgual_ignorado() {
+        caravana.setUltimoFrameCounter(5);
+        caravana.setUltimaSessionKeyId("A");
+        stubCaravanaConAnimal();
+
+        ResponseEntity<String> response = controller.receiveUplink(conSesion(payloadCon(5), "A"));
+
+        assertThat(response.getBody()).isEqualTo("Ignorado: frame duplicado (idempotencia)");
+        verify(caravanaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Misma sesión y fCnt mayor, procesa")
+    void mismaSesion_fCntMayor_procesa() {
+        caravana.setUltimoFrameCounter(5);
+        caravana.setUltimaSessionKeyId("A");
+        stubCaravanaConAnimal();
+
+        ResponseEntity<String> response = controller.receiveUplink(conSesion(payloadCon(6), "A"));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+        assertThat(caravana.getUltimoFrameCounter()).isEqualTo(6);
+    }
+
+    @Test
+    @DisplayName("Sesión nueva (rejoin) con fCnt menor al último: procesa, resetea el contador y guarda la sesión")
+    void sesionNueva_fCntMenor_procesaYResetea() {
+        caravana.setUltimoFrameCounter(219);
+        caravana.setUltimaSessionKeyId("A");
+        stubCaravanaConAnimal();
+
+        ResponseEntity<String> response = controller.receiveUplink(conSesion(payloadCon(1), "B"));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+        assertThat(caravana.getUltimoFrameCounter()).isEqualTo(1);
+        assertThat(caravana.getUltimaSessionKeyId()).isEqualTo("B");
+    }
+
+    @Test
+    @DisplayName("Fila legacy sin session key guardada: el primer uplink con sesión se acepta aunque fCnt < último")
+    void caravanaLegacySinSessionKey_procesa() {
+        caravana.setUltimoFrameCounter(219);
+        caravana.setUltimaSessionKeyId(null);
+        stubCaravanaConAnimal();
+
+        ResponseEntity<String> response = controller.receiveUplink(conSesion(payloadCon(2), "B"));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+        assertThat(caravana.getUltimoFrameCounter()).isEqualTo(2);
+        assertThat(caravana.getUltimaSessionKeyId()).isEqualTo("B");
+    }
+
+    @Test
+    @DisplayName("Regresión: 219 guardado, rejoin y fCnt 1, 2, 3 se aceptan; repetir el 3 se ignora")
+    void replayRejoin_aceptaSecuenciaNuevaEIgnoraRepetido() {
+        caravana.setUltimoFrameCounter(219);
+        caravana.setUltimaSessionKeyId("A");
+        stubCaravanaConAnimal();
+
+        for (int fCnt = 1; fCnt <= 3; fCnt++) {
+            assertThat(controller.receiveUplink(conSesion(payloadCon(fCnt), "B")).getBody()).isEqualTo("OK");
+        }
+        assertThat(controller.receiveUplink(conSesion(payloadCon(3), "B")).getBody())
+                .isEqualTo("Ignorado: frame duplicado (idempotencia)");
+        assertThat(caravana.getUltimoFrameCounter()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("fCnt ausente (0) en la misma sesión con contador previo > 0, ignora")
+    void fCntAusente_mismaSesion_ignorado() {
+        caravana.setUltimoFrameCounter(5);
+        caravana.setUltimaSessionKeyId("A");
+        stubCaravanaConAnimal();
+
+        ResponseEntity<String> response = controller.receiveUplink(conSesion(payloadCon(null), "A"));
+
+        assertThat(response.getBody()).isEqualTo("Ignorado: frame duplicado (idempotencia)");
+    }
+
+    @Test
+    @DisplayName("fCnt ausente (0) en una sesión nueva, procesa")
+    void fCntAusente_sesionNueva_procesa() {
+        caravana.setUltimoFrameCounter(5);
+        caravana.setUltimaSessionKeyId("A");
+        stubCaravanaConAnimal();
+
+        ResponseEntity<String> response = controller.receiveUplink(conSesion(payloadCon(null), "B"));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+        assertThat(caravana.getUltimoFrameCounter()).isEqualTo(0);
+        assertThat(caravana.getUltimaSessionKeyId()).isEqualTo("B");
+    }
+
+    @Test
+    @DisplayName("Fix GNSS fallido (coordenadas ~0), ignora sin guardar ni publicar")
+    void fixGnssFallido_ignorado() {
+        stubCaravanaConAnimal();
+        TTNWebhookRequestDTO payload = payloadCon(1);
+        payload.getUplinkMessage().getDecodedPayload().setLatitude(5.877471754111438e-39);
+        payload.getUplinkMessage().getDecodedPayload().setLongitude(5.877471754111438e-39);
+
+        ResponseEntity<String> response = controller.receiveUplink(payload);
+
+        assertThat(response.getBody()).isEqualTo("Ignorado: fix GNSS fallido");
+        verify(telemetriaRepository, never()).save(any());
+        verifyNoInteractions(rabbitTemplate, geofenceVerificationService);
+        verify(caravanaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Fix GNSS real (coordenadas válidas), procesa")
+    void fixGnssReal_procesa() {
+        stubCaravanaConAnimal();
+
+        ResponseEntity<String> response = controller.receiveUplink(payloadCon(1));
+
+        assertThat(response.getBody()).isEqualTo("OK");
+        verify(telemetriaRepository, times(1)).save(any(Telemetria.class));
+    }
 }

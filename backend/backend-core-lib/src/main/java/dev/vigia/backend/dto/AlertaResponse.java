@@ -16,4 +16,5 @@ public class AlertaResponse {
     private Long animalId;
     private LocalDateTime tsGeneracion;
     private String detalle;
+    private String accionRecomendada;
 }

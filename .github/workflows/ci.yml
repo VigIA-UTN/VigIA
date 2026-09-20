@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
 
 jobs:
   frontend-build:
@@ -72,11 +72,11 @@ jobs:
         run: mvn -B clean package --file pom.xml
 
   ml-checks:
-    name: ML Services Checks
+    name: ML Checks
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ml-celo, ml-geo, ml-salud]
+        service: [ml-celo, ml-geo, ml-salud, ml-training]
     defaults:
       run:
         working-directory: ${{ matrix.service }}

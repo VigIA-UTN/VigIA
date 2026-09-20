@@ -7,7 +7,8 @@ export interface AlertaResponse {
   tsGeneracion: string;
   estado: string;
   severidad?: "ALTA" | "MEDIA" | "BAJA";
-  gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';//no entiendo de donde se saca
+  gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';
+  accionRecomendada: string;
 }
 
 export async function getAlertas(
@@ -116,6 +117,7 @@ export interface AlertaDetalleResponse {
   datoDisparador: string;
   estadoActual: string;
   usuarioAccion?: string;
+  accionRecomendada: string;
   ultimosEstadosReproductivos?: {
     id: number;
     animalId: number;

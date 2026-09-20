@@ -118,17 +118,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
     );
   };
 
-  const handleSimularAlerta = () => {
-    const nuevaAlerta: AlertaResponse = {
-      id: Math.floor(Math.random() * 1000000),
-      animalId: Math.floor(Math.random() * 100) + 1,
-      tipo: 'CELO',
-      estado: 'PENDIENTE',
-      severidad: 'ALTA',
-      tsGeneracion: new Date().toISOString(),
-    };
-    setAlertas((prev) => [nuevaAlerta, ...prev]);
-  };
+
 
   const handleClose = () => {
     setIsClosing(true);
@@ -185,13 +175,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h4 className="m-0 fw-bold" style={{ color: '#1E3A5F' }}>Alertas</h4>
           <div className="d-flex gap-2 align-items-center">
-            <button
-              className="btn btn-sm btn-outline-primary rounded-pill fw-semibold d-flex align-items-center gap-1"
-              onClick={handleSimularAlerta}
-              title="Simular nueva alerta"
-            >
-              <i className="bi bi-bug-fill"></i> Mock
-            </button>
+
             <button className="btn btn-link text-secondary p-0" onClick={handleClose}>
               <i className="bi bi-chevron-double-left fs-5"></i>
             </button>
@@ -201,10 +185,10 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
         <div className="d-flex gap-2 mb-3">
           <button
             className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
-            style={{ 
-              backgroundColor: filtroTipo === 'CELO' ? '#13D4FB' : 'transparent', 
-              color: '#1E3A5F', 
-              border: '2px solid #1E3A5F' 
+            style={{
+              backgroundColor: filtroTipo === 'CELO' ? '#13D4FB' : 'transparent',
+              color: '#1E3A5F',
+              border: '2px solid #1E3A5F'
             }}
             onClick={() => setFiltroTipo(prev => prev === 'CELO' ? null : 'CELO')}
           >
@@ -212,10 +196,10 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           </button>
           <button
             className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
-            style={{ 
-              backgroundColor: filtroTipo === 'SALUD' ? '#13D4FB' : 'transparent', 
-              color: '#1E3A5F', 
-              border: '2px solid #1E3A5F' 
+            style={{
+              backgroundColor: filtroTipo === 'SALUD' ? '#13D4FB' : 'transparent',
+              color: '#1E3A5F',
+              border: '2px solid #1E3A5F'
             }}
             onClick={() => setFiltroTipo(prev => prev === 'SALUD' ? null : 'SALUD')}
           >
@@ -223,10 +207,10 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           </button>
           <button
             className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
-            style={{ 
-              backgroundColor: filtroTipo === 'ABIGEATO' ? '#13D4FB' : 'transparent', 
-              color: '#1E3A5F', 
-              border: '2px solid #1E3A5F' 
+            style={{
+              backgroundColor: filtroTipo === 'ABIGEATO' ? '#13D4FB' : 'transparent',
+              color: '#1E3A5F',
+              border: '2px solid #1E3A5F'
             }}
             onClick={() => setFiltroTipo(prev => prev === 'ABIGEATO' ? null : 'ABIGEATO')}
           >
@@ -234,8 +218,8 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           </button>
         </div>
 
-        <Form.Select 
-          className="mb-4 rounded-pill" 
+        <Form.Select
+          className="mb-4 rounded-pill"
           style={{ borderWidth: '2px' }}
           value={filtroSeveridad}
           onChange={(e) => setFiltroSeveridad(e.target.value)}
@@ -271,10 +255,6 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
         </div>
 
         <style>{`
-        .alerta-clickable:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.15) !important;
-        }
         @keyframes fadeInUp {
           from { opacity: 0; transform: translate(-50%, calc(-100% + 6px)); }
           to   { opacity: 1; transform: translate(-50%, -100%); }

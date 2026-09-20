@@ -8,9 +8,18 @@ basado en estudios de comportamiento bovino y dinámica del rodeo en pastoreo.
 
 import argparse
 import json
+import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from gps_noise_common import (  # noqa: E402
+    inject_gps_noise,
+    quantize_movestate,
+    DEFAULT_GPS_NOISE_STD_M,
+    DEFAULT_HEARTBEAT_INTERVAL_TICKS,
+)
 
 SAMPLES_PER_DAY = 288  # 1 lectura cada 5 minutos (24 * 60 / 5)
 MINUTES_PER_SAMPLE = 5
@@ -18,7 +27,9 @@ MINUTES_PER_SAMPLE = 5
 # moveState real del collar: 0 (reposo) a 9 (alta aceleración)
 
 
-def build_dataset(n_animales: int, dias: int, seed: int):
+def build_dataset(n_animales: int, dias: int, seed: int,
+                   gps_noise_std_m: float = DEFAULT_GPS_NOISE_STD_M,
+                   heartbeat_interval_ticks: int = DEFAULT_HEARTBEAT_INTERVAL_TICKS):
     rng = np.random.default_rng(seed)
     T = dias * SAMPLES_PER_DAY
 
@@ -127,6 +138,13 @@ def build_dataset(n_animales: int, dias: int, seed: int):
         lat[:, t] = lat[:, t - 1] + step_lat + pull_lat
         lon[:, t] = lon[:, t - 1] + step_lon + pull_lon
 
+    # Trayectoria "verdadera" (determina las labels is_celo/is_periestro,
+    # ya calculadas más arriba y ajenas a lat/lon) vs. observada: un collar
+    # real, aunque esté quieto, mide con ruido GNSS -- ver
+    # gps_noise_common.py para la derivación empírica de gps_noise_std_m.
+    lat_true, lon_true = lat, lon
+    lat, lon = inject_gps_noise(lat_true, lon_true, gps_noise_std_m, rng)
+
     # ------------------------------------------------------------------
     # 3. Estado de Movimiento (MOVESTATE)
     # ------------------------------------------------------------------
@@ -158,6 +176,12 @@ def build_dataset(n_animales: int, dias: int, seed: int):
     fp_mask = rng.random((n_animales, T)) < 0.005  # 0.5%
     move_state[fp_mask] = rng.integers(7, 10, fp_mask.sum())
 
+    # En producción moveState solo puede cambiar cuando llega un Heartbeat
+    # real (ver gps_noise_common.quantize_movestate): un valor fresco cada
+    # tick de 5 min, como se generó arriba, no es lo que el modelo va a
+    # ver en inferencia.
+    move_state = quantize_movestate(move_state, heartbeat_interval_ticks)
+
     # ------------------------------------------------------------------
     # 4. Batería
     # ------------------------------------------------------------------
@@ -180,6 +204,8 @@ def build_dataset(n_animales: int, dias: int, seed: int):
         "fecha_hora": fecha_hora,
         "latitud": np.round(lat.flatten(), 6),
         "longitud": np.round(lon.flatten(), 6),
+        "latitud_true": np.round(lat_true.flatten(), 6),
+        "longitud_true": np.round(lon_true.flatten(), 6),
         "moveState": move_state.flatten(),
         "bateria": np.round(bateria.flatten().astype(np.float32), 2),
         "intensidad_celo": np.round(intensidad.flatten(), 4),
@@ -192,13 +218,22 @@ def build_dataset(n_animales: int, dias: int, seed: int):
 
 def main():
     parser = argparse.ArgumentParser(description="Generador avanzado de telemetria bovina (VigIA) v3")
-    parser.add_argument("--n-animales", type=int, default=60)
-    parser.add_argument("--dias", type=int, default=60, help="Días totales a simular para todo el rodeo")
+    parser.add_argument("--n-animales", type=int, default=200,
+                         help="60 daba un test set de solo 720 muestras/57 positivos -- suficiente "
+                              "para entrenar pero con métricas de evaluación poco confiables (ver README.md)")
+    parser.add_argument("--dias", type=int, default=90, help="Días totales a simular para todo el rodeo")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--out-dir", type=str, default="dataset")
+    parser.add_argument("--gps-noise-std-m", type=float, default=DEFAULT_GPS_NOISE_STD_M,
+                         help="Desvío estándar (metros, por eje) del ruido de medición GNSS "
+                              "inyectado sobre la trayectoria simulada, ver gps_noise_common.py")
+    parser.add_argument("--heartbeat-interval-ticks", type=int, default=DEFAULT_HEARTBEAT_INTERVAL_TICKS,
+                         help="Cada cuántos ticks de 5 min cambia moveState (cadencia real de Heartbeat)")
     args = parser.parse_args()
 
-    df, metadata = build_dataset(args.n_animales, args.dias, args.seed)
+    df, metadata = build_dataset(args.n_animales, args.dias, args.seed,
+                                  gps_noise_std_m=args.gps_noise_std_m,
+                                  heartbeat_interval_ticks=args.heartbeat_interval_ticks)
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -207,7 +242,11 @@ def main():
     df.to_parquet(out_dir / "telemetria.parquet", index=False)
 
     with open(out_dir / "ground_truth_metadata.json", "w") as f:
-        json.dump(metadata, f, indent=2, ensure_ascii=False)
+        json.dump({
+            "gps_noise_std_m": args.gps_noise_std_m,
+            "heartbeat_interval_ticks": args.heartbeat_interval_ticks,
+            "animales": metadata,
+        }, f, indent=2, ensure_ascii=False)
 
     print("¡Generación completada con éxito!")
     print(f"Ticks en celo: {int(df['is_celo'].sum())} | en periestro: {int(df['is_periestro'].sum())}")

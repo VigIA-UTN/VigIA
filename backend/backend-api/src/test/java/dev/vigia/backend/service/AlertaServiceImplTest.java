@@ -109,6 +109,7 @@ public class AlertaServiceImplTest {
                 mockAlerta.setEstado(EstadoAlerta.PENDIENTE);
                 mockAlerta.setDisparador(DisparadorAlerta.CELO);
                 mockAlerta.setValorDetectado(0.85);
+                mockAlerta.setAccionRecomendada("Planificar inseminación artificial dentro de la ventana óptima.");
                 mockAlerta.setVentanaInicioIns(LocalDateTime.now().plusHours(2));
                 mockAlerta.setVentanaFinIns(LocalDateTime.now().plusHours(14));
         }
@@ -131,6 +132,8 @@ public class AlertaServiceImplTest {
                 assertNotNull(result);
                 assertEquals(1, result.size());
                 assertEquals(ALERTA_ID, result.get(0).getId());
+                assertEquals("Planificar inseminación artificial dentro de la ventana óptima.",
+                                result.get(0).getAccionRecomendada());
                 verify(alertaRepository, times(1)).findCeloByEstablecimiento(ESTABLECIMIENTO_ID);
         }
 
@@ -162,6 +165,7 @@ public class AlertaServiceImplTest {
         void listarAlertasSalud_Success() {
                 // Arrange
                 mockAlerta.setDisparador(DisparadorAlerta.SALUD);
+                mockAlerta.setAccionRecomendada("Revisar al animal y realizar seguimiento clínico.");
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
@@ -175,6 +179,8 @@ public class AlertaServiceImplTest {
                 assertNotNull(result);
                 assertEquals(1, result.size());
                 assertEquals(ALERTA_ID, result.get(0).getId());
+                assertEquals("Revisar al animal y realizar seguimiento clínico.",
+                                result.get(0).getAccionRecomendada());
                 verify(alertaRepository, times(1)).findSaludByEstablecimiento(ESTABLECIMIENTO_ID);
         }
 
@@ -219,6 +225,8 @@ public class AlertaServiceImplTest {
                 assertEquals(ALERTA_ID, result.getId());
                 assertEquals("CAR-123", result.getAnimalCaravanaOficial());
                 assertEquals("12 horas", result.getVentanaOptimaHoras());
+                assertEquals("Planificar inseminación artificial dentro de la ventana óptima.",
+                                result.getAccionRecomendada());
         }
 
         @Test
@@ -429,6 +437,8 @@ public class AlertaServiceImplTest {
                 // Assert
                 assertNotNull(result);
                 assertEquals(EstadoAlerta.CONFIRMADA, result.getEstado());
+                assertEquals("Planificar inseminación artificial dentro de la ventana óptima.",
+                                result.getAccionRecomendada());
                 verify(alertaRepository, times(1)).save(mockAlerta);
                 verify(intervencionRepository, never()).save(any(Intervencion.class));
         }
@@ -450,6 +460,8 @@ public class AlertaServiceImplTest {
                 // Assert
                 assertNotNull(result);
                 assertEquals(EstadoAlerta.DESCARTADA, result.getEstado());
+                assertEquals("Planificar inseminación artificial dentro de la ventana óptima.",
+                                result.getAccionRecomendada());
                 verify(alertaRepository, times(1)).save(mockAlerta);
                 verify(intervencionRepository, never()).save(any(Intervencion.class));
         }
@@ -562,6 +574,8 @@ public class AlertaServiceImplTest {
                 // Assert
                 assertNotNull(result);
                 assertEquals(EstadoAlerta.CONFIRMADA, result.getEstado());
+                assertEquals("Planificar inseminación artificial dentro de la ventana óptima.",
+                                result.getAccionRecomendada());
 
                 ArgumentCaptor<Intervencion> captor = ArgumentCaptor.forClass(Intervencion.class);
                 verify(intervencionRepository, times(1)).save(captor.capture());
@@ -904,4 +918,43 @@ public class AlertaServiceImplTest {
                 assertEquals(0L, result.getTiempoRestanteSegundos());
                 assertFalse(result.getProximaAVencer());
         }
+
+        // --- Tests dedicados a la actualización de toResponse ---
+
+        @Test
+        @SuppressWarnings("null")
+        void toResponse_MapeaAccionRecomendada_CuandoEsNull() {
+                mockAlerta.setAccionRecomendada(null);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findCeloByEstablecimiento(ESTABLECIMIENTO_ID))
+                                .thenReturn(List.of(mockAlerta));
+
+                List<AlertaResponse> result = alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null);
+
+                assertNotNull(result);
+                assertEquals(1, result.size());
+                assertNull(result.get(0).getAccionRecomendada());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void toResponse_MapeaAccionRecomendada_EnArchivarAlertaPorVencimiento() {
+                mockAlerta.setAccionRecomendada("Planificar inseminación artificial dentro de la ventana óptima.");
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
+
+                AlertaResponse result = alertaService.archivarAlertaPorVencimiento(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                assertNotNull(result);
+                assertEquals(EstadoAlerta.ARCHIVADA, result.getEstado());
+                assertEquals("Planificar inseminación artificial dentro de la ventana óptima.",
+                                result.getAccionRecomendada());
+                verify(alertaRepository, times(1)).save(mockAlerta);
+        }
 }
+

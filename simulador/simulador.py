@@ -64,7 +64,9 @@ SPEED_MULT_CELO_MAX = 4.0
 # componentes casi se cancelan, a veces se suman al máximo, así que la misma
 # "intensidad de celo" produce probabilidades muy dispares corrida a corrida
 # (medido: 0.27 a 0.93 con el generador viejo, promedio 0.74 — por debajo del
-# CELO_THRESHOLD=0.892 configurado en .env la mayoría de las veces). Usando un
+# CELO_THRESHOLD=0.892 configurado en .env en ese momento la mayoría de las
+# veces; el valor actual de CELO_THRESHOLD es otro, ver infra/.env.example).
+# Usando un
 # rumbo que persiste entre ticks y un paso de magnitud fija (speed*cos/sin),
 # igual que en entrenamiento, la probabilidad queda estable en ~0.996-0.998.
 # ---------------------------------------------------------------------------
@@ -317,7 +319,9 @@ def inyectar_historial_salud():
         estado["lon"] += speed * math.sin(estado["heading"])
 
         payload = {
-            "device_id": FORZAR_SALUD_DEVICE_ID,
+            "end_device_ids": {
+            "dev_eui": device_id
+            },
             "timestamp": past_time.replace(tzinfo=None).isoformat(),
             "payload": {
                 "latitud": round(estado["lat"], 6),
@@ -346,11 +350,16 @@ def main():
         exitos = 0
         errores = 0
 
+        headers = {}
+        api_key = os.getenv("TTN_WEBHOOK_API_KEY")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
         print(f"\n--- Iniciando ciclo de envío ({datetime.now().isoformat()}) ---")
         for device_id, estado in animales.items():
             payload = generar_payload(device_id, estado)
             try:
-                response = requests.post(API_URL, json=payload, timeout=5)
+                response = requests.post(API_URL, json=payload, timeout=5, headers=headers)
                 if response.status_code in [200, 201, 202]:
                     exitos += 1
                 else:

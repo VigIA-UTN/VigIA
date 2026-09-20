@@ -113,6 +113,7 @@ export default function AnimalesPage() {
                     tipo: 'CELO',
                     estado: animal.estadoActual,
                     tsGeneracion: new Date().toISOString(),
+                    accionRecomendada: "Realizar inseminación artificial dentro de la ventana óptima.",
                 };
                 setSelectedAlertaForAnimal(fallback);
             }
@@ -409,574 +410,574 @@ export default function AnimalesPage() {
 
     return (
         <>
-        <div className="vigia-page-container">
-            <Container>
-                <div className="vigia-page-header animales-header-mobile">
-                    <div className="d-flex align-items-center gap-2 flex-wrap">
-                        <h2 className="vigia-page-title">Animales</h2>
-                        <button className={`btn-filter${activeTab === 'general' ? ' active' : ''}`} onClick={() => setActiveTab('general')}>
-                            <i className="bi bi-list" /> General
-                        </button>
-                        <button className={`btn-filter${activeTab === 'celo' ? ' active' : ''}`} onClick={() => setActiveTab('celo')}>
-                            <i className="bi bi-search" /> Celo
-                        </button>
-                        <button className={`btn-filter${activeTab === 'salud' ? ' active' : ''}`} onClick={() => setActiveTab('salud')}>
-                            <i className="bi bi-heart" /> Salud
-                        </button>
-                    </div>
-                    <div className="animales-action-btns d-flex align-items-center gap-2">
-                        <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
-                            <i className="bi bi-plus-lg" /> Rodeo
-                        </Button>
-                        <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
-                            <i className="bi bi-upload" /> Cargar Estados
-                        </Button>
-                        <Button className="btn-vigia-success" onClick={() => { setUploadModal(true) }}>
-                            <i className="bi bi-upload" /> Cargar Animales
-                        </Button>
-                        <Button className="btn-vigia-success" onClick={openModal}>
-                            <i className="bi bi-plus-lg" /> Animal
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="mb-3 mt-3">
-                    <Form.Control
-                        type="text"
-                        placeholder="Buscar por identificador, nombre o lote..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        style={{ maxWidth: '400px' }}
-                    />
-                </div>
-
-                {error && <Alert variant="danger" className="mt-3">{error}</Alert>}
-
-                {
-                    loading ? (
-                        <div className="text-center mt-5">
-                            <Spinner animation="border" style={{ color: '#1E3A5F' }} />
+            <div className="vigia-page-container">
+                <Container>
+                    <div className="vigia-page-header animales-header-mobile">
+                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                            <h2 className="vigia-page-title">Animales</h2>
+                            <button className={`btn-filter${activeTab === 'general' ? ' active' : ''}`} onClick={() => setActiveTab('general')}>
+                                <i className="bi bi-list" /> General
+                            </button>
+                            <button className={`btn-filter${activeTab === 'celo' ? ' active' : ''}`} onClick={() => setActiveTab('celo')}>
+                                <i className="bi bi-search" /> Celo
+                            </button>
+                            <button className={`btn-filter${activeTab === 'salud' ? ' active' : ''}`} onClick={() => setActiveTab('salud')}>
+                                <i className="bi bi-heart" /> Salud
+                            </button>
                         </div>
-                    ) : (
-                        <div className="vigia-table-wrapper animales-table-wrapper">
-                            <table className="vigia-table">
-                                <thead>
-                                    <tr>
-                                        <th onClick={() => handleSort('idCaravanaOficial')} style={{ cursor: 'pointer' }}>
-                                            <div className="d-flex align-items-center justify-content-center">
-                                                ID <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'idCaravanaOficial' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                            </div>
-                                        </th>
-                                        <th onClick={() => handleSort('alias')} style={{ cursor: 'pointer' }}>
-                                            <div className="d-flex align-items-center justify-content-center">
-                                                Nombre <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'alias' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                            </div>
-                                        </th>
-                                        <th className="col-mobile-hide text-center">Caravana</th>
-                                        {activeTab === 'celo' ? (
-                                            <>
-                                                <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }}>
-                                                    <div className="d-flex align-items-center justify-content-center">
-                                                        <span className="d-none d-sm-inline">Estado Reproductivo</span>
-                                                        <span className="d-sm-none">Reproductivo</span>
-                                                        <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
-                                                <th onClick={() => handleSort('fechaUltimoParto')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-center">
-                                                        Fecha Último Parto <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimoParto' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
-                                                <th onClick={() => handleSort('fechaUltimaInseminacion')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-center">
-                                                        Fecha Última Inseminación <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimaInseminacion' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <th onClick={() => handleSort('rodeoLoteNombre')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-center">
-                                                        Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteNombre' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
-                                                <th onClick={() => handleSort('estadoActual')} style={{ cursor: 'pointer' }}>
-                                                    <div className="d-flex align-items-center justify-content-center">
-                                                        Estado <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoActual' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
-                                                <th onClick={() => handleSort('estadoSalud')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-center">
-                                                        Salud <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoSalud' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
-                                                <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
-                                                    <div className="d-flex align-items-center justify-content-center">
-                                                        Reproductivo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
-                                                    </div>
-                                                </th>
-                                            </>
-                                        )}
-                                        <th className="text-center">Acciones</th>
-                                    </tr >
-                                </thead >
-                                <tbody>
-                                    {sortedAnimales.length === 0 ? (
+                        <div className="animales-action-btns d-flex align-items-center gap-2">
+                            <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
+                                <i className="bi bi-plus-lg" /> Rodeo
+                            </Button>
+                            <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
+                                <i className="bi bi-upload" /> Cargar Estados
+                            </Button>
+                            <Button className="btn-vigia-success" onClick={() => { setUploadModal(true) }}>
+                                <i className="bi bi-upload" /> Cargar Animales
+                            </Button>
+                            <Button className="btn-vigia-success" onClick={openModal}>
+                                <i className="bi bi-plus-lg" /> Animal
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="mb-3 mt-3">
+                        <Form.Control
+                            type="text"
+                            placeholder="Buscar por identificador, nombre o lote..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            style={{ maxWidth: '400px' }}
+                        />
+                    </div>
+
+                    {error && <Alert variant="danger" className="mt-3">{error}</Alert>}
+
+                    {
+                        loading ? (
+                            <div className="text-center mt-5">
+                                <Spinner animation="border" style={{ color: '#1E3A5F' }} />
+                            </div>
+                        ) : (
+                            <div className="vigia-table-wrapper animales-table-wrapper">
+                                <table className="vigia-table">
+                                    <thead>
                                         <tr>
-                                            <td colSpan={8} className="text-center py-4 text-muted">
-                                                No se encontraron animales.
-                                            </td>
+                                            <th onClick={() => handleSort('idCaravanaOficial')} style={{ cursor: 'pointer' }}>
+                                                <div className="d-flex align-items-center justify-content-center">
+                                                    ID <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'idCaravanaOficial' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                </div>
+                                            </th>
+                                            <th onClick={() => handleSort('alias')} style={{ cursor: 'pointer' }}>
+                                                <div className="d-flex align-items-center justify-content-center">
+                                                    Nombre <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'alias' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                </div>
+                                            </th>
+                                            <th className="col-mobile-hide text-center">Caravana</th>
+                                            {activeTab === 'celo' ? (
+                                                <>
+                                                    <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }}>
+                                                        <div className="d-flex align-items-center justify-content-center">
+                                                            <span className="d-none d-sm-inline">Estado Reproductivo</span>
+                                                            <span className="d-sm-none">Reproductivo</span>
+                                                            <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                        </div>
+                                                    </th>
+                                                    <th onClick={() => handleSort('fechaUltimoParto')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
+                                                        <div className="d-flex align-items-center justify-content-center">
+                                                            Fecha Último Parto <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimoParto' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                        </div>
+                                                    </th>
+                                                    <th onClick={() => handleSort('fechaUltimaInseminacion')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
+                                                        <div className="d-flex align-items-center justify-content-center">
+                                                            Fecha Última Inseminación <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'fechaUltimaInseminacion' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                        </div>
+                                                    </th>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <th onClick={() => handleSort('rodeoLoteNombre')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
+                                                        <div className="d-flex align-items-center justify-content-center">
+                                                            Rodeo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'rodeoLoteNombre' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                        </div>
+                                                    </th>
+                                                    <th onClick={() => handleSort('estadoActual')} style={{ cursor: 'pointer' }}>
+                                                        <div className="d-flex align-items-center justify-content-center">
+                                                            Estado <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoActual' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                        </div>
+                                                    </th>
+                                                    <th onClick={() => handleSort('estadoSalud')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
+                                                        <div className="d-flex align-items-center justify-content-center">
+                                                            Salud <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoSalud' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                        </div>
+                                                    </th>
+                                                    <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }} className="col-mobile-hide">
+                                                        <div className="d-flex align-items-center justify-content-center">
+                                                            Reproductivo <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px', textAlign: 'left' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                                                        </div>
+                                                    </th>
+                                                </>
+                                            )}
+                                            <th className="text-center">Acciones</th>
                                         </tr >
-                                    ) : (
-                                        sortedAnimales.map(a => (
-                                            <tr key={a.id} className="animal-row">
-                                                <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
-                                                <td>{a.alias || '—'}</td>
-                                                <td className="col-mobile-hide">
-                                                    {a.caravanaId ? (
-                                                        <div className="d-flex align-items-center justify-content-between gap-2">
-                                                            <div className="text-truncate" style={{ minWidth: 0 }}>
-                                                                <div className="d-flex align-items-center gap-2">
-                                                                    <span className="text-truncate">{a.caravanaAlias || a.caravanaDevEui}</span>
+                                    </thead >
+                                    <tbody>
+                                        {sortedAnimales.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={8} className="text-center py-4 text-muted">
+                                                    No se encontraron animales.
+                                                </td>
+                                            </tr >
+                                        ) : (
+                                            sortedAnimales.map(a => (
+                                                <tr key={a.id} className="animal-row">
+                                                    <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
+                                                    <td>{a.alias || '—'}</td>
+                                                    <td className="col-mobile-hide">
+                                                        {a.caravanaId ? (
+                                                            <div className="d-flex align-items-center justify-content-between gap-2">
+                                                                <div className="text-truncate" style={{ minWidth: 0 }}>
+                                                                    <div className="d-flex align-items-center gap-2">
+                                                                        <span className="text-truncate">{a.caravanaAlias || a.caravanaDevEui}</span>
+                                                                        {(() => {
+                                                                            const bateria = formatBateria(a.caravanaBateria);
+                                                                            return (
+                                                                                <span style={{ fontSize: '0.75rem', color: bateria.amber ? '#8a6a00' : '#2f7d3b', flexShrink: 0 }}>
+                                                                                    {bateria.amber && <span className="bateria-dot" />}
+                                                                                    {bateria.text}
+                                                                                </span>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
                                                                     {(() => {
-                                                                        const bateria = formatBateria(a.caravanaBateria);
+                                                                        const senial = formatUltimaSenial(a.caravanaUltimaSenial);
                                                                         return (
-                                                                            <span style={{ fontSize: '0.75rem', color: bateria.amber ? '#8a6a00' : '#2f7d3b', flexShrink: 0 }}>
-                                                                                {bateria.amber && <span className="bateria-dot" />}
-                                                                                {bateria.text}
-                                                                            </span>
+                                                                            <div title={senial.title} style={{ fontSize: '0.7rem', color: senial.amber ? '#8a6a00' : '#9aa5b1' }}>
+                                                                                señal {senial.text}
+                                                                            </div>
                                                                         );
                                                                     })()}
                                                                 </div>
-                                                                {(() => {
-                                                                    const senial = formatUltimaSenial(a.caravanaUltimaSenial);
-                                                                    return (
-                                                                        <div title={senial.title} style={{ fontSize: '0.7rem', color: senial.amber ? '#8a6a00' : '#9aa5b1' }}>
-                                                                            señal {senial.text}
-                                                                        </div>
-                                                                    );
-                                                                })()}
+                                                                {puedeGestionarCaravanas && (
+                                                                    <Button
+                                                                        variant="outline-secondary"
+                                                                        size="sm"
+                                                                        className="flex-shrink-0"
+                                                                        disabled={desvinculandoId === a.id}
+                                                                        onClick={() => openDesvincularModal(a)}
+                                                                        title="Desvincular"
+                                                                    >
+                                                                        {desvinculandoId === a.id ? <Spinner as="span" animation="border" size="sm" /> : <i className="bi bi-x-lg"></i>}
+                                                                    </Button>
+                                                                )}
                                                             </div>
-                                                            {puedeGestionarCaravanas && (
-                                                                <Button
-                                                                    variant="outline-secondary"
-                                                                    size="sm"
-                                                                    className="flex-shrink-0"
-                                                                    disabled={desvinculandoId === a.id}
-                                                                    onClick={() => openDesvincularModal(a)}
-                                                                    title="Desvincular"
-                                                                >
-                                                                    {desvinculandoId === a.id ? <Spinner as="span" animation="border" size="sm" /> : <i className="bi bi-x-lg"></i>}
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="d-flex align-items-center justify-content-between gap-2">
-                                                            <span className="text-muted">Sin vincular</span>
-                                                            {puedeGestionarCaravanas && (
-                                                                <Button variant="outline-primary" size="sm" className="flex-shrink-0" onClick={() => openVincularModal(a)}>
-                                                                    Vincular
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                {activeTab === 'celo' ? (
-                                                    <>
-                                                        <td className="text-center">
-                                                            {a.estadoReproductivo ? (
-                                                                <span className={`estado-badge-celo ${a.estadoReproductivo === 'GESTANTE' ? 'celo-gestante' :
-                                                                    a.estadoReproductivo === 'CELO' ? 'celo-celo' :
-                                                                        a.estadoReproductivo === 'VACIA' ? 'celo-vacia' : 'celo-otro'
-                                                                    }`}>{ESTADO_REPRODUCTIVO_LABEL[a.estadoReproductivo] ?? a.estadoReproductivo}</span>
-                                                            ) : '—'}
-                                                        </td>
-                                                        <td className="col-mobile-hide">{formatFecha(a.fechaUltimoParto ?? null)}</td>
-                                                        <td className="col-mobile-hide">{formatFecha(a.fechaUltimaInseminacion ?? null)}</td>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <td className="col-mobile-hide">{a.rodeoLoteNombre || '—'}</td>
-                                                        <td className="text-center"><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
-                                                        <td className="text-center col-mobile-hide">
-                                                            {a.estadoSalud ? (
-                                                                <span className={`badge ${a.estadoSalud === 'SANO' ? 'bg-success' :
-                                                                    a.estadoSalud === 'ENFERMO' ? 'bg-danger' :
-                                                                        a.estadoSalud === 'EN_OBSERVACION' ? 'bg-warning text-dark' : 'bg-secondary'
-                                                                    }`}>{ESTADO_SALUD_LABEL[a.estadoSalud] ?? a.estadoSalud}</span>
-                                                            ) : '—'}
-                                                        </td>
-                                                        <td className="text-center col-mobile-hide">
-                                                            {a.estadoReproductivo ? (
-                                                                <span className={`badge ${a.estadoReproductivo === 'GESTANTE' ? 'bg-success' :
-                                                                    a.estadoReproductivo === 'CELO' ? 'bg-danger' :
-                                                                        a.estadoReproductivo === 'VACIA' ? 'bg-secondary' : 'bg-info'
-                                                                    }`}>{ESTADO_REPRODUCTIVO_LABEL[a.estadoReproductivo] ?? a.estadoReproductivo}</span>
-                                                            ) : '—'}
-                                                        </td>
-                                                    </>
-                                                )}
-                                                <td className="text-center">
-                                                    <div className="d-flex justify-content-center gap-2">
-                                                        <Button variant="outline-primary" size="sm" onClick={() => navigate(`/animales/${a.id}`)}>
-                                                            <i className="bi bi-eye"></i> Ver
-                                                        </Button>
-                                                        {a.estadoActual === 'CON_ALERTA' && (
-                                                            <Button
-                                                                variant="outline-warning"
-                                                                size="sm"
-                                                                title="Ver detalle de alerta"
-                                                                disabled={loadingAlerta === a.id}
-                                                                onClick={() => handleVerAlerta(a)}
-                                                            >
-                                                                {loadingAlerta === a.id
-                                                                    ? <Spinner as="span" animation="border" size="sm" />
-                                                                    : <><i className="bi bi-bell-fill"></i> Alerta</>}
-                                                            </Button>
+                                                        ) : (
+                                                            <div className="d-flex align-items-center justify-content-between gap-2">
+                                                                <span className="text-muted">Sin vincular</span>
+                                                                {puedeGestionarCaravanas && (
+                                                                    <Button variant="outline-primary" size="sm" className="flex-shrink-0" onClick={() => openVincularModal(a)}>
+                                                                        Vincular
+                                                                    </Button>
+                                                                )}
+                                                            </div>
                                                         )}
-                                                        <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)}>
-                                                            <i className="bi bi-trash"></i>
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody >
-                            </table >
-                        </div >
-                    )
-                }
-            </Container >
+                                                    </td>
+                                                    {activeTab === 'celo' ? (
+                                                        <>
+                                                            <td className="text-center">
+                                                                {a.estadoReproductivo ? (
+                                                                    <span className={`estado-badge-celo ${a.estadoReproductivo === 'GESTANTE' ? 'celo-gestante' :
+                                                                        a.estadoReproductivo === 'CELO' ? 'celo-celo' :
+                                                                            a.estadoReproductivo === 'VACIA' ? 'celo-vacia' : 'celo-otro'
+                                                                        }`}>{ESTADO_REPRODUCTIVO_LABEL[a.estadoReproductivo] ?? a.estadoReproductivo}</span>
+                                                                ) : '—'}
+                                                            </td>
+                                                            <td className="col-mobile-hide">{formatFecha(a.fechaUltimoParto ?? null)}</td>
+                                                            <td className="col-mobile-hide">{formatFecha(a.fechaUltimaInseminacion ?? null)}</td>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <td className="col-mobile-hide">{a.rodeoLoteNombre || '—'}</td>
+                                                            <td className="text-center"><span className={`estado-badge ${estadoClass(a.estadoActual)}`}>{a.estadoActual}</span></td>
+                                                            <td className="text-center col-mobile-hide">
+                                                                {a.estadoSalud ? (
+                                                                    <span className={`badge ${a.estadoSalud === 'SANO' ? 'bg-success' :
+                                                                        a.estadoSalud === 'ENFERMO' ? 'bg-danger' :
+                                                                            a.estadoSalud === 'EN_OBSERVACION' ? 'bg-warning text-dark' : 'bg-secondary'
+                                                                        }`}>{ESTADO_SALUD_LABEL[a.estadoSalud] ?? a.estadoSalud}</span>
+                                                                ) : '—'}
+                                                            </td>
+                                                            <td className="text-center col-mobile-hide">
+                                                                {a.estadoReproductivo ? (
+                                                                    <span className={`badge ${a.estadoReproductivo === 'GESTANTE' ? 'bg-success' :
+                                                                        a.estadoReproductivo === 'CELO' ? 'bg-danger' :
+                                                                            a.estadoReproductivo === 'VACIA' ? 'bg-secondary' : 'bg-info'
+                                                                        }`}>{ESTADO_REPRODUCTIVO_LABEL[a.estadoReproductivo] ?? a.estadoReproductivo}</span>
+                                                                ) : '—'}
+                                                            </td>
+                                                        </>
+                                                    )}
+                                                    <td className="text-center">
+                                                        <div className="d-flex justify-content-center gap-2">
+                                                            <Button variant="outline-primary" size="sm" onClick={() => navigate(`/animales/${a.id}`)}>
+                                                                <i className="bi bi-eye"></i> Ver
+                                                            </Button>
+                                                            {a.estadoActual === 'CON_ALERTA' && (
+                                                                <Button
+                                                                    variant="outline-warning"
+                                                                    size="sm"
+                                                                    title="Ver detalle de alerta"
+                                                                    disabled={loadingAlerta === a.id}
+                                                                    onClick={() => handleVerAlerta(a)}
+                                                                >
+                                                                    {loadingAlerta === a.id
+                                                                        ? <Spinner as="span" animation="border" size="sm" />
+                                                                        : <><i className="bi bi-bell-fill"></i> Alerta</>}
+                                                                </Button>
+                                                            )}
+                                                            <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)}>
+                                                                <i className="bi bi-trash"></i>
+                                                            </Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody >
+                                </table >
+                            </div >
+                        )
+                    }
+                </Container >
 
-            <Modal show={showModal} onHide={() => setShowModal(false)} centered dialogClassName="modal-nuevo-animal">
-                <Modal.Header closeButton>
-                    <Modal.Title>Nuevo Animal</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {formError && <Alert variant="danger">{formError}</Alert>}
-                    {formSuccess && <Alert variant="success">{formSuccess}</Alert>}
-                    <Form onSubmit={handleSubmit} id="form-nuevo-animal">
-                        <Form.Group className="mb-3">
-                            <Form.Label>Identificador*</Form.Label>
-                            <Form.Control name="idCaravanaOficial" type="text" placeholder="Ej: #F4829" value={form.idCaravanaOficial ?? ''} onChange={handleChange} required />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Nombre</Form.Label>
-                            <Form.Control name="alias" type="text" placeholder="Ej: Lola" value={form.alias ?? ''} onChange={handleChange} />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Fecha de Nacimiento*</Form.Label>
-                            <Form.Control name="fechaNacimiento" type="date" value={form.fechaNacimiento ?? ''} onChange={handleChange} required />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Raza</Form.Label>
-                            <Form.Control name="raza" type="text" placeholder="Ej: Holstein" value={form.raza ?? ''} onChange={handleChange} />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Lote*</Form.Label>
-                            <Form.Select
-                                name="rodeoLoteId"
-                                value={form.rodeoLoteId ?? ''}
-                                onChange={handleChange}
-                            >
-                                <option value="">Seleccioná una opción</option>
-                                {rodeoLotes.map(l => (
-                                    <option key={l.id} value={l.id}>{l.nombre}</option>
-                                ))}
-                            </Form.Select>
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Peso inicial (kg)</Form.Label>
-                            <Form.Control
-                                name="pesoInicial"
-                                type="number"
-                                min="0"
-                                step="0.1"
-                                placeholder="Ej: 320.5 (opcional)"
-                                value={form.pesoInicial ?? ''}
-                                onChange={e => setForm(prev => ({ ...prev, pesoInicial: e.target.value ? parseFloat(e.target.value) : null }))}
-                            />
-                        </Form.Group>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button type="submit" form="form-nuevo-animal" disabled={submitting} className="btn-guardar-animal">
-                        {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+                <Modal show={showModal} onHide={() => setShowModal(false)} centered dialogClassName="modal-nuevo-animal">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Nuevo Animal</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {formError && <Alert variant="danger">{formError}</Alert>}
+                        {formSuccess && <Alert variant="success">{formSuccess}</Alert>}
+                        <Form onSubmit={handleSubmit} id="form-nuevo-animal">
+                            <Form.Group className="mb-3">
+                                <Form.Label>Identificador*</Form.Label>
+                                <Form.Control name="idCaravanaOficial" type="text" placeholder="Ej: #F4829" value={form.idCaravanaOficial ?? ''} onChange={handleChange} required />
+                            </Form.Group>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Nombre</Form.Label>
+                                <Form.Control name="alias" type="text" placeholder="Ej: Lola" value={form.alias ?? ''} onChange={handleChange} />
+                            </Form.Group>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Fecha de Nacimiento*</Form.Label>
+                                <Form.Control name="fechaNacimiento" type="date" value={form.fechaNacimiento ?? ''} onChange={handleChange} required />
+                            </Form.Group>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Raza</Form.Label>
+                                <Form.Control name="raza" type="text" placeholder="Ej: Holstein" value={form.raza ?? ''} onChange={handleChange} />
+                            </Form.Group>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Lote*</Form.Label>
+                                <Form.Select
+                                    name="rodeoLoteId"
+                                    value={form.rodeoLoteId ?? ''}
+                                    onChange={handleChange}
+                                >
+                                    <option value="">Seleccioná una opción</option>
+                                    {rodeoLotes.map(l => (
+                                        <option key={l.id} value={l.id}>{l.nombre}</option>
+                                    ))}
+                                </Form.Select>
+                            </Form.Group>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Peso inicial (kg)</Form.Label>
+                                <Form.Control
+                                    name="pesoInicial"
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    placeholder="Ej: 320.5 (opcional)"
+                                    value={form.pesoInicial ?? ''}
+                                    onChange={e => setForm(prev => ({ ...prev, pesoInicial: e.target.value ? parseFloat(e.target.value) : null }))}
+                                />
+                            </Form.Group>
+                        </Form>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button type="submit" form="form-nuevo-animal" disabled={submitting} className="btn-guardar-animal">
+                            {submitting ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
 
-            <Modal show={createRodeoModal} onHide={() => setCreateRodeoModal(false)} centered dialogClassName="modal-nuevo-animal">
-                <Modal.Header closeButton>
-                    <Modal.Title>Nuevo Rodeo</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {formErrorRodeo && <Alert variant="danger">{formErrorRodeo}</Alert>}
-                    <Form onSubmit={handleSubmitRodeo} id="form-nuevo-rodeo">
-                        <Form.Group className="mb-3">
-                            <Form.Label>Nombre*</Form.Label>
-                            <Form.Control name="nombre" type="text" placeholder="Ej: #F4829" value={formRodeo.nombre ?? ''} onChange={handleChangeRodeo} required />
-                        </Form.Group>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button type="submit" form="form-nuevo-rodeo" disabled={submittingRodeo} className="btn-guardar-animal">
-                        {submittingRodeo ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+                <Modal show={createRodeoModal} onHide={() => setCreateRodeoModal(false)} centered dialogClassName="modal-nuevo-animal">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Nuevo Rodeo</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {formErrorRodeo && <Alert variant="danger">{formErrorRodeo}</Alert>}
+                        <Form onSubmit={handleSubmitRodeo} id="form-nuevo-rodeo">
+                            <Form.Group className="mb-3">
+                                <Form.Label>Nombre*</Form.Label>
+                                <Form.Control name="nombre" type="text" placeholder="Ej: #F4829" value={formRodeo.nombre ?? ''} onChange={handleChangeRodeo} required />
+                            </Form.Group>
+                        </Form>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button type="submit" form="form-nuevo-rodeo" disabled={submittingRodeo} className="btn-guardar-animal">
+                            {submittingRodeo ? <Spinner as="span" animation="border" size="sm" /> : 'Guardar'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
 
-            <Modal show={uploadModal} onHide={handleCloseUploadModal} centered dialogClassName="modal-nuevo-animal">
-                <Modal.Header closeButton>
-                    <Modal.Title>Cargar Animales con Excel</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {formErrorUpload && <Alert variant="danger">{formErrorUpload}</Alert>}
-                    {reporteCarga ? (
-                        <div>
-                            <Alert variant={reporteCarga.fallidos > 0 ? "warning" : "success"}>
-                                {reporteCarga.fallidos > 0 ? "Carga fallida. Se encontraron errores y no se guardó ningún registro." : "¡Carga procesada correctamente!"}
-                            </Alert>
-                            <ul>
-                                <li><strong>Procesados:</strong> {reporteCarga.procesados}</li>
-                                <li><strong>Exitosos:</strong> {reporteCarga.exitosos}</li>
-                                <li><strong>Fallidos:</strong> {reporteCarga.fallidos}</li>
-                            </ul>
-                            {reporteCarga.errores && reporteCarga.errores.length > 0 && (
-                                <div className="mt-3">
-                                    <h6 className="fw-bold">Detalle de errores:</h6>
+                <Modal show={uploadModal} onHide={handleCloseUploadModal} centered dialogClassName="modal-nuevo-animal">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Cargar Animales con Excel</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {formErrorUpload && <Alert variant="danger">{formErrorUpload}</Alert>}
+                        {reporteCarga ? (
+                            <div>
+                                <Alert variant={reporteCarga.fallidos > 0 ? "warning" : "success"}>
+                                    {reporteCarga.fallidos > 0 ? "Carga fallida. Se encontraron errores y no se guardó ningún registro." : "¡Carga procesada correctamente!"}
+                                </Alert>
+                                <ul>
+                                    <li><strong>Procesados:</strong> {reporteCarga.procesados}</li>
+                                    <li><strong>Exitosos:</strong> {reporteCarga.exitosos}</li>
+                                    <li><strong>Fallidos:</strong> {reporteCarga.fallidos}</li>
+                                </ul>
+                                {reporteCarga.errores && reporteCarga.errores.length > 0 && (
+                                    <div className="mt-3">
+                                        <h6 className="fw-bold">Detalle de errores:</h6>
+                                        <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                            <ul className="text-danger mb-0" style={{ fontSize: '0.9em' }}>
+                                                {reporteCarga.errores.map((err, i) => (
+                                                    <li key={i}>{err}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <Form onSubmit={handleSubmitUpload} id="form-cargar-animales">
+                                <div className="mb-3 text-white" style={{ fontSize: '0.9em' }}>
+                                    <p className="mb-1">El archivo debe contener las siguientes columnas en este orden:</p>
+                                    <ul>
+                                        <li><strong>IdCaravana</strong> (al menos IdCaravana o Alias debe estar presente)</li>
+                                        <li><strong>Alias</strong> (al menos IdCaravana o Alias debe estar presente)</li>
+                                        <li><strong>FechaNacimiento</strong> (opcional, formato YYYY-MM-DD)</li>
+                                        <li><strong>Raza</strong> (opcional)</li>
+                                        <li><strong>RodeoLote</strong> (opcional, nombre exacto del lote/rodeo, se creará si no existe)</li>
+                                    </ul>
+                                    <div className="d-flex gap-3 mb-3">
+                                        <a href="/template_animales.csv" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
+                                            <i className="bi bi-filetype-csv me-1" /> Descargar template CSV
+                                        </a>
+                                        <a href="/template_animales.xlsx" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
+                                            <i className="bi bi-filetype-xlsx me-1" /> Descargar template Excel
+                                        </a>
+                                    </div>
+                                </div>
+                                <Form.Group controlId="formUploadFile" className="mb-3">
+                                    <Form.Label>Archivo*</Form.Label>
+                                    <Form.Control name="file" type="file" accept=".xlsx,.xls,.csv" onChange={handleChangeUpload} required />
+                                </Form.Group>
+                            </Form>
+                        )}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        {reporteCarga ? (
+                            <Button onClick={handleCloseUploadModal} className="btn-guardar-animal">
+                                Cerrar
+                            </Button>
+                        ) : (
+                            <Button type="submit" form="form-cargar-animales" disabled={submittingUpload} className="btn-guardar-animal">
+                                {submittingUpload ? <Spinner as="span" animation="border" size="sm" /> : 'Subir Archivo'}
+                            </Button>
+                        )}
+                    </Modal.Footer>
+                </Modal>
+                <Modal show={uploadEstadosModal} onHide={handleCloseUploadEstadosModal} centered dialogClassName="modal-nuevo-animal">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Cargar Estados Reproductivos</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {formErrorUploadEstados && <Alert variant="danger">{formErrorUploadEstados}</Alert>}
+                        {reporteCargaEstados ? (
+                            <div>
+                                <Alert variant={reporteCargaEstados.fallidos > 0 ? "warning" : "success"}>Carga procesada</Alert>
+                                <ul>
+                                    <li><strong>Procesados:</strong> {reporteCargaEstados.procesados}</li>
+                                    <li><strong>Exitosos:</strong> {reporteCargaEstados.exitosos}</li>
+                                    <li><strong>Fallidos:</strong> {reporteCargaEstados.fallidos}</li>
+                                </ul>
+                                {reporteCargaEstados.errores && reporteCargaEstados.errores.length > 0 && (
                                     <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                                        <ul className="text-danger mb-0" style={{ fontSize: '0.9em' }}>
-                                            {reporteCarga.errores.map((err, i) => (
-                                                <li key={i}>{err}</li>
+                                        <strong>Errores:</strong>
+                                        <ul className="mb-0 text-danger" style={{ fontSize: '0.9em' }}>
+                                            {reporteCargaEstados.errores.map((e, idx) => (
+                                                <li key={idx}>Fila {e.fila}: {e.error}</li>
                                             ))}
                                         </ul>
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <Form onSubmit={handleSubmitUpload} id="form-cargar-animales">
-                            <div className="mb-3 text-white" style={{ fontSize: '0.9em' }}>
-                                <p className="mb-1">El archivo debe contener las siguientes columnas en este orden:</p>
-                                <ul>
-                                    <li><strong>IdCaravana</strong> (al menos IdCaravana o Alias debe estar presente)</li>
-                                    <li><strong>Alias</strong> (al menos IdCaravana o Alias debe estar presente)</li>
-                                    <li><strong>FechaNacimiento</strong> (opcional, formato YYYY-MM-DD)</li>
-                                    <li><strong>Raza</strong> (opcional)</li>
-                                    <li><strong>RodeoLote</strong> (opcional, nombre exacto del lote/rodeo, se creará si no existe)</li>
-                                </ul>
-                                <div className="d-flex gap-3 mb-3">
-                                    <a href="/template_animales.csv" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
-                                        <i className="bi bi-filetype-csv me-1" /> Descargar template CSV
-                                    </a>
-                                    <a href="/template_animales.xlsx" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
-                                        <i className="bi bi-filetype-xlsx me-1" /> Descargar template Excel
-                                    </a>
-                                </div>
+                                )}
                             </div>
-                            <Form.Group controlId="formUploadFile" className="mb-3">
-                                <Form.Label>Archivo*</Form.Label>
-                                <Form.Control name="file" type="file" accept=".xlsx,.xls,.csv" onChange={handleChangeUpload} required />
-                            </Form.Group>
-                        </Form>
-                    )}
-                </Modal.Body>
-                <Modal.Footer>
-                    {reporteCarga ? (
-                        <Button onClick={handleCloseUploadModal} className="btn-guardar-animal">
-                            Cerrar
-                        </Button>
-                    ) : (
-                        <Button type="submit" form="form-cargar-animales" disabled={submittingUpload} className="btn-guardar-animal">
-                            {submittingUpload ? <Spinner as="span" animation="border" size="sm" /> : 'Subir Archivo'}
-                        </Button>
-                    )}
-                </Modal.Footer>
-            </Modal>
-            <Modal show={uploadEstadosModal} onHide={handleCloseUploadEstadosModal} centered dialogClassName="modal-nuevo-animal">
-                <Modal.Header closeButton>
-                    <Modal.Title>Cargar Estados Reproductivos</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {formErrorUploadEstados && <Alert variant="danger">{formErrorUploadEstados}</Alert>}
-                    {reporteCargaEstados ? (
-                        <div>
-                            <Alert variant={reporteCargaEstados.fallidos > 0 ? "warning" : "success"}>Carga procesada</Alert>
-                            <ul>
-                                <li><strong>Procesados:</strong> {reporteCargaEstados.procesados}</li>
-                                <li><strong>Exitosos:</strong> {reporteCargaEstados.exitosos}</li>
-                                <li><strong>Fallidos:</strong> {reporteCargaEstados.fallidos}</li>
-                            </ul>
-                            {reporteCargaEstados.errores && reporteCargaEstados.errores.length > 0 && (
-                                <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                                    <strong>Errores:</strong>
-                                    <ul className="mb-0 text-danger" style={{ fontSize: '0.9em' }}>
-                                        {reporteCargaEstados.errores.map((e, idx) => (
-                                            <li key={idx}>Fila {e.fila}: {e.error}</li>
-                                        ))}
+                        ) : (
+                            <Form onSubmit={handleSubmitUploadEstados} id="form-cargar-estados">
+                                <div className="mb-3 text-white" style={{ fontSize: '0.9em' }}>
+                                    <p className="mb-1">El archivo debe contener las siguientes columnas en este orden:</p>
+                                    <ul>
+                                        <li><strong>IdCaravana</strong> (al menos IdCaravana o Alias debe estar presente)</li>
+                                        <li><strong>Alias</strong> (al menos IdCaravana o Alias debe estar presente)</li>
+                                        <li><strong>Estado</strong> (VACIA, GESTANTE, CELO, ANESTRO)</li>
+                                        <li><strong>FechaUltimoParto</strong> (opcional, formato YYYY-MM-DD)</li>
+                                        <li><strong>FechaUltimaInseminacion</strong> (opcional, formato YYYY-MM-DD)</li>
                                     </ul>
+                                    <div className="d-flex gap-3 mb-3">
+                                        <a href="/template_estados.csv" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
+                                            <i className="bi bi-filetype-csv me-1" /> Descargar template CSV
+                                        </a>
+                                        <a href="/template_estados.xlsx" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
+                                            <i className="bi bi-filetype-xlsx me-1" /> Descargar template Excel
+                                        </a>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                    ) : (
-                        <Form onSubmit={handleSubmitUploadEstados} id="form-cargar-estados">
-                            <div className="mb-3 text-white" style={{ fontSize: '0.9em' }}>
-                                <p className="mb-1">El archivo debe contener las siguientes columnas en este orden:</p>
-                                <ul>
-                                    <li><strong>IdCaravana</strong> (al menos IdCaravana o Alias debe estar presente)</li>
-                                    <li><strong>Alias</strong> (al menos IdCaravana o Alias debe estar presente)</li>
-                                    <li><strong>Estado</strong> (VACIA, GESTANTE, CELO, ANESTRO)</li>
-                                    <li><strong>FechaUltimoParto</strong> (opcional, formato YYYY-MM-DD)</li>
-                                    <li><strong>FechaUltimaInseminacion</strong> (opcional, formato YYYY-MM-DD)</li>
-                                </ul>
-                                <div className="d-flex gap-3 mb-3">
-                                    <a href="/template_estados.csv" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
-                                        <i className="bi bi-filetype-csv me-1" /> Descargar template CSV
-                                    </a>
-                                    <a href="/template_estados.xlsx" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
-                                        <i className="bi bi-filetype-xlsx me-1" /> Descargar template Excel
-                                    </a>
-                                </div>
-                            </div>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Archivo*</Form.Label>
+                                    <Form.Control name="file" type="file" accept=".xlsx,.xls,.csv" onChange={handleChangeUploadEstados} required />
+                                </Form.Group>
+                            </Form>
+                        )}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        {reporteCargaEstados ? (
+                            <Button onClick={handleCloseUploadEstadosModal} className="btn-guardar-animal">
+                                Cerrar
+                            </Button>
+                        ) : (
+                            <Button type="submit" form="form-cargar-estados" disabled={submittingUploadEstados} className="btn-guardar-animal">
+                                {submittingUploadEstados ? <Spinner as="span" animation="border" size="sm" /> : 'Subir Archivo'}
+                            </Button>
+                        )}
+                    </Modal.Footer>
+                </Modal>
+
+                <Modal show={!!vincularModalAnimal} onHide={() => setVincularModalAnimal(null)} centered dialogClassName="modal-nuevo-animal">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Vincular caravana</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {formErrorCaravana && <Alert variant="danger">{formErrorCaravana}</Alert>}
+                        <Form onSubmit={handleVincularSubmit} id="form-vincular-caravana">
                             <Form.Group className="mb-3">
-                                <Form.Label>Archivo*</Form.Label>
-                                <Form.Control name="file" type="file" accept=".xlsx,.xls,.csv" onChange={handleChangeUploadEstados} required />
+                                <Form.Label>Caravana disponible*</Form.Label>
+                                <Form.Select
+                                    value={selectedCaravanaId ?? ''}
+                                    onChange={(e) => setSelectedCaravanaId(e.target.value ? Number(e.target.value) : null)}
+                                >
+                                    <option value="">Seleccioná una opción</option>
+                                    {caravanasDisponibles.map(c => {
+                                        const bateria = formatBateria(c.bateria);
+                                        const senial = formatUltimaSenial(c.ultimaSenial);
+                                        return (
+                                            <option key={c.id} value={c.id}>
+                                                {c.alias || c.codigo || c.devEui} · {bateria.text} · {senial.text}
+                                            </option>
+                                        );
+                                    })}
+                                </Form.Select>
+                                {caravanasDisponibles.length === 0 && (
+                                    <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>
+                                        No hay caravanas disponibles en este establecimiento.
+                                    </div>
+                                )}
                             </Form.Group>
                         </Form>
-                    )}
-                </Modal.Body>
-                <Modal.Footer>
-                    {reporteCargaEstados ? (
-                        <Button onClick={handleCloseUploadEstadosModal} className="btn-guardar-animal">
-                            Cerrar
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button type="submit" form="form-vincular-caravana" disabled={submittingCaravana || caravanasDisponibles.length === 0} className="btn-guardar-animal">
+                            {submittingCaravana ? <Spinner as="span" animation="border" size="sm" /> : 'Vincular'}
                         </Button>
-                    ) : (
-                        <Button type="submit" form="form-cargar-estados" disabled={submittingUploadEstados} className="btn-guardar-animal">
-                            {submittingUploadEstados ? <Spinner as="span" animation="border" size="sm" /> : 'Subir Archivo'}
+                    </Modal.Footer>
+                </Modal>
+
+                <Modal show={!!desvincularModalAnimal} onHide={() => { setDesvincularModalAnimal(null); setFormErrorDesvincular(null); }} centered dialogClassName="modal-nuevo-animal">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Desvincular caravana</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {formErrorDesvincular && <Alert variant="danger">{formErrorDesvincular}</Alert>}
+                        <p className="text-center mb-0" style={{ color: '#cde' }}>
+                            ¿Estás seguro de que querés desvincular la caravana de{' '}
+                            <strong style={{ color: 'white' }}>
+                                {desvincularModalAnimal?.alias || desvincularModalAnimal?.idCaravanaOficial || 'este animal'}
+                            </strong>?
+                        </p>
+                    </Modal.Body>
+                    <Modal.Footer className="gap-3">
+                        <Button
+                            className="btn-guardar-animal"
+                            style={{ flex: 1 }}
+                            onClick={() => setDesvincularModalAnimal(null)}
+                            disabled={desvinculandoId === desvincularModalAnimal?.id}
+                        >
+                            Cancelar
                         </Button>
-                    )}
-                </Modal.Footer>
-            </Modal>
+                        <Button
+                            className="btn-confirmar-desvincular"
+                            style={{ flex: 1 }}
+                            onClick={handleConfirmDesvincular}
+                            disabled={desvinculandoId === desvincularModalAnimal?.id}
+                        >
+                            {desvinculandoId === desvincularModalAnimal?.id ? <Spinner as="span" animation="border" size="sm" /> : 'Sí, desvincular'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+            </div>
 
-            <Modal show={!!vincularModalAnimal} onHide={() => setVincularModalAnimal(null)} centered dialogClassName="modal-nuevo-animal">
-                <Modal.Header closeButton>
-                    <Modal.Title>Vincular caravana</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {formErrorCaravana && <Alert variant="danger">{formErrorCaravana}</Alert>}
-                    <Form onSubmit={handleVincularSubmit} id="form-vincular-caravana">
-                        <Form.Group className="mb-3">
-                            <Form.Label>Caravana disponible*</Form.Label>
-                            <Form.Select
-                                value={selectedCaravanaId ?? ''}
-                                onChange={(e) => setSelectedCaravanaId(e.target.value ? Number(e.target.value) : null)}
-                            >
-                                <option value="">Seleccioná una opción</option>
-                                {caravanasDisponibles.map(c => {
-                                    const bateria = formatBateria(c.bateria);
-                                    const senial = formatUltimaSenial(c.ultimaSenial);
-                                    return (
-                                        <option key={c.id} value={c.id}>
-                                            {c.alias || c.codigo || c.devEui} · {bateria.text} · {senial.text}
-                                        </option>
-                                    );
-                                })}
-                            </Form.Select>
-                            {caravanasDisponibles.length === 0 && (
-                                <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>
-                                    No hay caravanas disponibles en este establecimiento.
-                                </div>
-                            )}
-                        </Form.Group>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button type="submit" form="form-vincular-caravana" disabled={submittingCaravana || caravanasDisponibles.length === 0} className="btn-guardar-animal">
-                        {submittingCaravana ? <Spinner as="span" animation="border" size="sm" /> : 'Vincular'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+            {/* Alert detail overlay — rendered at page root so position:fixed works correctly */}
+            {selectedAlertaForAnimal && (
+                <AlertDetailSidebar
+                    alerta={selectedAlertaForAnimal}
+                    mode="fixed"
+                    onClose={() => setSelectedAlertaForAnimal(null)}
+                    onActionComplete={handleAlertaActionComplete}
+                    onOpenIntervencion={() => {
+                        setIntervencionAlerta(selectedAlertaForAnimal);
+                        setIsIntervencionOpen(true);
+                    }}
+                />
+            )}
 
-            <Modal show={!!desvincularModalAnimal} onHide={() => { setDesvincularModalAnimal(null); setFormErrorDesvincular(null); }} centered dialogClassName="modal-nuevo-animal">
-                <Modal.Header closeButton>
-                    <Modal.Title>Desvincular caravana</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {formErrorDesvincular && <Alert variant="danger">{formErrorDesvincular}</Alert>}
-                    <p className="text-center mb-0" style={{ color: '#cde' }}>
-                        ¿Estás seguro de que querés desvincular la caravana de{' '}
-                        <strong style={{ color: 'white' }}>
-                            {desvincularModalAnimal?.alias || desvincularModalAnimal?.idCaravanaOficial || 'este animal'}
-                        </strong>?
-                    </p>
-                </Modal.Body>
-                <Modal.Footer className="gap-3">
-                    <Button
-                        className="btn-guardar-animal"
-                        style={{ flex: 1 }}
-                        onClick={() => setDesvincularModalAnimal(null)}
-                        disabled={desvinculandoId === desvincularModalAnimal?.id}
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        className="btn-confirmar-desvincular"
-                        style={{ flex: 1 }}
-                        onClick={handleConfirmDesvincular}
-                        disabled={desvinculandoId === desvincularModalAnimal?.id}
-                    >
-                        {desvinculandoId === desvincularModalAnimal?.id ? <Spinner as="span" animation="border" size="sm" /> : 'Sí, desvincular'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-        </div>
+            {isIntervencionOpen && intervencionAlerta && (
+                <IntervencionFormPanel
+                    alerta={intervencionAlerta}
+                    mode="fixed"
+                    onClose={() => setIsIntervencionOpen(false)}
+                    onSuccess={() => {
+                        setIsIntervencionOpen(false);
+                        fetchAnimales();
+                    }}
+                />
+            )}
 
-        {/* Alert detail overlay — rendered at page root so position:fixed works correctly */}
-        {selectedAlertaForAnimal && (
-            <AlertDetailSidebar
-                alerta={selectedAlertaForAnimal}
-                mode="fixed"
-                onClose={() => setSelectedAlertaForAnimal(null)}
-                onActionComplete={handleAlertaActionComplete}
-                onOpenIntervencion={() => {
-                    setIntervencionAlerta(selectedAlertaForAnimal);
-                    setIsIntervencionOpen(true);
-                }}
-            />
-        )}
-
-        {isIntervencionOpen && intervencionAlerta && (
-            <IntervencionFormPanel
-                alerta={intervencionAlerta}
-                mode="fixed"
-                onClose={() => setIsIntervencionOpen(false)}
-                onSuccess={() => {
-                    setIsIntervencionOpen(false);
-                    fetchAnimales();
-                }}
-            />
-        )}
-
-        {/* Undo toast — estilo snackbar de Gmail, disponible 5s tras desvincular */}
-        <div className="undo-toast-container">
-            <Toast
-                show={!!undoToast}
-                onClose={() => setUndoToast(null)}
-                delay={5000}
-                autohide
-                className="undo-toast"
-            >
-                <Toast.Body className="d-flex align-items-center justify-content-between gap-3">
-                    <span>Caravana desvinculada de {undoToast?.alias}</span>
-                    <Button variant="link" className="undo-toast-btn p-0" onClick={handleUndoDesvincular}>
-                        Deshacer
-                    </Button>
-                </Toast.Body>
-            </Toast>
-        </div>
-    </>
+            {/* Undo toast — estilo snackbar de Gmail, disponible 5s tras desvincular */}
+            <div className="undo-toast-container">
+                <Toast
+                    show={!!undoToast}
+                    onClose={() => setUndoToast(null)}
+                    delay={5000}
+                    autohide
+                    className="undo-toast"
+                >
+                    <Toast.Body className="d-flex align-items-center justify-content-between gap-3">
+                        <span>Caravana desvinculada de {undoToast?.alias}</span>
+                        <Button variant="link" className="undo-toast-btn p-0" onClick={handleUndoDesvincular}>
+                            Deshacer
+                        </Button>
+                    </Toast.Body>
+                </Toast>
+            </div>
+        </>
     );
 }
 

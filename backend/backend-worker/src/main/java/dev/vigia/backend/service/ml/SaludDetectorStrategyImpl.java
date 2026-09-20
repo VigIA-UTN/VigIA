@@ -156,7 +156,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         // recientes (telemetriaList viene ordenada ascendente por
         // fechaHora) y si todavia no hay 288, se reintenta en el proximo
         // ciclo en vez de mandar una ventana invalida.
-        // Primero filtramos puntos con datos nulos para evitar errores 422 en el microservicio ML
+        // Primero filtramos puntos con datos nulos para evitar errores 422 en el
+        // microservicio ML
         List<Telemetria> telemetriaValida = telemetriaList.stream()
                 .filter(t -> t.getLatitud() != null && t.getLongitud() != null && t.getMoveState() != null)
                 .collect(Collectors.toList());
@@ -299,6 +300,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         alerta.setPosibleCausa(response.getPosibleCausa());
         alerta.setSerieComparativaJson(serializarSerieComparativa(animal, ventanaEvaluar, perfil, perfilCalculadoEn,
                 severidad.name(), response.getPosibleCausa()));
+        alerta.setAccionRecomendada(buildAccionRecomendada(response.getPosibleCausa(), severidad));
 
         alerta = alertaRepository.save(alerta);
 
@@ -315,6 +317,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
                 .confianzaModelo(alerta.getConfianzaModelo())
                 .desvioDetectado(alerta.getDesvioDetectado())
                 .posibleCausa(alerta.getPosibleCausa())
+                .accionRecomendada(buildAccionRecomendada(alerta.getPosibleCausa(), alerta.getSeveridad()))
                 .build();
 
         rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
@@ -362,7 +365,24 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         log.error(
                 "Fallo al comunicarse con el microservicio ML de salud (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
                 correlationId, t.getMessage());
-        telemetriaList.forEach(telemetria -> telemetria.setEstadoInferenciaSalud(EstadoInferencia.INFERENCIA_PENDIENTE));
+        telemetriaList
+                .forEach(telemetria -> telemetria.setEstadoInferenciaSalud(EstadoInferencia.INFERENCIA_PENDIENTE));
         telemetriaRepository.saveAll(telemetriaList);
+    }
+
+    private String buildAccionRecomendada(String posibleCausa, SeveridadAlerta severidad) {
+        switch (severidad) {
+            case ALTA:
+                return "Atención veterinaria urgente y aislamiento en enfermería. Causa sospechada:" + posibleCausa
+                        + " (riesgo alto).";
+            case MEDIA:
+                return "Apartar al animal para revisión clínica y evaluar tratamiento. Causa sospechada: "
+                        + posibleCausa + " (riesgo medio).";
+            case BAJA:
+                return "Monitorear la evolución y el comportamiento del animal en los próximos rodeos. Causa sospechada: "
+                        + posibleCausa + " (riesgo bajo).";
+            default:
+                return "Revisar al animal y realizar seguimiento clínico. Causa sospechada: " + posibleCausa + ".";
+        }
     }
 }

@@ -34,6 +34,9 @@ vigia:
     celo-url: http://localhost:8001
     salud-url: http://localhost:8002
     geo-url: http://localhost:8003
+  ttn:
+    webhook:
+      api-key: test-api-key
 
 resilience4j:
   circuitbreaker:

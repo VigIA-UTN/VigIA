@@ -19,8 +19,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,8 +72,7 @@ class PerimetroServiceImplTest {
                 new CoordenadaDTO(-34.0, -58.0),
                 new CoordenadaDTO(-34.0, -57.0),
                 new CoordenadaDTO(-35.0, -57.0),
-                new CoordenadaDTO(-35.0, -58.0)
-        );
+                new CoordenadaDTO(-35.0, -58.0));
     }
 
     @Test
@@ -161,7 +158,8 @@ class PerimetroServiceImplTest {
     @Test
     @DisplayName("Debe desactivar y activar perímetro cambiando el estado activo")
     void desactivarYActivarPerimetro() {
-        Perimetro perimetro = new Perimetro(establecimiento, "Potrero", GeometryUtils.crearPoligono(coordenadasValidas));
+        Perimetro perimetro = new Perimetro(establecimiento, "Potrero",
+                GeometryUtils.crearPoligono(coordenadasValidas));
 
         when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
         when(perimetroRepository.findById(1L)).thenReturn(Optional.of(perimetro));

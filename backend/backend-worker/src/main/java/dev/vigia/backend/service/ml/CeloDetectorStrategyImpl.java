@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,137 +33,151 @@ import java.util.stream.Collectors;
 @Service
 public class CeloDetectorStrategyImpl implements DetectorStrategy {
 
-    private final RestClient restClient;
-    private final TelemetriaRepository telemetriaRepository;
-    private final AlertaRepository alertaRepository;
-    private final EstadoReproductivoRepository estadoReproductivoRepository;
-    private final RabbitTemplate rabbitTemplate;
+        private final RestClient restClient;
+        private final TelemetriaRepository telemetriaRepository;
+        private final AlertaRepository alertaRepository;
+        private final EstadoReproductivoRepository estadoReproductivoRepository;
+        private final RabbitTemplate rabbitTemplate;
 
-    @SuppressWarnings("null")
-    public CeloDetectorStrategyImpl(
-            RestClient.Builder restClientBuilder,
-            @Value("${vigia.ml.celo-url}") String celoUrl,
-            TelemetriaRepository telemetriaRepository,
-            AlertaRepository alertaRepository,
-            EstadoReproductivoRepository estadoReproductivoRepository,
-            RabbitTemplate rabbitTemplate) {
-        this.restClient = restClientBuilder.baseUrl(celoUrl).build();
-        this.telemetriaRepository = telemetriaRepository;
-        this.alertaRepository = alertaRepository;
-        this.estadoReproductivoRepository = estadoReproductivoRepository;
-        this.rabbitTemplate = rabbitTemplate;
-    }
-
-    @Override
-    @CircuitBreaker(name = "celoML", fallbackMethod = "fallbackProcess")
-    @Retry(name = "celoML", fallbackMethod = "fallbackProcess")
-    @SuppressWarnings("null")
-    public void process(List<Telemetria> telemetriaList, String correlationId) {
-        if (telemetriaList == null || telemetriaList.isEmpty()) {
-            return;
+        @SuppressWarnings("null")
+        public CeloDetectorStrategyImpl(
+                        RestClient.Builder restClientBuilder,
+                        @Value("${vigia.ml.celo-url}") String celoUrl,
+                        TelemetriaRepository telemetriaRepository,
+                        AlertaRepository alertaRepository,
+                        EstadoReproductivoRepository estadoReproductivoRepository,
+                        RabbitTemplate rabbitTemplate) {
+                this.restClient = restClientBuilder.baseUrl(celoUrl).build();
+                this.telemetriaRepository = telemetriaRepository;
+                this.alertaRepository = alertaRepository;
+                this.estadoReproductivoRepository = estadoReproductivoRepository;
+                this.rabbitTemplate = rabbitTemplate;
         }
 
-        Animal animal = telemetriaList.get(0).getCaravana().getAnimal();
-        if (animal != null && alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(animal,
-                DisparadorAlerta.CELO, java.time.LocalDateTime.now().minusHours(24))) {
-            log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente (últimas 24hs).",
-                    animal.getId());
-            List<Telemetria> pendientes = telemetriaList.stream()
-                    .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
-                    .collect(Collectors.toList());
-            pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO));
-            telemetriaRepository.saveAll(pendientes);
-            return;
+        @Override
+        @CircuitBreaker(name = "celoML", fallbackMethod = "fallbackProcess")
+        @Retry(name = "celoML", fallbackMethod = "fallbackProcess")
+        @SuppressWarnings("null")
+        public void process(List<Telemetria> telemetriaList, String correlationId) {
+                if (telemetriaList == null || telemetriaList.isEmpty()) {
+                        return;
+                }
+
+                Animal animal = telemetriaList.get(0).getCaravana().getAnimal();
+                if (animal != null && alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(animal,
+                                DisparadorAlerta.CELO, java.time.LocalDateTime.now().minusHours(24))) {
+                        log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente (últimas 24hs).",
+                                        animal.getId());
+                        List<Telemetria> pendientes = telemetriaList.stream()
+                                        .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
+                                        .collect(Collectors.toList());
+                        pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO));
+                        telemetriaRepository.saveAll(pendientes);
+                        return;
+                }
+
+                List<PuntoTelemetriaDTO> requestDTO = buildRequest(telemetriaList);
+
+                log.info("Llamando a microservicio de celo con correlationId: {}", correlationId);
+
+                CeloPredictResponseDTO response = restClient.post()
+                                .uri("/api/internal/ml/celo/predict")
+                                .header("X-Correlation-ID", correlationId)
+                                .body(requestDTO)
+                                .retrieve()
+                                .body(CeloPredictResponseDTO.class);
+
+                log.info("Respuesta de microservicio de celo recibida: {}", response);
+
+                List<Telemetria> pendientes = telemetriaList.stream()
+                                .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
+                                .collect(Collectors.toList());
+                pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO));
+                telemetriaRepository.saveAll(pendientes);
+
+                if (response != null && response.isEventoCelo()) {
+                        log.info("¡Evento de celo detectado con confianza {}!", response.getConfianzaModelo());
+
+                        Alerta alerta = new Alerta();
+                        alerta.setAnimal(animal);
+                        alerta.setTipo("Celo Detectado");
+                        alerta.setSeveridad(SeveridadAlerta.ALTA);
+                        alerta.setTsGeneracion(java.time.LocalDateTime.now());
+                        alerta.setDisparador(DisparadorAlerta.CELO);
+                        alerta.setValorUmbral(0.5);
+                        alerta.setValorDetectado((double) response.getConfianzaModelo());
+                        alerta.setEstado(EstadoAlerta.PENDIENTE);
+                        alerta.setConfianzaModelo(response.getConfianzaModelo());
+                        alerta.setVentanaOptimaHoras(response.getVentanaOptimaHoras());
+
+                        alerta.setAccionRecomendada(
+                                        "Planificar inseminación artificial dentro de la ventana óptima (entre 6 y 24 horas posteriores a la detección: de "
+                                                        + alerta.getTsGeneracion().plusHours(6)
+                                                                        .format(DateTimeFormatter
+                                                                                        .ofPattern("dd/MM/yyyy HH:mm"))
+                                                        + " a "
+                                                        + alerta.getTsGeneracion().plusHours(24)
+                                                                        .format(DateTimeFormatter
+                                                                                        .ofPattern("dd/MM/yyyy HH:mm"))
+                                                        + ")");
+
+                        alerta.setVentanaInicioIns(alerta.getTsGeneracion().plusHours(6));
+                        alerta.setVentanaFinIns(alerta.getTsGeneracion().plusHours(24));
+
+                        alerta = alertaRepository.save(alerta);
+
+                        EstadoReproductivo nuevoEstado = new EstadoReproductivo();
+                        nuevoEstado.setAnimal(animal);
+                        nuevoEstado.setEstado(TipoReproductivo.POSIBLE_CELO);
+                        nuevoEstado.setOrigen(OrigenEstado.AUTOMATICO);
+                        nuevoEstado.setFechaRegistro(java.time.LocalDateTime.now());
+
+                        if (animal != null && animal.getEstadosReproductivos() != null
+                                        && !animal.getEstadosReproductivos().isEmpty()) {
+                                EstadoReproductivo ultimoEstado = animal.getEstadosReproductivos().get(0);
+                                nuevoEstado.setFechaUltParto(ultimoEstado.getFechaUltParto());
+                                nuevoEstado.setFechaUltInseminacion(ultimoEstado.getFechaUltInseminacion());
+                        }
+
+                        estadoReproductivoRepository.save(nuevoEstado);
+
+                        AlertaEventDTO eventDTO = AlertaEventDTO.builder()
+                                        .id(alerta.getId())
+                                        .animalId(animal != null ? animal.getId() : null)
+                                        .tipo(alerta.getTipo())
+                                        .severidad(alerta.getSeveridad())
+                                        .tsGeneracion(alerta.getTsGeneracion())
+                                        .disparador(alerta.getDisparador())
+                                        .valorUmbral(alerta.getValorUmbral())
+                                        .valorDetectado(alerta.getValorDetectado())
+                                        .estado(alerta.getEstado())
+                                        .confianzaModelo(alerta.getConfianzaModelo())
+                                        .ventanaOptimaHoras(alerta.getVentanaOptimaHoras())
+                                        .build();
+
+                        rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
+                        log.info("Alerta publicada en RabbitMQ con ID: {}", alerta.getId());
+                }
         }
 
-        List<PuntoTelemetriaDTO> requestDTO = buildRequest(telemetriaList);
-
-        log.info("Llamando a microservicio de celo con correlationId: {}", correlationId);
-
-        CeloPredictResponseDTO response = restClient.post()
-                .uri("/api/internal/ml/celo/predict")
-                .header("X-Correlation-ID", correlationId)
-                .body(requestDTO)
-                .retrieve()
-                .body(CeloPredictResponseDTO.class);
-
-        log.info("Respuesta de microservicio de celo recibida: {}", response);
-
-        List<Telemetria> pendientes = telemetriaList.stream()
-                .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
-                .collect(Collectors.toList());
-        pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO));
-        telemetriaRepository.saveAll(pendientes);
-
-        if (response != null && response.isEventoCelo()) {
-            log.info("¡Evento de celo detectado con confianza {}!", response.getConfianzaModelo());
-
-            Alerta alerta = new Alerta();
-            alerta.setAnimal(animal);
-            alerta.setTipo("Celo Detectado");
-            alerta.setSeveridad(SeveridadAlerta.ALTA);
-            alerta.setTsGeneracion(java.time.LocalDateTime.now());
-            alerta.setDisparador(DisparadorAlerta.CELO);
-            alerta.setValorUmbral(0.5);
-            alerta.setValorDetectado((double) response.getConfianzaModelo());
-            alerta.setEstado(EstadoAlerta.PENDIENTE);
-            alerta.setConfianzaModelo(response.getConfianzaModelo());
-            alerta.setVentanaOptimaHoras(response.getVentanaOptimaHoras());
-
-            alerta.setVentanaInicioIns(alerta.getTsGeneracion().plusHours(6));
-            alerta.setVentanaFinIns(alerta.getTsGeneracion().plusHours(24));
-
-            alerta = alertaRepository.save(alerta);
-
-            EstadoReproductivo nuevoEstado = new EstadoReproductivo();
-            nuevoEstado.setAnimal(animal);
-            nuevoEstado.setEstado(TipoReproductivo.POSIBLE_CELO);
-            nuevoEstado.setOrigen(OrigenEstado.AUTOMATICO);
-            nuevoEstado.setFechaRegistro(java.time.LocalDateTime.now());
-            
-            if (animal != null && animal.getEstadosReproductivos() != null && !animal.getEstadosReproductivos().isEmpty()) {
-                EstadoReproductivo ultimoEstado = animal.getEstadosReproductivos().get(0);
-                nuevoEstado.setFechaUltParto(ultimoEstado.getFechaUltParto());
-                nuevoEstado.setFechaUltInseminacion(ultimoEstado.getFechaUltInseminacion());
-            }
-            
-            estadoReproductivoRepository.save(nuevoEstado);
-
-            AlertaEventDTO eventDTO = AlertaEventDTO.builder()
-                    .id(alerta.getId())
-                    .animalId(animal != null ? animal.getId() : null)
-                    .tipo(alerta.getTipo())
-                    .severidad(alerta.getSeveridad())
-                    .tsGeneracion(alerta.getTsGeneracion())
-                    .disparador(alerta.getDisparador())
-                    .valorUmbral(alerta.getValorUmbral())
-                    .valorDetectado(alerta.getValorDetectado())
-                    .estado(alerta.getEstado())
-                    .confianzaModelo(alerta.getConfianzaModelo())
-                    .ventanaOptimaHoras(alerta.getVentanaOptimaHoras())
-                    .build();
-
-            rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
-            log.info("Alerta publicada en RabbitMQ con ID: {}", alerta.getId());
+        public void fallbackProcess(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
+                log.error(
+                                "Fallo al comunicarse con el microservicio ML de celo (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
+                                correlationId, t.getMessage());
+                telemetriaList.forEach(telemetria -> telemetria
+                                .setEstadoInferenciaCelo(EstadoInferencia.INFERENCIA_PENDIENTE));
+                telemetriaRepository.saveAll(telemetriaList);
         }
-    }
 
-    public void fallbackProcess(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
-        log.error(
-                "Fallo al comunicarse con el microservicio ML de celo (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
-                correlationId, t.getMessage());
-        telemetriaList.forEach(telemetria -> telemetria.setEstadoInferenciaCelo(EstadoInferencia.INFERENCIA_PENDIENTE));
-        telemetriaRepository.saveAll(telemetriaList);
-    }
-
-    private List<PuntoTelemetriaDTO> buildRequest(List<Telemetria> telemetriaList) {
-        return telemetriaList.stream()
-                .filter(t -> t.getLatitud() != null && t.getLongitud() != null && t.getMoveState() != null)
-                .map(t -> PuntoTelemetriaDTO.builder()
-                        .moveState(t.getMoveState())
-                        .latitud(t.getLatitud())
-                        .longitud(t.getLongitud())
-                        .build())
-                .collect(Collectors.toList());
-    }
+        private List<PuntoTelemetriaDTO> buildRequest(List<Telemetria> telemetriaList) {
+                return telemetriaList.stream()
+                                .filter(t -> t.getLatitud() != null && t.getLongitud() != null
+                                                && t.getMoveState() != null)
+                                .map(t -> PuntoTelemetriaDTO.builder()
+                                                .moveState(t.getMoveState())
+                                                .latitud(t.getLatitud())
+                                                .longitud(t.getLongitud())
+                                                .build())
+                                .collect(Collectors.toList());
+        }
 }

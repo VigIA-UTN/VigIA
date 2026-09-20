@@ -139,6 +139,7 @@ class AlertaControllerTest {
         alerta.setTsGeneracion(LocalDateTime.now());
         alerta.setValorUmbral(80.0);
         alerta.setValorDetectado(95.0);
+        alerta.setAccionRecomendada("Planificar inseminación artificial");
         alerta = alertaRepository.save(alerta);
         alertaId = alerta.getId();
 
@@ -193,7 +194,8 @@ class AlertaControllerTest {
                 .param("estado", "CONFIRMADA"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(alertaId))
-                .andExpect(jsonPath("$.estado").value("CONFIRMADA"));
+                .andExpect(jsonPath("$.estado").value("CONFIRMADA"))
+                .andExpect(jsonPath("$.accionRecomendada").value("Planificar inseminación artificial"));
     }
 
     @Test
@@ -236,6 +238,7 @@ class AlertaControllerTest {
         a1.setSeveridad(SeveridadAlerta.ALTA);
         a1.setTsGeneracion(LocalDateTime.now().minusHours(1));
         a1.setValorUmbral(1.0);
+        a1.setAccionRecomendada("Planificar IA en ventana optima");
         alertaRepository.save(a1);
 
         // 2. Alerta PENDIENTE, SALUD, MEDIA
@@ -266,6 +269,7 @@ class AlertaControllerTest {
                 .andExpect(jsonPath("$.length()").value(3))
                 // Por defecto ordena severidad DESC: ALTA (1), MEDIA (2), BAJA (3)
                 .andExpect(jsonPath("$[0].severidad").value("ALTA"))
+                .andExpect(jsonPath("$[0].accionRecomendada").value("Planificar IA en ventana optima"))
                 .andExpect(jsonPath("$[1].severidad").value("MEDIA"))
                 .andExpect(jsonPath("$[2].severidad").value("BAJA"));
 
@@ -276,7 +280,8 @@ class AlertaControllerTest {
                 .param("tipo", "REPRODUCTIVO"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].tipo").value("CELO"));
+                .andExpect(jsonPath("$[0].tipo").value("CELO"))
+                .andExpect(jsonPath("$[0].accionRecomendada").value("Planificar IA en ventana optima"));
 
         // Test 3: Filtro por severidad (MEDIA)
         mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas")
@@ -422,7 +427,8 @@ class AlertaControllerTest {
                 .header("Authorization", "Bearer " + productorToken)
                 .param("establecimientoId", establecimientoId.toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(alertaId));
+                .andExpect(jsonPath("$.id").value(alertaId))
+                .andExpect(jsonPath("$.accionRecomendada").value("Planificar inseminación artificial"));
     }
 
     @Test
