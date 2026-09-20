@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/purity, react-hooks/set-state-in-effect */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Spinner, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
