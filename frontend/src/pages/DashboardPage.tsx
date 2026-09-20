@@ -535,17 +535,18 @@ export default function DashboardPage() {
             const mm = String(desde.getMonth() + 1).padStart(2, '0');
             const label = `${dd}/${mm}`;
 
-            const count = gestantesConFecha.filter(a => {
+            const animalesSemana = gestantesConFecha.filter(a => {
                 const ins = new Date(a.fechaUltimaInseminacion!);
                 const parto = new Date(ins.getTime() + DIAS_GESTACION * 24 * 60 * 60 * 1000);
                 return parto >= desde && parto < hasta;
-            }).length;
+            });
 
-            return { label, count, desde, hasta };
+            return { label, count: animalesSemana.length, desde, hasta, animales: animalesSemana };
         });
 
         return { semanas, sinFecha, total: gestantesConFecha.length + sinFecha };
     }, [animalesFiltrados]);
+
 
     // ── Salud tab: Desempeño reproductivo ────────────────────────────────────
     const desempenyo = useMemo(() => {
@@ -784,7 +785,6 @@ export default function DashboardPage() {
             <>
                 {/* ── Header ejecutivo ─────────────────────────────────── */}
                 <div className="dash-exec-header">
-                    <h2 className="dash-exec-title">Resumen del establecimiento</h2>
                     <span className="dash-exec-period">Período: 30 d vs. anterior ▼</span>
                 </div>
 
@@ -946,26 +946,7 @@ export default function DashboardPage() {
             <>
                 {/* ── Título ──────────────────────────────────────────── */}
                 <div className="dash-salud-header">
-                    <div>
-                        <h2 className="dash-salud-title">Salud y reproducción del rodeo</h2>
-                        <span className="dash-salud-subtitle">Análitica del rodeo — no cola de tareas</span>
-                    </div>
                     <div className="dash-salud-filters">
-                        {rodeos.length > 0 && (
-                            <div className="dash-lote-filter">
-                                <i className="bi bi-funnel-fill" style={{ fontSize: '0.7rem' }} />
-                                <select
-                                    className="dash-lote-select"
-                                    value={loteFilter === 'todos' ? '' : loteFilter}
-                                    onChange={e => setLoteFilter(e.target.value === '' ? 'todos' : Number(e.target.value))}
-                                >
-                                    <option value="">Lote: todos</option>
-                                    {rodeos.map(r => (
-                                        <option key={r.id} value={r.id}>{r.nombre}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
                         <span className="dash-salud-period">Período: 30 d ▾</span>
                     </div>
                 </div>
@@ -1011,7 +992,7 @@ export default function DashboardPage() {
                                 <i className="bi bi-diagram-3-fill" />
                                 Embudo reproductivo
                             </p>
-                            <span className="dash-card-idea-tag">Idea 6</span>
+
                         </div>
 
                         {embudoExcepciones.totalRepro === 0 ? (
@@ -1117,7 +1098,7 @@ export default function DashboardPage() {
                                 <i className="bi bi-heart-pulse-fill" />
                                 Animales a revisar
                             </p>
-                            <span className="dash-card-idea-tag">Idea 3</span>
+
                         </div>
 
                         {/* Sub-sección: Alertas sin atender */}
@@ -1215,7 +1196,7 @@ export default function DashboardPage() {
                                 <i className="bi bi-calendar2-event-fill" />
                                 Partos esperados
                             </p>
-                            <span className="dash-card-idea-tag">Idea 7</span>
+
                         </div>
 
                         {partosEsperados.total === 0 ? (
@@ -1224,12 +1205,22 @@ export default function DashboardPage() {
                             <>
                                 <div className="dash-partos-chart">
                                     {partosEsperados.semanas.map((sem, i) => (
-                                        <div key={i} className="dash-partos-bar-col">
+                                        <div key={i} className={`dash-partos-bar-col ${sem.count > 0 ? 'dash-partos-bar-col-active' : ''}`}
+                                            title={sem.count === 0 ? '' : (() => {
+                                                const MAX_SHOW = 5;
+                                                const nombres = sem.animales.map(a => nombreAnimal(a));
+                                                const header = `📅 Semana ${sem.label} — ${sem.count} parto${sem.count > 1 ? 's' : ''} esperado${sem.count > 1 ? 's' : ''}`;
+                                                if (nombres.length <= MAX_SHOW) {
+                                                    return `${header}\n${nombres.map(n => `• ${n}`).join('\n')}`;
+                                                }
+                                                const resto = nombres.length - MAX_SHOW;
+                                                return `${header}\n${nombres.slice(0, MAX_SHOW).map(n => `• ${n}`).join('\n')}\n• …y ${resto} más`;
+                                            })()}
+                                        >
                                             <div className="dash-partos-bar-track">
                                                 <div
                                                     className="dash-partos-bar-fill"
                                                     style={{ height: `${maxParto > 0 ? Math.round((sem.count / maxParto) * 100) : 0}%` }}
-                                                    title={`${sem.label}: ${sem.count} partos`}
                                                 />
                                             </div>
                                             {sem.count > 0 && (
@@ -1239,6 +1230,7 @@ export default function DashboardPage() {
                                                 <span className="dash-partos-bar-label">{sem.label}</span>
                                             )}
                                         </div>
+
                                     ))}
                                 </div>
                                 <div className="dash-partos-sub">
@@ -1260,7 +1252,7 @@ export default function DashboardPage() {
                                 <i className="bi bi-bar-chart-steps" />
                                 Desempeño reproductivo
                             </p>
-                            <span className="dash-card-idea-tag">Idea 14</span>
+
                         </div>
 
                         {desempenyo.n < N_MIN ? (
@@ -1311,7 +1303,7 @@ export default function DashboardPage() {
                                 <i className="bi bi-arrow-repeat" />
                                 Reincidencia
                             </p>
-                            <span className="dash-card-idea-tag">Idea 13</span>
+
                         </div>
 
                         {reincidencia.rankingAnimales.length === 0 && reincidencia.rankingLotes.length === 0 ? (
@@ -1353,7 +1345,7 @@ export default function DashboardPage() {
                                 <i className="bi bi-clock-history" />
                                 Última intervención
                             </p>
-                            <span className="dash-card-idea-tag">Idea 11</span>
+
                         </div>
 
                         <div className="dash-salud-interv-note">
@@ -1397,7 +1389,7 @@ export default function DashboardPage() {
                                 <i className="bi bi-graph-up-arrow" />
                                 Ganancia de peso
                             </p>
-                            <span className="dash-card-idea-tag">Idea 17</span>
+
                         </div>
                         {/* TODO: implementar cuando exista endpoint GET /pesos?establecimientoId={id} */}
                         <div className="dash-salud-peso-empty">

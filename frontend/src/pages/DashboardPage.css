@@ -113,9 +113,9 @@
 }
 
 .dash-kpi-chip-sub {
-    font-size: 0.75rem;
-    color: #94A3B8;
-    font-weight: 400;
+    font-size: 0.82rem;
+    color: #64748B;
+    font-weight: 500;
     margin-top: 2px;
 }
 
@@ -1138,8 +1138,9 @@
 .dash-salud-kpi-val.dash-salud-kpi-muted  { color: #94A3B8; }
 
 .dash-salud-kpi-sub {
-    font-size: 0.73rem;
-    color: #94A3B8;
+    font-size: 0.8rem;
+    color: #64748B;
+    font-weight: 500;
 }
 
 /* ── Grids de contenido ────────────────────────────────────────── */
@@ -1361,6 +1362,18 @@
     gap: 2px;
     height: 100%;
     position: relative;
+}
+
+.dash-partos-bar-col-active {
+    cursor: help;
+}
+
+.dash-partos-bar-col-active .dash-partos-bar-fill {
+    background: #1A3558;
+}
+
+.dash-partos-bar-col-active:hover .dash-partos-bar-fill {
+    background: #2d5a9e;
 }
 
 .dash-partos-bar-track {
