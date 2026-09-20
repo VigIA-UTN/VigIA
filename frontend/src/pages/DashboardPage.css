@@ -1055,3 +1055,552 @@
         font-size: 1.25rem;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   TAB: Salud y Reproducción del Rodeo — VigIA
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Header interno de la tab ──────────────────────────────────── */
+.dash-salud-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    max-width: 1280px;
+    margin: 0 auto 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dash-salud-title {
+    font-size: 1.55rem;
+    font-weight: 500;
+    color: #1A3558;
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+}
+
+.dash-salud-subtitle {
+    font-size: 0.78rem;
+    color: #94A3B8;
+    display: block;
+}
+
+.dash-salud-filters {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.dash-salud-period {
+    font-size: 0.82rem;
+    color: #64748B;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+/* ── Strip de 4 KPIs ───────────────────────────────────────────── */
+.dash-salud-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    max-width: 1280px;
+    margin: 0 auto 18px;
+}
+
+.dash-salud-kpi {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #E2E8F0;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.dash-salud-kpi-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #94A3B8;
+}
+
+.dash-salud-kpi-val {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #1A3558;
+    line-height: 1.1;
+}
+
+.dash-salud-kpi-val.dash-salud-kpi-warn   { color: #D69E2E; }
+.dash-salud-kpi-val.dash-salud-kpi-danger { color: #E53E3E; }
+.dash-salud-kpi-val.dash-salud-kpi-muted  { color: #94A3B8; }
+
+.dash-salud-kpi-sub {
+    font-size: 0.73rem;
+    color: #94A3B8;
+}
+
+/* ── Grids de contenido ────────────────────────────────────────── */
+.dash-salud-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    max-width: 1280px;
+    margin: 0 auto 16px;
+}
+
+.dash-salud-mid-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    max-width: 1280px;
+    margin: 0 auto 0;
+}
+
+/* ── Separador "debajo del pliegue" ────────────────────────────── */
+.dash-salud-fold-label {
+    max-width: 1280px;
+    margin: 20px auto 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dash-salud-fold-label span {
+    font-size: 0.72rem;
+    color: #CBD5E1;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+}
+
+.dash-salud-fold-label::before,
+.dash-salud-fold-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #E2E8F0;
+}
+
+/* ── Grid inferior (3 cols) ────────────────────────────────────── */
+.dash-salud-bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    max-width: 1280px;
+    margin: 0 auto 0;
+}
+
+/* ── Card idea tag ─────────────────────────────────────────────── */
+.dash-card-idea-tag {
+    font-size: 0.68rem;
+    color: #CBD5E1;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+}
+
+/* ── Excepciones del embudo ────────────────────────────────────── */
+.dash-salud-excepciones {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.dash-salud-exc-header {
+    font-size: 0.71rem;
+    font-weight: 600;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.dash-salud-exc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 7px;
+    background: #F8FAFC;
+    margin-bottom: 5px;
+    gap: 8px;
+}
+
+.dash-salud-exc-desc {
+    font-size: 0.82rem;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.dash-salud-exc-state {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.dash-salud-exc-state.vacia      { background: rgba(26,53,88,0.1);   color: #1A3558; }
+.dash-salud-exc-state.inseminada { background: rgba(59,141,153,0.12); color: #3B8D99; }
+.dash-salud-exc-state.anestro    { background: rgba(203,213,225,0.4); color: #64748B; }
+
+.dash-salud-exc-action {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1A3558;
+    white-space: nowrap;
+}
+
+.dash-salud-completitud {
+    font-size: 0.73rem;
+    color: #94A3B8;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #F1F5F9;
+}
+
+/* ── Animales a revisar ────────────────────────────────────────── */
+.dash-salud-revisar-section {
+    padding: 2px 0 8px;
+}
+
+.dash-salud-revisar-seclabel {
+    font-size: 0.71rem;
+    font-weight: 600;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.dash-salud-revisar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 4px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.12s;
+}
+
+.dash-salud-revisar-row:hover { background: #F8FAFC; }
+
+.dash-salud-revisar-nombre {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1A3558;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-salud-revisar-lote {
+    font-size: 0.75rem;
+    color: #94A3B8;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-salud-revisar-tiempo {
+    font-size: 0.78rem;
+    color: #64748B;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.dash-salud-revisar-dias {
+    font-size: 0.75rem;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+.dash-salud-revisar-dias-urgente {
+    color: #E53E3E;
+    font-weight: 600;
+}
+
+.dash-salud-revisar-divider {
+    height: 1px;
+    background: #F1F5F9;
+    margin: 6px 0 10px;
+}
+
+/* ── Sparkline mini ────────────────────────────────────────────── */
+.dash-salud-sparkline {
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+/* ── Partos esperados — bar chart ──────────────────────────────── */
+.dash-partos-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 90px;
+    margin: 16px 0 10px;
+}
+
+.dash-partos-bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    height: 100%;
+    position: relative;
+}
+
+.dash-partos-bar-track {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background: #F1F5F9;
+    border-radius: 3px 3px 0 0;
+    overflow: hidden;
+    min-height: 4px;
+}
+
+.dash-partos-bar-fill {
+    width: 100%;
+    background: #1A3558;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.3s ease;
+    min-height: 0;
+}
+
+.dash-partos-bar-count {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #1A3558;
+    position: absolute;
+    top: -16px;
+}
+
+.dash-partos-bar-label {
+    font-size: 0.6rem;
+    color: #94A3B8;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 100%;
+    margin-top: 2px;
+}
+
+.dash-partos-sub {
+    font-size: 0.73rem;
+    color: #94A3B8;
+    margin-top: 6px;
+}
+
+.dash-partos-subfecha {
+    color: #D69E2E;
+}
+
+/* ── Desempeño reproductivo — funnel bars ──────────────────────── */
+.dash-desempenyo-funnel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.dash-desempenyo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dash-desempenyo-label {
+    font-size: 0.78rem;
+    color: #64748B;
+    width: 110px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.dash-desempenyo-bar-track {
+    flex: 1;
+    height: 10px;
+    background: #F1F5F9;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.dash-desempenyo-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.4s ease;
+    min-width: 2px;
+}
+
+.dash-desempenyo-bar-celo  { background: #1A3558; }
+.dash-desempenyo-bar-atend { background: rgba(26,53,88,0.55); }
+.dash-desempenyo-bar-ins   { background: #3B8D99; }
+.dash-desempenyo-bar-gest  { background: #38A169; }
+
+.dash-desempenyo-val {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1A3558;
+    width: 26px;
+    text-align: right;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.dash-desempenyo-note {
+    font-size: 0.7rem;
+    color: #CBD5E1;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #F1F5F9;
+}
+
+/* ── Reincidencia ──────────────────────────────────────────────── */
+.dash-salud-reincidencia-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 4px;
+    cursor: pointer;
+    border-bottom: 1px solid #F8FAFC;
+    transition: background 0.1s;
+    border-radius: 4px;
+    gap: 8px;
+}
+
+.dash-salud-reincidencia-row:hover { background: #F8FAFC; }
+.dash-salud-reincidencia-row:last-child { border-bottom: none; }
+
+.dash-salud-reincidencia-nombre {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #1A3558;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-salud-reincidencia-count {
+    font-size: 0.75rem;
+    color: #94A3B8;
+    white-space: nowrap;
+}
+
+/* ── Última intervención ───────────────────────────────────────── */
+.dash-salud-interv-note {
+    font-size: 0.68rem;
+    color: #CBD5E1;
+    margin-bottom: 10px;
+    font-style: italic;
+}
+
+.dash-salud-interv-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.1s;
+}
+
+.dash-salud-interv-row:hover { background: #F8FAFC; }
+
+.dash-salud-interv-nombre {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1A3558;
+    width: 80px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-salud-interv-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: #F1F5F9;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.dash-salud-interv-bar {
+    height: 100%;
+    background: #3B8D99;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    min-width: 2px;
+}
+
+.dash-salud-interv-dias {
+    font-size: 0.75rem;
+    color: #64748B;
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Ganancia de peso — empty state ────────────────────────────── */
+.dash-salud-peso-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 28px 16px;
+    text-align: center;
+}
+
+.dash-salud-peso-empty-text {
+    font-size: 0.82rem;
+    color: #94A3B8;
+    font-weight: 500;
+}
+
+.dash-salud-peso-empty-sub {
+    font-size: 0.72rem;
+    color: #CBD5E1;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .dash-salud-kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dash-salud-main-grid,
+    .dash-salud-mid-grid {
+        grid-template-columns: 1fr;
+    }
+    .dash-salud-bottom-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .dash-salud-kpi-row {
+        grid-template-columns: 1fr 1fr;
+    }
+    .dash-salud-title {
+        font-size: 1.2rem;
+    }
+}
+

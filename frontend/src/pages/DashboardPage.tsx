@@ -139,7 +139,7 @@ export default function DashboardPage() {
     const selectedId = useEstablecimientoStore(s => s.selectedId);
     const navigate = useNavigate();
 
-    const [activeTab, setActiveTab] = useState<'mando' | 'ejecutivo'>('mando');
+    const [activeTab, setActiveTab] = useState<'mando' | 'ejecutivo' | 'salud'>('mando');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [loteFilter, setLoteFilter] = useState<number | 'todos'>('todos');
@@ -459,6 +459,182 @@ export default function DashboardPage() {
         return { mediana, pctAtendidas, pctDescartadas, hist };
     }, [todasAlertas60d, alertasPendientes]);
 
+    // ── Salud tab: KPIs ──────────────────────────────────────────────────────
+    const kpiSaludSinAtender = useMemo(() =>
+        alertasFiltradas.filter(a => a.tipo === 'SALUD' && horasTranscurridas(a.tsGeneracion) > 24).length,
+        [alertasFiltradas]);
+
+    const kpiEnCalibracion = useMemo(() =>
+        animalesFiltrados.filter(a => a.estadoActual !== 'INACTIVO' && a.enCalibracion).length,
+        [animalesFiltrados]);
+
+    // ── Salud tab: Alertas de salud sin atender ──────────────────────────────
+    const alertasSaludSinAtender = useMemo(() =>
+        alertasFiltradas
+            .filter(a => a.tipo === 'SALUD' && horasTranscurridas(a.tsGeneracion) > 24)
+            .sort((a, b) => horasTranscurridas(b.tsGeneracion) - horasTranscurridas(a.tsGeneracion)),
+        [alertasFiltradas]);
+
+    // ── Salud tab: Excepciones del embudo ────────────────────────────────────
+    const embudoExcepciones = useMemo(() => {
+        const hace90d = 90 * 24 * 60 * 60 * 1000;
+        const reproductivos = animalesFiltrados.filter(
+            a => a.estadoActual !== 'INACTIVO' && esReproductiva(a)
+        );
+
+        const vaciasLargo = reproductivos.filter(a =>
+            a.estadoReproductivo === 'VACIA' &&
+            a.fechaUltimoParto &&
+            Date.now() - new Date(a.fechaUltimoParto).getTime() > hace90d
+        );
+
+        const inseminadasSinDiag = reproductivos.filter(a =>
+            a.estadoReproductivo === 'INSEMINADA' &&
+            a.fechaUltimaInseminacion &&
+            diffDias(a.fechaUltimaInseminacion) > INSEMINADA_DIAS_DIAG
+        );
+
+        const anestroSinInterv = reproductivos.filter(a => a.estadoReproductivo === 'ANESTRO');
+
+        const totalConEstado = reproductivos.filter(
+            a => a.estadoReproductivo && a.estadoReproductivo !== 'SIN_ESTADO'
+        ).length;
+        const completitudPct = reproductivos.length > 0
+            ? Math.round((totalConEstado / reproductivos.length) * 100)
+            : 0;
+
+        return { vaciasLargo, inseminadasSinDiag, anestroSinInterv, completitudPct, totalRepro: reproductivos.length };
+    }, [animalesFiltrados]);
+
+    // ── Salud tab: Partos esperados ──────────────────────────────────────────
+    const partosEsperados = useMemo(() => {
+        const DIAS_GESTACION = 283;
+        const hoy = new Date();
+
+        const gestantesConFecha = animalesFiltrados.filter(a =>
+            a.estadoActual !== 'INACTIVO' &&
+            a.estadoReproductivo === 'GESTANTE' &&
+            a.fechaUltimaInseminacion
+        );
+
+        const sinFecha = animalesFiltrados.filter(a =>
+            a.estadoActual !== 'INACTIVO' &&
+            a.estadoReproductivo === 'GESTANTE' &&
+            !a.fechaUltimaInseminacion
+        ).length;
+
+        // Agrupar por semana — próximas 12 semanas
+        const semanas = Array.from({ length: 12 }, (_, w) => {
+            const desde = new Date(hoy);
+            desde.setDate(desde.getDate() + w * 7);
+            const hasta = new Date(desde);
+            hasta.setDate(hasta.getDate() + 7);
+
+            // Label: "Sem 1", "Sem 2", etc., con fecha de inicio
+            const dd = String(desde.getDate()).padStart(2, '0');
+            const mm = String(desde.getMonth() + 1).padStart(2, '0');
+            const label = `${dd}/${mm}`;
+
+            const count = gestantesConFecha.filter(a => {
+                const ins = new Date(a.fechaUltimaInseminacion!);
+                const parto = new Date(ins.getTime() + DIAS_GESTACION * 24 * 60 * 60 * 1000);
+                return parto >= desde && parto < hasta;
+            }).length;
+
+            return { label, count, desde, hasta };
+        });
+
+        return { semanas, sinFecha, total: gestantesConFecha.length + sinFecha };
+    }, [animalesFiltrados]);
+
+    // ── Salud tab: Desempeño reproductivo ────────────────────────────────────
+    const desempenyo = useMemo(() => {
+        const hace30d = 30 * 24 * 60 * 60 * 1000;
+        const reproductivos = animalesFiltrados.filter(a => a.estadoActual !== 'INACTIVO' && esReproductiva(a));
+
+        // Celo detectado: total alertas de celo en 30d
+        const celoDetectado = todasAlertas60d.filter(a =>
+            a.tipo === 'CELO' &&
+            Date.now() - new Date(a.tsGeneracion).getTime() <= hace30d
+        ).length;
+
+        // Atendido: celo CONFIRMADA en 30d
+        const celoAtendido = todasAlertas60d.filter(a =>
+            a.tipo === 'CELO' && a.estado === 'CONFIRMADA' &&
+            Date.now() - new Date(a.tsGeneracion).getTime() <= hace30d
+        ).length;
+
+        // Inseminadas actualmente
+        const inseminadas = reproductivos.filter(a => a.estadoReproductivo === 'INSEMINADA').length;
+
+        // Gestantes actualmente
+        const gestantes = reproductivos.filter(a => a.estadoReproductivo === 'GESTANTE').length;
+
+        return { celoDetectado, celoAtendido, inseminadas, gestantes, n: reproductivos.length };
+    }, [animalesFiltrados, todasAlertas60d]);
+
+    // ── Salud tab: Reincidencia (Idea 13) ────────────────────────────────────
+    const reincidencia = useMemo(() => {
+        const hace30d = 30 * 24 * 60 * 60 * 1000;
+        const alertas30d = todasAlertas60d.filter(a =>
+            Date.now() - new Date(a.tsGeneracion).getTime() <= hace30d
+        );
+
+        // Por animal: cantidad de alertas en 30d
+        const porAnimal = new Map<number, number>();
+        alertas30d.forEach(a => {
+            porAnimal.set(a.animalId, (porAnimal.get(a.animalId) ?? 0) + 1);
+        });
+
+        const rankingAnimales = Array.from(porAnimal.entries())
+            .filter(([, count]) => count >= 2)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([animalId, count]) => ({ animal: animalMap.get(animalId), count }));
+
+        // Por lote: salidas de perímetro repetidas
+        const porLote = new Map<string, number>();
+        alertas30d.filter(a => a.tipo === 'FUERA_DE_PERIMETRO').forEach(a => {
+            const anim = animalMap.get(a.animalId);
+            const lote = anim?.rodeoLoteNombre ?? 'Sin lote';
+            porLote.set(lote, (porLote.get(lote) ?? 0) + 1);
+        });
+        const rankingLotes = Array.from(porLote.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([nombre, count]) => ({ nombre, count }));
+
+        return { rankingAnimales, rankingLotes };
+    }, [todasAlertas60d, animalMap]);
+
+    // ── Salud tab: Última intervención (proxy via alertas CONFIRMADA) ─────────
+    // TODO: reemplazar con endpoint GET /intervenciones?establecimientoId={id} cuando esté disponible
+    const ultimaIntervencion = useMemo(() => {
+        // Proxy: la fecha de la última alerta CONFIRMADA por animal como
+        // aproximación de la última vez que el equipo revisó el animal.
+        const ultimaPorAnimal = new Map<number, string>();
+        todasAlertas60d
+            .filter(a => a.estado === 'CONFIRMADA' || a.estado === 'DESCARTADA')
+            .sort((a, b) => new Date(a.tsGeneracion).getTime() - new Date(b.tsGeneracion).getTime())
+            .forEach(a => { ultimaPorAnimal.set(a.animalId, a.tsGeneracion); });
+
+        return animalesFiltrados
+            .filter(a => a.estadoActual !== 'INACTIVO')
+            .map(a => ({
+                animal: a,
+                ultimaFecha: ultimaPorAnimal.get(a.id) ?? null,
+                dias: ultimaPorAnimal.has(a.id) ? Math.floor(diffDias(ultimaPorAnimal.get(a.id)!)) : null,
+            }))
+            .sort((a, b) => {
+                // Nunca revisados primero, luego más días sin revisión
+                if (a.dias === null && b.dias === null) return 0;
+                if (a.dias === null) return -1;
+                if (b.dias === null) return 1;
+                return b.dias - a.dias;
+            })
+            .slice(0, 5);
+    }, [animalesFiltrados, todasAlertas60d]);
+
     // ── KPIs de header ────────────────────────────────────────────────────────
     const kpiAlertasPendientes = alertasFiltradas.length;
     const kpiVentanasAbiertas = ventanaItems.length;
@@ -648,7 +824,7 @@ export default function DashboardPage() {
                                                     <span className="dash-exec-rodeo-name">{row.rodeo.nombre}</span>
                                                     {row.totalAnim > 0 && (
                                                         <span style={{ color: '#94A3B8', fontSize: '0.78rem', marginLeft: 6 }}>
-                                                            ({row.totalAnim} an.)
+                                                            ({row.totalAnim} animales)
                                                         </span>
                                                     )}
                                                 </td>
@@ -756,6 +932,489 @@ export default function DashboardPage() {
         );
     }
 
+    // ── Salud y reproducción del rodeo view ──────────────────────────────
+    function SaludReproduccionView() {
+        if (loading) {
+            return <div className="dash-loading-center" style={{ padding: 60 }}><Spinner animation="border" /></div>;
+        }
+
+        const maxParto = Math.max(...partosEsperados.semanas.map(s => s.count), 1);
+        const maxDesempenyo = Math.max(desempenyo.celoDetectado, 1);
+        const N_MIN = 5; // ocultar tasa cuando n < N_MIN
+
+        return (
+            <>
+                {/* ── Título ──────────────────────────────────────────── */}
+                <div className="dash-salud-header">
+                    <div>
+                        <h2 className="dash-salud-title">Salud y reproducción del rodeo</h2>
+                        <span className="dash-salud-subtitle">Análitica del rodeo — no cola de tareas</span>
+                    </div>
+                    <div className="dash-salud-filters">
+                        {rodeos.length > 0 && (
+                            <div className="dash-lote-filter">
+                                <i className="bi bi-funnel-fill" style={{ fontSize: '0.7rem' }} />
+                                <select
+                                    className="dash-lote-select"
+                                    value={loteFilter === 'todos' ? '' : loteFilter}
+                                    onChange={e => setLoteFilter(e.target.value === '' ? 'todos' : Number(e.target.value))}
+                                >
+                                    <option value="">Lote: todos</option>
+                                    {rodeos.map(r => (
+                                        <option key={r.id} value={r.id}>{r.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        <span className="dash-salud-period">Período: 30 d ▾</span>
+                    </div>
+                </div>
+
+                {/* ── STRIP DE 4 KPIs ────────────────────────────────────── */}
+                <div className="dash-salud-kpi-row">
+                    <div className="dash-salud-kpi">
+                        <span className="dash-salud-kpi-label">Días abiertos (promedio)</span>
+                        <span className="dash-salud-kpi-val">{embudo.diasAbiertosProm}</span>
+                        <span className="dash-salud-kpi-sub">animales sin gesta confirmada</span>
+                    </div>
+                    <div className="dash-salud-kpi">
+                        <span className="dash-salud-kpi-label">Ventanas perdidas (30 d)</span>
+                        <span className="dash-salud-kpi-val dash-salud-kpi-warn">
+                            {celoArchivadasRecientes > 0
+                                ? `${Math.round((celoArchivadasRecientes / Math.max(celoArchivadasRecientes + ventanaItems.length, 1)) * 100)}%`
+                                : '0%'
+                            }
+                        </span>
+                        <span className="dash-salud-kpi-sub">n={celoArchivadasRecientes} oportunidades</span>
+                    </div>
+                    <div className="dash-salud-kpi">
+                        <span className="dash-salud-kpi-label">Salud sin atender</span>
+                        <span className={`dash-salud-kpi-val ${kpiSaludSinAtender > 0 ? 'dash-salud-kpi-danger' : ''}`}>
+                            {kpiSaludSinAtender}
+                        </span>
+                        <span className="dash-salud-kpi-sub">&gt; 24 h desde la alerta</span>
+                    </div>
+                    <div className="dash-salud-kpi">
+                        <span className="dash-salud-kpi-label">En calibración</span>
+                        <span className="dash-salud-kpi-val dash-salud-kpi-muted">{kpiEnCalibracion}</span>
+                        <span className="dash-salud-kpi-sub">sin monitoreo de salud</span>
+                    </div>
+                </div>
+
+                {/* ── GRID PRINCIPAL (2 cols) ─────────────────────────────── */}
+                <div className="dash-salud-main-grid">
+
+                    {/* ── IZQUIERDA: Embudo reproductivo ───────────────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-diagram-3-fill" />
+                                Embudo reproductivo
+                            </p>
+                            <span className="dash-card-idea-tag">Idea 6</span>
+                        </div>
+
+                        {embudoExcepciones.totalRepro === 0 ? (
+                            <p className="dash-no-items">Sin animales reproductivos registrados</p>
+                        ) : (
+                            <>
+                                {/* Barra horizontal */}
+                                <div className="dash-embudo-bar-wrap">
+                                    {Object.entries(embudo.dist)
+                                        .filter(([, v]) => v > 0)
+                                        .map(([estado, count]) => (
+                                            <div
+                                                key={estado}
+                                                className={`dash-embudo-seg dash-embudo-${estado.toLowerCase()}`}
+                                                style={{ flex: count }}
+                                                title={`${ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado}: ${count}`}
+                                            />
+                                        ))}
+                                </div>
+                                <div className="dash-embudo-legend">
+                                    {Object.entries(embudo.dist).filter(([, v]) => v > 0).map(([estado, count]) => (
+                                        <span key={estado} className="dash-embudo-leg-item">
+                                            <span
+                                                className={`dash-dot dash-embudo-${estado.toLowerCase()}`}
+                                                style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%' }}
+                                            />
+                                            {ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado}
+                                            <strong>{count}</strong>
+                                        </span>
+                                    ))}
+                                </div>
+
+                                {/* Excepciones */}
+                                <div className="dash-salud-excepciones">
+                                    <span className="dash-salud-exc-header">Excepciones que necesitan decisión</span>
+
+                                    <div className="dash-salud-exc-row">
+                                        <div className="dash-salud-exc-desc">
+                                            <span className="dash-salud-exc-state vacia">VACÍA</span>
+                                            {' '}con &gt; {DIAS_ABIERTOS_URGENTE} días abiertos
+                                        </div>
+                                        <div className="dash-salud-exc-action">
+                                            <strong>{embudoExcepciones.vaciasLargo.length}</strong>
+                                            {embudoExcepciones.vaciasLargo.length > 0 && (
+                                                <button
+                                                    className="dash-ver-todas-btn"
+                                                    onClick={() => navigate('/animales')}
+                                                >
+                                                    — ver lista
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="dash-salud-exc-row">
+                                        <div className="dash-salud-exc-desc">
+                                            <span className="dash-salud-exc-state inseminada">INSEMINADA</span>
+                                            {' '}sin diagnóstico &gt; {INSEMINADA_DIAS_DIAG} d
+                                        </div>
+                                        <div className="dash-salud-exc-action">
+                                            <strong>{embudoExcepciones.inseminadasSinDiag.length}</strong>
+                                            {embudoExcepciones.inseminadasSinDiag.length > 0 && (
+                                                <button
+                                                    className="dash-ver-todas-btn"
+                                                    onClick={() => navigate('/animales')}
+                                                >
+                                                    — ver lista
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="dash-salud-exc-row">
+                                        <div className="dash-salud-exc-desc">
+                                            <span className="dash-salud-exc-state anestro">ANESTRO</span>
+                                            {' '}sin intervención
+                                        </div>
+                                        <div className="dash-salud-exc-action">
+                                            <strong>{embudoExcepciones.anestroSinInterv.length}</strong>
+                                            {embudoExcepciones.anestroSinInterv.length > 0 && (
+                                                <button
+                                                    className="dash-ver-todas-btn"
+                                                    onClick={() => navigate('/animales')}
+                                                >
+                                                    — ver lista
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="dash-salud-completitud">
+                                    Completitud del dato: {embudoExcepciones.completitudPct}% de los animales con estado registrado
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* ── DERECHA: Animales a revisar ─────────────────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-heart-pulse-fill" />
+                                Animales a revisar
+                            </p>
+                            <span className="dash-card-idea-tag">Idea 3</span>
+                        </div>
+
+                        {/* Sub-sección: Alertas sin atender */}
+                        <div className="dash-salud-revisar-section">
+                            <span className="dash-salud-revisar-seclabel">Alertas sin atender</span>
+                            {alertasSaludSinAtender.length === 0 ? (
+                                <p className="dash-no-items" style={{ margin: '6px 0' }}>
+                                    <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
+                                    {' '}Sin alertas de salud pendientes
+                                </p>
+                            ) : (
+                                alertasSaludSinAtender.slice(0, 3).map(alerta => {
+                                    const animal = animalMap.get(alerta.animalId);
+                                    const h = horasTranscurridas(alerta.tsGeneracion);
+                                    const dias = Math.floor(h / 24);
+                                    const sevDot = alerta.severidad === 'ALTA' ? 'dash-sev-dot-alta'
+                                        : alerta.severidad === 'MEDIA' ? 'dash-sev-dot-media'
+                                        : 'dash-sev-dot-baja';
+                                    return (
+                                        <div
+                                            key={alerta.id}
+                                            className="dash-salud-revisar-row"
+                                            onClick={() => animal && navigate(`/animales/${animal.id}`)}
+                                        >
+                                            <span className={`dash-sev-dot ${sevDot}`} />
+                                            <span className="dash-salud-revisar-nombre">{nombreAnimal(animal)}</span>
+                                            <div className="dash-salud-sparkline">
+                                                {/* Placeholder de actividad (wireframe usa ~~ ) */}
+                                                <svg width="40" height="18" viewBox="0 0 40 18">
+                                                    <polyline
+                                                        points="0,9 8,5 16,12 24,4 32,10 40,7"
+                                                        fill="none" stroke="#94A3B8" strokeWidth="1.5"
+                                                        strokeLinejoin="round" strokeLinecap="round"
+                                                    />
+                                                </svg>
+                                            </div>
+                                            <span className="dash-salud-revisar-tiempo">
+                                                {dias > 0 ? `${dias} d` : `${Math.floor(h)}h`}
+                                            </span>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        <div className="dash-salud-revisar-divider" />
+
+                        {/* Sub-sección: En observación / enfermos */}
+                        <div className="dash-salud-revisar-section">
+                            <span className="dash-salud-revisar-seclabel">En observación / enfermos</span>
+                            {animalesARevisar.length === 0 ? (
+                                <p className="dash-no-items" style={{ margin: '6px 0' }}>
+                                    <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
+                                    {' '}Todos los animales sanos
+                                </p>
+                            ) : (
+                                animalesARevisar.slice(0, 4).map(a => {
+                                    const diasObs = a.caravanaUltimaSenial
+                                        ? Math.floor(diffDias(a.caravanaUltimaSenial))
+                                        : null;
+                                    const esEnfermo = a.estadoSalud === 'ENFERMO';
+                                    const sinRevisionLargo = diasObs !== null && diasObs > 14;
+                                    return (
+                                        <div
+                                            key={a.id}
+                                            className="dash-salud-revisar-row"
+                                            onClick={() => navigate(`/animales/${a.id}`)}
+                                        >
+                                            <span
+                                                className="dash-sev-dot"
+                                                style={{ background: esEnfermo ? '#E53E3E' : '#D69E2E' }}
+                                            />
+                                            <span className="dash-salud-revisar-nombre">{nombreAnimal(a)}</span>
+                                            <span className="dash-salud-revisar-lote">{a.rodeoLoteNombre ?? ''}</span>
+                                            <span
+                                                className={`dash-salud-revisar-dias ${sinRevisionLargo ? 'dash-salud-revisar-dias-urgente' : ''}`}
+                                            >
+                                                {diasObs !== null ? `${diasObs} d sin revisión` : '—'}
+                                            </span>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── GRID MEDIO (2 cols) ─────────────────────────────────── */}
+                <div className="dash-salud-mid-grid">
+
+                    {/* ── IZQUIERDA: Partos esperados ──────────────────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-calendar2-event-fill" />
+                                Partos esperados
+                            </p>
+                            <span className="dash-card-idea-tag">Idea 7</span>
+                        </div>
+
+                        {partosEsperados.total === 0 ? (
+                            <p className="dash-no-items">Sin animales gestantes registrados</p>
+                        ) : (
+                            <>
+                                <div className="dash-partos-chart">
+                                    {partosEsperados.semanas.map((sem, i) => (
+                                        <div key={i} className="dash-partos-bar-col">
+                                            <div className="dash-partos-bar-track">
+                                                <div
+                                                    className="dash-partos-bar-fill"
+                                                    style={{ height: `${maxParto > 0 ? Math.round((sem.count / maxParto) * 100) : 0}%` }}
+                                                    title={`${sem.label}: ${sem.count} partos`}
+                                                />
+                                            </div>
+                                            {sem.count > 0 && (
+                                                <span className="dash-partos-bar-count">{sem.count}</span>
+                                            )}
+                                            {i % 3 === 0 && (
+                                                <span className="dash-partos-bar-label">{sem.label}</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="dash-partos-sub">
+                                    Por semana, próximos 60 d
+                                    {partosEsperados.sinFecha > 0 && (
+                                        <span className="dash-partos-subfecha">
+                                            {' '}· {partosEsperados.sinFecha} sin fecha de inseminación
+                                        </span>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* ── DERECHA: Desempeño reproductivo ──────────────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-bar-chart-steps" />
+                                Desempeño reproductivo
+                            </p>
+                            <span className="dash-card-idea-tag">Idea 14</span>
+                        </div>
+
+                        {desempenyo.n < N_MIN ? (
+                            <p className="dash-no-items">
+                                <i className="bi bi-info-circle" style={{ color: '#94A3B8' }} />
+                                {' '}Se necesitan al menos {N_MIN} animales reproductivos (n={desempenyo.n})
+                            </p>
+                        ) : (
+                            <>
+                                <div className="dash-desempenyo-funnel">
+                                    {[
+                                        { label: 'Celo detectado', val: desempenyo.celoDetectado, cls: 'dash-desempenyo-bar-celo' },
+                                        { label: 'Atendido',        val: desempenyo.celoAtendido,  cls: 'dash-desempenyo-bar-atend' },
+                                        { label: 'Inseminado',      val: desempenyo.inseminadas,   cls: 'dash-desempenyo-bar-ins' },
+                                        { label: 'Gestante',        val: desempenyo.gestantes,     cls: 'dash-desempenyo-bar-gest' },
+                                    ].map(row => (
+                                        <div key={row.label} className="dash-desempenyo-row">
+                                            <span className="dash-desempenyo-label">{row.label}</span>
+                                            <div className="dash-desempenyo-bar-track">
+                                                <div
+                                                    className={`dash-desempenyo-bar-fill ${row.cls}`}
+                                                    style={{ width: `${Math.round((row.val / maxDesempenyo) * 100)}%` }}
+                                                />
+                                            </div>
+                                            <span className="dash-desempenyo-val">{row.val}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="dash-desempenyo-note">
+                                    n={desempenyo.n} · tasas ocultas cuando n &lt; {N_MIN}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* ── DEBAJO DEL PLIEGUE ─────────────────────────────────────── */}
+                <div className="dash-salud-fold-label">
+                    <span>debajo del pliegue</span>
+                </div>
+
+                <div className="dash-salud-bottom-grid">
+
+                    {/* ── Reincidencia (Idea 13) ───────────────────────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-arrow-repeat" />
+                                Reincidencia
+                            </p>
+                            <span className="dash-card-idea-tag">Idea 13</span>
+                        </div>
+
+                        {reincidencia.rankingAnimales.length === 0 && reincidencia.rankingLotes.length === 0 ? (
+                            <p className="dash-no-items">
+                                <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
+                                {' '}Sin reincidentes en 30 d
+                            </p>
+                        ) : (
+                            <>
+                                {reincidencia.rankingAnimales.map((item, i) => (
+                                    <div
+                                        key={i}
+                                        className="dash-salud-reincidencia-row"
+                                        onClick={() => item.animal && navigate(`/animales/${item.animal.id}`)}
+                                    >
+                                        <span className="dash-salud-reincidencia-nombre">{nombreAnimal(item.animal)}</span>
+                                        <span className="dash-salud-reincidencia-count">{item.count} alertas / 30 d</span>
+                                    </div>
+                                ))}
+                                {reincidencia.rankingLotes.length > 0 && (
+                                    <>
+                                        <div className="dash-salud-revisar-divider" />
+                                        {reincidencia.rankingLotes.map((item, i) => (
+                                            <div key={i} className="dash-salud-reincidencia-row">
+                                                <span className="dash-salud-reincidencia-nombre">{item.nombre}</span>
+                                                <span className="dash-salud-reincidencia-count">{item.count} salidas de perímetro</span>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* ── Última intervención (Idea 11) ─────────────────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-clock-history" />
+                                Última intervención
+                            </p>
+                            <span className="dash-card-idea-tag">Idea 11</span>
+                        </div>
+
+                        <div className="dash-salud-interv-note">
+                            {/* Nota: proxy via alertas atendidas hasta que exista endpoint global de intervenciones */}
+                            Basado en alertas atendidas (proxy)
+                        </div>
+
+                        {ultimaIntervencion.length === 0 ? (
+                            <p className="dash-no-items">Sin datos de intervenciones</p>
+                        ) : (
+                            ultimaIntervencion.map((item, i) => (
+                                <div
+                                    key={i}
+                                    className="dash-salud-interv-row"
+                                    onClick={() => navigate(`/animales/${item.animal.id}`)}
+                                >
+                                    <span className="dash-salud-interv-nombre">{nombreAnimal(item.animal)}</span>
+                                    <div className="dash-salud-interv-bar-wrap">
+                                        <div
+                                            className="dash-salud-interv-bar"
+                                            style={{
+                                                width: item.dias !== null
+                                                    ? `${Math.min(100, Math.round((item.dias / 60) * 100))}%`
+                                                    : '100%',
+                                                opacity: item.dias === null ? 0.35 : 1,
+                                            }}
+                                        />
+                                    </div>
+                                    <span className="dash-salud-interv-dias">
+                                        {item.dias !== null ? `${item.dias} d` : 'nunca'}
+                                    </span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* ── Ganancia de peso (Idea 17) ────────────────────────── */}
+                    <div className="dash-card">
+                        <div className="dash-card-header">
+                            <p className="dash-card-title">
+                                <i className="bi bi-graph-up-arrow" />
+                                Ganancia de peso
+                            </p>
+                            <span className="dash-card-idea-tag">Idea 17</span>
+                        </div>
+                        {/* TODO: implementar cuando exista endpoint GET /pesos?establecimientoId={id} */}
+                        <div className="dash-salud-peso-empty">
+                            <i className="bi bi-rulers" style={{ fontSize: '1.6rem', color: '#CBD5E1' }} />
+                            <span className="dash-salud-peso-empty-text">
+                                Disponible cuando haya pesadas cargadas
+                            </span>
+                            <span className="dash-salud-peso-empty-sub">
+                                Solo si hay ≥ 2 pesadas · se oculta si la cobertura es baja
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </>
+        );
+    }
+
     // ── Render ────────────────────────────────────────────────────────────
     if (!selectedId) {
         return (
@@ -782,13 +1441,15 @@ export default function DashboardPage() {
                                 EN VIVO
                             </div>
                         </>
+                    ) : activeTab === 'salud' ? (
+                        <h2>Salud y reproducción del rodeo</h2>
                     ) : (
                         <h2>Resumen del establecimiento</h2>
                     )}
                 </div>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    {/* Filtro por lote — solo visible en Centro de mando */}
-                    {activeTab === 'mando' && rodeos.length > 0 && (
+                    {/* Filtro por lote — visible en Centro de mando y Salud */}
+                    {(activeTab === 'mando' || activeTab === 'salud') && rodeos.length > 0 && (
                         <div className="dash-lote-filter">
                             <i className="bi bi-funnel-fill" style={{ fontSize: '0.7rem' }} />
                             <select
@@ -828,6 +1489,14 @@ export default function DashboardPage() {
                     Centro de mando
                 </button>
                 <button
+                    className={`dash-tab${activeTab === 'salud' ? ' dash-tab-active' : ''}`}
+                    onClick={() => setActiveTab('salud')}
+                    id="dash-tab-salud"
+                >
+                    <i className="bi bi-heart-pulse-fill me-2" />
+                    Salud y reproducción
+                </button>
+                <button
                     className={`dash-tab${activeTab === 'ejecutivo' ? ' dash-tab-active' : ''}`}
                     onClick={() => setActiveTab('ejecutivo')}
                     id="dash-tab-ejecutivo"
@@ -846,8 +1515,12 @@ export default function DashboardPage() {
             {/* ── TAB: Resumen ejecutivo ───────────────────────────────────── */}
             {activeTab === 'ejecutivo' && <ResumenEjecutivoView />}
 
+            {/* ── TAB: Salud y reproducción ─────────────────────────────────── */}
+            {activeTab === 'salud' && <SaludReproduccionView />}
+
             {/* ── TAB: Centro de mando ──────────────────────────────────────── */}
             {activeTab === 'mando' && (
+
             <>
             {/* ── KPI Chips ──────────────────────────────────────────────── */}
 
