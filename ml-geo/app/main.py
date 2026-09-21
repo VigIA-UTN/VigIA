@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
 from collections import defaultdict
+import math
 
 app = FastAPI(title="VigIA - Microservicio de Análisis Geoespacial")
 
@@ -95,5 +96,49 @@ def analyze(payload: GeoAnalyzeRequest):
         intensidad = count / max_count
         mapa_calor.append(MatrizDensidad(lat=center_lat, lng=center_lng, intensidad=intensidad))
 
-    # TODO: reemplazar por el cálculo real de cohesión para las alertas
-    return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=[])
+    # Umbral de aislamiento en metros. Configurable para alertar si un animal se aleja demasiado.
+    UMBRAL_AISLAMIENTO_METROS = 100.0
+
+    # Obtener la posición más reciente de cada animal
+    ultimas_posiciones = {}
+    for p in payload.historial_7d:
+        # Se asume que el timestamp puede ordenarse lexicográficamente
+        if p.animal_id not in ultimas_posiciones or p.timestamp > ultimas_posiciones[p.animal_id].timestamp:
+            ultimas_posiciones[p.animal_id] = p
+
+    animales = list(ultimas_posiciones.values())
+    alertas = []
+
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371000 # Radio de la Tierra en metros
+        phi_1 = math.radians(lat1)
+        phi_2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lon2 - lon1)
+        
+        a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi_1) * math.cos(phi_2) * math.sin(delta_lambda / 2.0) ** 2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return R * c
+
+    if len(animales) == 1:
+        # Con un solo animal, no hay aislamiento posible respecto a un rodeo
+        alertas.append(AlertaAnimal(
+            animal_id=animales[0].animal_id,
+            indice_cohesion=0.0,
+            alerta_aislamiento=False
+        ))
+    elif len(animales) > 1:
+        for a in animales:
+            otros = [o for o in animales if o.animal_id != a.animal_id]
+            avg_lat = sum(o.lat for o in otros) / len(otros)
+            avg_lng = sum(o.lng for o in otros) / len(otros)
+            
+            distancia_centroide = haversine(a.lat, a.lng, avg_lat, avg_lng)
+            
+            alertas.append(AlertaAnimal(
+                animal_id=a.animal_id,
+                indice_cohesion=distancia_centroide,
+                alerta_aislamiento=distancia_centroide > UMBRAL_AISLAMIENTO_METROS
+            ))
+
+    return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas)
