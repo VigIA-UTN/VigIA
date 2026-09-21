@@ -660,13 +660,17 @@
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .lt-filters {
-    flex-direction: column;
     gap: 0.75rem;
   }
 
   .lt-filter-group {
     max-width: 100%;
-    min-width: 0;
+    min-width: calc(50% - 1rem);
+  }
+
+  .lt-filter-clear {
+    width: 100%;
+    text-align: center;
   }
 
   .lt-header-left {

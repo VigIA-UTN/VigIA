@@ -1,287 +1,1619 @@
-/* ── Dashboard Power BI Style ───────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   Dashboard "Centro de mando diario" — VigIA
+   ═══════════════════════════════════════════════════════════════ */
 
-/* La página usa el fondo claro estándar de VigIA */
-.dashboard-pbi-page {
-    padding: 40px 24px 48px;
-    background: #F4F6F9;
+.dashboard-page {
+    padding: 28px 24px 60px;
+    background: #F4F6F9; /* Fondo claro de la foto */
     min-height: calc(100vh - 60px);
+    font-family: inherit;
+    color: #1A3558; /* Texto oscuro por defecto */
 }
 
-/* ── Header ─────────────────────────────────────────────────────── */
-.dashboard-pbi-header {
+/* ── Header ──────────────────────────────────────────────────────────── */
+.dash-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 20px;
-    max-width: 1100px;
-    margin-left: auto;
-    margin-right: auto;
+    max-width: 1280px;
+    margin: 0 auto 20px;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
-.dashboard-pbi-title {
-    color: #1E3A5F;
-    font-weight: 700;
-    font-size: 1.6rem;
-    margin: 0;
+.dash-header-left h2 {
+    font-size: 1.8rem;
+    font-weight: 500;
+    color: #1A3558;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+}
+
+.dash-header-meta {
+    font-size: 0.8rem;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dash-live-dot {
+    width: 7px;
+    height: 7px;
+    background: #8CC63F;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ── Filtro de lote ──────────────────────────────────────────────────── */
+.dash-lote-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: #64748B;
+}
+
+.dash-lote-select {
+    background: transparent;
+    border: none;
+    color: #64748B;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+}
+
+.dash-lote-select option {
+    background: #fff;
+    color: #1A3558;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   KPI CHIPS ROW (4 chips)
+   ══════════════════════════════════════════════════════════════ */
+.dash-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    max-width: 1280px;
+    margin: 0 auto 18px;
+}
+
+.dash-kpi-chip {
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #E2E8F0;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    cursor: default;
+}
+
+.dash-kpi-chip-label {
+    font-size: 0.8rem;
+    color: #64748B;
+    font-weight: 500;
+}
+
+.dash-kpi-chip-val {
+    font-size: 2.4rem;
+    font-weight: 400;
+    line-height: 1.1;
+    color: #1A3558;
     letter-spacing: -0.02em;
 }
 
-.pbi-timestamp {
-    color: #9CA3AF;
-    font-size: 0.75rem;
-    margin: 3px 0 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+.dash-kpi-chip-sub {
+    font-size: 0.82rem;
+    color: #64748B;
+    font-weight: 500;
+    margin-top: 2px;
 }
 
-.pbi-refresh-btn {
-    background: #1E3A5F !important;
-    border: none !important;
-    color: #fff !important;
-    font-size: 0.82rem !important;
-    border-radius: 8px !important;
-    padding: 7px 16px !important;
-    transition: background 0.18s ease !important;
+/* ══════════════════════════════════════════════════════════════
+   MAIN GRID (left 2/3 + right 1/3)
+   ══════════════════════════════════════════════════════════════ */
+.dash-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 18px;
+    max-width: 1280px;
+    margin: 0 auto 18px;
+    align-items: start;
 }
 
-.pbi-refresh-btn:hover {
-    background: #2B5080 !important;
-}
-
-/* ── Contenedor principal: el "panelito" navy ───────────────────── */
-.pbi-widget {
-    background: #1A3558;
-    border-radius: 20px;
-    padding: 32px 32px 36px;
-    max-width: 1100px;
-    margin: 0 auto 20px;
-    box-shadow: 0 6px 32px rgba(0,0,0,0.2);
-}
-
-/* ── Fila principal (hero + alertas) ───────────────────────────── */
-.pbi-main-row {
-    display: flex;
-    gap: 14px;
-    align-items: stretch;
-    flex-wrap: wrap;
-}
-
-/* ── Hero card ──────────────────────────────────────────────────── */
-.pbi-kpi-hero {
-    background: #2B5080;
-    border-radius: 14px;
-    padding: 26px 36px;
-    min-width: 190px;
-    flex: 0 0 auto;
+.dash-left-col, .dash-right-col {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    gap: 18px;
+}
+
+/* ── Card base (blancas) ────────────────────────────────────────────── */
+.dash-card {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    padding: 20px 24px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+}
+
+/* ── Card dark (Solo para idea 4: Cobertura) ────────────────────────── */
+.dash-card-dark {
+    background: #1A3558;
+    border: none;
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(26, 53, 88, 0.28);
+}
+.dash-card-dark .dash-card-title {
+    color: #ffffff;
+}
+
+.dash-card-full {
+    max-width: 1280px;
+    margin: 0 auto 18px;
+}
+
+/* ── Card header ─────────────────────────────────────────────────────── */
+.dash-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.dash-card-title {
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: #1A3558;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.dash-card-tag {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #94A3B8;
+}
+
+.dash-ver-todas-btn {
+    background: none;
+    border: none;
+    color: #64748B;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.dash-ver-todas-btn:hover {
+    background: #F1F5F9;
+    color: #1A3558;
+}
+
+.dash-card-dark .dash-ver-todas-btn {
+    color: rgba(255,255,255,0.7);
+}
+.dash-card-dark .dash-ver-todas-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 1 — COLA DE ATENCIÓN
+   ══════════════════════════════════════════════════════════════ */
+.dash-cola-header-row {
+    display: grid;
+    grid-template-columns: 24px 1.2fr 1.2fr 1fr 1fr 80px;
+    gap: 8px 10px;
+    padding: 0 4px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #94A3B8;
+    border-bottom: 1px solid #E2E8F0;
+    margin-bottom: 6px;
+}
+
+.dash-cola-row {
+    display: grid;
+    grid-template-columns: 24px 1.2fr 1.2fr 1fr 1fr 80px;
+    gap: 8px 10px;
+    align-items: center;
+    padding: 10px 4px;
+    border-radius: 8px;
+    transition: background 0.15s;
+    cursor: pointer;
+}
+
+.dash-cola-row:hover {
+    background: rgba(140, 198, 63, 0.1);
+}
+
+/* Dot de severidad */
+.dash-sev-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-left: 7px;
+}
+
+.dash-sev-dot-alta   { background: #E53E3E; box-shadow: 0 0 4px rgba(229,62,62,0.4); }
+.dash-sev-dot-media  { background: #D69E2E; }
+.dash-sev-dot-baja   { background: #38A169; }
+.dash-sev-dot-none   { background: #CBD5E1; }
+
+/* Animal nombre */
+.dash-cola-nombre {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Línea de recomendación gris como en la foto */
+.dash-cola-rec-bar {
+    height: 6px;
+    background: #E2E8F0;
+    border-radius: 999px;
+    width: 100%;
+    max-width: 110px;
+}
+
+/* Tipo chip */
+.dash-tipo-chip {
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: 20px;
+    border: 1px solid #CBD5E1;
+    color: #64748B;
+    white-space: nowrap;
+    text-align: center;
+    background: transparent;
+    justify-self: center;
+}
+
+/* Antigüedad / countdown */
+.dash-cola-tiempo {
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    padding: 0 10px;
+    justify-self: center;
+}
+
+.dash-cola-tiempo-urgente {
+    color: #E53E3E;
+}
+
+/* Botón atender */
+.dash-atender-btn {
+    background: #8CC63F;
+    border: 1px solid #8CC63F;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 4px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    white-space: nowrap;
+}
+
+.dash-atender-btn:hover {
+    background: #7ab334;
+    border-color: #7ab334;
+}
+
+.dash-atender-btn-outline {
+    background: #ffffff;
+    border: 1px solid #CBD5E1;
+    color: #64748B;
+}
+
+.dash-atender-btn-outline:hover {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+    color: #1A3558;
+}
+
+.dash-divider {
+    border: none;
+    border-top: 1px solid #F1F5F9;
+    margin: 4px 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 2 — VENTANAS DE INSEMINACIÓN
+   ══════════════════════════════════════════════════════════════ */
+.dash-ventana-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.dash-ventana-id {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #475569;
+    width: 80px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.dash-ventana-bar-track {
+    flex: 1;
+    height: 6px;
+    background: #E2E8F0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.dash-ventana-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.5s;
+}
+
+.dash-ventana-bar-optima   { background: #8CC63F; }
+.dash-ventana-bar-venciendo { background: #ECC94B; }
+.dash-ventana-bar-critica  { background: #E53E3E; }
+
+.dash-ventana-restante {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #64748B;
+    min-width: 80px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 4 — COBERTURA DE COLLARES
+   ══════════════════════════════════════════════════════════════ */
+.dash-coverage-pct {
+    font-size: 3.2rem;
+    font-weight: 500;
+    line-height: 1;
+    margin-bottom: 4px;
+    color: #ffffff;
+}
+
+.dash-coverage-sub {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 18px;
+}
+
+.dash-coverage-bar-wrap {
+    display: flex;
+    height: 12px;
+    border-radius: 999px;
+    overflow: hidden;
+    gap: 2px;
+    background: rgba(255,255,255,0.1);
+    margin-bottom: 18px;
+}
+
+.dash-coverage-seg {
+    border-radius: 999px;
+    transition: flex 0.4s ease;
+}
+
+.dash-coverage-ok        { background: #8CC63F; }
+.dash-coverage-calibrando { background: #13D4FB; }
+.dash-coverage-silencio  { background: #D69E2E; }
+.dash-coverage-bateria   { background: #E53E3E; }
+.dash-coverage-sincollar { background: rgba(255,255,255,0.3); }
+
+.dash-coverage-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dash-coverage-leg-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.8rem;
+}
+
+.dash-coverage-leg-left {
+    display: flex;
     align-items: center;
     gap: 8px;
-    text-align: center;
-    transition: background 0.18s;
+    color: rgba(255,255,255,0.85);
 }
 
-.pbi-kpi-hero:hover { background: #34608F; }
-
-.pbi-kpi-hero .pbi-val {
-    font-size: 4rem;
-    font-weight: 800;
-    color: #ffffff;
-    line-height: 1;
-    letter-spacing: -0.03em;
-    display: block;
-}
-
-.pbi-kpi-hero .pbi-lbl {
-    font-size: 0.92rem;
+.dash-coverage-leg-count {
     font-weight: 600;
-    color: #A8C8E8;
-    margin: 0;
-}
-
-/* ── Separador vertical ─────────────────────────────────────────── */
-.pbi-divider {
-    width: 1px;
-    background: rgba(255,255,255,0.1);
-    flex-shrink: 0;
-    align-self: stretch;
-    margin: 0 2px;
-}
-
-/* ── Grupo de alertas (título + row de sub-cards) ───────────────── */
-.pbi-alertas-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    flex: 1 1 280px;
-}
-
-.pbi-alertas-group-title {
-    color: #C5D8EE;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0;
-}
-
-.pbi-alertas-row {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-/* Sub-card de alerta */
-.pbi-alerta-card {
-    background: #243F62;
-    border-radius: 13px;
-    padding: 18px 22px;
-    flex: 1 1 100px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    text-align: center;
-    transition: background 0.18s;
-}
-
-.pbi-alerta-card:hover { background: #2E4E77; }
-
-.pbi-alerta-card .pbi-val {
-    font-size: 2.6rem;
-    font-weight: 800;
     color: #ffffff;
-    line-height: 1;
-    display: block;
 }
 
-.pbi-alerta-card .pbi-lbl {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #A8C8E8;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* ── Dots de color ──────────────────────────────────────────────── */
-.pbi-dot {
-    width: 7px;
-    height: 7px;
+/* ── Dot ─────────────────────────────────────────────────────────────── */
+.dash-dot {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    display: inline-block;
     flex-shrink: 0;
 }
-.pbi-dot-repro    { background: #F472B6; }
-.pbi-dot-salud    { background: #FBBF24; }
-.pbi-dot-abigeato { background: #60A5FA; }
-.pbi-dot-total    { background: #34D399; }
 
-/* ── Panel 2: KPIs de celo ──────────────────────────────────────── */
-.pbi-panel-title {
-    color: #C5D8EE;
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0 0 12px;
+/* ══════════════════════════════════════════════════════════════
+   IDEA 5 — MAPA VIVO (mini)
+   ══════════════════════════════════════════════════════════════ */
+.dash-map-wrap {
+    border-radius: 8px;
+    overflow: hidden;
+    height: 200px;
+    position: relative;
+    cursor: pointer;
 }
 
-.pbi-celo-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 10px;
-}
 
-.pbi-kpi-card {
-    background: #243F62;
-    border-radius: 13px;
-    padding: 20px 18px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+
+/* ══════════════════════════════════════════════════════════════
+   BELOW THE FOLD SECTION
+   ══════════════════════════════════════════════════════════════ */
+.dash-fold-label {
+    max-width: 1280px;
+    margin: 0 auto 16px;
     text-align: center;
-    gap: 5px;
-    transition: background 0.18s;
-}
-
-.pbi-kpi-card:hover { background: #2E4E77; }
-
-.pbi-kpi-card .pbi-val {
-    font-size: 2.6rem;
-    font-weight: 800;
-    color: #ffffff;
-    line-height: 1;
-    display: block;
-}
-
-.pbi-kpi-card .pbi-lbl {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #A8C8E8;
-    margin: 0;
-}
-
-.pbi-kpi-card .pbi-sub {
-    font-size: 0.65rem;
-    color: #506882;
-    margin: 0;
-}
-
-/* ── Separador interno entre paneles ────────────────────────────── */
-.pbi-inner-sep {
-    height: 1px;
-    background: rgba(255,255,255,0.08);
-    margin: 20px 0;
-}
-
-/* ── Spinner inline ─────────────────────────────────────────────── */
-.pbi-spinner-val {
-    height: 1em;
+    font-size: 0.75rem;
+    color: #94A3B8;
     display: flex;
     align-items: center;
-    justify-content: center;
-    min-height: 2.2rem;
+    gap: 12px;
 }
 
-/* ── Empty state ────────────────────────────────────────────────── */
-.pbi-empty {
-    background: #1A3558;
-    border-radius: 18px;
+.dash-fold-label::before,
+.dash-fold-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #E2E8F0;
+}
+
+.dash-below-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    max-width: 1280px;
+    margin: 0 auto 18px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 6 — EMBUDO REPRODUCTIVO
+   ══════════════════════════════════════════════════════════════ */
+.dash-embudo-bar-wrap {
+    display: flex;
+    height: 20px;
+    border-radius: 999px;
+    overflow: hidden;
+    gap: 2px;
+    margin-bottom: 14px;
+}
+
+.dash-embudo-seg {
+    border-radius: 999px;
+    transition: flex 0.5s ease;
+    min-width: 3px;
+}
+
+.dash-embudo-vacia       { background: #E2E8F0; } /* Gris claro */
+.dash-embudo-celo        { background: #13D4FB; } /* Cyan */
+.dash-embudo-inseminada  { background: #3B8D99; } /* Teal */
+.dash-embudo-gestante    { background: #8CC63F; } /* Verde brand */
+.dash-embudo-anestro     { background: #94A3B8; } /* Gris medio */
+.dash-embudo-posible_celo { background: #D69E2E; } /* Ambar */
+.dash-embudo-parida      { background: #38A169; } /* Verde oscuro */
+.dash-embudo-sin_estado  { background: #F1F5F9; } /* Gris muy claro */
+
+.dash-embudo-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+}
+
+.dash-embudo-leg-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #64748B;
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+}
+
+.dash-embudo-leg-item strong {
+    display: none; /* Según la foto, solo texto, no hay cantidades */
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 3 — ANIMALES A REVISAR (SANIDAD) -> Adaptado al light theme
+   ══════════════════════════════════════════════════════════════ */
+.dash-revisar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 6px;
+    border-radius: 8px;
+    transition: background 0.15s;
+    cursor: pointer;
+}
+
+.dash-revisar-row:hover {
+    background: #F8FAFC;
+}
+
+.dash-revisar-nombre {
+    flex: 1;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #1A3558;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-revisar-causa {
+    font-size: 0.85rem;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+
+.dash-salud-badge {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 20px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.dash-salud-badge-obs {
+    background: #FEFCBF;
+    color: #B7791F;
+    border: 1px solid #F6E05E;
+}
+
+.dash-salud-badge-enfermo {
+    background: #FED7D7;
+    color: #C53030;
+    border: 1px solid #FC8181;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MISC
+   ══════════════════════════════════════════════════════════════ */
+.dash-no-items {
+    font-size: 1rem;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.dash-loading-center {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.dash-empty {
+    background: #ffffff;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
     padding: 40px 24px;
     text-align: center;
-    color: #7A9CC0;
+    color: #64748B;
     font-size: 0.9rem;
     max-width: 860px;
     margin: 0 auto;
 }
 
-/* ── Responsive ─────────────────────────────────────────────────── */
-@media (max-width: 640px) {
-    .pbi-kpi-hero .pbi-val { font-size: 2.4rem; }
-    .pbi-kpi-card .pbi-val  { font-size: 1.6rem; }
-    .pbi-alerta-card .pbi-val { font-size: 1.6rem; }
-    .pbi-widget { padding: 18px 14px 22px; }
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 1100px) {
+    .dash-main-grid {
+        grid-template-columns: 1fr;
+    }
 
-    /* Centrar el hero card y ocultar el divisor en mobile */
-    .pbi-main-row {
-        flex-direction: column;
-        align-items: center;
-    }
-    .pbi-kpi-hero {
-        width: 100%;
-        align-items: center;
-    }
-    .pbi-divider {
-        display: none;
-    }
-    .pbi-alertas-group {
-        width: 100%;
-        flex: none;
+    .dash-right-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
     }
 }
+
+@media (max-width: 900px) {
+    .dash-kpi-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .dash-below-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dash-right-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .dashboard-page {
+        padding: 20px 14px 40px;
+    }
+
+    .dash-kpi-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .dash-kpi-chip-val {
+        font-size: 2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .dash-kpi-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TAB BAR — Centro de mando / Resumen ejecutivo
+   ══════════════════════════════════════════════════════════════ */
+.dash-tabs {
+    display: flex;
+    gap: 4px;
+    max-width: 1280px;
+    margin: 0 auto 22px;
+    border-bottom: 2px solid #E2E8F0;
+    padding-bottom: 0;
+}
+
+.dash-tab {
+    background: none;
+    border: none;
+    padding: 10px 22px 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #94A3B8;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.18s;
+    border-radius: 8px 8px 0 0;
+    letter-spacing: 0.01em;
+}
+
+.dash-tab:hover {
+    color: #1A3558;
+    background: #F8FAFC;
+}
+
+.dash-tab::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: transparent;
+    border-radius: 2px 2px 0 0;
+    transition: background 0.18s;
+}
+
+.dash-tab-active {
+    color: #1A3558;
+    font-weight: 600;
+}
+
+.dash-tab-active::after {
+    background: #8CC63F;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RESUMEN EJECUTIVO — layout general
+   ══════════════════════════════════════════════════════════════ */
+.dash-exec-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1280px;
+    margin: 0 auto 6px;
+}
+
+.dash-exec-title {
+    font-size: 1.55rem;
+    font-weight: 500;
+    color: #1A3558;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+
+.dash-exec-period {
+    font-size: 0.82rem;
+    color: #64748B;
+    font-weight: 500;
+}
+
+/* ── Hero card: tabla por rodeo ──────────────────────────────── */
+.dash-exec-hero {
+    max-width: 1280px;
+    margin: 0 auto 18px;
+}
+
+.dash-exec-hero-label {
+    font-size: 0.72rem;
+    color: #94A3B8;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+    padding-right: 2px;
+    margin-bottom: 2px;
+}
+
+.dash-exec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.dash-exec-table thead th {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 8px 12px 10px;
+    text-align: left;
+    border-bottom: 1px solid #E2E8F0;
+    white-space: nowrap;
+}
+
+.dash-exec-table thead th:not(:first-child) {
+    text-align: center;
+}
+
+.dash-exec-table tbody tr {
+    border-bottom: 1px solid #F1F5F9;
+    transition: background 0.13s;
+    cursor: default;
+}
+
+.dash-exec-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.dash-exec-table tbody tr:hover {
+    background: #F8FAFC;
+}
+
+.dash-exec-table td {
+    padding: 12px 12px;
+    color: #475569;
+    vertical-align: middle;
+}
+
+.dash-exec-table td:not(:first-child) {
+    text-align: center;
+}
+
+/* Nombre del rodeo */
+.dash-exec-rodeo-name {
+    font-weight: 600;
+    color: #1A3558;
+    font-size: 0.95rem;
+}
+
+/* Celda con valor normal */
+.dash-exec-cell-normal {
+    color: #475569;
+}
+
+/* Celda con badge de alerta */
+.dash-exec-cell-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.dash-exec-badge-red {
+    background: #FED7D7;
+    color: #C53030;
+}
+
+.dash-exec-badge-yellow {
+    background: #FEFCBF;
+    color: #B7791F;
+}
+
+.dash-exec-badge-green {
+    background: #C6F6D5;
+    color: #276749;
+}
+
+.dash-exec-badge-neutral {
+    background: #EDF2F7;
+    color: #4A5568;
+}
+
+/* Flecha de variación */
+.dash-exec-trend-up   { color: #E53E3E; font-size: 0.75rem; }
+.dash-exec-trend-down { color: #38A169; font-size: 0.75rem; }
+
+/* Link "Ver" */
+.dash-exec-ver-btn {
+    background: none;
+    border: none;
+    color: #8CC63F;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.13s;
+}
+.dash-exec-ver-btn:hover {
+    background: rgba(140, 198, 63, 0.1);
+}
+
+/* Footer note */
+.dash-exec-table-note {
+    font-size: 0.72rem;
+    color: #94A3B8;
+    padding: 10px 12px 2px;
+    display: block;
+}
+
+/* ── Grid inferior: tendencias + equipo ──────────────────────── */
+.dash-exec-bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 18px;
+    max-width: 1280px;
+    margin: 0 auto 18px;
+    align-items: start;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 8 — TENDENCIA DE ALERTAS (SVG inline)
+   ══════════════════════════════════════════════════════════════ */
+.dash-trend-svg-wrap {
+    width: 100%;
+    overflow: hidden;
+}
+
+.dash-trend-legend {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.dash-trend-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: #64748B;
+    font-weight: 500;
+}
+
+.dash-trend-legend-dot {
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.dash-trend-norm-note {
+    font-size: 0.72rem;
+    color: #94A3B8;
+    text-align: right;
+    margin-top: 6px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   IDEA 9 — ¿ESTÁ ACTUANDO EL EQUIPO?
+   ══════════════════════════════════════════════════════════════ */
+.dash-team-kpis {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px 4px;
+    margin-bottom: 20px;
+}
+
+.dash-team-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dash-team-kpi-label {
+    font-size: 0.7rem;
+    color: #94A3B8;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.dash-team-kpi-val {
+    font-size: 1.9rem;
+    font-weight: 500;
+    color: #1A3558;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.dash-team-hist-label {
+    font-size: 0.72rem;
+    color: #94A3B8;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.dash-team-hist {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 80px;
+}
+
+.dash-team-hist-bar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.dash-team-hist-bar {
+    width: 100%;
+    background: #1A3558;
+    border-radius: 4px 4px 0 0;
+    min-height: 4px;
+    transition: background 0.2s;
+}
+
+.dash-team-hist-bar:hover {
+    background: #8CC63F;
+}
+
+.dash-team-hist-bar-label {
+    font-size: 0.62rem;
+    color: #94A3B8;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.dash-team-hist-sub {
+    font-size: 0.68rem;
+    color: #94A3B8;
+    margin-top: 10px;
+    display: block;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE — ejecutivo
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 1100px) {
+    .dash-exec-bottom-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 800px) {
+    .dash-exec-hero {
+        overflow-x: auto;
+    }
+
+    .dash-exec-table {
+        min-width: 640px;
+    }
+
+    .dash-team-kpis {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .dash-tab {
+        padding: 8px 14px 10px;
+        font-size: 0.82rem;
+    }
+
+    .dash-exec-title {
+        font-size: 1.25rem;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TAB: Salud y Reproducción del Rodeo — VigIA
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Header interno de la tab ──────────────────────────────────── */
+.dash-salud-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    max-width: 1280px;
+    margin: 0 auto 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dash-salud-title {
+    font-size: 1.55rem;
+    font-weight: 500;
+    color: #1A3558;
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+}
+
+.dash-salud-subtitle {
+    font-size: 0.78rem;
+    color: #94A3B8;
+    display: block;
+}
+
+.dash-salud-filters {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.dash-salud-period {
+    font-size: 0.82rem;
+    color: #64748B;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+/* ── Strip de 4 KPIs ───────────────────────────────────────────── */
+.dash-salud-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    max-width: 1280px;
+    margin: 0 auto 18px;
+}
+
+.dash-salud-kpi {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #E2E8F0;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.dash-salud-kpi-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #94A3B8;
+}
+
+.dash-salud-kpi-val {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #1A3558;
+    line-height: 1.1;
+}
+
+.dash-salud-kpi-val.dash-salud-kpi-warn   { color: #D69E2E; }
+.dash-salud-kpi-val.dash-salud-kpi-danger { color: #E53E3E; }
+.dash-salud-kpi-val.dash-salud-kpi-muted  { color: #94A3B8; }
+
+.dash-salud-kpi-sub {
+    font-size: 0.8rem;
+    color: #64748B;
+    font-weight: 500;
+}
+
+/* ── Grids de contenido ────────────────────────────────────────── */
+.dash-salud-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    max-width: 1280px;
+    margin: 0 auto 16px;
+}
+
+.dash-salud-mid-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    max-width: 1280px;
+    margin: 0 auto 0;
+}
+
+/* ── Separador "debajo del pliegue" ────────────────────────────── */
+.dash-salud-fold-label {
+    max-width: 1280px;
+    margin: 20px auto 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dash-salud-fold-label span {
+    font-size: 0.72rem;
+    color: #CBD5E1;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+}
+
+.dash-salud-fold-label::before,
+.dash-salud-fold-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #E2E8F0;
+}
+
+/* ── Grid inferior (3 cols) ────────────────────────────────────── */
+.dash-salud-bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    max-width: 1280px;
+    margin: 0 auto 0;
+}
+
+/* ── Card idea tag ─────────────────────────────────────────────── */
+.dash-card-idea-tag {
+    font-size: 0.68rem;
+    color: #CBD5E1;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+}
+
+/* ── Excepciones del embudo ────────────────────────────────────── */
+.dash-salud-excepciones {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.dash-salud-exc-header {
+    font-size: 0.71rem;
+    font-weight: 600;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.dash-salud-exc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 7px;
+    background: #F8FAFC;
+    margin-bottom: 5px;
+    gap: 8px;
+}
+
+.dash-salud-exc-desc {
+    font-size: 0.82rem;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.dash-salud-exc-state {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.dash-salud-exc-state.vacia      { background: rgba(26,53,88,0.1);   color: #1A3558; }
+.dash-salud-exc-state.inseminada { background: rgba(59,141,153,0.12); color: #3B8D99; }
+.dash-salud-exc-state.anestro    { background: rgba(203,213,225,0.4); color: #64748B; }
+
+.dash-salud-exc-action {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1A3558;
+    white-space: nowrap;
+}
+
+.dash-salud-completitud {
+    font-size: 0.73rem;
+    color: #94A3B8;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #F1F5F9;
+}
+
+/* ── Animales a revisar ────────────────────────────────────────── */
+.dash-salud-revisar-section {
+    padding: 2px 0 8px;
+}
+
+.dash-salud-revisar-seclabel {
+    font-size: 0.71rem;
+    font-weight: 600;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.dash-salud-revisar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 4px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.12s;
+}
+
+.dash-salud-revisar-row:hover { background: #F8FAFC; }
+
+.dash-salud-revisar-nombre {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1A3558;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-salud-revisar-lote {
+    font-size: 0.75rem;
+    color: #94A3B8;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-salud-revisar-tiempo {
+    font-size: 0.78rem;
+    color: #64748B;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.dash-salud-revisar-dias {
+    font-size: 0.75rem;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+.dash-salud-revisar-dias-urgente {
+    color: #E53E3E;
+    font-weight: 600;
+}
+
+.dash-salud-revisar-divider {
+    height: 1px;
+    background: #F1F5F9;
+    margin: 6px 0 10px;
+}
+
+/* ── Sparkline mini ────────────────────────────────────────────── */
+.dash-salud-sparkline {
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+/* ── Partos esperados — bar chart ──────────────────────────────── */
+.dash-partos-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 90px;
+    margin: 16px 0 10px;
+}
+
+.dash-partos-bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    height: 100%;
+    position: relative;
+}
+
+.dash-partos-bar-col-active {
+    cursor: help;
+}
+
+.dash-partos-bar-col-active .dash-partos-bar-fill {
+    background: #1A3558;
+}
+
+.dash-partos-bar-col-active:hover .dash-partos-bar-fill {
+    background: #2d5a9e;
+}
+
+.dash-partos-bar-track {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background: #F1F5F9;
+    border-radius: 3px 3px 0 0;
+    overflow: hidden;
+    min-height: 4px;
+}
+
+.dash-partos-bar-fill {
+    width: 100%;
+    background: #1A3558;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.3s ease;
+    min-height: 0;
+}
+
+.dash-partos-bar-count {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #1A3558;
+    position: absolute;
+    top: -16px;
+}
+
+.dash-partos-bar-label {
+    font-size: 0.6rem;
+    color: #94A3B8;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 100%;
+    margin-top: 2px;
+}
+
+.dash-partos-sub {
+    font-size: 0.73rem;
+    color: #94A3B8;
+    margin-top: 6px;
+}
+
+.dash-partos-subfecha {
+    color: #D69E2E;
+}
+
+/* ── Desempeño reproductivo — funnel bars ──────────────────────── */
+.dash-desempenyo-funnel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.dash-desempenyo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dash-desempenyo-label {
+    font-size: 0.78rem;
+    color: #64748B;
+    width: 110px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.dash-desempenyo-bar-track {
+    flex: 1;
+    height: 10px;
+    background: #F1F5F9;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.dash-desempenyo-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.4s ease;
+    min-width: 2px;
+}
+
+.dash-desempenyo-bar-celo  { background: #1A3558; }
+.dash-desempenyo-bar-atend { background: rgba(26,53,88,0.55); }
+.dash-desempenyo-bar-ins   { background: #3B8D99; }
+.dash-desempenyo-bar-gest  { background: #38A169; }
+
+.dash-desempenyo-val {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1A3558;
+    width: 26px;
+    text-align: right;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.dash-desempenyo-note {
+    font-size: 0.7rem;
+    color: #CBD5E1;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #F1F5F9;
+}
+
+/* ── Reincidencia ──────────────────────────────────────────────── */
+.dash-salud-reincidencia-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 4px;
+    cursor: pointer;
+    border-bottom: 1px solid #F8FAFC;
+    transition: background 0.1s;
+    border-radius: 4px;
+    gap: 8px;
+}
+
+.dash-salud-reincidencia-row:hover { background: #F8FAFC; }
+.dash-salud-reincidencia-row:last-child { border-bottom: none; }
+
+.dash-salud-reincidencia-nombre {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #1A3558;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-salud-reincidencia-count {
+    font-size: 0.75rem;
+    color: #94A3B8;
+    white-space: nowrap;
+}
+
+/* ── Última intervención ───────────────────────────────────────── */
+.dash-salud-interv-note {
+    font-size: 0.68rem;
+    color: #CBD5E1;
+    margin-bottom: 10px;
+    font-style: italic;
+}
+
+.dash-salud-interv-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.1s;
+}
+
+.dash-salud-interv-row:hover { background: #F8FAFC; }
+
+.dash-salud-interv-nombre {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1A3558;
+    width: 80px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-salud-interv-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: #F1F5F9;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.dash-salud-interv-bar {
+    height: 100%;
+    background: #3B8D99;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    min-width: 2px;
+}
+
+.dash-salud-interv-dias {
+    font-size: 0.75rem;
+    color: #64748B;
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Ganancia de peso — empty state ────────────────────────────── */
+.dash-salud-peso-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 28px 16px;
+    text-align: center;
+}
+
+.dash-salud-peso-empty-text {
+    font-size: 0.82rem;
+    color: #94A3B8;
+    font-weight: 500;
+}
+
+.dash-salud-peso-empty-sub {
+    font-size: 0.72rem;
+    color: #CBD5E1;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .dash-salud-kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dash-salud-main-grid,
+    .dash-salud-mid-grid {
+        grid-template-columns: 1fr;
+    }
+    .dash-salud-bottom-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .dash-salud-kpi-row {
+        grid-template-columns: 1fr 1fr;
+    }
+    .dash-salud-title {
+        font-size: 1.2rem;
+    }
+}
+

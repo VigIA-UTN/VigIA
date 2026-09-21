@@ -108,19 +108,54 @@ function formatDateTime(dt: string | null | undefined) {
 }
 
 function CaravanaVinculadaInfo({ animal }: { animal: AnimalResponse }) {
+    const navigate = useNavigate();
     if (!animal.caravanaId) return <>—</>;
     const bateria = formatBateria(animal.caravanaBateria);
     const senial = formatUltimaSenial(animal.caravanaUltimaSenial);
+    
+    const hasBateria = bateria.text !== '—';
+    const hasSenial = senial.text !== '—';
+
     return (
-        <>
-            {animal.caravanaAlias || animal.caravanaDevEui} ({animal.caravanaEstado}){' '}
-            <span style={{ color: bateria.amber ? '#8a6a00' : '#2f7d3b' }}>
-                {bateria.amber && <span className="bateria-dot" />}
-                {bateria.text}
-            </span>
-            {' · '}
-            <span title={senial.title} style={{ color: senial.amber ? '#8a6a00' : undefined }}>señal {senial.text}</span>
-        </>
+        <div className="d-flex align-items-center justify-content-between mt-1 px-3 py-2 bg-light rounded border border-light-subtle w-100">
+            <div className="d-flex align-items-center gap-2">
+                <span className="fw-medium text-dark text-nowrap">
+                    <i className="bi bi-tag-fill text-primary me-2"></i>
+                    {animal.caravanaAlias || animal.caravanaDevEui}
+                </span>
+                <Badge bg={animal.caravanaEstado === 'VINCULADO' ? 'success' : 'secondary'} className="fw-normal">
+                    {animal.caravanaEstado}
+                </Badge>
+            </div>
+            <div className="d-flex align-items-center gap-2">
+                {(hasBateria || hasSenial) ? (
+                    <>
+                        {hasBateria && (
+                            <span style={{ fontSize: '0.85rem', color: bateria.amber ? '#8a6a00' : '#2f7d3b', whiteSpace: 'nowrap' }} title="Batería">
+                                {bateria.amber && <span className="bateria-dot d-inline-block me-1" />}
+                                <i className={`bi bi-battery-${bateria.amber ? 'half' : 'full'} me-1`} />
+                                {bateria.text}
+                            </span>
+                        )}
+                        {hasSenial && (
+                            <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }} title={senial.title}>
+                                <i className="bi bi-reception-4 me-1"></i>
+                                {senial.text}
+                            </span>
+                        )}
+                    </>
+                ) : (
+                    <span className="text-muted" style={{ fontSize: '0.8rem', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
+                        Sin datos
+                    </span>
+                )}
+                <div className="border-start border-secondary-subtle ps-2 ms-0">
+                    <Button variant="link" className="p-0 text-decoration-none fw-medium text-nowrap" onClick={() => navigate('/animales')} style={{ fontSize: '0.85rem' }}>
+                        Gestionar
+                    </Button>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -614,13 +649,9 @@ export default function AnimalDetailPage() {
                                             </Form.Group>
                                             <ul className="list-unstyled detail-list mt-4">
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
-                                                <li>
-                                                    <strong>Caravana vinculada:</strong>{' '}
-                                                    <CaravanaVinculadaInfo animal={animal} />
-                                                    {' '}
-                                                    <Button variant="link" className="p-0 align-baseline" onClick={() => navigate('/animales')}>
-                                                        Gestionar en Animales
-                                                    </Button>
+                                                <li className="flex-column align-items-stretch border-bottom-0 pb-0 mt-3">
+                                                    <div className="w-100 mb-1"><strong>Caravana vinculada:</strong></div>
+                                                    <div className="w-100"><CaravanaVinculadaInfo animal={animal} /></div>
                                                 </li>
                                             </ul>
                                         </Col>
@@ -645,13 +676,9 @@ export default function AnimalDetailPage() {
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
                                                 <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
                                                 <li><strong>Estado de Salud:</strong> {estadoSaludBadge(saludHistorial[0]?.estado ?? animal.estadoSalud)}</li>
-                                                <li>
-                                                    <strong>Caravana vinculada:</strong>{' '}
-                                                    <CaravanaVinculadaInfo animal={animal} />
-                                                    {' '}
-                                                    <Button variant="link" className="p-0 align-baseline" onClick={() => navigate('/animales')}>
-                                                        Gestionar en Animales
-                                                    </Button>
+                                                <li className="flex-column align-items-stretch border-bottom-0 pb-0 mt-3">
+                                                    <div className="w-100 mb-1"><strong>Caravana vinculada:</strong></div>
+                                                    <div className="w-100"><CaravanaVinculadaInfo animal={animal} /></div>
                                                 </li>
                                             </ul>
                                         </Col>
