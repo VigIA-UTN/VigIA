@@ -8,7 +8,7 @@ calcula el índice de aislamiento y las zonas subutilizadas del campo
 from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from collections import defaultdict
 import math
 
@@ -21,6 +21,7 @@ class CoordenadaGPS(BaseModel):
     timestamp: str
 
 class GeoAnalyzeRequest(BaseModel):
+    animal_id: Optional[str] = None
     historial_7d: List[CoordenadaGPS]
 
 class AlertaAnimal(BaseModel):
@@ -71,7 +72,12 @@ def analyze(payload: GeoAnalyzeRequest):
 
     grid_counts = defaultdict(int)
 
-    for p in payload.historial_7d:
+    # Filtrar puntos para el mapa de calor si se especificó un animal
+    puntos_mapa = payload.historial_7d
+    if payload.animal_id:
+        puntos_mapa = [p for p in payload.historial_7d if p.animal_id == payload.animal_id]
+
+    for p in puntos_mapa:
         lat_idx = int((p.lat - min_lat) / lat_step)
         lng_idx = int((p.lng - min_lng) / lng_step)
         
