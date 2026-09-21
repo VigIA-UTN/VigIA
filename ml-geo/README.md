@@ -4,7 +4,7 @@ Este microservicio se encarga de procesar el historial de coordenadas GPS del ro
 
 ## Funcionalidades Principales
 
-- **Mapa de Calor:** Discretiza el área cubierta por las coordenadas en una grilla dinámica y calcula la intensidad de uso basada en la frecuencia de los puntos GPS.
+- **Mapa de Calor y Zonas Subutilizadas:** Discretiza el área cubierta por las coordenadas en una grilla de 20x20. Devuelve todas las celdas (incluso las vacías) calculando su intensidad relativa al máximo de visitas. Aquellas celdas con un uso menor o igual al 15% (`intensidad <= 0.15`) se marcan automáticamente como `subutilizada: true` para facilitar el renderizado en el frontend.
 - **Índice de Cohesión:** Calcula la distancia relativa (en metros, usando la fórmula de Haversine) de cada animal con respecto al centroide del resto del rodeo.
 - **Alerta de Aislamiento:** Dispara una alerta si la distancia relativa de un animal supera un umbral de aislamiento establecido.
 

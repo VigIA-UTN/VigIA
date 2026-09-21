@@ -14,39 +14,33 @@ import math
 
 app = FastAPI(title="VigIA - Microservicio de Análisis Geoespacial")
 
-
 class CoordenadaGPS(BaseModel):
     animal_id: str
     lat: float
     lng: float
     timestamp: str
 
-
 class GeoAnalyzeRequest(BaseModel):
     historial_7d: List[CoordenadaGPS]
-
 
 class AlertaAnimal(BaseModel):
     animal_id: str
     indice_cohesion: float
     alerta_aislamiento: bool
 
-
 class MatrizDensidad(BaseModel):
     lat: float
     lng: float
     intensidad: float
-
+    subutilizada: bool = False
 
 class GeoAnalyzeResponse(BaseModel):
     mapa_calor: List[MatrizDensidad]
     alertas: List[AlertaAnimal]
 
-
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "ml-geo"}
-
 
 @app.post("/api/internal/ml/geo/analyze", response_model=GeoAnalyzeResponse)
 def analyze(payload: GeoAnalyzeRequest):
@@ -88,13 +82,23 @@ def analyze(payload: GeoAnalyzeRequest):
         grid_counts[(lat_idx, lng_idx)] += 1
 
     max_count = max(grid_counts.values()) if grid_counts else 1
+    UMBRAL_SUBUTILIZADA = 0.15
 
     mapa_calor = []
-    for (lat_idx, lng_idx), count in grid_counts.items():
-        center_lat = min_lat + (lat_idx + 0.5) * lat_step
-        center_lng = min_lng + (lng_idx + 0.5) * lng_step
-        intensidad = count / max_count
-        mapa_calor.append(MatrizDensidad(lat=center_lat, lng=center_lng, intensidad=intensidad))
+    for lat_idx in range(GRID_SIZE):
+        for lng_idx in range(GRID_SIZE):
+            count = grid_counts.get((lat_idx, lng_idx), 0)
+            center_lat = min_lat + (lat_idx + 0.5) * lat_step
+            center_lng = min_lng + (lng_idx + 0.5) * lng_step
+            intensidad = count / max_count
+            es_subutilizada = intensidad <= UMBRAL_SUBUTILIZADA
+            
+            mapa_calor.append(MatrizDensidad(
+                lat=center_lat, 
+                lng=center_lng, 
+                intensidad=intensidad,
+                subutilizada=es_subutilizada
+            ))
 
     # Umbral de aislamiento en metros. Configurable para alertar si un animal se aleja demasiado.
     UMBRAL_AISLAMIENTO_METROS = 100.0
