@@ -68,55 +68,24 @@ function MapEditorEvents({
   return null;
 }
 
-const staleIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png',
-  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+const pinUrls = import.meta.glob('../assets/pins/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 
-const defaultIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// 1x + 2x (Leaflet elige el 2x en pantallas retina). Punta del pin = centro inferior.
+const makePin = (estado: string, selected: boolean) => {
+  const [w, h] = selected ? [60, 78] : [40, 52];
+  const base = `../assets/pins/pin-${estado}${selected ? '-sel' : ''}`;
+  return new L.Icon({
+    iconUrl: pinUrls[`${base}-1x.png`],
+    iconRetinaUrl: pinUrls[`${base}-2x.png`],
+    iconSize: [w, h],
+    iconAnchor: [w / 2, h],
+    popupAnchor: [0, -h],
+  });
+};
 
-const alertaBajaIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png',
-  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const alertaMediaIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png',
-  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const alertaAltaIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+const PIN_ICONS = Object.fromEntries(
+  ['normal', 'borde', 'critico', 'sindatos'].map(e => [e, [makePin(e, false), makePin(e, true)]])
+) as Record<string, [L.Icon, L.Icon]>;
 
 const CENTRO_CAMPO: [number, number] = [-34.6037, -58.3816];
 
@@ -136,13 +105,13 @@ function MapUpdater({ center, trigger }: { center: [number, number], trigger: { 
   return null;
 }
 
-function determinarIcono(animal: AnimalMapa) {
-  if (animal.sinDatosRecientes) return staleIcon;
-  if (animal.alertasAnimal.length === 0) return defaultIcon;
-  if (animal.alertasAnimal.some(a => a.severidad !== null && a.severidad === 'ALTA')) return alertaAltaIcon;
-  if (animal.alertasAnimal.some(a => a.severidad !== null && a.severidad === 'MEDIA')) return alertaMediaIcon;
-  if (animal.alertasAnimal.some(a => a.severidad !== null && a.severidad === 'BAJA')) return alertaBajaIcon;
-  return defaultIcon;
+function determinarIcono(animal: AnimalMapa, selected: boolean) {
+  const severidades = animal.alertasAnimal.map(a => a.severidad);
+  const estado = animal.sinDatosRecientes ? 'sindatos'
+    : severidades.includes('ALTA') ? 'critico'
+    : severidades.includes('MEDIA') || severidades.includes('BAJA') ? 'borde'
+    : 'normal';
+  return PIN_ICONS[estado][selected ? 1 : 0];
 }
 
 export default function MapPage() {
@@ -592,7 +561,8 @@ export default function MapPage() {
             <Marker
               key={animal.id}
               position={[animal.latitud, animal.longitud]}
-              icon={determinarIcono(animal)}
+              icon={determinarIcono(animal, selectedAnimalMap?.id === animal.id)}
+              zIndexOffset={selectedAnimalMap?.id === animal.id ? 1000 : 0}
               eventHandlers={{
                 click: () => {
                   setSelectedAnimalMap(animal);
