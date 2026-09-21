@@ -14,3 +14,9 @@
 .map-fab:hover .map-fab-label, .map-fab:focus-visible .map-fab-label, .map-fab[aria-expanded="true"] .map-fab-label { opacity: 1; }
 .map-fab-dot { width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle, #FFC700 0%, #94C11E 48%, #13D4FB 100%); }
 .map-fab-on { margin-left: 6px; font-size: .65rem; background: #94C11E; color: #1B344D; border-radius: 999px; padding: 1px 6px; }
+
+/* Transición suave entre pin normal y seleccionado (Leaflet reutiliza el <img> y solo cambia tamaño/margen).
+   No se toca transform: lo usa Leaflet para posicionar y animar el zoom. */
+.leaflet-marker-icon {
+  transition: width 120ms ease-out, height 120ms ease-out, margin 120ms ease-out;
+}
