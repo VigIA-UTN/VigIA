@@ -28,9 +28,9 @@ function haceCuanto(ts: string) {
 const textoAccionRecomendada = (alerta: AlertaResponse | null) => {
   if (alerta?.accionRecomendada) {
     return alerta.accionRecomendada;
-  } else if (alerta.tipo === 'SALUD') {
+  } else if (alerta && alerta.tipo === 'SALUD') {
     return 'Revisar al animal y realizar seguimiento clínico.';
-  } else if (alerta.tipo === 'CELO') {
+  } else if (alerta && alerta.tipo === 'CELO') {
     return 'Realizar inseminación artificial dentro de la ventana óptima.';
   } else {
     return 'Revisar al animal y realizar seguimiento.';
