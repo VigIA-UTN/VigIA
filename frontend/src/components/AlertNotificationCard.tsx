@@ -25,6 +25,18 @@ function haceCuanto(ts: string) {
   return `Hace ${Math.floor(min / 1440)} d`;
 }
 
+const textoAccionRecomendada = (alerta: AlertaResponse | null) => {
+  if (alerta?.accionRecomendada) {
+    return alerta.accionRecomendada;
+  } else if (alerta.tipo === 'SALUD') {
+    return 'Revisar al animal y realizar seguimiento clínico.';
+  } else if (alerta.tipo === 'CELO') {
+    return 'Realizar inseminación artificial dentro de la ventana óptima.';
+  } else {
+    return 'Revisar al animal y realizar seguimiento.';
+  }
+}
+
 export default function AlertNotificationCard({
   alerta,
   onClick,
@@ -41,7 +53,10 @@ export default function AlertNotificationCard({
       severidad={severidad}
       icono={ICONO[alerta.tipo] ?? 'bi-exclamation-triangle-fill'}
       titulo={`#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
-      cuerpo={alerta.tipo === 'CELO' ? `Se estima alerta de ${tipo}` : `Alerta de ${tipo}`}
+      cuerpo={<div>
+        <div>{alerta.tipo === 'CELO' ? `Se estima alerta de ${tipo}` : `Alerta de ${tipo}`}</div>
+        <div className='text-truncate'>{textoAccionRecomendada(alerta)}</div>
+      </div>}
       timestamp={haceCuanto(alerta.tsGeneracion)}
       acento={isUnread}
       apagada={resuelta}

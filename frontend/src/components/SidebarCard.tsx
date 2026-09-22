@@ -15,7 +15,7 @@ interface SidebarCardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'>
   severidad?: Severidad | 'PERIMETRO';
   icono: string; // clase bootstrap-icons
   titulo: string;
-  cuerpo?: string;
+  cuerpo?: string | ReactNode;
   detalle?: string;
   timestamp?: string;
   /** Muestra la barra de acento (alerta no leída / perímetro activo). */

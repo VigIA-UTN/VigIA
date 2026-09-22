@@ -17,7 +17,7 @@ public class MlGeoClient {
 
     @SuppressWarnings("null")
     public MlGeoClient(@Value("${vigia.ml.geo-url:${ML_GEO_URL:http://localhost:8003}}") String geoUrl,
-                       RestClient.Builder restClientBuilder) {
+            RestClient.Builder restClientBuilder) {
         this.restClient = restClientBuilder.baseUrl(geoUrl).build();
     }
 
