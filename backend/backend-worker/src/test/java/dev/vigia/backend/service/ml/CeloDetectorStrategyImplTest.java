@@ -35,6 +35,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.time.format.DateTimeFormatter;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -230,7 +231,11 @@ class CeloDetectorStrategyImplTest {
         assertNotNull(alertaGuardada.getTsGeneracion());
         assertNotNull(alertaGuardada.getVentanaInicioIns());
         assertNotNull(alertaGuardada.getVentanaFinIns());
-        assertTrue(alertaGuardada.getAccionRecomendada().contains("Planificar inseminación artificial"));
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        assertEquals("Planificar inseminación artificial dentro de la ventana óptima (entre 6 y 24 horas posteriores a la detección: de "
+                        + alertaGuardada.getVentanaInicioIns().format(fmt) + " a "
+                        + alertaGuardada.getVentanaFinIns().format(fmt) + ")",
+                alertaGuardada.getAccionRecomendada());
 
         // 3. Verificar persistencia de EstadoReproductivo
         ArgumentCaptor<EstadoReproductivo> estadoCaptor = ArgumentCaptor.forClass(EstadoReproductivo.class);
