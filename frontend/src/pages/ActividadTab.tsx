@@ -1,12 +1,12 @@
 import axios from 'axios';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
     BarChart, Bar,
     LineChart, Line, ReferenceLine,
     XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Cell
 } from 'recharts';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import { Modal, Button, Form, Spinner, Alert } from 'react-bootstrap';
 import {
     getMetricasAnimal,
@@ -54,21 +54,49 @@ function CustomTooltip({ active, payload, label, unit }: TooltipProps) {
     );
 }
 
-// invalidate size when tab becomes visible
+// keep the map in sync with its container (tab becoming visible, expand/collapse, window resize).
+// Debounced: invalidateSize redraws tiles and the heat canvas, so it must run once after the resize settles, not per frame.
 function MapInvalidator() {
     const map = useMap();
     useEffect(() => {
-        setTimeout(() => map.invalidateSize(), 200);
+        let timer: number | undefined;
+        const observer = new ResizeObserver(() => {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => map.invalidateSize({ animate: false }), 120);
+        });
+        observer.observe(map.getContainer());
+        return () => { window.clearTimeout(timer); observer.disconnect(); };
     }, [map]);
     return null;
 }
 
-// zoom the map to where the heat is whenever the data changes
-function FitToPoints({ points }: { points: HeatLatLngTuple[] }) {
+const PANEL_MAX_WIDTH = 462;
+const PANEL_INSET = 16;
+/** Horizontal space the overlaid panel covers on the left of the map. */
+const panelCover = () => Math.min(PANEL_MAX_WIDTH, window.innerWidth - 40) + PANEL_INSET * 2;
+
+/**
+ * The map is always full width and the panel floats over its left side, so the map never resizes.
+ * Zooms to the heat inside the visible (uncovered) area, and re-centres it with one cheap pan when the panel toggles.
+ */
+function MapInset({ points, expanded }: { points: HeatLatLngTuple[]; expanded: boolean }) {
     const map = useMap();
+    const expandedRef = useRef(expanded);
+    const first = useRef(true);
+
+    useEffect(() => {
+        expandedRef.current = expanded;
+        if (first.current) { first.current = false; return; }
+        map.panBy([expanded ? panelCover() / 2 : -panelCover() / 2, 0], { duration: 0.25 });
+    }, [map, expanded]);
+
     useEffect(() => {
         if (points.length === 0) return;
-        map.fitBounds(points.map(p => [p[0], p[1]] as [number, number]), { maxZoom: 17, padding: [24, 24] });
+        map.fitBounds(points.map(p => [p[0], p[1]] as [number, number]), {
+            maxZoom: 17,
+            paddingTopLeft: [(expandedRef.current ? 0 : panelCover()) + 24, 24],
+            paddingBottomRight: [24, 24],
+        });
     }, [map, points]);
     return null;
 }
@@ -207,6 +235,8 @@ export default function ActividadTab({ animalId, establecimientoId }: ActividadT
 
     // Mapa de calor: posiciones reales de este animal; solo el período es editable
     const [heatRange, setHeatRange] = useState(() => lastDaysRange(7));
+    // mapa ampliado: oculta el panel (calendario) y el mapa ocupa todo el ancho
+    const [mapExpanded, setMapExpanded] = useState(() => window.innerWidth < 900); // en pantallas angostas el panel taparía el mapa
     const heatFilter = useMemo<HeatFilter>(
         () => ({ scope: 'animal', rodeoId: null, animalId, underused: false, ...heatRange }),
         [animalId, heatRange],
@@ -318,8 +348,37 @@ export default function ActividadTab({ animalId, establecimientoId }: ActividadT
                 title="Mapa de Calor — Posición"
                 subtitle="Zonas por las que más tiempo estuvo el animal en el período elegido"
             >
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-                    <div style={{ height: 460, display: 'flex' }}>
+                <div style={{ position: 'relative', height: 480, borderRadius: 10, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
+                    <MapContainer
+                        center={DEFAULT_CENTER}
+                        zoom={15}
+                        style={{ height: '100%', width: '100%', background: '#1E3A5F' }}
+                        zoomControl={false}
+                        attributionControl={false}
+                        scrollWheelZoom={false}
+                    >
+                        <ZoomControl position="bottomright" />
+                        <TileLayer
+                            attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        />
+                        <HeatmapLayer points={heatPoints} />
+                        <MapInset points={heatPoints} expanded={mapExpanded} />
+                        <MapInvalidator />
+                    </MapContainer>
+
+                    {/* panel over the map; only opacity/transform animate, so toggling never resizes or redraws the map */}
+                    <div
+                        aria-hidden={mapExpanded}
+                        style={{
+                            position: 'absolute', top: PANEL_INSET, bottom: PANEL_INSET, left: PANEL_INSET, zIndex: 1000,
+                            display: 'flex', pointerEvents: 'none',
+                            opacity: mapExpanded ? 0 : 1,
+                            transform: mapExpanded ? 'translateX(-16px)' : 'translateX(0)',
+                            visibility: mapExpanded ? 'hidden' : 'visible',
+                            transition: `opacity 200ms ease, transform 200ms ease, visibility 0s linear ${mapExpanded ? '200ms' : '0s'}`,
+                        }}
+                    >
                         <HeatmapPanel
                             fixedAnimal
                             enabled
@@ -333,24 +392,25 @@ export default function ActividadTab({ animalId, establecimientoId }: ActividadT
                             pointCount={heatPoints.length}
                         />
                     </div>
-                    <div style={{ flex: '1 1 320px', minHeight: 320, height: 460, borderRadius: 10, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
-                        <MapContainer
-                            center={DEFAULT_CENTER}
-                            zoom={15}
-                            style={{ height: '100%', width: '100%' }}
-                            zoomControl={true}
-                            scrollWheelZoom={false}
-                        >
-                            <TileLayer
-                                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                            />
-                            <HeatmapLayer points={heatPoints} />
-                            <FitToPoints points={heatPoints} />
-                            <MapInvalidator />
-                        </MapContainer>
-                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setMapExpanded(v => !v)}
+                        aria-label={mapExpanded ? 'Mostrar filtros' : 'Ampliar mapa'}
+                        aria-pressed={mapExpanded}
+                        title={mapExpanded ? 'Mostrar filtros' : 'Ampliar mapa'}
+                        style={{
+                            position: 'absolute', top: 10, right: 10, zIndex: 1001, width: 34, height: 34,
+                            border: 0, borderRadius: 8, background: '#1E3A5F', color: '#fff', cursor: 'pointer',
+                            boxShadow: '0 1px 5px rgba(0,0,0,0.4)',
+                        }}
+                    >
+                        <i className={`bi ${mapExpanded ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}`} />
+                    </button>
                 </div>
+                <p style={{ margin: '8px 0 0', fontSize: '0.7rem', color: '#A0AEC0' }}>
+                    Imágenes: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP y la comunidad de usuarios de GIS.
+                </p>
             </ChartCard>
 
             {/* ── Gráfico 3: Evolución de Peso ── */}
