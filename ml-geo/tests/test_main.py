@@ -345,3 +345,66 @@ class TestCohesionAislamiento:
         ids = [a["animal_id"] for a in alertas]
         assert len(ids) == 3
         assert len(set(ids)) == 3  # sin duplicados
+
+
+# ===========================================================================
+# FILTRO POR RODEO / ZONAS SUBUTILIZADAS
+# ===========================================================================
+
+class TestFiltroYZonasSubutilizadas:
+    """animal_ids filtra el mapa de calor (grilla ajustada al filtro) y define las zonas subutilizadas del campo."""
+
+    PUNTOS = [
+        make_punto("A1", -34.0000, -59.0000),
+        make_punto("A1", -34.0010, -59.0010),
+        make_punto("A2", -35.0, -60.0),
+    ]
+
+    def test_animal_ids_solo_cuenta_esos_animales(self):
+        response = client.post(ENDPOINT, json={"animal_ids": ["A1"], "historial_7d": self.PUNTOS})
+
+        assert response.status_code == 200
+        activas = [c for c in response.json()["mapa_calor"] if c["intensidad"] > 0]
+        assert len(activas) == 2  # los dos puntos de A1; A2 queda afuera
+
+    def test_grilla_del_mapa_de_calor_se_ajusta_al_filtro(self):
+        """Con A1 filtrado la grilla cubre ~0.001 grados, no el grado completo del campo."""
+        response = client.post(ENDPOINT, json={"animal_ids": ["A1"], "historial_7d": self.PUNTOS})
+
+        lats = [c["lat"] for c in response.json()["mapa_calor"]]
+        assert len(lats) == GRID_SIZE * GRID_SIZE
+        assert max(lats) - min(lats) < 0.002
+
+    def test_animal_ids_vacio_devuelve_mapa_vacio_pero_conserva_alertas(self):
+        """Un rodeo sin animales no tiene mapa de calor, pero las alertas usan el historial completo."""
+        response = client.post(ENDPOINT, json={"animal_ids": [], "historial_7d": self.PUNTOS})
+
+        data = response.json()
+        assert data["mapa_calor"] == []
+        assert data["celdas_subutilizadas"] is None
+        assert len(data["alertas"]) == 2
+
+    def test_alertas_no_dependen_del_filtro(self):
+        con = client.post(ENDPOINT, json={"animal_ids": ["A1"], "historial_7d": self.PUNTOS}).json()["alertas"]
+        sin = client.post(ENDPOINT, json={"historial_7d": self.PUNTOS}).json()["alertas"]
+
+        assert sorted(con, key=lambda a: a["animal_id"]) == sorted(sin, key=lambda a: a["animal_id"])
+
+    def test_celdas_subutilizadas_se_calculan_sobre_todo_el_campo(self):
+        """
+        Campo = bbox de A1 y A2 (1 grado). Filtrando A1 (todo en una esquina), solo las celdas
+        que A1 pisa dejan de ser subutilizadas; las demas, incluida la de A2, si lo son.
+        """
+        response = client.post(ENDPOINT, json={"animal_ids": ["A1"], "historial_7d": self.PUNTOS})
+
+        zonas = response.json()["celdas_subutilizadas"]
+        assert zonas["lat_step"] == pytest.approx(1.0 / GRID_SIZE)
+        assert zonas["lng_step"] == pytest.approx(1.0 / GRID_SIZE)
+        assert len(zonas["celdas"]) == GRID_SIZE * GRID_SIZE - 1  # A1 cae entero en una celda
+        assert {"lat", "lng"} == set(zonas["celdas"][0].keys())
+
+    def test_sin_filtro_las_celdas_subutilizadas_son_las_no_visitadas(self):
+        response = client.post(ENDPOINT, json={"historial_7d": self.PUNTOS})
+
+        # A1 (2 puntos, 1 celda: 1.0) y A2 (1 punto: 0.5) superan el umbral -> 398 subutilizadas
+        assert len(response.json()["celdas_subutilizadas"]["celdas"]) == GRID_SIZE * GRID_SIZE - 2

@@ -30,6 +30,7 @@ public class MapaCalorController {
     public ResponseEntity<?> getMapaCalor(
             @RequestParam(name = "establecimientoId") Long establecimientoId,
             @RequestParam(name = "animalId", required = false) Long animalId,
+            @RequestParam(name = "rodeoId", required = false) Long rodeoId,
             @RequestParam(name = "desde", required = false) 
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime desde,
             @RequestParam(name = "hasta", required = false) 
@@ -45,7 +46,7 @@ public class MapaCalorController {
             }
 
             String email = authentication.getName();
-            GeoAnalyzeResponseDTO response = mapaCalorService.obtenerMapaCalor(email, establecimientoId, desde, hasta, animalId);
+            GeoAnalyzeResponseDTO response = mapaCalorService.obtenerMapaCalor(email, establecimientoId, desde, hasta, animalId, rodeoId);
             return ResponseEntity.ok(response);
             
         } catch (AccessDeniedException e) {

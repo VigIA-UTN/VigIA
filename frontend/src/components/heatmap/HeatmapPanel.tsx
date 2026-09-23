@@ -34,11 +34,16 @@ interface Props {
     error?: string | null;
     /** number of points currently drawn, used for the empty state */
     pointCount: number;
+    /** under-used zones currently drawn (rodeo scope); shown in the toggle's subtitle */
+    zonaCount?: number;
+    /** host is a single animal's page: only the period is editable, no scope/list/toggles */
+    fixedAnimal?: boolean;
 }
 
 /** Filter panel for the heatmap. Presentational: state lives in the host, data fetching in useHeatPoints. */
 export default function HeatmapPanel({
-    enabled, onEnabledChange, filter, onFilterChange, rodeos, animals, loading, error, pointCount,
+    enabled, onEnabledChange, filter, onFilterChange, rodeos, animals, loading, error, pointCount, zonaCount = 0,
+    fixedAnimal = false,
 }: Props) {
     const [query, setQuery] = useState('');
     // remounts the calendar (and re-centers its view) after presets / reset, never while picking a range
@@ -74,25 +79,35 @@ export default function HeatmapPanel({
     const reset = () => {
         setQuery('');
         setCalKey(k => k + 1);
-        onFilterChange(defaultHeatFilter(rodeos[0]?.id ?? null));
+        onFilterChange(fixedAnimal ? { ...filter, ...lastDaysRange(7) } : defaultHeatFilter(rodeos[0]?.id ?? null));
     };
 
+    const showUnderused = !fixedAnimal && filter.scope === 'rodeo';
+    const underusedSub = !filter.underused ? 'Marcá las zonas que el rodeo no pisa'
+        : error ? 'No disponible'
+            : loading ? 'Calculando…'
+                : zonaCount === 0 ? 'Sin zonas sin pisar en el período'
+                    : `${zonaCount} ${zonaCount === 1 ? 'zona' : 'zonas'} de ${selectedRodeo?.nombre ?? 'el rodeo'} sin pisar en el período`;
+
     return (
-        <div className="hm-panel" role="dialog" aria-label="Mapa de calor">
-            <div className="hm-head">
-            <div className="hm-row">
-                <div className="hm-title">Mapa de Calor</div>
-                <button
-                    type="button" role="switch" aria-checked={enabled} aria-label="Activar HeatMap"
-                    className={`hm-switch${enabled ? ' on' : ''}`} onClick={() => onEnabledChange(!enabled)}
-                >
-                    <span className="hm-knob" />
-                </button>
-            </div>
-            <div className="hm-sep" />
-            </div>
+        <div className={`hm-panel${fixedAnimal ? ' hm-fixed' : ''}`} role="dialog" aria-label="Mapa de calor">
+            {!fixedAnimal && (
+                <div className="hm-head">
+                    <div className="hm-row">
+                        <div className="hm-title">Mapa de Calor</div>
+                        <button
+                            type="button" role="switch" aria-checked={enabled} aria-label="Activar HeatMap"
+                            className={`hm-switch${enabled ? ' on' : ''}`} onClick={() => onEnabledChange(!enabled)}
+                        >
+                            <span className="hm-knob" />
+                        </button>
+                    </div>
+                    <div className="hm-sep" />
+                </div>
+            )}
 
             <div className={`hm-body${enabled ? '' : ' off'}`}>
+                {!fixedAnimal && <>
                 <section>
                     <div className="hm-label-row">
                         <div className="hm-label">ALCANCE</div>
@@ -157,6 +172,24 @@ export default function HeatmapPanel({
                     )}
                 </div>
 
+                {showUnderused && (
+                    <div className={`hm-under${filter.underused ? ' on' : ''}`}>
+                        <span className="hm-zone-swatch" />
+                        <span className="hm-item-text" style={{ flex: 1 }}>
+                            <span className="hm-item-main">Áreas subutilizadas</span>
+                            <span className="hm-hint">{underusedSub}</span>
+                        </span>
+                        <button
+                            type="button" role="switch" aria-checked={filter.underused} aria-label="Mostrar áreas subutilizadas"
+                            className={`hm-switch sm${filter.underused ? ' on' : ''}`}
+                            onClick={() => set({ underused: !filter.underused })}
+                        >
+                            <span className="hm-knob" />
+                        </button>
+                    </div>
+                )}
+                </>}
+
                 <section>
                     <div className="hm-label-row">
                         <div className="hm-label">PERÍODO</div>
@@ -172,15 +205,18 @@ export default function HeatmapPanel({
                         onChange={(from, to) => set({ from, to })} />
                 </section>
 
-                <div className="hm-row">
-                    <HeatmapLegend dark />
-                    <button type="button" className="hm-reset" onClick={reset}>Restablecer</button>
-                </div>
+                {/* legend + reset + status; pinned to the panel's bottom in the fixed (detail page) layout */}
+                <div className="hm-foot">
+                    <div className="hm-row">
+                        <HeatmapLegend dark zones={showUnderused && filter.underused && zonaCount > 0} />
+                        <button type="button" className="hm-reset" onClick={reset}>Restablecer</button>
+                    </div>
 
-                <div className="hm-status" aria-live="polite">
-                    {error ? <span className="err">{error}</span>
-                        : loading ? 'Cargando…'
-                            : enabled && pointCount === 0 ? 'Sin datos para el filtro elegido.' : ''}
+                    <div className="hm-status" aria-live="polite">
+                        {error ? <span className="err">{error}</span>
+                            : loading ? 'Cargando…'
+                                : enabled && pointCount === 0 ? 'Sin datos para el filtro elegido.' : ''}
+                    </div>
                 </div>
             </div>
         </div>

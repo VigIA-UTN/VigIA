@@ -22,6 +22,8 @@ class CoordenadaGPS(BaseModel):
 
 class GeoAnalyzeRequest(BaseModel):
     animal_id: Optional[str] = None
+    # Animales a incluir en el mapa de calor (p. ej. los de un rodeo); None = todos. Las alertas usan siempre el historial completo.
+    animal_ids: Optional[List[str]] = None
     historial_7d: List[CoordenadaGPS]
 
 class AlertaAnimal(BaseModel):
@@ -35,9 +37,48 @@ class MatrizDensidad(BaseModel):
     intensidad: float
     subutilizada: bool = False
 
+class CeldaSubutilizada(BaseModel):
+    lat: float
+    lng: float
+
+class CeldasSubutilizadas(BaseModel):
+    lat_step: float
+    lng_step: float
+    celdas: List[CeldaSubutilizada]
+
 class GeoAnalyzeResponse(BaseModel):
     mapa_calor: List[MatrizDensidad]
     alertas: List[AlertaAnimal]
+    celdas_subutilizadas: Optional[CeldasSubutilizadas] = None
+
+GRID_SIZE = 20  # Grilla de 20x20
+UMBRAL_SUBUTILIZADA = 0.15
+
+def _grilla(puntos):
+    """Bounding box de los puntos dividido en GRID_SIZE x GRID_SIZE: (min_lat, min_lng, lat_step, lng_step)."""
+    min_lat = min(p.lat for p in puntos)
+    max_lat = max(p.lat for p in puntos)
+    min_lng = min(p.lng for p in puntos)
+    max_lng = max(p.lng for p in puntos)
+    # Manejar caso de un solo punto o puntos idénticos
+    if min_lat == max_lat:
+        min_lat -= 0.0001
+        max_lat += 0.0001
+    if min_lng == max_lng:
+        min_lng -= 0.0001
+        max_lng += 0.0001
+    return min_lat, min_lng, (max_lat - min_lat) / GRID_SIZE, (max_lng - min_lng) / GRID_SIZE
+
+def _intensidades(puntos, min_lat, min_lng, lat_step, lng_step):
+    """Intensidad 0..1 (count / max_count) de cada celda de la grilla, como ((lat_idx, lng_idx), intensidad)."""
+    counts = defaultdict(int)
+    for p in puntos:
+        # El máximo cae en el último bin
+        lat_idx = min(int((p.lat - min_lat) / lat_step), GRID_SIZE - 1)
+        lng_idx = min(int((p.lng - min_lng) / lng_step), GRID_SIZE - 1)
+        counts[(lat_idx, lng_idx)] += 1
+    max_count = max(counts.values()) if counts else 1
+    return [((i, j), counts.get((i, j), 0) / max_count) for i in range(GRID_SIZE) for j in range(GRID_SIZE)]
 
 @app.get("/health")
 def health():
@@ -50,61 +91,38 @@ def analyze(payload: GeoAnalyzeRequest):
     en los últimos 7 días.
     """
     if not payload.historial_7d:
-        return GeoAnalyzeResponse(mapa_calor=[], alertas=[])
+        return GeoAnalyzeResponse(mapa_calor=[], alertas=[], celdas_subutilizadas=None)
 
-    # Encontrar límites (bounding box)
-    min_lat = min(p.lat for p in payload.historial_7d)
-    max_lat = max(p.lat for p in payload.historial_7d)
-    min_lng = min(p.lng for p in payload.historial_7d)
-    max_lng = max(p.lng for p in payload.historial_7d)
-
-    # Manejar caso de un solo punto o puntos idénticos
-    if min_lat == max_lat:
-        min_lat -= 0.0001
-        max_lat += 0.0001
-    if min_lng == max_lng:
-        min_lng -= 0.0001
-        max_lng += 0.0001
-
-    GRID_SIZE = 20 # Grilla de 20x20
-    lat_step = (max_lat - min_lat) / GRID_SIZE
-    lng_step = (max_lng - min_lng) / GRID_SIZE
-
-    grid_counts = defaultdict(int)
-
-    # Filtrar puntos para el mapa de calor si se especificó un animal
-    puntos_mapa = payload.historial_7d
-    if payload.animal_id:
-        puntos_mapa = [p for p in payload.historial_7d if p.animal_id == payload.animal_id]
-
-    for p in puntos_mapa:
-        lat_idx = int((p.lat - min_lat) / lat_step)
-        lng_idx = int((p.lng - min_lng) / lng_step)
-        
-        # Asegurar que el valor máximo caiga dentro del último bin
-        if lat_idx == GRID_SIZE: lat_idx -= 1
-        if lng_idx == GRID_SIZE: lng_idx -= 1
-        
-        grid_counts[(lat_idx, lng_idx)] += 1
-
-    max_count = max(grid_counts.values()) if grid_counts else 1
-    UMBRAL_SUBUTILIZADA = 0.15
+    # Animales cuyo mapa de calor se pide; None = todos los del historial
+    ids = payload.animal_ids
+    if ids is None and payload.animal_id:
+        ids = [payload.animal_id]
+    puntos_mapa = payload.historial_7d if ids is None else [p for p in payload.historial_7d if p.animal_id in set(ids)]
 
     mapa_calor = []
-    for lat_idx in range(GRID_SIZE):
-        for lng_idx in range(GRID_SIZE):
-            count = grid_counts.get((lat_idx, lng_idx), 0)
-            center_lat = min_lat + (lat_idx + 0.5) * lat_step
-            center_lng = min_lng + (lng_idx + 0.5) * lng_step
-            intensidad = count / max_count
-            es_subutilizada = intensidad <= UMBRAL_SUBUTILIZADA
-            
+    celdas_subutilizadas = None
+    if puntos_mapa:
+        # Mapa de calor: la grilla se ajusta a los puntos filtrados para no perder detalle
+        min_lat, min_lng, lat_step, lng_step = _grilla(puntos_mapa)
+        for (lat_idx, lng_idx), intensidad in _intensidades(puntos_mapa, min_lat, min_lng, lat_step, lng_step):
             mapa_calor.append(MatrizDensidad(
-                lat=center_lat, 
-                lng=center_lng, 
+                lat=min_lat + (lat_idx + 0.5) * lat_step,
+                lng=min_lng + (lng_idx + 0.5) * lng_step,
                 intensidad=intensidad,
-                subutilizada=es_subutilizada
+                subutilizada=intensidad <= UMBRAL_SUBUTILIZADA,
             ))
+
+        # Zonas subutilizadas: grilla sobre TODO el campo, contando solo los puntos filtrados
+        f_lat, f_lng, f_lat_step, f_lng_step = _grilla(payload.historial_7d)
+        celdas_subutilizadas = CeldasSubutilizadas(
+            lat_step=f_lat_step,
+            lng_step=f_lng_step,
+            celdas=[
+                CeldaSubutilizada(lat=f_lat + (i + 0.5) * f_lat_step, lng=f_lng + (j + 0.5) * f_lng_step)
+                for (i, j), intensidad in _intensidades(puntos_mapa, f_lat, f_lng, f_lat_step, f_lng_step)
+                if intensidad <= UMBRAL_SUBUTILIZADA
+            ],
+        )
 
     # Umbral de aislamiento en metros. Configurable para alertar si un animal se aleja demasiado.
     UMBRAL_AISLAMIENTO_METROS = 100.0
@@ -151,4 +169,4 @@ def analyze(payload: GeoAnalyzeRequest):
                 alerta_aislamiento=distancia_centroide > UMBRAL_AISLAMIENTO_METROS
             ))
 
-    return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas)
+    return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas, celdas_subutilizadas=celdas_subutilizadas)

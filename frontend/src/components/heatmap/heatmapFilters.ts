@@ -1,4 +1,4 @@
-import type { HeatAnimal, HeatFilter, HeatPoint } from './types';
+import type { HeatFilter } from './types';
 
 const DAY = 86400000;
 
@@ -15,19 +15,5 @@ export function thisMonthRange(today = new Date()): { from: number; to: number }
 }
 
 export function defaultHeatFilter(firstRodeoId: number | null): HeatFilter {
-    return { scope: 'rodeo', rodeoId: firstRodeoId, animalId: null, ...thisMonthRange() };
-}
-
-/** Client-side filter by scope + inclusive day range. Backend will do this server-side later. */
-export function filterHeatPoints(points: HeatPoint[], f: HeatFilter, animals: HeatAnimal[]): HeatPoint[] {
-    const rodeoAnimalIds = f.scope === 'rodeo' && f.rodeoId != null
-        ? new Set(animals.filter(a => a.rodeoId === f.rodeoId).map(a => a.id))
-        : null;
-    return points.filter(p => {
-        const t = dayStart(new Date(p.ts));
-        if (t < f.from || t > f.to) return false;
-        if (f.scope === 'animal') return f.animalId != null && p.animalId === f.animalId;
-        if (rodeoAnimalIds) return rodeoAnimalIds.has(p.animalId);
-        return f.scope === 'todo';
-    });
+    return { scope: 'rodeo', rodeoId: firstRodeoId, animalId: null, underused: false, ...thisMonthRange() };
 }

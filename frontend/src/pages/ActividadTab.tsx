@@ -17,8 +17,10 @@ import {
 } from '../api/animalesApi';
 import 'leaflet/dist/leaflet.css';
 import HeatmapLayer from '../components/heatmap/HeatmapLayer';
-import HeatmapLegend from '../components/heatmap/HeatmapLegend';
-import type { HeatLatLngTuple } from '../components/heatmap/types';
+import HeatmapPanel from '../components/heatmap/HeatmapPanel';
+import { useHeatPoints } from '../components/heatmap/useHeatPoints';
+import { lastDaysRange } from '../components/heatmap/heatmapFilters';
+import type { HeatFilter, HeatLatLngTuple } from '../components/heatmap/types';
 
 // ─── Custom Tooltip ──────────────────────────────────────────────────────────
 
@@ -60,6 +62,20 @@ function MapInvalidator() {
     }, [map]);
     return null;
 }
+
+// zoom the map to where the heat is whenever the data changes
+function FitToPoints({ points }: { points: HeatLatLngTuple[] }) {
+    const map = useMap();
+    useEffect(() => {
+        if (points.length === 0) return;
+        map.fitBounds(points.map(p => [p[0], p[1]] as [number, number]), { maxZoom: 17, padding: [24, 24] });
+    }, [map, points]);
+    return null;
+}
+
+const NO_ITEMS: never[] = [];
+const noop = () => undefined;
+const DEFAULT_CENTER: [number, number] = [-36.622, -64.292];
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
@@ -116,9 +132,10 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 
 interface ActividadTabProps {
     animalId: number;
+    establecimientoId: number;
 }
 
-export default function ActividadTab({ animalId }: ActividadTabProps) {
+export default function ActividadTab({ animalId, establecimientoId }: ActividadTabProps) {
     const [metricas, setMetricas] = useState<AnimalMetricaResponse[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -188,24 +205,13 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
         });
     }, [metricas]);
 
-    const heatPoints = useMemo(() => {
-        const points: HeatLatLngTuple[] = [];
-        metricas.forEach(m => {
-            if (!m.sinDatos && m.latitud != null && m.longitud != null) {
-                points.push([m.latitud, m.longitud, 0.8]);
-            }
-        });
-        return points;
-    }, [metricas]);
-
-    const mapCenter: [number, number] = useMemo(() => {
-        if (heatPoints.length > 0) {
-            const avgLat = heatPoints.reduce((sum, p) => sum + p[0], 0) / heatPoints.length;
-            const avgLng = heatPoints.reduce((sum, p) => sum + p[1], 0) / heatPoints.length;
-            return [avgLat, avgLng];
-        }
-        return [-36.622, -64.292];
-    }, [heatPoints]);
+    // Mapa de calor: posiciones reales de este animal; solo el período es editable
+    const [heatRange, setHeatRange] = useState(() => lastDaysRange(7));
+    const heatFilter = useMemo<HeatFilter>(
+        () => ({ scope: 'animal', rodeoId: null, animalId, underused: false, ...heatRange }),
+        [animalId, heatRange],
+    );
+    const { points: heatPoints, loading: heatLoading, error: heatError } = useHeatPoints(heatFilter, { establecimientoId });
 
     const handleSubmitPeso = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -310,26 +316,40 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
             {/* ── Gráfico 2: Mapa de Calor de Posición ── */}
             <ChartCard
                 title="Mapa de Calor — Posición"
-                subtitle="Zonas por las que más tiempo estuvo el animal · últimos 7 días"
+                subtitle="Zonas por las que más tiempo estuvo el animal en el período elegido"
             >
-                <div style={{ marginBottom: '0.75rem', maxWidth: 260 }}>
-                    <HeatmapLegend />
-                </div>
-                <div style={{ borderRadius: 10, overflow: 'hidden', height: 340, border: '1px solid #E2E8F0' }}>
-                    <MapContainer
-                        center={mapCenter}
-                        zoom={15}
-                        style={{ height: '100%', width: '100%' }}
-                        zoomControl={true}
-                        scrollWheelZoom={false}
-                    >
-                        <TileLayer
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                    <div style={{ height: 460, display: 'flex' }}>
+                        <HeatmapPanel
+                            fixedAnimal
+                            enabled
+                            onEnabledChange={noop}
+                            filter={heatFilter}
+                            onFilterChange={f => setHeatRange({ from: f.from, to: f.to })}
+                            rodeos={NO_ITEMS}
+                            animals={NO_ITEMS}
+                            loading={heatLoading}
+                            error={heatError}
+                            pointCount={heatPoints.length}
                         />
-                        <HeatmapLayer points={heatPoints} />
-                        <MapInvalidator />
-                    </MapContainer>
+                    </div>
+                    <div style={{ flex: '1 1 320px', minHeight: 320, height: 460, borderRadius: 10, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
+                        <MapContainer
+                            center={DEFAULT_CENTER}
+                            zoom={15}
+                            style={{ height: '100%', width: '100%' }}
+                            zoomControl={true}
+                            scrollWheelZoom={false}
+                        >
+                            <TileLayer
+                                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                            />
+                            <HeatmapLayer points={heatPoints} />
+                            <FitToPoints points={heatPoints} />
+                            <MapInvalidator />
+                        </MapContainer>
+                    </div>
                 </div>
             </ChartCard>
 

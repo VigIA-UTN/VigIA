@@ -25,6 +25,7 @@ import AlertDetailSidebar from '../components/AlertDetailSidebar';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import HeatmapLayer from '../components/heatmap/HeatmapLayer';
 import HeatmapPanel from '../components/heatmap/HeatmapPanel';
+import ZonasSubutilizadasLayer from '../components/heatmap/ZonasSubutilizadasLayer';
 import { useHeatPoints } from '../components/heatmap/useHeatPoints';
 import { defaultHeatFilter } from '../components/heatmap/heatmapFilters';
 import type { HeatAnimal, HeatFilter } from '../components/heatmap/types';
@@ -331,14 +332,12 @@ export default function MapPage() {
     }
     return heatFilterRaw;
   }, [heatFilterRaw, rodeos]);
-  const heatCenter: [number, number] = activeEstablecimiento?.latitud != null && activeEstablecimiento?.longitud != null
-    ? [activeEstablecimiento.latitud, activeEstablecimiento.longitud]
-    : CENTRO_CAMPO;
-  const { points: heatPoints, loading: heatLoading, error: heatError } = useHeatPoints(
+  const { points: heatPoints, zonas: heatZonas, loading: heatLoading, error: heatError } = useHeatPoints(
     heatFilter,
-    { establecimientoId: selectedId ?? null, center: heatCenter, animals: heatAnimals },
+    { establecimientoId: selectedId ?? null },
     heatEnabled,
   );
+  const showZonas = heatEnabled && heatFilter.scope === 'rodeo' && heatFilter.underused;
 
   const handleToggleActivoPerimetro = async (perimetro: PerimetroResponse) => {
     const nuevoEstado = !perimetro.activo;
@@ -435,6 +434,7 @@ export default function MapPage() {
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
         <MapUpdater center={center} trigger={flyToTrigger} />
+        {showZonas && <ZonasSubutilizadasLayer zonas={heatZonas} />}
         {heatEnabled && <HeatmapLayer points={heatPoints} />}
 
         {/* Captura de clicks en el mapa para agregar vértices en modo edición */}
@@ -641,6 +641,7 @@ export default function MapPage() {
                 loading={heatLoading}
                 error={heatError}
                 pointCount={heatPoints.length}
+                zonaCount={heatZonas.length}
               />
             </div>
           )}
