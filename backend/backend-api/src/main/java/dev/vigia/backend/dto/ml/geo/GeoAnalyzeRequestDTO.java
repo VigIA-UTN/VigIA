@@ -16,6 +16,10 @@ public class GeoAnalyzeRequestDTO {
     @JsonProperty("animal_id")
     private String animalId;
 
+    /** Animales a incluir en el mapa de calor (p. ej. los de un rodeo); null = todos. */
+    @JsonProperty("animal_ids")
+    private List<String> animalIds;
+
     @JsonProperty("historial_7d")
     private List<CoordenadaGPSDTO> historial7d;
 }

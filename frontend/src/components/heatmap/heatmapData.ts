@@ -1,60 +1,64 @@
-import { filterHeatPoints } from './heatmapFilters';
-import type { HeatAnimal, HeatFilter, HeatPoint } from './types';
+import axiosClient from '../../api/axiosClient';
+import { groupZonas } from './heatmapZonas';
+import type { HeatLatLngTuple, HeatQuery, ZonaSubutilizada } from './types';
 
 export interface HeatContext {
     establecimientoId: number | null;
-    /** map center; the mock clusters points around it */
-    center: [number, number];
-    animals: HeatAnimal[];
 }
 
-const DAY = 86400000;
-const MOCK_DAYS = 90;
-const READINGS_PER_DAY = 3;
+export interface HeatData {
+    points: HeatLatLngTuple[];
+    zonas: ZonaSubutilizada[];
+}
 
-// small deterministic PRNG so the mock is stable between renders
-function mulberry32(seed: number) {
-    return () => {
-        seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
-        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+/** The backend answered 206: ml-geo is degraded, so an empty map would be misleading. */
+export class HeatUnavailableError extends Error {
+    constructor() {
+        super('Servicio de análisis no disponible');
+    }
+}
+
+/** Shape of GET /mapa-calor (GeoAnalyzeResponseDTO). */
+interface MapaCalorResponse {
+    mapa_calor: { lat: number; lng: number; intensidad: number }[];
+    celdas_subutilizadas: { lat_step: number; lng_step: number; celdas: { lat: number; lng: number }[] } | null;
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** Local wall-clock ISO date-time without offset, as the backend's LocalDateTime expects. */
+function localDateTime(dayMs: number, endOfDay: boolean): string {
+    const d = new Date(dayMs);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${endOfDay ? '23:59:59' : '00:00:00'}`;
+}
+
+/** Query params for GET /mapa-calor, or null when the filter is not ready to fetch (nothing selected yet). */
+export function heatQueryParams(filter: HeatQuery, ctx: HeatContext): Record<string, string | number> | null {
+    if (ctx.establecimientoId == null) return null;
+    if (filter.scope === 'rodeo' && filter.rodeoId == null) return null;
+    if (filter.scope === 'animal' && filter.animalId == null) return null;
+    return {
+        establecimientoId: ctx.establecimientoId,
+        ...(filter.scope === 'rodeo' && { rodeoId: filter.rodeoId! }),
+        ...(filter.scope === 'animal' && { animalId: filter.animalId! }),
+        desde: localDateTime(filter.from, false),
+        hasta: localDateTime(filter.to, true),
     };
 }
 
-function mockPoints({ center: [lat, lng], animals }: HeatContext): HeatPoint[] {
-    const now = Date.now();
-    const out: HeatPoint[] = [];
-    for (const a of animals) {
-        const rnd = mulberry32(a.id * 7919);
-        // each rodeo grazes in its own zone (~1 km apart); animals wander around it
-        const rid = a.rodeoId ?? 0;
-        const zoneLat = lat + (((rid * 37) % 7) - 3) * 0.003;
-        const zoneLng = lng + (((rid * 53) % 7) - 3) * 0.003;
-        for (let d = 0; d < MOCK_DAYS; d++) {
-            for (let r = 0; r < READINGS_PER_DAY; r++) {
-                out.push({
-                    lat: zoneLat + (rnd() - 0.5) * 0.004,
-                    lng: zoneLng + (rnd() - 0.5) * 0.004,
-                    weight: 0.4 + rnd() * 0.6,
-                    ts: new Date(now - d * DAY - r * 3600000 * 6).toISOString(),
-                    animalId: a.id,
-                    rodeoId: a.rodeoId,
-                });
-            }
-        }
-    }
-    return out;
-}
+/** Real heatmap data: GET /mapa-calor. Empty cells are dropped; only the intensity is drawn. */
+export async function fetchHeatPoints(filter: HeatQuery, ctx: HeatContext): Promise<HeatData> {
+    const params = heatQueryParams(filter, ctx);
+    if (!params) return { points: [], zonas: [] };
 
-/**
- * Single data seam for the heatmap. MOCK for now.
- *
- * Backend contract to swap in (not built yet):
- *   GET /animales/mapa/calor?establecimientoId&desde=YYYY-MM-DD&hasta=YYYY-MM-DD[&rodeoId=|&animalId=]
- *   -> { lat: number; lng: number; weight: number (0..1); ts: string (ISO); animalId: number; rodeoId: number | null }[]
- * Replace only this function's body; the hook and UI do not change. Scope 'todo' sends no rodeoId/animalId.
- */
-export async function fetchHeatPoints(filter: HeatFilter, ctx: HeatContext): Promise<HeatPoint[]> {
-    return filterHeatPoints(mockPoints(ctx), filter, ctx.animals);
+    const res = await axiosClient.get<MapaCalorResponse>('/mapa-calor', { params });
+    if (res.status === 206) throw new HeatUnavailableError();
+
+    const { mapa_calor, celdas_subutilizadas } = res.data;
+    return {
+        points: mapa_calor.filter(c => c.intensidad > 0).map(c => [c.lat, c.lng, c.intensidad]),
+        zonas: celdas_subutilizadas
+            ? groupZonas(celdas_subutilizadas.celdas, celdas_subutilizadas.lat_step, celdas_subutilizadas.lng_step)
+            : [],
+    };
 }

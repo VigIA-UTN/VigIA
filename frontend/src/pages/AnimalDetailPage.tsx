@@ -579,7 +579,7 @@ export default function AnimalDetailPage() {
                 {/* ── Tab: Actividad ── */}
                 {activeTab === 'actividad' && (
                     <div key="actividad" className="tab-content-animated">
-                        <ActividadTab animalId={animal.id} />
+                        <ActividadTab animalId={animal.id} establecimientoId={animal.establecimientoId} />
                         <AnimalAlertasSanitarias animalId={animal.id} establecimientoId={animal.establecimientoId} onOpenIntervencion={(alerta) => {
                             setIntervencionAlerta(alerta);
                             setIsIntervencionOpen(true);

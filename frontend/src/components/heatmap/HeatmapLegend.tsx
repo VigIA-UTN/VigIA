@@ -1,10 +1,13 @@
 import { HEAT_GRADIENT } from './types';
 
+// sorted numerically: the integer-like key "1" would otherwise come first and collapse the gradient to one color
 const stops = Object.entries(HEAT_GRADIENT)
+    .sort(([a], [b]) => Number(a) - Number(b))
     .map(([offset, color]) => `${color} ${Math.round(Number(offset) * 100)}%`)
     .join(', ');
 
-export default function HeatmapLegend({ dark = false }: { dark?: boolean }) {
+/** `zones` adds the key for the under-used areas overlay. */
+export default function HeatmapLegend({ dark = false, zones = false }: { dark?: boolean; zones?: boolean }) {
     const text = dark ? '#7A9CC0' : '#718096';
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 160 }}>
@@ -13,6 +16,12 @@ export default function HeatmapLegend({ dark = false }: { dark?: boolean }) {
                 <span>Baja concentración</span>
                 <span>Alta</span>
             </div>
+            {zones && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 500, color: dark ? '#A8C8E8' : '#718096' }}>
+                    <span className="hm-zone-swatch sm" />
+                    <span>Sin pisar en el período</span>
+                </div>
+            )}
         </div>
     );
 }

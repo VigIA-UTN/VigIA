@@ -8,6 +8,7 @@ import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.model.Rol;
+import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -26,12 +27,17 @@ public class MapaCalorServiceImpl implements MapaCalorService {
 
     private final TelemetriaRepository telemetriaRepository;
     private final EstablecimientoRepository establecimientoRepository;
+    private final AnimalRepository animalRepository;
     private final UsuarioRepository usuarioRepository;
     private final MlGeoClient mlGeoClient;
 
     @Override
-    public GeoAnalyzeResponseDTO obtenerMapaCalor(String emailUsuario, Long establecimientoId, LocalDateTime desde, LocalDateTime hasta, Long animalId) {
-        
+    public GeoAnalyzeResponseDTO obtenerMapaCalor(String emailUsuario, Long establecimientoId, LocalDateTime desde, LocalDateTime hasta, Long animalId, Long rodeoId) {
+
+        if (animalId != null && rodeoId != null) {
+            throw new IllegalArgumentException("Solo se puede filtrar por animal o por rodeo, no por ambos.");
+        }
+
         Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
@@ -57,8 +63,15 @@ public class MapaCalorServiceImpl implements MapaCalorService {
                         .build())
                 .collect(Collectors.toList());
 
+        // Un rodeo se filtra por los animales que lo componen; un rodeo de otro establecimiento queda vacío
+        List<String> animalIds = rodeoId == null ? null : animalRepository.findByRodeoLoteId(rodeoId).stream()
+                .filter(a -> a.getEstablecimiento() != null && establecimientoId.equals(a.getEstablecimiento().getId()))
+                .map(a -> a.getId().toString())
+                .toList();
+
         GeoAnalyzeRequestDTO request = GeoAnalyzeRequestDTO.builder()
                 .animalId(animalId != null ? animalId.toString() : null)
+                .animalIds(animalIds)
                 .historial7d(coordenadas)
                 .build();
 
