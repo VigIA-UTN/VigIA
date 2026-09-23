@@ -399,16 +399,6 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             )}
 
-            {/* Recomendacion (solo reproductivo) */}
-            {!isSanitaria && (
-              <div className="p-3 rounded-3 d-flex gap-3 align-items-start" style={{ backgroundColor: '#EEF2FF', color: '#1E3A5F', border: '1px solid #C7D2FE' }}>
-                <i className="bi bi-info-circle-fill fs-5 mt-1" style={{ color: '#6366F1' }}></i>
-                <p className="m-0" style={{ fontSize: '0.95rem' }}>
-                  Se recomienda inseminar a la vaca {animalName} entre las horas indicadas en la ventana de inseminación.
-                </p>
-              </div>
-            )}
-
             {/* Informacion Adicional */}
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>

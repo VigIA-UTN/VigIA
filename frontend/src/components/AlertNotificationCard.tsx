@@ -46,17 +46,20 @@ export default function AlertNotificationCard({
   const resuelta = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
   // Severidad: el backend manda ALTA/MEDIA/BAJA. Fallback por tipo mientras no llegue.
   const severidad: Severidad = alerta.severidad ?? (alerta.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
-  const tipo = alerta.tipo?.toLowerCase() || 'desconocida';
 
   return (
     <SidebarCard
       severidad={severidad}
       icono={ICONO[alerta.tipo] ?? 'bi-exclamation-triangle-fill'}
       titulo={`#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
-      cuerpo={<div>
-        <div>{alerta.tipo === 'CELO' ? `Se estima alerta de ${tipo}` : `Alerta de ${tipo}`}</div>
-        <div className='text-truncate'>{textoAccionRecomendada(alerta)}</div>
-      </div>}
+      cuerpo={
+        <div
+          title={textoAccionRecomendada(alerta)}
+          style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+        >
+          {textoAccionRecomendada(alerta)}
+        </div>
+      }
       timestamp={haceCuanto(alerta.tsGeneracion)}
       acento={isUnread}
       apagada={resuelta}

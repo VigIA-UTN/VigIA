@@ -249,6 +249,7 @@ class AlertaControllerTest {
         a2.setSeveridad(SeveridadAlerta.MEDIA);
         a2.setTsGeneracion(LocalDateTime.now().minusHours(2));
         a2.setValorUmbral(1.0);
+        a2.setAccionRecomendada("Apartar al animal para revision clinica");
         alertaRepository.save(a2);
 
         // 3. Alerta PENDIENTE, ABIGEATO, BAJA
@@ -311,6 +312,22 @@ class AlertaControllerTest {
                 .param("severidad", "BAJA"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+
+        // Test 6: /alertas/celo devuelve accionRecomendada sin pedir el detalle
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas/celo")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].accionRecomendada").value("Planificar IA en ventana optima"));
+
+        // Test 7: /alertas/salud devuelve accionRecomendada sin pedir el detalle
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas/salud")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].accionRecomendada").value("Apartar al animal para revision clinica"));
     }
 
     // =========================================================================
