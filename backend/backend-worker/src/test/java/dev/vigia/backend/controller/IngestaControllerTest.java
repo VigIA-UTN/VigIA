@@ -155,6 +155,7 @@ class IngestaControllerTest {
         verifyNoInteractions(telemetriaRepository);
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Frame counter menor o igual al último persistido, ignora por idempotencia")
     void frameCounterDuplicado_ignoradoPorIdempotencia() {
@@ -169,6 +170,7 @@ class IngestaControllerTest {
         verify(caravanaRepository, never()).save(any());
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Frame counter mayor al último persistido, procesa y actualiza ultimoFrameCounter")
     void frameCounterNuevo_procesaYActualizaContador() {
@@ -187,6 +189,7 @@ class IngestaControllerTest {
         assertThat(caravanaCaptor.getValue().getUltimoFrameCounter()).isEqualTo(6);
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Frame counter menor al último persistido (llegada fuera de orden), ignora por idempotencia")
     void frameCounterMenorAlUltimo_llegadaFueraDeOrden_ignorado() {
@@ -221,6 +224,7 @@ class IngestaControllerTest {
         verifyNoInteractions(telemetriaRepository, rabbitTemplate, geofenceVerificationService, eventPublisher);
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Primer uplink sin ultimoFrameCounter previo, procesa y guarda el contador")
     void sinFrameCounterPrevio_procesaYGuardaContador() {
@@ -238,6 +242,7 @@ class IngestaControllerTest {
         assertThat(caravanaCaptor.getValue().getUltimoFrameCounter()).isEqualTo(1);
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Sin decoded_payload, ignora sin tocar telemetria ni el contador")
     void sinDecodedPayload_ignorado() {
@@ -269,7 +274,8 @@ class IngestaControllerTest {
         assertThat(response.getBody()).isEqualTo("OK");
 
         ArgumentCaptor<TelemetriaEventDTO> eventCaptor = ArgumentCaptor.forClass(TelemetriaEventDTO.class);
-        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.TELEMETRIA_EXCHANGE), eq(""), eventCaptor.capture());
+        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.TELEMETRIA_EXCHANGE), eq(""),
+                eventCaptor.capture());
         assertThat(eventCaptor.getValue().getAnimalId()).isEqualTo(animal.getId());
         assertThat(eventCaptor.getValue().getLatitud()).isEqualTo(-34.5);
         assertThat(eventCaptor.getValue().getLongitud()).isEqualTo(-58.5);
@@ -279,6 +285,7 @@ class IngestaControllerTest {
         verify(eventPublisher, times(1)).publishEvent("NUEVA_TELEMETRIA");
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Heartbeat sin telemetría previa, crea fila nueva sin coordenadas con batería y moveState")
     void heartbeatSinTelemetriaPrevia_creaFilaNueva() {
@@ -303,6 +310,7 @@ class IngestaControllerTest {
         verify(eventPublisher, times(1)).publishEvent("NUEVA_TELEMETRIA");
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Heartbeat con telemetría previa, actualiza la fila existente en vez de crear una nueva")
     void heartbeatConTelemetriaPrevia_actualizaFilaExistente() {
@@ -329,7 +337,8 @@ class IngestaControllerTest {
         assertThat(guardada.getMoveState()).isEqualTo(1);
         assertThat(guardada.getBateria()).isEqualTo(60.0);
 
-        // Al actualizar una fila existente no se considera una fila "nueva" de telemetría
+        // Al actualizar una fila existente no se considera una fila "nueva" de
+        // telemetría
         verify(eventPublisher, never()).publishEvent(any());
     }
 
@@ -350,6 +359,7 @@ class IngestaControllerTest {
         assertThat(previa.getBateria()).isEqualTo(90.0);
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Heartbeat con batería, escribe bateria y ultimaSenial en la Caravana")
     void heartbeatConBateria_actualizaCaravana() {
@@ -367,6 +377,7 @@ class IngestaControllerTest {
         assertThat(caravanaCaptor.getValue().getUltimaSenial()).isNotNull();
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Heartbeat sin batería en el payload pero con valor previo en Telemetria, la Caravana conserva el último valor conocido")
     void heartbeatSinBateriaEnPayload_caravanaConservaUltimoValor() {
@@ -399,6 +410,7 @@ class IngestaControllerTest {
                 .thenReturn(Optional.empty());
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Misma sesión y fCnt <= último, ignora")
     void mismaSesion_fCntMenorOIgual_ignorado() {
@@ -494,6 +506,7 @@ class IngestaControllerTest {
         assertThat(caravana.getUltimaSessionKeyId()).isEqualTo("B");
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Fix GNSS fallido (coordenadas ~0), ignora sin guardar ni publicar")
     void fixGnssFallido_ignorado() {
@@ -510,6 +523,7 @@ class IngestaControllerTest {
         verify(caravanaRepository, never()).save(any());
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Fix GNSS real (coordenadas válidas), procesa")
     void fixGnssReal_procesa() {

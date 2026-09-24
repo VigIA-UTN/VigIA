@@ -19,10 +19,10 @@ class PerimetroTest {
                 new CoordenadaDTO(-34.0, -58.0),
                 new CoordenadaDTO(-34.0, -57.0),
                 new CoordenadaDTO(-35.0, -57.0),
-                new CoordenadaDTO(-35.0, -58.0)
-        ));
+                new CoordenadaDTO(-35.0, -58.0)));
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("Debe instanciar Perímetro con estado activo y validar sus invariantes")
     void debeInstanciarPerimetroValido() {
@@ -91,6 +91,7 @@ class PerimetroTest {
         assertThat(perimetro.getLotes()).containsExactly(lote2);
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("Debe actualizar polígono completo validándolo")
     void debeActualizarPoligonoCompleto() {
@@ -101,8 +102,7 @@ class PerimetroTest {
                 new CoordenadaDTO(-30.0, -60.0),
                 new CoordenadaDTO(-30.0, -59.0),
                 new CoordenadaDTO(-31.0, -59.0),
-                new CoordenadaDTO(-31.0, -60.0)
-        ));
+                new CoordenadaDTO(-31.0, -60.0)));
 
         perimetro.actualizarArea(nuevoPoly);
         assertThat(perimetro.getArea()).isEqualTo(nuevoPoly);

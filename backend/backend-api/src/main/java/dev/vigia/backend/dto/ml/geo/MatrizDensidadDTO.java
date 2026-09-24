@@ -13,5 +13,4 @@ public class MatrizDensidadDTO {
     private Double lat;
     private Double lng;
     private Double intensidad;
-    private Boolean subutilizada;
 }

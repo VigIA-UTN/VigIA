@@ -9,7 +9,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Fija el contrato JSON entre ml-geo (snake_case), el backend y el frontend (que lee la respuesta tal cual). */
 @DisplayName("DTOs de ml-geo — contrato JSON")
 class GeoDtoJsonTest {
 
@@ -19,8 +18,8 @@ class GeoDtoJsonTest {
     @DisplayName("La respuesta de ml-geo se deserializa y se vuelve a serializar con las mismas claves")
     void respuestaIdaYVuelta() throws Exception {
         String mlGeo = """
-                {"mapa_calor":[{"lat":-34.0,"lng":-59.0,"intensidad":0.5,"subutilizada":false}],
-                 "alertas":[{"animal_id":"1","indice_cohesion":12.5,"alerta_aislamiento":false}],
+                {"mapa_calor":[{"lat":-34.0,"lng":-59.0,"intensidad":0.5}],
+                 "alertas":[{"animal_id":"1","indice_cohesion":0.25,"distancia_centroide_m":300.0,"alerta_aislamiento":true}],
                  "celdas_subutilizadas":{"lat_step":0.05,"lng_step":0.04,"celdas":[{"lat":-34.975,"lng":-59.975}]}}
                 """;
 
@@ -29,11 +28,16 @@ class GeoDtoJsonTest {
         assertThat(dto.getCeldasSubutilizadas().getLatStep()).isEqualTo(0.05);
         assertThat(dto.getCeldasSubutilizadas().getLngStep()).isEqualTo(0.04);
         assertThat(dto.getCeldasSubutilizadas().getCeldas()).hasSize(1);
+        assertThat(dto.getAlertas().get(0).getIndiceCohesion()).isEqualTo(0.25);
+        assertThat(dto.getAlertas().get(0).getDistanciaCentroideM()).isEqualTo(300.0);
 
         JsonNode out = mapper.readTree(mapper.writeValueAsString(dto));
         assertThat(out.at("/celdas_subutilizadas/lat_step").asDouble()).isEqualTo(0.05);
         assertThat(out.at("/celdas_subutilizadas/celdas/0/lat").asDouble()).isEqualTo(-34.975);
         assertThat(out.at("/mapa_calor/0/intensidad").asDouble()).isEqualTo(0.5);
+        assertThat(out.at("/alertas/0/distancia_centroide_m").asDouble()).isEqualTo(300.0);
+        // Las zonas de baja frecuencia viajan solo en celdas_subutilizadas
+        assertThat(out.at("/mapa_calor/0").has("subutilizada")).isFalse();
     }
 
     @Test
@@ -50,7 +54,8 @@ class GeoDtoJsonTest {
     void request() throws Exception {
         GeoAnalyzeRequestDTO request = GeoAnalyzeRequestDTO.builder()
                 .animalIds(List.of("1", "2"))
-                .historial7d(List.of(CoordenadaGPSDTO.builder().animalId("1").lat(-34.0).lng(-59.0).timestamp("t").build()))
+                .historial7d(
+                        List.of(CoordenadaGPSDTO.builder().animalId("1").lat(-34.0).lng(-59.0).timestamp("t").build()))
                 .build();
 
         JsonNode json = mapper.readTree(mapper.writeValueAsString(request));

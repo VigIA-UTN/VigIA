@@ -5,12 +5,16 @@ calcula el índice de aislamiento y las zonas subutilizadas del campo
 (Documento de Arquitectura, sección 3.3).
 """
 # pyrefly: ignore [missing-import]
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+# pyrefly: ignore [missing-import]
+from fastapi.responses import JSONResponse
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 from typing import List, Optional
 from collections import defaultdict
+from datetime import datetime, timezone
 import math
+import os
 
 app = FastAPI(title="VigIA - Microservicio de Análisis Geoespacial")
 
@@ -18,7 +22,9 @@ class CoordenadaGPS(BaseModel):
     animal_id: str
     lat: float
     lng: float
-    timestamp: str
+    # Pydantic parsea ISO-8601 con o sin 'Z'/offset y rechaza el resto con 422.
+    # En el cable sigue siendo el mismo string que manda el backend.
+    timestamp: datetime
 
 class GeoAnalyzeRequest(BaseModel):
     animal_id: Optional[str] = None
@@ -28,14 +34,16 @@ class GeoAnalyzeRequest(BaseModel):
 
 class AlertaAnimal(BaseModel):
     animal_id: str
+    # Cohesión con el rodeo, 0..1 (ver _indice_cohesion)
     indice_cohesion: float
+    # Distancia cruda al centroide del resto del rodeo, en metros
+    distancia_centroide_m: float
     alerta_aislamiento: bool
 
 class MatrizDensidad(BaseModel):
     lat: float
     lng: float
     intensidad: float
-    subutilizada: bool = False
 
 class CeldaSubutilizada(BaseModel):
     lat: float
@@ -53,6 +61,12 @@ class GeoAnalyzeResponse(BaseModel):
 
 GRID_SIZE = 20  # Grilla de 20x20
 UMBRAL_SUBUTILIZADA = 0.15
+
+# Distancia al centroide del resto del rodeo, en metros, a partir de la cual se
+# considera que un animal quedó aislado. El default de 100 m es del orden del
+# diámetro de un rodeo en pastoreo: más lejos que eso el animal dejó de seguir
+# al grupo. Se ajusta por entorno mientras no sea configurable por establecimiento.
+UMBRAL_AISLAMIENTO_METROS = float(os.getenv("UMBRAL_AISLAMIENTO_METROS", "100.0"))
 
 def _grilla(puntos):
     """Bounding box de los puntos dividido en GRID_SIZE x GRID_SIZE: (min_lat, min_lng, lat_step, lng_step)."""
@@ -80,93 +94,138 @@ def _intensidades(puntos, min_lat, min_lng, lat_step, lng_step):
     max_count = max(counts.values()) if counts else 1
     return [((i, j), counts.get((i, j), 0) / max_count) for i in range(GRID_SIZE) for j in range(GRID_SIZE)]
 
+def _ts(coordenada):
+    """
+    Timestamp comparable. Los naive se asumen UTC: mezclar aware y naive al
+    comparar lanza TypeError, y el backend manda LocalDateTime sin offset.
+    """
+    t = coordenada.timestamp
+    return t if t.tzinfo is not None else t.replace(tzinfo=timezone.utc)
+
+def _haversine(lat1, lon1, lat2, lon2):
+    R = 6371000  # Radio de la Tierra en metros
+    phi_1 = math.radians(lat1)
+    phi_2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+
+    a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi_1) * math.cos(phi_2) * math.sin(delta_lambda / 2.0) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+def _indice_cohesion(distancia_m):
+    """
+    Cohesión con el rodeo en 0..1: 1.0 pegado al grupo, 0.5 exactamente sobre
+    UMBRAL_AISLAMIENTO_METROS, y tendiendo a 0 a medida que el animal se aleja.
+    Por construcción indice < 0.5 <=> distancia > UMBRAL_AISLAMIENTO_METROS, pero
+    la alerta se deriva de la distancia para no depender de la igualdad de floats.
+    """
+    return UMBRAL_AISLAMIENTO_METROS / (UMBRAL_AISLAMIENTO_METROS + distancia_m)
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "ml-geo"}
 
 @app.post("/api/internal/ml/geo/analyze", response_model=GeoAnalyzeResponse)
-def analyze(payload: GeoAnalyzeRequest):
+def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
     """
     Request: historial de coordenadas GPS (lat/lng) del rodeo
     en los últimos 7 días.
     """
-    if not payload.historial_7d:
-        return GeoAnalyzeResponse(mapa_calor=[], alertas=[], celdas_subutilizadas=None)
+    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
+    print(f"[{correlation_id}] Request recibida para análisis geoespacial con {len(payload.historial_7d)} puntos.")
+    response.headers["X-Correlation-ID"] = correlation_id
 
-    # Animales cuyo mapa de calor se pide; None = todos los del historial
-    ids = payload.animal_ids
-    if ids is None and payload.animal_id:
-        ids = [payload.animal_id]
-    puntos_mapa = payload.historial_7d if ids is None else [p for p in payload.historial_7d if p.animal_id in set(ids)]
+    try:
+        if not payload.historial_7d:
+            print(f"[{correlation_id}] Historial vacío: se devuelve respuesta vacía.")
+            return GeoAnalyzeResponse(mapa_calor=[], alertas=[], celdas_subutilizadas=None)
 
-    mapa_calor = []
-    celdas_subutilizadas = None
-    if puntos_mapa:
-        # Mapa de calor: la grilla se ajusta a los puntos filtrados para no perder detalle
-        min_lat, min_lng, lat_step, lng_step = _grilla(puntos_mapa)
-        for (lat_idx, lng_idx), intensidad in _intensidades(puntos_mapa, min_lat, min_lng, lat_step, lng_step):
-            mapa_calor.append(MatrizDensidad(
-                lat=min_lat + (lat_idx + 0.5) * lat_step,
-                lng=min_lng + (lng_idx + 0.5) * lng_step,
-                intensidad=intensidad,
-                subutilizada=intensidad <= UMBRAL_SUBUTILIZADA,
-            ))
+        # Animales cuyo mapa de calor se pide; None = todos los del historial
+        ids = payload.animal_ids
+        if ids is None and payload.animal_id:
+            ids = [payload.animal_id]
+        sin_filtro = ids is None
+        puntos_mapa = payload.historial_7d if sin_filtro else [p for p in payload.historial_7d if p.animal_id in set(ids)]
 
-        # Zonas subutilizadas: grilla sobre TODO el campo, contando solo los puntos filtrados
-        f_lat, f_lng, f_lat_step, f_lng_step = _grilla(payload.historial_7d)
-        celdas_subutilizadas = CeldasSubutilizadas(
-            lat_step=f_lat_step,
-            lng_step=f_lng_step,
-            celdas=[
-                CeldaSubutilizada(lat=f_lat + (i + 0.5) * f_lat_step, lng=f_lng + (j + 0.5) * f_lng_step)
-                for (i, j), intensidad in _intensidades(puntos_mapa, f_lat, f_lng, f_lat_step, f_lng_step)
-                if intensidad <= UMBRAL_SUBUTILIZADA
-            ],
-        )
+        mapa_calor = []
+        celdas_subutilizadas = None
+        if puntos_mapa:
+            # Mapa de calor: la grilla se ajusta a los puntos filtrados para no perder detalle
+            grilla_mapa = _grilla(puntos_mapa)
+            intensidades_mapa = _intensidades(puntos_mapa, *grilla_mapa)
+            min_lat, min_lng, lat_step, lng_step = grilla_mapa
+            mapa_calor = [
+                MatrizDensidad(
+                    lat=min_lat + (i + 0.5) * lat_step,
+                    lng=min_lng + (j + 0.5) * lng_step,
+                    intensidad=intensidad,
+                )
+                for (i, j), intensidad in intensidades_mapa
+            ]
 
-    # Umbral de aislamiento en metros. Configurable para alertar si un animal se aleja demasiado.
-    UMBRAL_AISLAMIENTO_METROS = 100.0
+            # Zonas subutilizadas: grilla sobre TODO el campo, contando solo los puntos
+            # filtrados. Sin filtro esa grilla es la misma que la del mapa, así que se reusa.
+            grilla_campo = grilla_mapa if sin_filtro else _grilla(payload.historial_7d)
+            intensidades_campo = intensidades_mapa if sin_filtro else _intensidades(puntos_mapa, *grilla_campo)
+            f_lat, f_lng, f_lat_step, f_lng_step = grilla_campo
+            celdas_subutilizadas = CeldasSubutilizadas(
+                lat_step=f_lat_step,
+                lng_step=f_lng_step,
+                celdas=[
+                    CeldaSubutilizada(lat=f_lat + (i + 0.5) * f_lat_step, lng=f_lng + (j + 0.5) * f_lng_step)
+                    for (i, j), intensidad in intensidades_campo
+                    if intensidad <= UMBRAL_SUBUTILIZADA
+                ],
+            )
 
-    # Obtener la posición más reciente de cada animal
-    ultimas_posiciones = {}
-    for p in payload.historial_7d:
-        # Se asume que el timestamp puede ordenarse lexicográficamente
-        if p.animal_id not in ultimas_posiciones or p.timestamp > ultimas_posiciones[p.animal_id].timestamp:
-            ultimas_posiciones[p.animal_id] = p
+        # Obtener la posición más reciente de cada animal
+        ultimas_posiciones = {}
+        for p in payload.historial_7d:
+            if p.animal_id not in ultimas_posiciones or _ts(p) > _ts(ultimas_posiciones[p.animal_id]):
+                ultimas_posiciones[p.animal_id] = p
 
-    animales = list(ultimas_posiciones.values())
-    alertas = []
+        animales = list(ultimas_posiciones.values())
+        alertas = []
 
-    def haversine(lat1, lon1, lat2, lon2):
-        R = 6371000 # Radio de la Tierra en metros
-        phi_1 = math.radians(lat1)
-        phi_2 = math.radians(lat2)
-        delta_phi = math.radians(lat2 - lat1)
-        delta_lambda = math.radians(lon2 - lon1)
-        
-        a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi_1) * math.cos(phi_2) * math.sin(delta_lambda / 2.0) ** 2
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        return R * c
-
-    if len(animales) == 1:
-        # Con un solo animal, no hay aislamiento posible respecto a un rodeo
-        alertas.append(AlertaAnimal(
-            animal_id=animales[0].animal_id,
-            indice_cohesion=0.0,
-            alerta_aislamiento=False
-        ))
-    elif len(animales) > 1:
-        for a in animales:
-            otros = [o for o in animales if o.animal_id != a.animal_id]
-            avg_lat = sum(o.lat for o in otros) / len(otros)
-            avg_lng = sum(o.lng for o in otros) / len(otros)
-            
-            distancia_centroide = haversine(a.lat, a.lng, avg_lat, avg_lng)
-            
+        if len(animales) == 1:
+            # Con un solo animal, no hay aislamiento posible respecto a un rodeo
             alertas.append(AlertaAnimal(
-                animal_id=a.animal_id,
-                indice_cohesion=distancia_centroide,
-                alerta_aislamiento=distancia_centroide > UMBRAL_AISLAMIENTO_METROS
+                animal_id=animales[0].animal_id,
+                indice_cohesion=_indice_cohesion(0.0),
+                distancia_centroide_m=0.0,
+                alerta_aislamiento=False
             ))
+        elif len(animales) > 1:
+            for a in animales:
+                otros = [o for o in animales if o.animal_id != a.animal_id]
+                avg_lat = sum(o.lat for o in otros) / len(otros)
+                avg_lng = sum(o.lng for o in otros) / len(otros)
 
-    return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas, celdas_subutilizadas=celdas_subutilizadas)
+                distancia_centroide = _haversine(a.lat, a.lng, avg_lat, avg_lng)
+
+                alertas.append(AlertaAnimal(
+                    animal_id=a.animal_id,
+                    indice_cohesion=_indice_cohesion(distancia_centroide),
+                    distancia_centroide_m=distancia_centroide,
+                    alerta_aislamiento=distancia_centroide > UMBRAL_AISLAMIENTO_METROS
+                ))
+
+        n_zonas = len(celdas_subutilizadas.celdas) if celdas_subutilizadas else 0
+        aisladas = sum(1 for a in alertas if a.alerta_aislamiento)
+        print(f"[{correlation_id}] Análisis exitoso: {len(mapa_calor)} celdas, "
+              f"{len(alertas)} animales ({aisladas} aislados), {n_zonas} zonas subutilizadas.")
+
+        return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas, celdas_subutilizadas=celdas_subutilizadas)
+
+    except Exception as e:
+        print(f"[{correlation_id}] Error durante el análisis: {str(e)}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "Internal Server Error",
+                "mensaje": str(e),
+                "trace_id": correlation_id
+            },
+            headers={"X-Correlation-ID": correlation_id}
+        )

@@ -25,56 +25,62 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MapaCalorServiceImpl implements MapaCalorService {
 
-    private final TelemetriaRepository telemetriaRepository;
-    private final EstablecimientoRepository establecimientoRepository;
-    private final AnimalRepository animalRepository;
-    private final UsuarioRepository usuarioRepository;
-    private final MlGeoClient mlGeoClient;
+        private final TelemetriaRepository telemetriaRepository;
+        private final EstablecimientoRepository establecimientoRepository;
+        private final AnimalRepository animalRepository;
+        private final UsuarioRepository usuarioRepository;
+        private final MlGeoClient mlGeoClient;
 
-    @Override
-    public GeoAnalyzeResponseDTO obtenerMapaCalor(String emailUsuario, Long establecimientoId, LocalDateTime desde, LocalDateTime hasta, Long animalId, Long rodeoId) {
+        @Override
+        public GeoAnalyzeResponseDTO obtenerMapaCalor(String emailUsuario, Long establecimientoId, LocalDateTime desde,
+                        LocalDateTime hasta, Long animalId, Long rodeoId) {
 
-        if (animalId != null && rodeoId != null) {
-            throw new IllegalArgumentException("Solo se puede filtrar por animal o por rodeo, no por ambos.");
+                if (animalId != null && rodeoId != null) {
+                        throw new IllegalArgumentException(
+                                        "Solo se puede filtrar por animal o por rodeo, no por ambos.");
+                }
+
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                if (!usuario.getRol().equals(Rol.ADMINISTRADOR)) {
+                        List<Establecimiento> establecimientos = establecimientoRepository
+                                        .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+                        boolean pertenece = establecimientos.stream()
+                                        .anyMatch(e -> e.getId().equals(establecimientoId));
+                        if (!pertenece) {
+                                throw new AccessDeniedException(
+                                                "No tiene permisos para ver el mapa de calor de este establecimiento.");
+                        }
+                }
+
+                List<Telemetria> telemetriaList = telemetriaRepository
+                                .findByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta, null);
+
+                List<CoordenadaGPSDTO> coordenadas = telemetriaList.stream()
+                                .filter(t -> t.getLatitud() != null && t.getLongitud() != null)
+                                .filter(t -> t.getCaravana().getAnimal() != null)
+                                .map(t -> CoordenadaGPSDTO.builder()
+                                                .animalId(t.getCaravana().getAnimal().getId().toString())
+                                                .lat(t.getLatitud())
+                                                .lng(t.getLongitud())
+                                                .timestamp(t.getFechaHora().toString())
+                                                .build())
+                                .collect(Collectors.toList());
+
+                List<String> animalIds = rodeoId == null ? null
+                                : animalRepository.findByRodeoLoteId(rodeoId).stream()
+                                                .filter(a -> a.getEstablecimiento() != null && establecimientoId
+                                                                .equals(a.getEstablecimiento().getId()))
+                                                .map(a -> a.getId().toString())
+                                                .toList();
+
+                GeoAnalyzeRequestDTO request = GeoAnalyzeRequestDTO.builder()
+                                .animalId(animalId != null ? animalId.toString() : null)
+                                .animalIds(animalIds)
+                                .historial7d(coordenadas)
+                                .build();
+
+                return mlGeoClient.analyze(request);
         }
-
-        Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
-
-        if (!usuario.getRol().equals(Rol.ADMINISTRADOR)) {
-            List<Establecimiento> establecimientos = establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(emailUsuario);
-            boolean pertenece = establecimientos.stream()
-                    .anyMatch(e -> e.getId().equals(establecimientoId));
-            if (!pertenece) {
-                throw new AccessDeniedException("No tiene permisos para ver el mapa de calor de este establecimiento.");
-            }
-        }
-
-        // Obtener historial completo del rodeo (animalId = null) para el cálculo de aislamiento
-        List<Telemetria> telemetriaList = telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta, null);
-
-        List<CoordenadaGPSDTO> coordenadas = telemetriaList.stream()
-                .filter(t -> t.getLatitud() != null && t.getLongitud() != null)
-                .map(t -> CoordenadaGPSDTO.builder()
-                        .animalId(t.getCaravana().getAnimal() != null ? t.getCaravana().getAnimal().getId().toString() : t.getCaravana().getId().toString())
-                        .lat(t.getLatitud())
-                        .lng(t.getLongitud())
-                        .timestamp(t.getFechaHora().toString())
-                        .build())
-                .collect(Collectors.toList());
-
-        // Un rodeo se filtra por los animales que lo componen; un rodeo de otro establecimiento queda vacío
-        List<String> animalIds = rodeoId == null ? null : animalRepository.findByRodeoLoteId(rodeoId).stream()
-                .filter(a -> a.getEstablecimiento() != null && establecimientoId.equals(a.getEstablecimiento().getId()))
-                .map(a -> a.getId().toString())
-                .toList();
-
-        GeoAnalyzeRequestDTO request = GeoAnalyzeRequestDTO.builder()
-                .animalId(animalId != null ? animalId.toString() : null)
-                .animalIds(animalIds)
-                .historial7d(coordenadas)
-                .build();
-
-        return mlGeoClient.analyze(request);
-    }
 }

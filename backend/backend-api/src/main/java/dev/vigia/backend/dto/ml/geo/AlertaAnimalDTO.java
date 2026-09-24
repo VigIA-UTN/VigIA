@@ -13,10 +13,13 @@ import lombok.NoArgsConstructor;
 public class AlertaAnimalDTO {
     @JsonProperty("animal_id")
     private String animalId;
-    
+
     @JsonProperty("indice_cohesion")
     private Double indiceCohesion;
-    
+
+    @JsonProperty("distancia_centroide_m")
+    private Double distanciaCentroideM;
+
     @JsonProperty("alerta_aislamiento")
     private Boolean alertaAislamiento;
 }

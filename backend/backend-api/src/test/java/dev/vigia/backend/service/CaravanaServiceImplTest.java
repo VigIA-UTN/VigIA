@@ -63,6 +63,7 @@ class CaravanaServiceImplTest {
         productor.setRol(Rol.PRODUCTOR);
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Debe crear una caravana DISPONIBLE, sin animal ni codigo, asociada al establecimiento indicado")
     void crearCaravanaSinCodigoExitoso() {
@@ -95,6 +96,7 @@ class CaravanaServiceImplTest {
         verify(caravanaRepository, times(1)).save(any(Caravana.class));
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Debe crear una caravana con idCaravanaOficial, fijando la fecha de asignacion")
     void crearCaravanaConCodigoExitoso() {
