@@ -18,7 +18,14 @@ public interface PerimetroRepository extends JpaRepository<Perimetro, Long> {
         JOIN perimetro_lote pl ON pl.perimetro_id = p.id
         WHERE pl.rodeo_lote_id = :loteId
           AND p.activo = true
-          AND ST_Contains(p.area, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326))
+          AND (
+                ST_Contains(p.area, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326))
+                OR (p.zona_estricta = false
+                    AND p.distancia_tolerancia_metros > 0
+                    AND ST_DWithin(CAST(p.area AS geography),
+                                   CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography),
+                                   p.distancia_tolerancia_metros))
+              )
         """, nativeQuery = true)
     List<Perimetro> findPerimetrosQueContienen(@Param("loteId") Long loteId,
                                               @Param("lat") double lat,

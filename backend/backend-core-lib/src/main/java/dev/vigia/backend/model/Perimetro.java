@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.locationtech.jts.geom.Polygon;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
@@ -41,12 +42,15 @@ public class Perimetro {
     @Column(columnDefinition = "geometry(Polygon,4326)", nullable = false)
     private Polygon area;
 
+    @Column(name = "distancia_tolerancia_metros", nullable = false, precision = 10, scale = 2)
+    private BigDecimal distanciaToleranciaMetros = BigDecimal.ZERO;
+
+    @Convert(disableConversion = true)
+    @Column(name = "zona_estricta", nullable = false)
+    private boolean zonaEstricta = false;
+
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "perimetro_lote",
-            joinColumns = @JoinColumn(name = "perimetro_id"),
-            inverseJoinColumns = @JoinColumn(name = "rodeo_lote_id")
-    )
+    @JoinTable(name = "perimetro_lote", joinColumns = @JoinColumn(name = "perimetro_id"), inverseJoinColumns = @JoinColumn(name = "rodeo_lote_id"))
     private Set<RodeoLote> lotes = new HashSet<>();
 
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
@@ -115,6 +119,21 @@ public class Perimetro {
         this.nombre = nombre;
         this.descripcion = descripcion;
         this.fechaModificacion = LocalDateTime.now();
+    }
+
+    public void configurarUmbral(BigDecimal distanciaToleranciaMetros, boolean zonaEstricta) {
+        if (distanciaToleranciaMetros == null) {
+            throw new IllegalArgumentException("La distancia de tolerancia no puede ser nula.");
+        }
+        if (distanciaToleranciaMetros.signum() < 0) {
+            throw new IllegalArgumentException("La distancia de tolerancia no puede ser negativa.");
+        }
+        this.distanciaToleranciaMetros = distanciaToleranciaMetros;
+        this.zonaEstricta = zonaEstricta;
+    }
+
+    public BigDecimal getToleranciaEfectivaMetros() {
+        return zonaEstricta ? BigDecimal.ZERO : distanciaToleranciaMetros;
     }
 
     public void asignarLote(RodeoLote lote) {

@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +26,8 @@ public class PerimetroResponse {
     private List<Long> loteIds = new ArrayList<>();
     @Builder.Default
     private List<CoordenadaDTO> coordenadas = new ArrayList<>();
+    private BigDecimal distanciaToleranciaMetros;
+    private boolean zonaEstricta;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaModificacion;
     private Long version;

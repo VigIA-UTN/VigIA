@@ -19,6 +19,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -47,6 +48,10 @@ public class PerimetroServiceImpl implements PerimetroService {
         Polygon polygon = GeometryUtils.crearPoligono(request.getCoordenadas());
 
         Perimetro perimetro = new Perimetro(establecimiento, request.getNombre(), request.getDescripcion(), polygon);
+        perimetro.configurarUmbral(
+                request.getDistanciaToleranciaMetros() != null ? request.getDistanciaToleranciaMetros()
+                        : BigDecimal.ZERO,
+                Boolean.TRUE.equals(request.getZonaEstricta()));
 
         if (request.getLoteIds() != null && !request.getLoteIds().isEmpty()) {
             List<RodeoLote> lotes = rodeoLoteRepository.findAllById(request.getLoteIds());
@@ -79,6 +84,12 @@ public class PerimetroServiceImpl implements PerimetroService {
         perimetro.actualizarArea(nuevoPolygon);
 
         perimetro.actualizarDatos(request.getNombre(), request.getDescripcion());
+
+        perimetro.configurarUmbral(
+                request.getDistanciaToleranciaMetros() != null
+                        ? request.getDistanciaToleranciaMetros()
+                        : perimetro.getDistanciaToleranciaMetros(),
+                request.getZonaEstricta() != null ? request.getZonaEstricta() : perimetro.isZonaEstricta());
 
         if (request.getLoteIds() != null) {
             List<RodeoLote> lotes = rodeoLoteRepository.findAllById(request.getLoteIds());
@@ -183,6 +194,8 @@ public class PerimetroServiceImpl implements PerimetroService {
                 .activo(perimetro.isActivo())
                 .loteIds(loteIds)
                 .coordenadas(GeometryUtils.extraerCoordenadas(perimetro.getArea()))
+                .distanciaToleranciaMetros(perimetro.getDistanciaToleranciaMetros())
+                .zonaEstricta(perimetro.isZonaEstricta())
                 .fechaCreacion(perimetro.getFechaCreacion())
                 .fechaModificacion(perimetro.getFechaModificacion())
                 .version(perimetro.getVersion())

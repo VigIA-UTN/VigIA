@@ -27,6 +27,10 @@ public class PerimetroController {
      * POST /api/v1/perimetros
      * <p>
      * Crea un nuevo perímetro geográfico para un establecimiento.
+     * <p>
+     * Acepta opcionalmente {@code distanciaToleranciaMetros} (>= 0, default 0) y
+     * {@code zonaEstricta} (default false). Con zona estricta la tolerancia se
+     * ignora y cualquier punto fuera del polígono dispara alerta.
      *
      * @param request        datos del perímetro a crear
      * @param authentication contexto de seguridad inyectado por Spring Security
@@ -52,6 +56,9 @@ public class PerimetroController {
      * PUT /api/v1/perimetros/{id}
      * <p>
      * Edita un perímetro existente.
+     * <p>
+     * Si {@code distanciaToleranciaMetros} o {@code zonaEstricta} no se envían,
+     * se conservan sus valores actuales.
      *
      * @param id             ID del perímetro a editar
      * @param request        nuevos datos del perímetro

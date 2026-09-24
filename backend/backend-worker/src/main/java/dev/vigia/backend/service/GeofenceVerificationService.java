@@ -47,7 +47,7 @@ public class GeofenceVerificationService {
                 lote.getId(), latitud, longitud);
 
         if (!perimetrosContenedores.isEmpty()) {
-            log.debug("Animal {} en posición ({}, {}) se encuentra dentro del perímetro del lote {}",
+            log.debug("Animal {} en posición ({}, {}) se encuentra dentro del perímetro (o su tolerancia) del lote {}",
                     animal.getId(), latitud, longitud, lote.getId());
             return;
         }

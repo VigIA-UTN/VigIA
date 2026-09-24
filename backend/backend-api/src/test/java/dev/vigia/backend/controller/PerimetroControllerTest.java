@@ -21,6 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -160,6 +161,45 @@ class PerimetroControllerTest {
                                 .coordenadas(List.of(
                                                 new CoordenadaDTO(-34.0, -58.0),
                                                 new CoordenadaDTO(-34.0, -57.0)))
+                                .build();
+
+                mockMvc.perform(post("/api/v1/perimetros")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/perimetros - Expone tolerancia y zona estricta en la respuesta")
+        void crearPerimetro_conUmbral() throws Exception {
+                PerimetroRequest request = PerimetroRequest.builder()
+                                .establecimientoId(establecimientoId)
+                                .nombre("Perímetro Tolerante")
+                                .coordenadas(getCoordenadasValidas())
+                                .distanciaToleranciaMetros(new BigDecimal("25.5"))
+                                .zonaEstricta(false)
+                                .build();
+
+                mockMvc.perform(post("/api/v1/perimetros")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.distanciaToleranciaMetros").value(25.5))
+                                .andExpect(jsonPath("$.zonaEstricta").value(false));
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/perimetros - Rechaza tolerancia negativa")
+        void crearPerimetro_toleranciaNegativa() throws Exception {
+                PerimetroRequest request = PerimetroRequest.builder()
+                                .establecimientoId(establecimientoId)
+                                .nombre("Perímetro Invalido")
+                                .coordenadas(getCoordenadasValidas())
+                                .distanciaToleranciaMetros(new BigDecimal("-1"))
                                 .build();
 
                 mockMvc.perform(post("/api/v1/perimetros")

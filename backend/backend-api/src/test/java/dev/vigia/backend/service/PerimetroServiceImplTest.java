@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -170,5 +171,114 @@ class PerimetroServiceImplTest {
 
         perimetroService.activarPerimetro(1L, "productor@vigia.dev");
         assertThat(perimetro.isActivo()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Debe crear perímetro con tolerancia y zona estricta indicadas")
+    void crearPerimetroConUmbral() {
+        PerimetroRequest request = PerimetroRequest.builder()
+                .establecimientoId(10L)
+                .nombre("Potrero Alto")
+                .coordenadas(coordenadasValidas)
+                .distanciaToleranciaMetros(new BigDecimal("50"))
+                .zonaEstricta(true)
+                .build();
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+        when(perimetroRepository.save(any(Perimetro.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PerimetroResponse response = perimetroService.crearPerimetro(request, "productor@vigia.dev");
+
+        assertThat(response.getDistanciaToleranciaMetros()).isEqualByComparingTo("50");
+        assertThat(response.isZonaEstricta()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Debe crear perímetro con tolerancia 0 y zona no estricta si no se indican")
+    void crearPerimetroConUmbralPorDefecto() {
+        PerimetroRequest request = PerimetroRequest.builder()
+                .establecimientoId(10L)
+                .nombre("Potrero Alto")
+                .coordenadas(coordenadasValidas)
+                .build();
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+        when(perimetroRepository.save(any(Perimetro.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PerimetroResponse response = perimetroService.crearPerimetro(request, "productor@vigia.dev");
+
+        assertThat(response.getDistanciaToleranciaMetros()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.isZonaEstricta()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Debe fallar al crear perímetro con tolerancia negativa")
+    void crearPerimetroConToleranciaNegativa() {
+        PerimetroRequest request = PerimetroRequest.builder()
+                .establecimientoId(10L)
+                .nombre("Potrero Alto")
+                .coordenadas(coordenadasValidas)
+                .distanciaToleranciaMetros(new BigDecimal("-5"))
+                .build();
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(establecimientoRepository.findById(10L)).thenReturn(Optional.of(establecimiento));
+
+        assertThatThrownBy(() -> perimetroService.crearPerimetro(request, "productor@vigia.dev"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no puede ser negativa");
+
+        verify(perimetroRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Debe actualizar tolerancia y zona estricta cuando se envían")
+    void actualizarPerimetroConUmbral() {
+        Perimetro perimetro = new Perimetro(establecimiento, "Potrero",
+                GeometryUtils.crearPoligono(coordenadasValidas));
+
+        PerimetroRequest request = PerimetroRequest.builder()
+                .establecimientoId(10L)
+                .nombre("Potrero")
+                .coordenadas(coordenadasValidas)
+                .distanciaToleranciaMetros(new BigDecimal("30.5"))
+                .zonaEstricta(true)
+                .build();
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(perimetroRepository.findById(1L)).thenReturn(Optional.of(perimetro));
+        when(perimetroRepository.save(any(Perimetro.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PerimetroResponse response = perimetroService.actualizarPerimetro(1L, request, "productor@vigia.dev");
+
+        assertThat(response.getDistanciaToleranciaMetros()).isEqualByComparingTo("30.5");
+        assertThat(response.isZonaEstricta()).isTrue();
+        assertThat(perimetro.getToleranciaEfectivaMetros()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("Debe conservar tolerancia y zona estricta si no se envían al actualizar")
+    void actualizarPerimetroSinUmbralConservaValores() {
+        Perimetro perimetro = new Perimetro(establecimiento, "Potrero",
+                GeometryUtils.crearPoligono(coordenadasValidas));
+        perimetro.configurarUmbral(new BigDecimal("40"), true);
+
+        PerimetroRequest request = PerimetroRequest.builder()
+                .establecimientoId(10L)
+                .nombre("Potrero Renombrado")
+                .coordenadas(coordenadasValidas)
+                .build();
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(perimetroRepository.findById(1L)).thenReturn(Optional.of(perimetro));
+        when(perimetroRepository.save(any(Perimetro.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PerimetroResponse response = perimetroService.actualizarPerimetro(1L, request, "productor@vigia.dev");
+
+        assertThat(response.getNombre()).isEqualTo("Potrero Renombrado");
+        assertThat(response.getDistanciaToleranciaMetros()).isEqualByComparingTo("40");
+        assertThat(response.isZonaEstricta()).isTrue();
     }
 }
