@@ -23,6 +23,8 @@ const TABS: { id: HeatScope; label: string }[] = [
     { id: 'animal', label: 'Animal' },
 ];
 
+const NO_NAMES: string[] = [];
+
 interface Props {
     enabled: boolean;
     onEnabledChange: (on: boolean) => void;
@@ -34,15 +36,15 @@ interface Props {
     error?: string | null;
     /** number of points currently drawn, used for the empty state */
     pointCount: number;
-    /** under-used zones currently drawn (rodeo scope); shown in the toggle's subtitle */
-    zonaCount?: number;
+    /** names of the selected rodeo's active perimeters; the perimeter toggle only shows when there is at least one */
+    perimetroNames?: string[];
     /** host is a single animal's page: only the period is editable, no scope/list/toggles */
     fixedAnimal?: boolean;
 }
 
 /** Filter panel for the heatmap. Presentational: state lives in the host, data fetching in useHeatPoints. */
 export default function HeatmapPanel({
-    enabled, onEnabledChange, filter, onFilterChange, rodeos, animals, loading, error, pointCount, zonaCount = 0,
+    enabled, onEnabledChange, filter, onFilterChange, rodeos, animals, loading, error, pointCount, perimetroNames = NO_NAMES,
     fixedAnimal = false,
 }: Props) {
     const [query, setQuery] = useState('');
@@ -82,12 +84,9 @@ export default function HeatmapPanel({
         onFilterChange(fixedAnimal ? { ...filter, ...lastDaysRange(7) } : defaultHeatFilter(rodeos[0]?.id ?? null));
     };
 
-    const showUnderused = !fixedAnimal && filter.scope === 'rodeo';
-    const underusedSub = !filter.underused ? 'Marcá las zonas que el rodeo no pisa'
-        : error ? 'No disponible'
-            : loading ? 'Calculando…'
-                : zonaCount === 0 ? 'Sin zonas sin pisar en el período'
-                    : `${zonaCount} ${zonaCount === 1 ? 'zona' : 'zonas'} de ${selectedRodeo?.nombre ?? 'el rodeo'} sin pisar en el período`;
+    const showPerimetro = !fixedAnimal && filter.scope === 'rodeo' && perimetroNames.length > 0;
+    const perimetroSub = !filter.perimetro ? 'Marcá el perímetro del rodeo'
+        : perimetroNames.length === 1 ? perimetroNames[0] : `${perimetroNames.length} perímetros`;
 
     return (
         <div className={`hm-panel${fixedAnimal ? ' hm-fixed' : ''}`} role="dialog" aria-label="Mapa de calor">
@@ -172,17 +171,17 @@ export default function HeatmapPanel({
                     )}
                 </div>
 
-                {showUnderused && (
-                    <div className={`hm-under${filter.underused ? ' on' : ''}`}>
-                        <span className="hm-zone-swatch" />
+                {showPerimetro && (
+                    <div className={`hm-peri${filter.perimetro ? ' on' : ''}`}>
+                        <span className="hm-peri-swatch" />
                         <span className="hm-item-text" style={{ flex: 1 }}>
-                            <span className="hm-item-main">Áreas subutilizadas</span>
-                            <span className="hm-hint">{underusedSub}</span>
+                            <span className="hm-item-main">Perímetro del rodeo</span>
+                            <span className="hm-hint">{perimetroSub}</span>
                         </span>
                         <button
-                            type="button" role="switch" aria-checked={filter.underused} aria-label="Mostrar áreas subutilizadas"
-                            className={`hm-switch sm${filter.underused ? ' on' : ''}`}
-                            onClick={() => set({ underused: !filter.underused })}
+                            type="button" role="switch" aria-checked={filter.perimetro} aria-label="Mostrar perímetro del rodeo"
+                            className={`hm-switch sm${filter.perimetro ? ' on' : ''}`}
+                            onClick={() => set({ perimetro: !filter.perimetro })}
                         >
                             <span className="hm-knob" />
                         </button>
@@ -208,7 +207,7 @@ export default function HeatmapPanel({
                 {/* legend + reset + status; pinned to the panel's bottom in the fixed (detail page) layout */}
                 <div className="hm-foot">
                     <div className="hm-row">
-                        <HeatmapLegend dark zones={showUnderused && filter.underused && zonaCount > 0} />
+                        <HeatmapLegend dark perimetro={showPerimetro && filter.perimetro} />
                         <button type="button" className="hm-reset" onClick={reset}>Restablecer</button>
                     </div>
 

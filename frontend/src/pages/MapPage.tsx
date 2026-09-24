@@ -25,9 +25,9 @@ import AlertDetailSidebar from '../components/AlertDetailSidebar';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import HeatmapLayer from '../components/heatmap/HeatmapLayer';
 import HeatmapPanel from '../components/heatmap/HeatmapPanel';
-import ZonasSubutilizadasLayer from '../components/heatmap/ZonasSubutilizadasLayer';
+import PerimetroRodeoLayer from '../components/heatmap/PerimetroRodeoLayer';
 import { useHeatPoints } from '../components/heatmap/useHeatPoints';
-import { defaultHeatFilter } from '../components/heatmap/heatmapFilters';
+import { defaultHeatFilter, perimetrosDeRodeo } from '../components/heatmap/heatmapFilters';
 import type { HeatAnimal, HeatFilter } from '../components/heatmap/types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -332,12 +332,20 @@ export default function MapPage() {
     }
     return heatFilterRaw;
   }, [heatFilterRaw, rodeos]);
-  const { points: heatPoints, zonas: heatZonas, loading: heatLoading, error: heatError } = useHeatPoints(
+  const { points: heatPoints, loading: heatLoading, error: heatError } = useHeatPoints(
     heatFilter,
     { establecimientoId: selectedId ?? null },
     heatEnabled,
   );
-  const showZonas = heatEnabled && heatFilter.scope === 'rodeo' && heatFilter.underused;
+  // Perímetros activos del rodeo elegido: el toggle del panel los resalta (y oculta su contorno celeste habitual)
+  const rodeoPerimetros = useMemo(
+    () => perimetrosDeRodeo(perimetros, heatFilter.scope === 'rodeo' ? heatFilter.rodeoId : null),
+    [perimetros, heatFilter.scope, heatFilter.rodeoId],
+  );
+  const perimetroNames = useMemo(() => rodeoPerimetros.map(p => p.nombre), [rodeoPerimetros]);
+  const highlightedPerimetros = heatEnabled && heatFilter.perimetro
+    ? rodeoPerimetros.filter(p => p.id !== editingPerimetro?.id)
+    : [];
 
   const handleToggleActivoPerimetro = async (perimetro: PerimetroResponse) => {
     const nuevoEstado = !perimetro.activo;
@@ -434,7 +442,6 @@ export default function MapPage() {
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
         <MapUpdater center={center} trigger={flyToTrigger} />
-        {showZonas && <ZonasSubutilizadasLayer zonas={heatZonas} />}
         {heatEnabled && <HeatmapLayer points={heatPoints} />}
 
         {/* Captura de clicks en el mapa para agregar vértices en modo edición */}
@@ -448,6 +455,7 @@ export default function MapPage() {
         {/* Capa de Perímetros Activos (Contorno continuo celeste #00FFF6 con relleno 20% opacidad) */}
         {perimetros.map(p => {
           if (!p.activo || (editingPerimetro && editingPerimetro.id === p.id)) return null;
+          if (highlightedPerimetros.some(h => h.id === p.id)) return null;
           const isHovered = hoveredPerimetroId === p.id;
           const positions: [number, number][] = p.coordenadas.map(c => [c.latitud, c.longitud]);
           return (
@@ -463,6 +471,9 @@ export default function MapPage() {
             />
           );
         })}
+
+        {/* Perímetros del rodeo resaltados desde el panel de mapa de calor (rosa con rayado) */}
+        {highlightedPerimetros.length > 0 && <PerimetroRodeoLayer perimetros={highlightedPerimetros} />}
 
         {/* Capa de Perímetro en Hover (Línea de contorno punteada #00FFF6 sin relleno) */}
         {hoveredPerimetroId && !editingPerimetro && (() => {
@@ -641,7 +652,7 @@ export default function MapPage() {
                 loading={heatLoading}
                 error={heatError}
                 pointCount={heatPoints.length}
-                zonaCount={heatZonas.length}
+                perimetroNames={perimetroNames}
               />
             </div>
           )}

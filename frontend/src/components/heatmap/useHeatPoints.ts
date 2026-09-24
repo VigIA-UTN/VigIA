@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { fetchHeatPoints, HeatUnavailableError, type HeatContext, type HeatData } from './heatmapData';
-import type { HeatFilter } from './types';
+import { fetchHeatPoints, HeatUnavailableError, type HeatContext } from './heatmapData';
+import type { HeatFilter, HeatLatLngTuple } from './types';
 
-const EMPTY: HeatData = { points: [], zonas: [] };
+const EMPTY: HeatLatLngTuple[] = [];
 
-/** Loads heat points (and under-used zones) for a filter. Results keep a stable identity until data actually changes. */
+/** Loads heat points for a filter. `points` keeps a stable identity until data actually changes. */
 export function useHeatPoints(filter: HeatFilter, ctx: HeatContext, enabled = true) {
-    const [data, setData] = useState<HeatData>(EMPTY);
+    const [points, setPoints] = useState<HeatLatLngTuple[]>(EMPTY);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -20,11 +20,11 @@ export function useHeatPoints(filter: HeatFilter, ctx: HeatContext, enabled = tr
         setLoading(true);
         setError(null);
         fetchHeatPoints({ scope, rodeoId, animalId, from, to }, { establecimientoId })
-            .then(res => { if (!cancelled) setData(res); })
+            .then(res => { if (!cancelled) setPoints(res); })
             .catch(err => {
                 console.error('Error al cargar mapa de calor:', err);
                 if (!cancelled) {
-                    setData(EMPTY);
+                    setPoints(EMPTY);
                     setError(err instanceof HeatUnavailableError ? `${err.message}.` : 'No se pudo cargar el mapa de calor.');
                 }
             })
@@ -32,5 +32,5 @@ export function useHeatPoints(filter: HeatFilter, ctx: HeatContext, enabled = tr
         return () => { cancelled = true; };
     }, [enabled, scope, rodeoId, animalId, from, to, establecimientoId]);
 
-    return { points: data.points, zonas: data.zonas, loading, error };
+    return { points, loading, error };
 }

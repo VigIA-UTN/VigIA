@@ -6,8 +6,8 @@ const stops = Object.entries(HEAT_GRADIENT)
     .map(([offset, color]) => `${color} ${Math.round(Number(offset) * 100)}%`)
     .join(', ');
 
-/** `zones` adds the key for the under-used areas overlay. */
-export default function HeatmapLegend({ dark = false, zones = false }: { dark?: boolean; zones?: boolean }) {
+/** `perimetro` adds the key for the highlighted rodeo perimeter. */
+export default function HeatmapLegend({ dark = false, perimetro = false }: { dark?: boolean; perimetro?: boolean }) {
     const text = dark ? '#7A9CC0' : '#718096';
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 160 }}>
@@ -16,10 +16,10 @@ export default function HeatmapLegend({ dark = false, zones = false }: { dark?: 
                 <span>Baja concentración</span>
                 <span>Alta</span>
             </div>
-            {zones && (
+            {perimetro && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 500, color: dark ? '#A8C8E8' : '#718096' }}>
-                    <span className="hm-zone-swatch sm" />
-                    <span>Sin pisar en el período</span>
+                    <span className="hm-peri-swatch sm" />
+                    <span>Perímetro del rodeo</span>
                 </div>
             )}
         </div>
