@@ -1,3 +1,4 @@
+import type { PerimetroResponse } from '../../api/perimetrosApi';
 import type { HeatFilter } from './types';
 
 const DAY = 86400000;
@@ -15,5 +16,10 @@ export function thisMonthRange(today = new Date()): { from: number; to: number }
 }
 
 export function defaultHeatFilter(firstRodeoId: number | null): HeatFilter {
-    return { scope: 'rodeo', rodeoId: firstRodeoId, animalId: null, underused: false, ...thisMonthRange() };
+    return { scope: 'rodeo', rodeoId: firstRodeoId, animalId: null, perimetro: false, ...thisMonthRange() };
+}
+
+/** Active perimeters assigned to a rodeo (a perimeter lists the rodeos it applies to in `loteIds`). */
+export function perimetrosDeRodeo(perimetros: PerimetroResponse[], rodeoId: number | null): PerimetroResponse[] {
+    return rodeoId == null ? [] : perimetros.filter(p => p.activo && p.loteIds.includes(rodeoId));
 }

@@ -1,14 +1,8 @@
 import axiosClient from '../../api/axiosClient';
-import { groupZonas } from './heatmapZonas';
-import type { HeatLatLngTuple, HeatQuery, ZonaSubutilizada } from './types';
+import type { HeatLatLngTuple, HeatQuery } from './types';
 
 export interface HeatContext {
     establecimientoId: number | null;
-}
-
-export interface HeatData {
-    points: HeatLatLngTuple[];
-    zonas: ZonaSubutilizada[];
 }
 
 /** The backend answered 206: ml-geo is degraded, so an empty map would be misleading. */
@@ -21,7 +15,6 @@ export class HeatUnavailableError extends Error {
 /** Shape of GET /mapa-calor (GeoAnalyzeResponseDTO). */
 interface MapaCalorResponse {
     mapa_calor: { lat: number; lng: number; intensidad: number }[];
-    celdas_subutilizadas: { lat_step: number; lng_step: number; celdas: { lat: number; lng: number }[] } | null;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -47,18 +40,12 @@ export function heatQueryParams(filter: HeatQuery, ctx: HeatContext): Record<str
 }
 
 /** Real heatmap data: GET /mapa-calor. Empty cells are dropped; only the intensity is drawn. */
-export async function fetchHeatPoints(filter: HeatQuery, ctx: HeatContext): Promise<HeatData> {
+export async function fetchHeatPoints(filter: HeatQuery, ctx: HeatContext): Promise<HeatLatLngTuple[]> {
     const params = heatQueryParams(filter, ctx);
-    if (!params) return { points: [], zonas: [] };
+    if (!params) return [];
 
     const res = await axiosClient.get<MapaCalorResponse>('/mapa-calor', { params });
     if (res.status === 206) throw new HeatUnavailableError();
 
-    const { mapa_calor, celdas_subutilizadas } = res.data;
-    return {
-        points: mapa_calor.filter(c => c.intensidad > 0).map(c => [c.lat, c.lng, c.intensidad]),
-        zonas: celdas_subutilizadas
-            ? groupZonas(celdas_subutilizadas.celdas, celdas_subutilizadas.lat_step, celdas_subutilizadas.lng_step)
-            : [],
-    };
+    return res.data.mapa_calor.filter(c => c.intensidad > 0).map(c => [c.lat, c.lng, c.intensidad]);
 }

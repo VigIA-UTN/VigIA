@@ -12,7 +12,7 @@ export const HEAT_GRADIENT: Record<number, string> = {
 export type HeatScope = 'todo' | 'rodeo' | 'animal';
 
 /** What decides the request (everything in HeatFilter but the overlay toggle). */
-export type HeatQuery = Omit<HeatFilter, 'underused'>;
+export type HeatQuery = Omit<HeatFilter, 'perimetro'>;
 
 export interface HeatFilter {
     scope: HeatScope;
@@ -21,17 +21,8 @@ export interface HeatFilter {
     /** inclusive day range, epoch ms at local midnight */
     from: number;
     to: number;
-    /** overlay the field areas the selected rodeo did not step on (rodeo scope only); does not affect the request */
-    underused: boolean;
-}
-
-/** [[south, west], [north, east]] */
-export type CellBounds = [[number, number], [number, number]];
-
-/** Contiguous group of under-used grid cells. */
-export interface ZonaSubutilizada {
-    id: number;
-    cells: CellBounds[];
+    /** highlight the selected rodeo's active perimeter on the map (rodeo scope only); does not affect the request */
+    perimetro: boolean;
 }
 
 /** Animal as the heatmap panel needs it (built by the host page from AnimalResponse). */

@@ -37,19 +37,9 @@ class MatrizDensidad(BaseModel):
     intensidad: float
     subutilizada: bool = False
 
-class CeldaSubutilizada(BaseModel):
-    lat: float
-    lng: float
-
-class CeldasSubutilizadas(BaseModel):
-    lat_step: float
-    lng_step: float
-    celdas: List[CeldaSubutilizada]
-
 class GeoAnalyzeResponse(BaseModel):
     mapa_calor: List[MatrizDensidad]
     alertas: List[AlertaAnimal]
-    celdas_subutilizadas: Optional[CeldasSubutilizadas] = None
 
 GRID_SIZE = 20  # Grilla de 20x20
 UMBRAL_SUBUTILIZADA = 0.15
@@ -91,7 +81,7 @@ def analyze(payload: GeoAnalyzeRequest):
     en los últimos 7 días.
     """
     if not payload.historial_7d:
-        return GeoAnalyzeResponse(mapa_calor=[], alertas=[], celdas_subutilizadas=None)
+        return GeoAnalyzeResponse(mapa_calor=[], alertas=[])
 
     # Animales cuyo mapa de calor se pide; None = todos los del historial
     ids = payload.animal_ids
@@ -100,7 +90,6 @@ def analyze(payload: GeoAnalyzeRequest):
     puntos_mapa = payload.historial_7d if ids is None else [p for p in payload.historial_7d if p.animal_id in set(ids)]
 
     mapa_calor = []
-    celdas_subutilizadas = None
     if puntos_mapa:
         # Mapa de calor: la grilla se ajusta a los puntos filtrados para no perder detalle
         min_lat, min_lng, lat_step, lng_step = _grilla(puntos_mapa)
@@ -111,18 +100,6 @@ def analyze(payload: GeoAnalyzeRequest):
                 intensidad=intensidad,
                 subutilizada=intensidad <= UMBRAL_SUBUTILIZADA,
             ))
-
-        # Zonas subutilizadas: grilla sobre TODO el campo, contando solo los puntos filtrados
-        f_lat, f_lng, f_lat_step, f_lng_step = _grilla(payload.historial_7d)
-        celdas_subutilizadas = CeldasSubutilizadas(
-            lat_step=f_lat_step,
-            lng_step=f_lng_step,
-            celdas=[
-                CeldaSubutilizada(lat=f_lat + (i + 0.5) * f_lat_step, lng=f_lng + (j + 0.5) * f_lng_step)
-                for (i, j), intensidad in _intensidades(puntos_mapa, f_lat, f_lng, f_lat_step, f_lng_step)
-                if intensidad <= UMBRAL_SUBUTILIZADA
-            ],
-        )
 
     # Umbral de aislamiento en metros. Configurable para alertar si un animal se aleja demasiado.
     UMBRAL_AISLAMIENTO_METROS = 100.0
@@ -169,4 +146,4 @@ def analyze(payload: GeoAnalyzeRequest):
                 alerta_aislamiento=distancia_centroide > UMBRAL_AISLAMIENTO_METROS
             ))
 
-    return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas, celdas_subutilizadas=celdas_subutilizadas)
+    return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas)

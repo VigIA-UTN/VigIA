@@ -238,7 +238,7 @@ export default function ActividadTab({ animalId, establecimientoId }: ActividadT
     // mapa ampliado: oculta el panel (calendario) y el mapa ocupa todo el ancho
     const [mapExpanded, setMapExpanded] = useState(() => window.innerWidth < 900); // en pantallas angostas el panel taparía el mapa
     const heatFilter = useMemo<HeatFilter>(
-        () => ({ scope: 'animal', rodeoId: null, animalId, underused: false, ...heatRange }),
+        () => ({ scope: 'animal', rodeoId: null, animalId, perimetro: false, ...heatRange }),
         [animalId, heatRange],
     );
     const { points: heatPoints, loading: heatLoading, error: heatError } = useHeatPoints(heatFilter, { establecimientoId });
