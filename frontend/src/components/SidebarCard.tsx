@@ -11,6 +11,15 @@ const SEVERIDAD = {
 };
 const APAGADO = { bg: '#EDF2F7', fg: '#A0AEC0' };
 
+export interface Categoria {
+  /** Color de categoría, consistente con las tarjetas de resumen del mapa. */
+  color: string;
+  /** Clase bootstrap-icons para el badge de categoría. */
+  icono: string;
+  /** Nombre de categoría, usado como accesible/title del badge. */
+  label: string;
+}
+
 interface SidebarCardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   severidad?: Severidad | 'PERIMETRO';
   icono: string; // clase bootstrap-icons
@@ -24,6 +33,8 @@ interface SidebarCardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'>
   apagada?: boolean;
   seleccionada?: boolean;
   acciones?: ReactNode;
+  /** Badge de categoría (reproductivo/sanitario/geoespacial) superpuesto al ícono. */
+  categoria?: Categoria;
 }
 
 const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
@@ -39,6 +50,7 @@ export default function SidebarCard({
   apagada = false,
   seleccionada = false,
   acciones,
+  categoria,
   ...rest
 }: SidebarCardProps) {
   const c = SEVERIDAD[severidad] ?? SEVERIDAD.MEDIA;
@@ -65,14 +77,31 @@ export default function SidebarCard({
       >
         {acento && <div style={{ width: 6, flexShrink: 0, backgroundColor: c.bar }} />}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              width: 45, height: 45, borderRadius: 12, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backgroundColor: disco.bg, color: disco.fg,
-            }}
-          >
-            <i className={`bi ${icono} fs-4`} />
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div
+              style={{
+                width: 45, height: 45, borderRadius: 12,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backgroundColor: disco.bg, color: disco.fg,
+              }}
+            >
+              <i className={`bi ${icono} fs-4`} />
+            </div>
+            {categoria && (
+              <div
+                title={categoria.label}
+                aria-label={categoria.label}
+                style={{
+                  position: 'absolute', bottom: -4, right: -4,
+                  width: 18, height: 18, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: apagada ? '#A0AEC0' : categoria.color,
+                  border: '2px solid #fff',
+                }}
+              >
+                <i className={`bi ${categoria.icono}`} style={{ fontSize: 9, color: '#fff' }} />
+              </div>
+            )}
           </div>
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div

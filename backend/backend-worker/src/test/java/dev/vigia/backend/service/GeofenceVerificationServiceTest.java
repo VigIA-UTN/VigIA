@@ -64,8 +64,7 @@ class GeofenceVerificationServiceTest {
                         new CoordenadaDTO(-34.0, -58.0),
                         new CoordenadaDTO(-34.0, -57.0),
                         new CoordenadaDTO(-35.0, -57.0),
-                        new CoordenadaDTO(-35.0, -58.0)
-                )));
+                        new CoordenadaDTO(-35.0, -58.0))));
     }
 
     @Test
@@ -105,12 +104,14 @@ class GeofenceVerificationServiceTest {
         verifyNoInteractions(rabbitTemplate);
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Si el animal está fuera del perímetro, genera alerta FUERA_DE_PERIMETRO y publica a RabbitMQ")
     void animalFueraDePerimetro_generaAlertaYPublicaRabbit() {
         when(perimetroRepository.findPerimetrosActivosByLoteId(100L)).thenReturn(List.of(perimetro));
         when(perimetroRepository.findPerimetrosQueContienen(100L, -40.0, -60.0)).thenReturn(Collections.emptyList());
-        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(eq(animal), eq(DisparadorAlerta.FUERA_DE_PERIMETRO), any()))
+        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(eq(animal),
+                eq(DisparadorAlerta.FUERA_DE_PERIMETRO), any()))
                 .thenReturn(false);
 
         when(alertaRepository.save(any(Alerta.class))).thenAnswer(inv -> {
@@ -131,17 +132,20 @@ class GeofenceVerificationServiceTest {
                 .isEqualTo("Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.");
 
         ArgumentCaptor<AlertaEventDTO> eventCaptor = ArgumentCaptor.forClass(AlertaEventDTO.class);
-        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), eventCaptor.capture());
+        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""),
+                eventCaptor.capture());
         assertThat(eventCaptor.getValue().getAccionRecomendada())
                 .isEqualTo("Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.");
     }
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("Si el animal está fuera de perímetro pero ya tiene alerta reciente, omite por cooldown")
     void animalFueraDePerimetroConAlertaReciente_omitePorCooldown() {
         when(perimetroRepository.findPerimetrosActivosByLoteId(100L)).thenReturn(List.of(perimetro));
         when(perimetroRepository.findPerimetrosQueContienen(100L, -40.0, -60.0)).thenReturn(Collections.emptyList());
-        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(eq(animal), eq(DisparadorAlerta.FUERA_DE_PERIMETRO), any()))
+        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(eq(animal),
+                eq(DisparadorAlerta.FUERA_DE_PERIMETRO), any()))
                 .thenReturn(true);
 
         geofenceVerificationService.verificarPosicion(animal, -40.0, -60.0, LocalDateTime.now());

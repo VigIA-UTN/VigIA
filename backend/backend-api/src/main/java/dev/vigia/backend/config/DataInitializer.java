@@ -173,8 +173,22 @@ public class DataInitializer implements CommandLineRunner {
         // para disparar el indicador "sin datos recientes" en el mapa (H0012).
         crearTelemetria(vaca3.getCaravana(), -34.943317, -59.225728, 45.0, LocalDateTime.now().minusHours(1), telemetriaRepository);
 
+        // Historial de pastoreo de 7 días para el mapa de calor (H0025): sin esto
+        // el rango por defecto del mapa (7 días) se alimenta de un solo animal con
+        // 24hs y de cuatro puntos sueltos, y tanto el heatmap como el filtro por
+        // rodeo quedan vacíos. Cada historial termina un tick ANTES de la posición
+        // reciente de arriba, para no alterar los indicadores del Acto 3.
+        LocalDateTime ahoraPastoreo = LocalDateTime.now();
+        sembrarHistorialPastoreo(vaca2.getCaravana(), -34.9448, -59.2241, 79.0, 7, ahoraPastoreo.minusMinutes(21), telemetriaRepository);
+        sembrarHistorialPastoreo(vaca4.getCaravana(), -34.9421, -59.2279, 94.0, 7, ahoraPastoreo.minusMinutes(17), telemetriaRepository);
+        sembrarHistorialPastoreo(vaca5.getCaravana(), -34.9455, -59.2260, 67.0, 7, ahoraPastoreo.minusMinutes(25), telemetriaRepository);
+        sembrarHistorialPastoreo(vaca3.getCaravana(), -34.943317, -59.225728, 48.0, 7, ahoraPastoreo.minusMinutes(75), telemetriaRepository);
+        // vaca1 completa los 6 días previos a su ventana de celo (que arranca en -24hs).
+        sembrarHistorialPastoreo(vaca1.getCaravana(), -34.9430, -59.2255, 92.0, 6, ahoraPastoreo.minusHours(24).minusMinutes(15), telemetriaRepository);
+
         log.info("[DataInitializer] ✅ Telemetría cargada — 3 animales con posición reciente, "
-                + "vaca1 con 24hs de historial en patrón de celo, 1 en estado 'sin datos recientes'.");
+                + "vaca1 con 24hs de historial en patrón de celo, 1 en estado 'sin datos recientes', "
+                + "y 7 días de historial de pastoreo en los 5 animales para el mapa de calor.");
 
         // ── Acto 4: Alertas sanitarias (demo de la vista de detalle sanitario) ──
         // El detalle sanitario del endpoint /api/v1/alertas/{id} devuelve un
@@ -463,6 +477,73 @@ public class DataInitializer implements CommandLineRunner {
             t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
             telemetriaRepository.save(t);
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Historial de pastoreo para el mapa de calor (H0025).
+    //
+    // A diferencia de sembrarHistorialCelo, que reproduce el patrón de actividad
+    // que el modelo de celo tiene que detectar, acá solo importa DÓNDE estuvo el
+    // animal: una caminata aleatoria con atracción a la aguada, para que el mapa
+    // muestre zonas calientes (donde abreva el rodeo), zonas de uso medio y
+    // rincones poco visitados, que es lo que pide el criterio de aceptación.
+    //
+    // Un punto cada 15 min (no cada 5 como el historial de celo) alcanza de sobra
+    // para una grilla de 20x20 y mantiene el arranque liviano: ~672 filas por
+    // animal para 7 días. Se marca COMPLETADO para no disparar los jobs de ML.
+    // ---------------------------------------------------------------------------
+    private void sembrarHistorialPastoreo(Caravana caravana, double latInicial, double lonInicial,
+                                          double bateriaInicial, int dias, LocalDateTime ultimaFecha,
+                                          TelemetriaRepository telemetriaRepository) {
+        final int TICK_SEGUNDOS = 900;
+        final double PASO_DEG_POR_TICK = 0.000054;   // pastoreo normal en un tick de 15 min
+        final double TURN_STD = 0.9;
+        final double PROB_IR_A_LA_AGUADA = 0.12;
+        final double RADIO_POTRERO_DEG = 0.004;      // ~450 m alrededor de la aguada
+        final double AGUADA_LAT = -34.9440;
+        final double AGUADA_LON = -59.2250;
+        final int MOVESTATE_PASTOREO_MIN = 2;
+        final int MOVESTATE_PASTOREO_MAX = 5;
+
+        Random rnd = new Random();
+        double lat = latInicial;
+        double lon = lonInicial;
+        double heading = rnd.nextDouble() * 2 * Math.PI;
+        double bateria = bateriaInicial;
+
+        int muestras = (int) ((long) dias * 24 * 3600 / TICK_SEGUNDOS);
+        List<Telemetria> historial = new ArrayList<>(muestras);
+
+        for (int i = muestras; i >= 1; i--) {
+            LocalDateTime fecha = ultimaFecha.minusSeconds((long) (i - 1) * TICK_SEGUNDOS);
+
+            double dLat = AGUADA_LAT - lat;
+            double dLon = AGUADA_LON - lon;
+            boolean fueraDelPotrero = Math.hypot(dLat, dLon) > RADIO_POTRERO_DEG;
+            if (fueraDelPotrero || rnd.nextDouble() < PROB_IR_A_LA_AGUADA) {
+                heading = Math.atan2(dLon, dLat);    // rumbo hacia la aguada
+            } else {
+                heading += rnd.nextGaussian() * TURN_STD;
+            }
+
+            lat += PASO_DEG_POR_TICK * Math.cos(heading);
+            lon += PASO_DEG_POR_TICK * Math.sin(heading);
+            bateria = Math.max(5.0, bateria - 0.005);
+
+            Telemetria t = new Telemetria();
+            t.setCaravana(caravana);
+            t.setFechaHora(fecha);
+            t.setLatitud(lat);
+            t.setLongitud(lon);
+            t.setMoveState(MOVESTATE_PASTOREO_MIN
+                    + rnd.nextInt(MOVESTATE_PASTOREO_MAX - MOVESTATE_PASTOREO_MIN + 1));
+            t.setBateria(bateria);
+            t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+            t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+            historial.add(t);
+        }
+
+        telemetriaRepository.saveAll(historial);
     }
 
     private void crearTelemetria(Caravana caravana, double lat, double lon, double bateria,

@@ -173,6 +173,24 @@ class MapaCalorServiceImplTest {
     }
 
     @Test
+    @DisplayName("Caravana sin animal: su telemetría queda fuera del análisis")
+    void caravanaSinAnimal() {
+        usuarioProductor();
+        Animal a1 = animal(1L, establecimiento);
+        Telemetria huerfana = telemetria(a1, -34.5, -59.5);
+        huerfana.getCaravana().setAnimal(null);
+        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
+                .thenReturn(List.of(telemetria(a1, -34.0, -59.0), huerfana));
+        when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
+
+        service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, null, null);
+
+        GeoAnalyzeRequestDTO request = requestEnviadoAMl();
+        assertThat(request.getHistorial7d()).hasSize(1);
+        assertThat(request.getHistorial7d().get(0).getAnimalId()).isEqualTo("1");
+    }
+
+    @Test
     @DisplayName("Animal y rodeo a la vez: IllegalArgumentException sin llamar a ml-geo")
     void animalYRodeo() {
         assertThatThrownBy(() -> service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, 1L, 5L))

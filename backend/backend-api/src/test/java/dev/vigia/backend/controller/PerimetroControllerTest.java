@@ -126,6 +126,7 @@ class PerimetroControllerTest {
                                 new CoordenadaDTO(-35.0, -58.0));
         }
 
+        @SuppressWarnings("null")
         @Test
         @DisplayName("POST /api/v1/perimetros - Productor crea perímetro exitosamente")
         void crearPerimetro_success() throws Exception {
@@ -149,6 +150,7 @@ class PerimetroControllerTest {
                                 .andExpect(jsonPath("$.coordenadas").isArray());
         }
 
+        @SuppressWarnings("null")
         @Test
         @DisplayName("POST /api/v1/perimetros - Rechaza creación si faltan coordenadas (menos de 3)")
         void crearPerimetro_invalido_menosDe3Puntos() throws Exception {
@@ -167,6 +169,7 @@ class PerimetroControllerTest {
                                 .andExpect(status().isBadRequest());
         }
 
+        @SuppressWarnings("null")
         @Test
         @DisplayName("GET /api/v1/perimetros - Listar perímetros de un establecimiento")
         void listarPerimetros_success() throws Exception {
@@ -192,6 +195,7 @@ class PerimetroControllerTest {
                                 .andExpect(jsonPath("$[0].nombre").value("Perímetro 1"));
         }
 
+        @SuppressWarnings("null")
         @Test
         @DisplayName("PATCH /api/v1/perimetros/{id}/desactivar y activar - Cambia estado")
         void activarDesactivar_success() throws Exception {

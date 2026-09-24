@@ -33,6 +33,7 @@ class ApiKeyInterceptorTest {
         interceptor = new ApiKeyInterceptor();
     }
 
+    @SuppressWarnings("null")
     private void configurarApiKey(String apiKey) {
         ReflectionTestUtils.setField(interceptor, "configuredApiKey", apiKey);
     }

@@ -1,5 +1,5 @@
 import type { AlertaResponse } from '../api/alertaApi';
-import SidebarCard, { type Severidad } from './SidebarCard';
+import SidebarCard, { type Categoria, type Severidad } from './SidebarCard';
 
 interface AlertNotificationCardProps {
   alerta: AlertaResponse;
@@ -14,6 +14,13 @@ const ICONO: Record<string, string> = {
   SALUD: 'bi-heart-pulse',
   GEOESPACIAL: 'bi-globe-americas',
   ABIGEATO: 'bi-globe-americas',
+};
+// Colores alineados con las tarjetas de resumen de MapPage (Reproductivo/Sanitario/Geoespacial).
+const CATEGORIA: Record<string, Categoria> = {
+  CELO: { label: 'Reproductivo', color: '#0d6efd', icono: 'bi-arrow-through-heart' },
+  SALUD: { label: 'Sanitario', color: '#198754', icono: 'bi-heart-pulse' },
+  GEOESPACIAL: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
+  ABIGEATO: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
 };
 
 function haceCuanto(ts: string) {
@@ -46,17 +53,21 @@ export default function AlertNotificationCard({
   const resuelta = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
   // Severidad: el backend manda ALTA/MEDIA/BAJA. Fallback por tipo mientras no llegue.
   const severidad: Severidad = alerta.severidad ?? (alerta.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
-  const tipo = alerta.tipo?.toLowerCase() || 'desconocida';
 
   return (
     <SidebarCard
       severidad={severidad}
       icono={ICONO[alerta.tipo] ?? 'bi-exclamation-triangle-fill'}
+      categoria={CATEGORIA[alerta.tipo]}
       titulo={`#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
-      cuerpo={<div>
-        <div>{alerta.tipo === 'CELO' ? `Se estima alerta de ${tipo}` : `Alerta de ${tipo}`}</div>
-        <div className='text-truncate'>{textoAccionRecomendada(alerta)}</div>
-      </div>}
+      cuerpo={
+        <div
+          title={textoAccionRecomendada(alerta)}
+          style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+        >
+          {textoAccionRecomendada(alerta)}
+        </div>
+      }
       timestamp={haceCuanto(alerta.tsGeneracion)}
       acento={isUnread}
       apagada={resuelta}

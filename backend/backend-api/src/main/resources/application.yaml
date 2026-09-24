@@ -68,9 +68,17 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+      geoML:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
   retry:
     instances:
       celoML:
+        maxAttempts: 2
+        waitDuration: 500ms
+      geoML:
         maxAttempts: 2
         waitDuration: 500ms
   timelimiter:

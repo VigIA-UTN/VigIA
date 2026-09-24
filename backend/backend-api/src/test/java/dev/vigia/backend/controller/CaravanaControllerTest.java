@@ -49,527 +49,547 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("CaravanaController — Tests")
 class CaravanaControllerTest {
 
-    @MockBean
-    private ConnectionFactory connectionFactory;
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private EstablecimientoRepository establecimientoRepository;
-
-    @Autowired
-    private CaravanaRepository caravanaRepository;
-
-    @Autowired
-    private AnimalRepository animalRepository;
-
-    @Autowired
-    private RodeoLoteRepository rodeoLoteRepository;
-
-    @Autowired
-    private InvitacionRepository invitacionRepository;
-
-    @Autowired
-    private EstadoReproductivoRepository estadoReproductivoRepository;
-
-    @Autowired
-    private EstadoSaludRepository estadoSaludRepository;
-
-    @Autowired
-    private AlertaRepository alertaRepository;
-
-    @Autowired
-    private IntervencionRepository intervencionRepository;
-
-    @Autowired
-    private TelemetriaRepository telemetriaRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private AuthService authService;
-
-    private String adminToken;
-    private String productorToken;
-    private Long establecimientoId;
-    private Long otroEstablecimientoId;
-
-    @BeforeEach
-    @SuppressWarnings("null")
-    void setUp() throws Exception {
-        // Limpieza completa en el mismo orden que DataInitializer, para no chocar con
-        // filas que puedan haber quedado de otras clases de test que comparten el
-        // mismo contexto/DB H2 dentro de la misma corrida de la suite.
-        telemetriaRepository.deleteAll();
-        intervencionRepository.deleteAll();
-        alertaRepository.deleteAll();
-        estadoReproductivoRepository.deleteAll();
-        estadoSaludRepository.deleteAll();
-        invitacionRepository.deleteAll();
-        animalRepository.deleteAll();
-        caravanaRepository.deleteAll();
-        rodeoLoteRepository.deleteAll();
-        establecimientoRepository.deleteAll();
-        usuarioRepository.deleteAll();
-        usuarioRepository.flush();
-        authService.clearCacheForTests();
-
-        Usuario admin = new Usuario();
-        admin.setEmail("admin@vigia.dev");
-        admin.setPasswordHash(passwordEncoder.encode("admin123"));
-        admin.setNombre("Admin");
-        admin.setRol(Rol.ADMINISTRADOR);
-        admin.setActivo(true);
-        usuarioRepository.save(admin);
-
-        Usuario productor = new Usuario();
-        productor.setEmail("productor@vigia.dev");
-        productor.setPasswordHash(passwordEncoder.encode("prod123"));
-        productor.setNombre("Productor");
-        productor.setRol(Rol.PRODUCTOR);
-        productor.setActivo(true);
-        usuarioRepository.save(productor);
-
-        adminToken = getTokenFor("admin@vigia.dev", "admin123");
-        productorToken = getTokenFor("productor@vigia.dev", "prod123");
-
-        Establecimiento est = new Establecimiento();
-        est.setNombre("Establecimiento Test");
-        est.setLatitud(-34.0);
-        est.setLongitud(-58.0);
-        est.setActivo(true);
-        est.setFechaAlta(LocalDate.now());
-        est.setEmpleados(new ArrayList<>());
-        est.getEmpleados().add(new Empleado(est, productor));
-        est = establecimientoRepository.save(est);
-        establecimientoId = est.getId();
-
-        Establecimiento otroEst = new Establecimiento();
-        otroEst.setNombre("Otro Establecimiento");
-        otroEst.setLatitud(-33.0);
-        otroEst.setLongitud(-57.0);
-        otroEst.setActivo(true);
-        otroEst.setFechaAlta(LocalDate.now());
-        otroEst.setEmpleados(new ArrayList<>());
-        otroEst = establecimientoRepository.save(otroEst);
-        otroEstablecimientoId = otroEst.getId();
-    }
-
-    @SuppressWarnings("null")
-    private String getTokenFor(String email, String password) throws Exception {
-        AuthRequest body = new AuthRequest(email, password);
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("token").asText();
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/caravana - Admin registra una caravana DISPONIBLE, sin codigo ni animal")
-    void crearCaravana_asAdmin_sinCodigo_success() throws Exception {
-        Map<String, Object> body = Map.of(
-                "dev_eui", "AA-BB-CC-DD-01",
-                "alias", "Collar Norte",
-                "establecimientoId", establecimientoId);
-
-        mockMvc.perform(post("/api/v1/caravana")
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.devEui").value("AA-BB-CC-DD-01"))
-                .andExpect(jsonPath("$.alias").value("Collar Norte"))
-                .andExpect(jsonPath("$.estadoSensor").value("DISPONIBLE"))
-                .andExpect(jsonPath("$.establecimientoId").value(establecimientoId))
-                .andExpect(jsonPath("$.codigo").doesNotExist())
-                .andExpect(jsonPath("$.animalId").doesNotExist());
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/caravana - Admin registra una caravana con idCaravanaOficial")
-    void crearCaravana_asAdmin_conCodigo_success() throws Exception {
-        Map<String, Object> body = Map.of(
-                "dev_eui", "AA-BB-CC-DD-05",
-                "idCaravanaOficial", "CAR-001",
-                "establecimientoId", establecimientoId);
-
-        mockMvc.perform(post("/api/v1/caravana")
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.codigo").value("CAR-001"))
-                .andExpect(jsonPath("$.fechaAsignacion").exists());
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/caravana - Rechaza dev_eui duplicado con 409")
-    void crearCaravana_devEuiDuplicado_conflict() throws Exception {
-        Map<String, Object> body = Map.of(
-                "dev_eui", "AA-BB-CC-DD-02",
-                "establecimientoId", establecimientoId);
-
-        mockMvc.perform(post("/api/v1/caravana")
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isCreated());
-
-        mockMvc.perform(post("/api/v1/caravana")
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isConflict());
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/caravana - Rechaza idCaravanaOficial duplicado con 400")
-    void crearCaravana_codigoDuplicado_badRequest() throws Exception {
-        Map<String, Object> body1 = Map.of(
-                "dev_eui", "AA-BB-CC-DD-06",
-                "idCaravanaOficial", "CAR-DUP",
-                "establecimientoId", establecimientoId);
-        Map<String, Object> body2 = Map.of(
-                "dev_eui", "AA-BB-CC-DD-07",
-                "idCaravanaOficial", "CAR-DUP",
-                "establecimientoId", establecimientoId);
-
-        mockMvc.perform(post("/api/v1/caravana")
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body1)))
-                .andExpect(status().isCreated());
-
-        mockMvc.perform(post("/api/v1/caravana")
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body2)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/caravana - Usuario no-Admin recibe 403 Forbidden")
-    void crearCaravana_asProductor_forbidden() throws Exception {
-        Map<String, Object> body = Map.of(
-                "dev_eui", "AA-BB-CC-DD-03",
-                "establecimientoId", establecimientoId);
-
-        mockMvc.perform(post("/api/v1/caravana")
-                .header("Authorization", "Bearer " + productorToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/caravana - Establecimiento inexistente responde 404")
-    void crearCaravana_establecimientoInexistente_notFound() throws Exception {
-        Map<String, Object> body = Map.of(
-                "dev_eui", "AA-BB-CC-DD-04",
-                "establecimientoId", 999999L);
-
-        mockMvc.perform(post("/api/v1/caravana")
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/caravana - dev_eui vacio responde 400")
-    void crearCaravana_devEuiVacio_badRequest() throws Exception {
-        Map<String, Object> body = Map.of(
-                "dev_eui", "",
-                "establecimientoId", establecimientoId);
-
-        mockMvc.perform(post("/api/v1/caravana")
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/caravana - Lista las caravanas del establecimiento, con el animal vinculado si corresponde")
-    void listarCaravanas_incluyeDisponibleYVinculada() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-
-        Caravana disponible = new Caravana();
-        disponible.setDevEui("SENSOR-DISPONIBLE");
-        disponible.setEstablecimiento(est);
-        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
-        disponible.setActivo(false);
-        caravanaRepository.save(disponible);
-
-        Caravana vinculada = new Caravana();
-        vinculada.setDevEui("SENSOR-VINCULADO");
-        vinculada.setEstablecimiento(est);
-        vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
-        vinculada.setActivo(true);
-        vinculada = caravanaRepository.save(vinculada);
-
-        Animal animal = new Animal(est, null);
-        animal.setAlias("Lola");
-        animal.setEstadoActual(dev.vigia.backend.model.EstadoAnimal.ACTIVO);
-        animal.setCaravana(vinculada);
-        animalRepository.save(animal);
-
-        // Caravana de otro establecimiento: no debe aparecer en el listado.
-        Establecimiento otroEst = establecimientoRepository.findById(otroEstablecimientoId).orElseThrow();
-        Caravana deOtroEstablecimiento = new Caravana();
-        deOtroEstablecimiento.setDevEui("SENSOR-OTRO-EST");
-        deOtroEstablecimiento.setEstablecimiento(otroEst);
-        deOtroEstablecimiento.setEstadoSensor(EstadoSensor.DISPONIBLE);
-        caravanaRepository.save(deOtroEstablecimiento);
-
-        mockMvc.perform(get("/api/v1/caravana")
-                .param("establecimientoId", establecimientoId.toString())
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-DISPONIBLE')].estadoSensor").value("DISPONIBLE"))
-                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-VINCULADO')].estadoSensor").value("VINCULADO"))
-                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-VINCULADO')].animalAlias").value("Lola"));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/caravana - Productor con acceso al establecimiento puede listar")
-    void listarCaravanas_asProductorConAcceso_success() throws Exception {
-        mockMvc.perform(get("/api/v1/caravana")
-                .param("establecimientoId", establecimientoId.toString())
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/caravana - Productor sin acceso al establecimiento recibe 403")
-    void listarCaravanas_asProductorSinAcceso_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/caravana")
-                .param("establecimientoId", otroEstablecimientoId.toString())
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/caravana - Establecimiento inexistente responde 404")
-    void listarCaravanas_establecimientoInexistente_notFound() throws Exception {
-        mockMvc.perform(get("/api/v1/caravana")
-                .param("establecimientoId", "999999")
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/caravana - Filtra por estado y codigo cuando se pasan como query params")
-    void listarCaravanas_filtraPorEstadoYCodigo() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-
-        Caravana disponibleConCodigo = new Caravana();
-        disponibleConCodigo.setDevEui("SENSOR-FILTRO-1");
-        disponibleConCodigo.setCodigo("CAR-100");
-        disponibleConCodigo.setEstablecimiento(est);
-        disponibleConCodigo.setEstadoSensor(EstadoSensor.DISPONIBLE);
-        caravanaRepository.save(disponibleConCodigo);
-
-        Caravana vinculadaConCodigo = new Caravana();
-        vinculadaConCodigo.setDevEui("SENSOR-FILTRO-2");
-        vinculadaConCodigo.setCodigo("CAR-200");
-        vinculadaConCodigo.setEstablecimiento(est);
-        vinculadaConCodigo.setEstadoSensor(EstadoSensor.VINCULADO);
-        caravanaRepository.save(vinculadaConCodigo);
-
-        mockMvc.perform(get("/api/v1/caravana")
-                .param("establecimientoId", establecimientoId.toString())
-                .param("estado", "DISPONIBLE")
-                .param("codigo", "CAR-100")
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].devEui").value("SENSOR-FILTRO-1"));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/caravana/disponibles debe retornar únicamente las caravanas en estado DISPONIBLE")
-    void listarCaravanasDisponibles_retornaSoloDisponibles() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-
-        Caravana disponible = new Caravana();
-        disponible.setDevEui("SENSOR-SOLO-DISPONIBLE");
-        disponible.setEstablecimiento(est);
-        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
-        caravanaRepository.save(disponible);
-
-        Caravana vinculada = new Caravana();
-        vinculada.setDevEui("SENSOR-YA-VINCULADO");
-        vinculada.setEstablecimiento(est);
-        vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
-        caravanaRepository.save(vinculada);
-
-        mockMvc.perform(get("/api/v1/caravana/disponibles")
-                .param("establecimientoId", establecimientoId.toString())
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-SOLO-DISPONIBLE')].estadoSensor").value("DISPONIBLE"))
-                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-YA-VINCULADO')]").doesNotExist());
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/caravana/disponibles - Veterinario recibe 403")
-    void listarCaravanasDisponibles_veterinario_forbidden() throws Exception {
-        Usuario vet = new Usuario();
-        vet.setEmail("vet.disponibles@vigia.dev");
-        vet.setPasswordHash(passwordEncoder.encode("vet123"));
-        vet.setNombre("Veterinario");
-        vet.setRol(Rol.VETERINARIO);
-        vet.setActivo(true);
-        usuarioRepository.save(vet);
-        String vetToken = getTokenFor("vet.disponibles@vigia.dev", "vet123");
-
-        mockMvc.perform(get("/api/v1/caravana/disponibles")
-                .param("establecimientoId", establecimientoId.toString())
-                .header("Authorization", "Bearer " + vetToken))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Admin da de baja una caravana DISPONIBLE")
-    void darDeBajaCaravana_asAdmin_disponible_success() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-        Caravana disponible = new Caravana();
-        disponible.setDevEui("SENSOR-BAJA-1");
-        disponible.setEstablecimiento(est);
-        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
-        disponible = caravanaRepository.save(disponible);
-
-        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", disponible.getId())
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of("motivo", "Collar dañado"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estadoSensor").value("INACTIVO"))
-                .andExpect(jsonPath("$.activo").value(false));
-    }
-
-    @Test
-    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Da de baja una caravana VINCULADO y desvincula el animal")
-    void darDeBajaCaravana_vinculada_desvinculaAnimal() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-        Caravana vinculada = new Caravana();
-        vinculada.setDevEui("SENSOR-BAJA-2");
-        vinculada.setEstablecimiento(est);
-        vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
-        vinculada.setActivo(true);
-        vinculada = caravanaRepository.save(vinculada);
-
-        Animal animal = new Animal(est, null);
-        animal.setAlias("Lola");
-        animal.setEstadoActual(dev.vigia.backend.model.EstadoAnimal.ACTIVO);
-        animal.setCaravana(vinculada);
-        animal = animalRepository.save(animal);
-
-        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", vinculada.getId())
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estadoSensor").value("INACTIVO"))
-                .andExpect(jsonPath("$.animalId").doesNotExist());
-
-        Animal animalActualizado = animalRepository.findById(animal.getId()).orElseThrow();
-        org.assertj.core.api.Assertions.assertThat(animalActualizado.getCaravana()).isNull();
-    }
-
-    @Test
-    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Ya INACTIVO responde 400")
-    void darDeBajaCaravana_yaInactiva_badRequest() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-        Caravana inactiva = new Caravana();
-        inactiva.setDevEui("SENSOR-BAJA-3");
-        inactiva.setEstablecimiento(est);
-        inactiva.setEstadoSensor(EstadoSensor.INACTIVO);
-        inactiva = caravanaRepository.save(inactiva);
-
-        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", inactiva.getId())
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Usuario no-Admin recibe 403 Forbidden")
-    void darDeBajaCaravana_asProductor_forbidden() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-        Caravana disponible = new Caravana();
-        disponible.setDevEui("SENSOR-BAJA-4");
-        disponible.setEstablecimiento(est);
-        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
-        disponible = caravanaRepository.save(disponible);
-
-        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", disponible.getId())
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("PATCH /api/v1/caravana/{id}/reactivar - Admin reactiva una caravana INACTIVO")
-    void reactivarCaravana_asAdmin_success() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-        Caravana inactiva = new Caravana();
-        inactiva.setDevEui("SENSOR-REACT-1");
-        inactiva.setEstablecimiento(est);
-        inactiva.setEstadoSensor(EstadoSensor.INACTIVO);
-        inactiva = caravanaRepository.save(inactiva);
-
-        mockMvc.perform(patch("/api/v1/caravana/{id}/reactivar", inactiva.getId())
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estadoSensor").value("DISPONIBLE"))
-                .andExpect(jsonPath("$.activo").value(false));
-    }
-
-    @Test
-    @DisplayName("PATCH /api/v1/caravana/{id}/reactivar - No INACTIVO responde 400")
-    void reactivarCaravana_noInactiva_badRequest() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-        Caravana disponible = new Caravana();
-        disponible.setDevEui("SENSOR-REACT-2");
-        disponible.setEstablecimiento(est);
-        disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
-        disponible = caravanaRepository.save(disponible);
-
-        mockMvc.perform(patch("/api/v1/caravana/{id}/reactivar", disponible.getId())
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("PATCH /api/v1/caravana/{id}/reactivar - Usuario no-Admin recibe 403 Forbidden")
-    void reactivarCaravana_asProductor_forbidden() throws Exception {
-        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
-        Caravana inactiva = new Caravana();
-        inactiva.setDevEui("SENSOR-REACT-3");
-        inactiva.setEstablecimiento(est);
-        inactiva.setEstadoSensor(EstadoSensor.INACTIVO);
-        inactiva = caravanaRepository.save(inactiva);
-
-        mockMvc.perform(patch("/api/v1/caravana/{id}/reactivar", inactiva.getId())
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("PATCH /api/v1/caravana/{id}/baja - Caravana inexistente responde 404")
-    void darDeBajaCaravana_inexistente_notFound() throws Exception {
-        mockMvc.perform(patch("/api/v1/caravana/{id}/baja", 999999L)
-                .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound());
-    }
+        @MockBean
+        private ConnectionFactory connectionFactory;
+
+        @Autowired
+        private MockMvc mockMvc;
+
+        @Autowired
+        private UsuarioRepository usuarioRepository;
+
+        @Autowired
+        private EstablecimientoRepository establecimientoRepository;
+
+        @Autowired
+        private CaravanaRepository caravanaRepository;
+
+        @Autowired
+        private AnimalRepository animalRepository;
+
+        @Autowired
+        private RodeoLoteRepository rodeoLoteRepository;
+
+        @Autowired
+        private InvitacionRepository invitacionRepository;
+
+        @Autowired
+        private EstadoReproductivoRepository estadoReproductivoRepository;
+
+        @Autowired
+        private EstadoSaludRepository estadoSaludRepository;
+
+        @Autowired
+        private AlertaRepository alertaRepository;
+
+        @Autowired
+        private IntervencionRepository intervencionRepository;
+
+        @Autowired
+        private TelemetriaRepository telemetriaRepository;
+
+        @Autowired
+        private PasswordEncoder passwordEncoder;
+
+        @Autowired
+        private ObjectMapper objectMapper;
+
+        @Autowired
+        private AuthService authService;
+
+        private String adminToken;
+        private String productorToken;
+        private Long establecimientoId;
+        private Long otroEstablecimientoId;
+
+        @BeforeEach
+        @SuppressWarnings("null")
+        void setUp() throws Exception {
+                // Limpieza completa en el mismo orden que DataInitializer, para no chocar con
+                // filas que puedan haber quedado de otras clases de test que comparten el
+                // mismo contexto/DB H2 dentro de la misma corrida de la suite.
+                telemetriaRepository.deleteAll();
+                intervencionRepository.deleteAll();
+                alertaRepository.deleteAll();
+                estadoReproductivoRepository.deleteAll();
+                estadoSaludRepository.deleteAll();
+                invitacionRepository.deleteAll();
+                animalRepository.deleteAll();
+                caravanaRepository.deleteAll();
+                rodeoLoteRepository.deleteAll();
+                establecimientoRepository.deleteAll();
+                usuarioRepository.deleteAll();
+                usuarioRepository.flush();
+                authService.clearCacheForTests();
+
+                Usuario admin = new Usuario();
+                admin.setEmail("admin@vigia.dev");
+                admin.setPasswordHash(passwordEncoder.encode("admin123"));
+                admin.setNombre("Admin");
+                admin.setRol(Rol.ADMINISTRADOR);
+                admin.setActivo(true);
+                usuarioRepository.save(admin);
+
+                Usuario productor = new Usuario();
+                productor.setEmail("productor@vigia.dev");
+                productor.setPasswordHash(passwordEncoder.encode("prod123"));
+                productor.setNombre("Productor");
+                productor.setRol(Rol.PRODUCTOR);
+                productor.setActivo(true);
+                usuarioRepository.save(productor);
+
+                adminToken = getTokenFor("admin@vigia.dev", "admin123");
+                productorToken = getTokenFor("productor@vigia.dev", "prod123");
+
+                Establecimiento est = new Establecimiento();
+                est.setNombre("Establecimiento Test");
+                est.setLatitud(-34.0);
+                est.setLongitud(-58.0);
+                est.setActivo(true);
+                est.setFechaAlta(LocalDate.now());
+                est.setEmpleados(new ArrayList<>());
+                est.getEmpleados().add(new Empleado(est, productor));
+                est = establecimientoRepository.save(est);
+                establecimientoId = est.getId();
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Establecimiento");
+                otroEst.setLatitud(-33.0);
+                otroEst.setLongitud(-57.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst = establecimientoRepository.save(otroEst);
+                otroEstablecimientoId = otroEst.getId();
+        }
+
+        @SuppressWarnings("null")
+        private String getTokenFor(String email, String password) throws Exception {
+                AuthRequest body = new AuthRequest(email, password);
+                MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                                .andExpect(status().isOk())
+                                .andReturn();
+
+                return objectMapper.readTree(result.getResponse().getContentAsString()).get("token").asText();
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/caravana - Admin registra una caravana DISPONIBLE, sin codigo ni animal")
+        void crearCaravana_asAdmin_sinCodigo_success() throws Exception {
+                Map<String, Object> body = Map.of(
+                                "dev_eui", "AA-BB-CC-DD-01",
+                                "alias", "Collar Norte",
+                                "establecimientoId", establecimientoId);
+
+                mockMvc.perform(post("/api/v1/caravana")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.devEui").value("AA-BB-CC-DD-01"))
+                                .andExpect(jsonPath("$.alias").value("Collar Norte"))
+                                .andExpect(jsonPath("$.estadoSensor").value("DISPONIBLE"))
+                                .andExpect(jsonPath("$.establecimientoId").value(establecimientoId))
+                                .andExpect(jsonPath("$.codigo").doesNotExist())
+                                .andExpect(jsonPath("$.animalId").doesNotExist());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/caravana - Admin registra una caravana con idCaravanaOficial")
+        void crearCaravana_asAdmin_conCodigo_success() throws Exception {
+                Map<String, Object> body = Map.of(
+                                "dev_eui", "AA-BB-CC-DD-05",
+                                "idCaravanaOficial", "CAR-001",
+                                "establecimientoId", establecimientoId);
+
+                mockMvc.perform(post("/api/v1/caravana")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.codigo").value("CAR-001"))
+                                .andExpect(jsonPath("$.fechaAsignacion").exists());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/caravana - Rechaza dev_eui duplicado con 409")
+        void crearCaravana_devEuiDuplicado_conflict() throws Exception {
+                Map<String, Object> body = Map.of(
+                                "dev_eui", "AA-BB-CC-DD-02",
+                                "establecimientoId", establecimientoId);
+
+                mockMvc.perform(post("/api/v1/caravana")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                                .andExpect(status().isCreated());
+
+                mockMvc.perform(post("/api/v1/caravana")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                                .andExpect(status().isConflict());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/caravana - Rechaza idCaravanaOficial duplicado con 400")
+        void crearCaravana_codigoDuplicado_badRequest() throws Exception {
+                Map<String, Object> body1 = Map.of(
+                                "dev_eui", "AA-BB-CC-DD-06",
+                                "idCaravanaOficial", "CAR-DUP",
+                                "establecimientoId", establecimientoId);
+                Map<String, Object> body2 = Map.of(
+                                "dev_eui", "AA-BB-CC-DD-07",
+                                "idCaravanaOficial", "CAR-DUP",
+                                "establecimientoId", establecimientoId);
+
+                mockMvc.perform(post("/api/v1/caravana")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body1)))
+                                .andExpect(status().isCreated());
+
+                mockMvc.perform(post("/api/v1/caravana")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body2)))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/caravana - Usuario no-Admin recibe 403 Forbidden")
+        void crearCaravana_asProductor_forbidden() throws Exception {
+                Map<String, Object> body = Map.of(
+                                "dev_eui", "AA-BB-CC-DD-03",
+                                "establecimientoId", establecimientoId);
+
+                mockMvc.perform(post("/api/v1/caravana")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                                .andExpect(status().isForbidden());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/caravana - Establecimiento inexistente responde 404")
+        void crearCaravana_establecimientoInexistente_notFound() throws Exception {
+                Map<String, Object> body = Map.of(
+                                "dev_eui", "AA-BB-CC-DD-04",
+                                "establecimientoId", 999999L);
+
+                mockMvc.perform(post("/api/v1/caravana")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                                .andExpect(status().isNotFound());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/caravana - dev_eui vacio responde 400")
+        void crearCaravana_devEuiVacio_badRequest() throws Exception {
+                Map<String, Object> body = Map.of(
+                                "dev_eui", "",
+                                "establecimientoId", establecimientoId);
+
+                mockMvc.perform(post("/api/v1/caravana")
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("GET /api/v1/caravana - Lista las caravanas del establecimiento, con el animal vinculado si corresponde")
+        void listarCaravanas_incluyeDisponibleYVinculada() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+                Caravana disponible = new Caravana();
+                disponible.setDevEui("SENSOR-DISPONIBLE");
+                disponible.setEstablecimiento(est);
+                disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                disponible.setActivo(false);
+                caravanaRepository.save(disponible);
+
+                Caravana vinculada = new Caravana();
+                vinculada.setDevEui("SENSOR-VINCULADO");
+                vinculada.setEstablecimiento(est);
+                vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
+                vinculada.setActivo(true);
+                vinculada = caravanaRepository.save(vinculada);
+
+                Animal animal = new Animal(est, null);
+                animal.setAlias("Lola");
+                animal.setEstadoActual(dev.vigia.backend.model.EstadoAnimal.ACTIVO);
+                animal.setCaravana(vinculada);
+                animalRepository.save(animal);
+
+                // Caravana de otro establecimiento: no debe aparecer en el listado.
+                Establecimiento otroEst = establecimientoRepository.findById(otroEstablecimientoId).orElseThrow();
+                Caravana deOtroEstablecimiento = new Caravana();
+                deOtroEstablecimiento.setDevEui("SENSOR-OTRO-EST");
+                deOtroEstablecimiento.setEstablecimiento(otroEst);
+                deOtroEstablecimiento.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                caravanaRepository.save(deOtroEstablecimiento);
+
+                mockMvc.perform(get("/api/v1/caravana")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(2))
+                                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-DISPONIBLE')].estadoSensor")
+                                                .value("DISPONIBLE"))
+                                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-VINCULADO')].estadoSensor")
+                                                .value("VINCULADO"))
+                                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-VINCULADO')].animalAlias").value("Lola"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/caravana - Productor con acceso al establecimiento puede listar")
+        void listarCaravanas_asProductorConAcceso_success() throws Exception {
+                mockMvc.perform(get("/api/v1/caravana")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/caravana - Productor sin acceso al establecimiento recibe 403")
+        void listarCaravanas_asProductorSinAcceso_forbidden() throws Exception {
+                mockMvc.perform(get("/api/v1/caravana")
+                                .param("establecimientoId", otroEstablecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/caravana - Establecimiento inexistente responde 404")
+        void listarCaravanas_establecimientoInexistente_notFound() throws Exception {
+                mockMvc.perform(get("/api/v1/caravana")
+                                .param("establecimientoId", "999999")
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isNotFound());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("GET /api/v1/caravana - Filtra por estado y codigo cuando se pasan como query params")
+        void listarCaravanas_filtraPorEstadoYCodigo() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+                Caravana disponibleConCodigo = new Caravana();
+                disponibleConCodigo.setDevEui("SENSOR-FILTRO-1");
+                disponibleConCodigo.setCodigo("CAR-100");
+                disponibleConCodigo.setEstablecimiento(est);
+                disponibleConCodigo.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                caravanaRepository.save(disponibleConCodigo);
+
+                Caravana vinculadaConCodigo = new Caravana();
+                vinculadaConCodigo.setDevEui("SENSOR-FILTRO-2");
+                vinculadaConCodigo.setCodigo("CAR-200");
+                vinculadaConCodigo.setEstablecimiento(est);
+                vinculadaConCodigo.setEstadoSensor(EstadoSensor.VINCULADO);
+                caravanaRepository.save(vinculadaConCodigo);
+
+                mockMvc.perform(get("/api/v1/caravana")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .param("estado", "DISPONIBLE")
+                                .param("codigo", "CAR-100")
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].devEui").value("SENSOR-FILTRO-1"));
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("GET /api/v1/caravana/disponibles debe retornar únicamente las caravanas en estado DISPONIBLE")
+        void listarCaravanasDisponibles_retornaSoloDisponibles() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+                Caravana disponible = new Caravana();
+                disponible.setDevEui("SENSOR-SOLO-DISPONIBLE");
+                disponible.setEstablecimiento(est);
+                disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                caravanaRepository.save(disponible);
+
+                Caravana vinculada = new Caravana();
+                vinculada.setDevEui("SENSOR-YA-VINCULADO");
+                vinculada.setEstablecimiento(est);
+                vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
+                caravanaRepository.save(vinculada);
+
+                mockMvc.perform(get("/api/v1/caravana/disponibles")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-SOLO-DISPONIBLE')].estadoSensor")
+                                                .value("DISPONIBLE"))
+                                .andExpect(jsonPath("$[?(@.devEui == 'SENSOR-YA-VINCULADO')]").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/caravana/disponibles - Veterinario recibe 403")
+        void listarCaravanasDisponibles_veterinario_forbidden() throws Exception {
+                Usuario vet = new Usuario();
+                vet.setEmail("vet.disponibles@vigia.dev");
+                vet.setPasswordHash(passwordEncoder.encode("vet123"));
+                vet.setNombre("Veterinario");
+                vet.setRol(Rol.VETERINARIO);
+                vet.setActivo(true);
+                usuarioRepository.save(vet);
+                String vetToken = getTokenFor("vet.disponibles@vigia.dev", "vet123");
+
+                mockMvc.perform(get("/api/v1/caravana/disponibles")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + vetToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("PATCH /api/v1/caravana/{id}/baja - Admin da de baja una caravana DISPONIBLE")
+        void darDeBajaCaravana_asAdmin_disponible_success() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+                Caravana disponible = new Caravana();
+                disponible.setDevEui("SENSOR-BAJA-1");
+                disponible.setEstablecimiento(est);
+                disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                disponible = caravanaRepository.save(disponible);
+
+                mockMvc.perform(patch("/api/v1/caravana/{id}/baja", disponible.getId())
+                                .header("Authorization", "Bearer " + adminToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(Map.of("motivo", "Collar dañado"))))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.estadoSensor").value("INACTIVO"))
+                                .andExpect(jsonPath("$.activo").value(false));
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("PATCH /api/v1/caravana/{id}/baja - Da de baja una caravana VINCULADO y desvincula el animal")
+        void darDeBajaCaravana_vinculada_desvinculaAnimal() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+                Caravana vinculada = new Caravana();
+                vinculada.setDevEui("SENSOR-BAJA-2");
+                vinculada.setEstablecimiento(est);
+                vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
+                vinculada.setActivo(true);
+                vinculada = caravanaRepository.save(vinculada);
+
+                Animal animal = new Animal(est, null);
+                animal.setAlias("Lola");
+                animal.setEstadoActual(dev.vigia.backend.model.EstadoAnimal.ACTIVO);
+                animal.setCaravana(vinculada);
+                animal = animalRepository.save(animal);
+
+                mockMvc.perform(patch("/api/v1/caravana/{id}/baja", vinculada.getId())
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.estadoSensor").value("INACTIVO"))
+                                .andExpect(jsonPath("$.animalId").doesNotExist());
+
+                Animal animalActualizado = animalRepository.findById(animal.getId()).orElseThrow();
+                org.assertj.core.api.Assertions.assertThat(animalActualizado.getCaravana()).isNull();
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("PATCH /api/v1/caravana/{id}/baja - Ya INACTIVO responde 400")
+        void darDeBajaCaravana_yaInactiva_badRequest() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+                Caravana inactiva = new Caravana();
+                inactiva.setDevEui("SENSOR-BAJA-3");
+                inactiva.setEstablecimiento(est);
+                inactiva.setEstadoSensor(EstadoSensor.INACTIVO);
+                inactiva = caravanaRepository.save(inactiva);
+
+                mockMvc.perform(patch("/api/v1/caravana/{id}/baja", inactiva.getId())
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("PATCH /api/v1/caravana/{id}/baja - Usuario no-Admin recibe 403 Forbidden")
+        void darDeBajaCaravana_asProductor_forbidden() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+                Caravana disponible = new Caravana();
+                disponible.setDevEui("SENSOR-BAJA-4");
+                disponible.setEstablecimiento(est);
+                disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                disponible = caravanaRepository.save(disponible);
+
+                mockMvc.perform(patch("/api/v1/caravana/{id}/baja", disponible.getId())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("PATCH /api/v1/caravana/{id}/reactivar - Admin reactiva una caravana INACTIVO")
+        void reactivarCaravana_asAdmin_success() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+                Caravana inactiva = new Caravana();
+                inactiva.setDevEui("SENSOR-REACT-1");
+                inactiva.setEstablecimiento(est);
+                inactiva.setEstadoSensor(EstadoSensor.INACTIVO);
+                inactiva = caravanaRepository.save(inactiva);
+
+                mockMvc.perform(patch("/api/v1/caravana/{id}/reactivar", inactiva.getId())
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.estadoSensor").value("DISPONIBLE"))
+                                .andExpect(jsonPath("$.activo").value(false));
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("PATCH /api/v1/caravana/{id}/reactivar - No INACTIVO responde 400")
+        void reactivarCaravana_noInactiva_badRequest() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+                Caravana disponible = new Caravana();
+                disponible.setDevEui("SENSOR-REACT-2");
+                disponible.setEstablecimiento(est);
+                disponible.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                disponible = caravanaRepository.save(disponible);
+
+                mockMvc.perform(patch("/api/v1/caravana/{id}/reactivar", disponible.getId())
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("PATCH /api/v1/caravana/{id}/reactivar - Usuario no-Admin recibe 403 Forbidden")
+        void reactivarCaravana_asProductor_forbidden() throws Exception {
+                Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+                Caravana inactiva = new Caravana();
+                inactiva.setDevEui("SENSOR-REACT-3");
+                inactiva.setEstablecimiento(est);
+                inactiva.setEstadoSensor(EstadoSensor.INACTIVO);
+                inactiva = caravanaRepository.save(inactiva);
+
+                mockMvc.perform(patch("/api/v1/caravana/{id}/reactivar", inactiva.getId())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("PATCH /api/v1/caravana/{id}/baja - Caravana inexistente responde 404")
+        void darDeBajaCaravana_inexistente_notFound() throws Exception {
+                mockMvc.perform(patch("/api/v1/caravana/{id}/baja", 999999L)
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isNotFound());
+        }
 }

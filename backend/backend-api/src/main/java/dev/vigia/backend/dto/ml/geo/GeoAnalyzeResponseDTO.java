@@ -15,6 +15,9 @@ import java.util.List;
 public class GeoAnalyzeResponseDTO {
     @JsonProperty("mapa_calor")
     private List<MatrizDensidadDTO> mapaCalor;
-    
+
     private List<AlertaAnimalDTO> alertas;
+
+    @JsonProperty("celdas_subutilizadas")
+    private CeldasSubutilizadasDTO celdasSubutilizadas;
 }

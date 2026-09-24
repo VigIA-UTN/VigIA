@@ -370,19 +370,26 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         telemetriaRepository.saveAll(telemetriaList);
     }
 
-    private String buildAccionRecomendada(String posibleCausa, SeveridadAlerta severidad) {
+    String buildAccionRecomendada(String posibleCausa, SeveridadAlerta severidad) {
+        // ml-salud puede devolver posible_causa nula: no mostrar "null" al productor.
+        String causa = (posibleCausa == null || posibleCausa.isBlank())
+                ? "no determinada"
+                : posibleCausa.trim();
+        if (severidad == null) {
+            return "Revisar al animal y realizar seguimiento clínico. Causa sospechada: " + causa + ".";
+        }
         switch (severidad) {
             case ALTA:
-                return "Atención veterinaria urgente y aislamiento en enfermería. Causa sospechada:" + posibleCausa
+                return "Atención veterinaria urgente y aislamiento en enfermería. Causa sospechada: " + causa
                         + " (riesgo alto).";
             case MEDIA:
                 return "Apartar al animal para revisión clínica y evaluar tratamiento. Causa sospechada: "
-                        + posibleCausa + " (riesgo medio).";
+                        + causa + " (riesgo medio).";
             case BAJA:
                 return "Monitorear la evolución y el comportamiento del animal en los próximos rodeos. Causa sospechada: "
-                        + posibleCausa + " (riesgo bajo).";
+                        + causa + " (riesgo bajo).";
             default:
-                return "Revisar al animal y realizar seguimiento clínico. Causa sospechada: " + posibleCausa + ".";
+                return "Revisar al animal y realizar seguimiento clínico. Causa sospechada: " + causa + ".";
         }
     }
 }
