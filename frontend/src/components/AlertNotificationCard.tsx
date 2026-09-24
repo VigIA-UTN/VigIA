@@ -32,6 +32,17 @@ function haceCuanto(ts: string) {
   return `Hace ${Math.floor(min / 1440)} d`;
 }
 
+function tiempoFueraBadge(ts: string) {
+  const min = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+  if (isNaN(min) || min < 0) return 'Fuera ahora';
+  if (min < 1) return 'Fuera hace menos de 1 min';
+  if (min < 60) return `Fuera hace ${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (m === 0) return `Fuera hace ${h}h`;
+  return `Fuera hace ${h}h ${m}m`;
+}
+
 const textoAccionRecomendada = (alerta: AlertaResponse | null) => {
   if (alerta?.accionRecomendada) {
     return alerta.accionRecomendada;
@@ -53,27 +64,49 @@ export default function AlertNotificationCard({
   const resuelta = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
   // Severidad: el backend manda ALTA/MEDIA/BAJA. Fallback por tipo mientras no llegue.
   const severidad: Severidad = alerta.severidad ?? (alerta.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
+  const tipoNorm = (alerta.tipo ?? '').toUpperCase();
+  const isGeoespacial = tipoNorm.includes('FUERA') || tipoNorm.includes('PERIMETRO') || tipoNorm === 'GEOESPACIAL';
+
+  const cuerpoPrincipal = isGeoespacial ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <i
+        className="bi bi-geo-alt-fill"
+        style={{ color: '#dc3545', fontSize: '0.95rem', animation: 'geoPulse 1.4s ease-in-out infinite' }}
+      />
+      <span style={{ color: '#B00020', fontWeight: 600, fontSize: '0.88rem' }}>
+        {tiempoFueraBadge(alerta.tsGeneracion)}
+      </span>
+    </div>
+  ) : (
+    <div
+      title={textoAccionRecomendada(alerta)}
+      style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+    >
+      {textoAccionRecomendada(alerta)}
+    </div>
+  );
 
   return (
-    <SidebarCard
-      severidad={severidad}
-      icono={ICONO[alerta.tipo] ?? 'bi-exclamation-triangle-fill'}
-      categoria={CATEGORIA[alerta.tipo]}
-      titulo={`#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
-      cuerpo={
-        <div
-          title={textoAccionRecomendada(alerta)}
-          style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-        >
-          {textoAccionRecomendada(alerta)}
-        </div>
-      }
-      timestamp={haceCuanto(alerta.tsGeneracion)}
-      acento={isUnread}
-      apagada={resuelta}
-      seleccionada={isMenuOpen}
-      onClick={() => onClick(alerta)}
-      acciones={<i className="bi bi-chevron-right" style={{ color: '#98A2B3' }} />}
-    />
+    <>
+      <SidebarCard
+        severidad={severidad}
+        icono={ICONO[alerta.tipo] ?? 'bi-exclamation-triangle-fill'}
+        categoria={CATEGORIA[alerta.tipo]}
+        titulo={`#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
+        cuerpo={cuerpoPrincipal}
+        timestamp={haceCuanto(alerta.tsGeneracion)}
+        acento={isUnread}
+        apagada={resuelta}
+        seleccionada={isMenuOpen}
+        onClick={() => onClick(alerta)}
+        acciones={<i className="bi bi-chevron-right" style={{ color: '#98A2B3' }} />}
+      />
+      <style>{`
+        @keyframes geoPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.5; transform: scale(1.3); }
+        }
+      `}</style>
+    </>
   );
 }

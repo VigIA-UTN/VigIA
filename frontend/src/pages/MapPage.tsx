@@ -568,6 +568,23 @@ export default function MapPage() {
         {/* Animales en el mapa */}
         {animales.map(animal => {
           if (animal.latitud == null || animal.longitud == null) return null;
+
+          // Buscar alerta geoespacial pendiente para mostrar en el popup
+          const alertaGeo = animal.alertasAnimal.find(a => {
+            const t = (a.tipo ?? '').toUpperCase();
+            return (t.includes('FUERA') || t.includes('PERIMETRO') || t === 'ABIGEATO') && a.estado === 'PENDIENTE';
+          });
+
+          const tiempoFueraPopup = (ts: string) => {
+            const min = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+            if (isNaN(min) || min < 0) return 'Ahora';
+            if (min < 1) return '< 1 min';
+            if (min < 60) return `${min} min`;
+            const h = Math.floor(min / 60);
+            const m = min % 60;
+            return m === 0 ? `${h}h` : `${h}h ${m}m`;
+          };
+
           return (
             <Marker
               key={animal.id}
@@ -579,7 +596,44 @@ export default function MapPage() {
                   setSelectedAnimalMap(animal);
                 },
               }}
-            />
+            >
+              <Popup>
+                <div style={{ minWidth: '160px', fontFamily: 'inherit' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: '4px', color: '#1E3A5F' }}>
+                    {animal.identificador ?? `Animal #${animal.id}`}
+                  </div>
+                  {animal.tsUltimaPosicion && (
+                    <div style={{ fontSize: '0.75rem', color: '#6c757d', marginBottom: '6px' }}>
+                      Última pos.: {new Date(animal.tsUltimaPosicion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  )}
+                  {alertaGeo && (
+                    <div
+                      style={{
+                        marginTop: '6px',
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #FFF0F0, #FFD6D6)',
+                        border: '1px solid #dc3545',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <i className="bi bi-geo-alt-fill" style={{ color: '#dc3545', fontSize: '1rem' }} />
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#B00020', fontSize: '0.85rem' }}>
+                          Fuera del perímetro
+                        </div>
+                        <div style={{ color: '#9B1C1C', fontSize: '0.78rem' }}>
+                          {tiempoFueraPopup(alertaGeo.tsGeneracion)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
           );
         })}
       </MapContainer>

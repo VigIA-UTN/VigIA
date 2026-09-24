@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import type { AlertaResponse, AlertaDetalleResponse, SeveridadNivel } from '../api/alertaApi';
+import { useState, useEffect, useRef } from 'react';
+import type { AlertaResponse, AlertaDetalleResponse, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
 import { updateAlertaEstado, getAlertaDetalle } from '../api/alertaApi';
 import SanitarioAlertDetail, { SeveridadBadge } from './SanitarioAlertDetail';
 import { useAuthStore } from '../store/authStore';
@@ -39,6 +39,24 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
     selectedId ?? null,
     isCelo,
   );
+
+  // Detección del tipo geoespacial
+  const disparadorNorm = (alerta.tipo ?? '').toUpperCase();
+  const isGeoespacial = disparadorNorm.includes('FUERA') || disparadorNorm.includes('PERIMETRO') ||
+    (detalle?.datoDisparador ?? '').toString().toUpperCase() === 'FUERA_DE_PERIMETRO';
+  const detGeo: DetalleGeoespacial | null = detalle?.detalleGeoespacial ?? null;
+
+  // Contador en vivo del tiempo fuera del perímetro (tick cada segundo)
+  const [segundosVivoFuera, setSegundosVivoFuera] = useState<number>(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (!isGeoespacial) return;
+    const base = detGeo?.segundosFuera ?? Math.floor((Date.now() - new Date(alerta.tsGeneracion).getTime()) / 1000);
+    setSegundosVivoFuera(Math.max(0, base));
+    timerRef.current = setInterval(() => setSegundosVivoFuera(s => s + 1), 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGeoespacial, detGeo?.segundosFuera, alerta.tsGeneracion]);
 
   useEffect(() => {
     let isMounted = true;
@@ -153,12 +171,24 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       return detalle.accionRecomendada;
     } else if (isSanitaria) {
       return 'Revisar al animal y realizar seguimiento clínico.';
+    } else if (isGeoespacial) {
+      return 'Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.';
     } else if (isCelo) {
       return 'Realizar inseminación artificial dentro de la ventana óptima.';
     } else {
       return 'Revisar al animal y realizar seguimiento.';
     }
   }
+
+  /** Formatea segundos en "Xh Ym Zs" o "Ym Zs" o "Zs" */
+  const formatTiempoFuera = (seg: number) => {
+    const h = Math.floor(seg / 3600);
+    const m = Math.floor((seg % 3600) / 60);
+    const s = seg % 60;
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
 
   return (
     <div
@@ -263,8 +293,95 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
             {/* Detalle sanitario (solo alertas de SALUD) */}
             {isSanitaria && detSan && <SanitarioAlertDetail detalle={detSan} />}
 
-            {/* Ventana de inseminacion (solo reproductivo) */}
-            {!isSanitaria && (
+            {/* Detalle geoespacial (solo alertas FUERA_DE_PERIMETRO) */}
+            {isGeoespacial && (
+              <div>
+                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
+                  <i className="bi bi-geo-alt-fill" style={{ color: '#dc3545' }}></i> Detalle de salida del perímetro
+                </h6>
+
+                {/* Contador vivo */}
+                <div
+                  className="card border-0 shadow-sm rounded-4 mb-3"
+                  style={{
+                    background: 'linear-gradient(135deg, #FFF0F0 0%, #FFE0E0 100%)',
+                    border: '1px solid #dc3545',
+                  }}
+                >
+                  <div className="card-body py-3 px-4 d-flex align-items-center gap-3">
+                    <i className="bi bi-clock-history fs-3 urgency-pulse" style={{ color: '#dc3545' }}></i>
+                    <div>
+                      <div
+                        className="fw-bold font-monospace"
+                        style={{ fontSize: '1.6rem', color: '#B00020', letterSpacing: '0.05em' }}
+                      >
+                        {formatTiempoFuera(segundosVivoFuera)}
+                      </div>
+                      <small style={{ color: '#9B1C1C' }}>Tiempo fuera del perímetro</small>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info grid: hora salida, lote, coordenadas */}
+                <div className="card border-0 shadow-sm rounded-4">
+                  <div className="card-body">
+                    <div className="row g-3">
+
+                      {/* Hora de salida */}
+                      <div className="col-6">
+                        <small className="text-muted d-block mb-1"><i className="bi bi-alarm me-1"></i>Hora de salida</small>
+                        <span className="fw-semibold" style={{ color: '#1E3A5F' }}>
+                          {date && !isNaN(date.getTime())
+                            ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                            : '--:--'}
+                        </span>
+                        <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>
+                          {date && !isNaN(date.getTime()) ? date.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                        </small>
+                      </div>
+
+                      {/* Lote */}
+                      <div className="col-6">
+                        <small className="text-muted d-block mb-1"><i className="bi bi-layers me-1"></i>Lote / Rodeo</small>
+                        <span className="fw-semibold" style={{ color: '#1E3A5F' }}>
+                          {detGeo?.nombreLote ?? detalle?.animalRaza ?? '—'}
+                        </span>
+                      </div>
+
+                      {/* Coordenadas de salida */}
+                      {detGeo?.latitudSalida != null && detGeo?.longitudSalida != null && (
+                        <div className="col-12">
+                          <small className="text-muted d-block mb-1"><i className="bi bi-crosshair me-1"></i>Posición al salir del perímetro</small>
+                          <a
+                            href={`https://www.google.com/maps?q=${detGeo.latitudSalida},${detGeo.longitudSalida}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="fw-semibold text-danger text-decoration-none d-flex align-items-center gap-1"
+                            style={{ fontSize: '0.88rem' }}
+                          >
+                            <i className="bi bi-map-fill"></i>
+                            {detGeo.latitudSalida.toFixed(5)}, {detGeo.longitudSalida.toFixed(5)}
+                            <i className="bi bi-box-arrow-up-right ms-1" style={{ fontSize: '0.75rem' }}></i>
+                          </a>
+                          <small className="text-muted d-block mt-1" style={{ fontSize: '0.75rem' }}>Ver en Google Maps</small>
+                        </div>
+                      )}
+
+                      {/* Si no hay coords persistidas, mostramos la posición actual del tracker */}
+                      {(detGeo == null || detGeo.latitudSalida == null) && (
+                        <div className="col-12">
+                          <small className="text-muted d-block mb-1"><i className="bi bi-geo me-1"></i>Posición de salida</small>
+                          <span className="text-muted fst-italic" style={{ fontSize: '0.85rem' }}>No disponible para esta alerta</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Ventana de inseminacion (solo reproductivo, no sanitario, no geoespacial) */}
+            {!isSanitaria && !isGeoespacial && (
               <div>
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                   <i className="bi bi-clock"></i> Ventana de inseminación
@@ -435,8 +552,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             </div>
 
-            {/* Ultimos Estados Reproductivos (solo reproductivo) */}
-            {!isSanitaria && detalle?.ultimosEstadosReproductivos && detalle.ultimosEstadosReproductivos.length > 0 && (
+            {/* Ultimos Estados Reproductivos (solo reproductivo, no geoespacial) */}
+            {!isSanitaria && !isGeoespacial && detalle?.ultimosEstadosReproductivos && detalle.ultimosEstadosReproductivos.length > 0 && (
               <div>
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                   <i className="bi bi-activity"></i> Últimos estados reproductivos
@@ -514,10 +631,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               onClick={() => handleAccion('CONFIRMADA', false, isSanitaria ? 'Alerta sanitaria atendida' : undefined)}
               disabled={actionLoading}
             >
-              <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : 'Confirmar celo'}
+              <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : isGeoespacial ? 'Confirmar salida' : 'Confirmar celo'}
             </button>
           </div>
-          {!isSanitaria && (
+          {!isSanitaria && !isGeoespacial && (
             <button
               className="btn rounded-3 fw-semibold w-100 py-2 d-flex justify-content-center align-items-center gap-2"
               style={{ backgroundColor: '#198754', color: 'white', border: '1px solid #198754' }}

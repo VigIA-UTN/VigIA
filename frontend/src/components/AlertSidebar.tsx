@@ -136,7 +136,15 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
 
   // Derived filtered alerts
   const alertasFiltradas = alertas.filter(a => {
-    if (filtroTipo && a.tipo !== filtroTipo) return false;
+    if (filtroTipo) {
+      // 'GEO' es el valor interno que agrupa ABIGEATO y FUERA_DE_PERIMETRO
+      if (filtroTipo === 'GEO') {
+        const t = (a.tipo ?? '').toUpperCase();
+        if (!t.includes('FUERA') && !t.includes('PERIMETRO') && t !== 'ABIGEATO' && t !== 'GEOESPACIAL') return false;
+      } else if (a.tipo !== filtroTipo) {
+        return false;
+      }
+    }
     if (filtroSeveridad && a.severidad !== filtroSeveridad) return false;
     return true;
   }).sort((a, b) => {
@@ -147,8 +155,46 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
       if (sev === 'BAJA') return 1;
       return 0;
     };
-    return sevValue(b.severidad) - sevValue(a.severidad);
+    const sevDiff = sevValue(b.severidad) - sevValue(a.severidad);
+    if (sevDiff !== 0) return sevDiff;
+    // Si tienen la misma severidad, ordenar por fecha descendente para que las cercanas queden juntas
+    return new Date(b.tsGeneracion).getTime() - new Date(a.tsGeneracion).getTime();
   });
+
+  // Agrupar geoespaciales cercanas en tiempo (<= 15 min)
+  const groupedAlertas: Array<{ type: 'single', alerta: AlertaResponse } | { type: 'group', alertas: AlertaResponse[] }> = [];
+  let currentGroup: AlertaResponse[] = [];
+
+  alertasFiltradas.forEach(alerta => {
+    const isGeo = (alerta.tipo ?? '').toUpperCase().includes('FUERA') || (alerta.tipo ?? '').toUpperCase() === 'GEOESPACIAL';
+    
+    if (!isGeo) {
+      if (currentGroup.length > 0) {
+        if (currentGroup.length === 1) groupedAlertas.push({ type: 'single', alerta: currentGroup[0] });
+        else groupedAlertas.push({ type: 'group', alertas: currentGroup });
+        currentGroup = [];
+      }
+      groupedAlertas.push({ type: 'single', alerta });
+      return;
+    }
+    
+    if (currentGroup.length === 0) {
+      currentGroup.push(alerta);
+    } else {
+      const lastTs = new Date(currentGroup[currentGroup.length - 1].tsGeneracion).getTime();
+      const currTs = new Date(alerta.tsGeneracion).getTime();
+      // Si la diferencia es <= 15 minutos, agrupamos
+      if (Math.abs(lastTs - currTs) <= 15 * 60 * 1000) {
+        currentGroup.push(alerta);
+      } else {
+        if (currentGroup.length === 1) groupedAlertas.push({ type: 'single', alerta: currentGroup[0] });
+        else groupedAlertas.push({ type: 'group', alertas: currentGroup });
+        currentGroup = [alerta];
+      }
+    }
+  });
+  if (currentGroup.length === 1) groupedAlertas.push({ type: 'single', alerta: currentGroup[0] });
+  else if (currentGroup.length > 1) groupedAlertas.push({ type: 'group', alertas: currentGroup });
 
   return (
     <>
@@ -208,13 +254,13 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           <button
             className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
             style={{
-              backgroundColor: filtroTipo === 'ABIGEATO' ? '#13D4FB' : 'transparent',
+              backgroundColor: filtroTipo === 'GEO' ? '#13D4FB' : 'transparent',
               color: '#1E3A5F',
               border: '2px solid #1E3A5F'
             }}
-            onClick={() => setFiltroTipo(prev => prev === 'ABIGEATO' ? null : 'ABIGEATO')}
+            onClick={() => setFiltroTipo(prev => prev === 'GEO' ? null : 'GEO')}
           >
-            <i className="bi bi-globe-americas"></i> Posición
+            <i className="bi bi-geo-alt-fill"></i> Geoespacial
           </button>
         </div>
 
@@ -233,24 +279,51 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
         <div className="flex-grow-1 overflow-auto pe-2 d-flex flex-column gap-3 custom-scrollbar">
           {loading && <div className="text-center text-muted mt-4">Cargando alertas...</div>}
 
-          {!loading && alertasFiltradas.length === 0 && (
+          {!loading && groupedAlertas.length === 0 && (
             <div className="text-center text-muted mt-4">No hay alertas registradas.</div>
           )}
 
-          {!loading && alertasFiltradas.map((alerta) => {
-            const isPendiente = alerta.estado === 'PENDIENTE';
-            const isMenuOpen = selectedAlerta?.id === alerta.id;
-            const isUnread = isPendiente && !viewedIds.has(alerta.id);
+          {!loading && groupedAlertas.map((item, idx) => {
+            if (item.type === 'single') {
+              const alerta = item.alerta;
+              const isPendiente = alerta.estado === 'PENDIENTE';
+              const isMenuOpen = selectedAlerta?.id === alerta.id;
+              const isUnread = isPendiente && !viewedIds.has(alerta.id);
 
-            return (
-              <AlertNotificationCard
-                key={alerta.id}
-                alerta={alerta}
-                onClick={handleAlertClick}
-                isMenuOpen={isMenuOpen}
-                isUnread={isUnread}
-              />
-            );
+              return (
+                <AlertNotificationCard
+                  key={alerta.id}
+                  alerta={alerta}
+                  onClick={handleAlertClick}
+                  isMenuOpen={isMenuOpen}
+                  isUnread={isUnread}
+                />
+              );
+            } else {
+              return (
+                <div key={`group-${idx}`} className="p-2 rounded-4" style={{ backgroundColor: '#FFF0F0', border: '1px dashed #dc3545' }}>
+                  <div className="text-danger fw-bold mb-2 ms-2 d-flex align-items-center gap-1" style={{ fontSize: '0.85rem' }}>
+                    <i className="bi bi-exclamation-diamond-fill"></i> {item.alertas.length} animales salieron del perímetro en horario cercano
+                  </div>
+                  <div className="d-flex flex-column gap-2">
+                    {item.alertas.map(alerta => {
+                      const isPendiente = alerta.estado === 'PENDIENTE';
+                      const isMenuOpen = selectedAlerta?.id === alerta.id;
+                      const isUnread = isPendiente && !viewedIds.has(alerta.id);
+                      return (
+                        <AlertNotificationCard
+                          key={alerta.id}
+                          alerta={alerta}
+                          onClick={handleAlertClick}
+                          isMenuOpen={isMenuOpen}
+                          isUnread={isUnread}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
           })}
         </div>
 

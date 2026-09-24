@@ -104,6 +104,20 @@ export interface DetalleSanitario {
   serieDesplazamiento: BloqueComparativo[] | null;
 }
 
+/** Bloque geoespacial del detalle de alerta (solo cuando datoDisparador === 'FUERA_DE_PERIMETRO'). */
+export interface DetalleGeoespacial {
+  /** Latitud donde el animal salió del perímetro. Puede ser null en alertas antiguas. */
+  latitudSalida: number | null;
+  /** Longitud donde el animal salió del perímetro. Puede ser null en alertas antiguas. */
+  longitudSalida: number | null;
+  /** Nombre del lote/rodeo al que pertenece el animal. */
+  nombreLote: string | null;
+  /** Nombre del perímetro violado (si está disponible). */
+  nombrePerimetro: string | null;
+  /** Segundos transcurridos desde que el animal salió del perímetro (calculado en el backend). */
+  segundosFuera: number | null;
+}
+
 export interface AlertaDetalleResponse {
   id: number;
   animalId: number;
@@ -135,6 +149,8 @@ export interface AlertaDetalleResponse {
   valorUmbral?: number | null;
   /** Presente solo para alertas sanitarias (datoDisparador === 'SALUD'). */
   detalleSanitario?: DetalleSanitario | null;
+  /** Presente solo para alertas geoespaciales (datoDisparador === 'FUERA_DE_PERIMETRO'). */
+  detalleGeoespacial?: DetalleGeoespacial | null;
 }
 
 export async function getAlertaDetalle(alertaId: number, establecimientoId: number): Promise<AlertaDetalleResponse> {
