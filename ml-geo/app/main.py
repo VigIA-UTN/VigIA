@@ -1,7 +1,7 @@
 """
 Microservicio de Análisis Geoespacial (Pastoreo y Cohesión)
 Compara el posicionamiento del animal para detectar anomalías (abigeato),
-calcula el índice de aislamiento y las zonas subutilizadas del campo
+calcula el mapa de calor de pastoreo y el índice de aislamiento
 (Documento de Arquitectura, sección 3.3).
 """
 # pyrefly: ignore [missing-import]
@@ -45,22 +45,11 @@ class MatrizDensidad(BaseModel):
     lng: float
     intensidad: float
 
-class CeldaSubutilizada(BaseModel):
-    lat: float
-    lng: float
-
-class CeldasSubutilizadas(BaseModel):
-    lat_step: float
-    lng_step: float
-    celdas: List[CeldaSubutilizada]
-
 class GeoAnalyzeResponse(BaseModel):
     mapa_calor: List[MatrizDensidad]
     alertas: List[AlertaAnimal]
-    celdas_subutilizadas: Optional[CeldasSubutilizadas] = None
 
 GRID_SIZE = 20  # Grilla de 20x20
-UMBRAL_SUBUTILIZADA = 0.15
 
 # Distancia al centroide del resto del rodeo, en metros, a partir de la cual se
 # considera que un animal quedó aislado. El default de 100 m es del orden del
@@ -139,45 +128,26 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
     try:
         if not payload.historial_7d:
             print(f"[{correlation_id}] Historial vacío: se devuelve respuesta vacía.")
-            return GeoAnalyzeResponse(mapa_calor=[], alertas=[], celdas_subutilizadas=None)
+            return GeoAnalyzeResponse(mapa_calor=[], alertas=[])
 
         # Animales cuyo mapa de calor se pide; None = todos los del historial
         ids = payload.animal_ids
         if ids is None and payload.animal_id:
             ids = [payload.animal_id]
-        sin_filtro = ids is None
-        puntos_mapa = payload.historial_7d if sin_filtro else [p for p in payload.historial_7d if p.animal_id in set(ids)]
+        puntos_mapa = payload.historial_7d if ids is None else [p for p in payload.historial_7d if p.animal_id in set(ids)]
 
         mapa_calor = []
-        celdas_subutilizadas = None
         if puntos_mapa:
             # Mapa de calor: la grilla se ajusta a los puntos filtrados para no perder detalle
-            grilla_mapa = _grilla(puntos_mapa)
-            intensidades_mapa = _intensidades(puntos_mapa, *grilla_mapa)
-            min_lat, min_lng, lat_step, lng_step = grilla_mapa
+            min_lat, min_lng, lat_step, lng_step = _grilla(puntos_mapa)
             mapa_calor = [
                 MatrizDensidad(
                     lat=min_lat + (i + 0.5) * lat_step,
                     lng=min_lng + (j + 0.5) * lng_step,
                     intensidad=intensidad,
                 )
-                for (i, j), intensidad in intensidades_mapa
+                for (i, j), intensidad in _intensidades(puntos_mapa, min_lat, min_lng, lat_step, lng_step)
             ]
-
-            # Zonas subutilizadas: grilla sobre TODO el campo, contando solo los puntos
-            # filtrados. Sin filtro esa grilla es la misma que la del mapa, así que se reusa.
-            grilla_campo = grilla_mapa if sin_filtro else _grilla(payload.historial_7d)
-            intensidades_campo = intensidades_mapa if sin_filtro else _intensidades(puntos_mapa, *grilla_campo)
-            f_lat, f_lng, f_lat_step, f_lng_step = grilla_campo
-            celdas_subutilizadas = CeldasSubutilizadas(
-                lat_step=f_lat_step,
-                lng_step=f_lng_step,
-                celdas=[
-                    CeldaSubutilizada(lat=f_lat + (i + 0.5) * f_lat_step, lng=f_lng + (j + 0.5) * f_lng_step)
-                    for (i, j), intensidad in intensidades_campo
-                    if intensidad <= UMBRAL_SUBUTILIZADA
-                ],
-            )
 
         # Obtener la posición más reciente de cada animal
         ultimas_posiciones = {}
@@ -211,12 +181,11 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
                     alerta_aislamiento=distancia_centroide > UMBRAL_AISLAMIENTO_METROS
                 ))
 
-        n_zonas = len(celdas_subutilizadas.celdas) if celdas_subutilizadas else 0
         aisladas = sum(1 for a in alertas if a.alerta_aislamiento)
         print(f"[{correlation_id}] Análisis exitoso: {len(mapa_calor)} celdas, "
-              f"{len(alertas)} animales ({aisladas} aislados), {n_zonas} zonas subutilizadas.")
+              f"{len(alertas)} animales ({aisladas} aislados).")
 
-        return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas, celdas_subutilizadas=celdas_subutilizadas)
+        return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas)
 
     except Exception as e:
         print(f"[{correlation_id}] Error durante el análisis: {str(e)}")

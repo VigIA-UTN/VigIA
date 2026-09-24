@@ -18,7 +18,6 @@ client = TestClient(app)
 
 ENDPOINT = "/api/internal/ml/geo/analyze"
 GRID_SIZE = 20  # Debe coincidir con la constante en main.py
-UMBRAL_SUBUTILIZADA = 0.15
 UMBRAL_AISLAMIENTO_METROS = 100.0
 
 
@@ -82,10 +81,7 @@ class TestDensidad:
         assert len(data["mapa_calor"]) == GRID_SIZE * GRID_SIZE
 
     def test_celda_del_mapa_solo_expone_posicion_e_intensidad(self):
-        """
-        Las zonas de baja frecuencia viajan en celdas_subutilizadas, no como un
-        flag por celda: el mapa de calor solo lleva posicion e intensidad.
-        """
+        """El mapa de calor solo lleva posicion e intensidad por celda."""
         puntos = [make_punto("A1", -34.0, -59.0), make_punto("A2", -35.0, -60.0)]
         response = client.post(ENDPOINT, json={"historial_7d": puntos})
 
@@ -441,11 +437,11 @@ class TestCohesionAislamiento:
 
 
 # ===========================================================================
-# FILTRO POR RODEO / ZONAS SUBUTILIZADAS
+# FILTRO POR RODEO
 # ===========================================================================
 
-class TestFiltroYZonasSubutilizadas:
-    """animal_ids filtra el mapa de calor (grilla ajustada al filtro) y define las zonas subutilizadas del campo."""
+class TestFiltroPorRodeo:
+    """animal_ids filtra el mapa de calor (grilla ajustada al filtro); las alertas siguen usando todo el historial."""
 
     PUNTOS = [
         make_punto("A1", -34.0000, -59.0000),
@@ -474,7 +470,6 @@ class TestFiltroYZonasSubutilizadas:
 
         data = response.json()
         assert data["mapa_calor"] == []
-        assert data["celdas_subutilizadas"] is None
         assert len(data["alertas"]) == 2
 
     def test_alertas_no_dependen_del_filtro(self):
@@ -482,36 +477,6 @@ class TestFiltroYZonasSubutilizadas:
         sin = client.post(ENDPOINT, json={"historial_7d": self.PUNTOS}).json()["alertas"]
 
         assert sorted(con, key=lambda a: a["animal_id"]) == sorted(sin, key=lambda a: a["animal_id"])
-
-    def test_celdas_subutilizadas_se_calculan_sobre_todo_el_campo(self):
-        """
-        Campo = bbox de A1 y A2 (1 grado). Filtrando A1 (todo en una esquina), solo las celdas
-        que A1 pisa dejan de ser subutilizadas; las demas, incluida la de A2, si lo son.
-        """
-        response = client.post(ENDPOINT, json={"animal_ids": ["A1"], "historial_7d": self.PUNTOS})
-
-        zonas = response.json()["celdas_subutilizadas"]
-        assert zonas["lat_step"] == pytest.approx(1.0 / GRID_SIZE)
-        assert zonas["lng_step"] == pytest.approx(1.0 / GRID_SIZE)
-        assert len(zonas["celdas"]) == GRID_SIZE * GRID_SIZE - 1  # A1 cae entero en una celda
-        assert {"lat", "lng"} == set(zonas["celdas"][0].keys())
-
-    def test_sin_filtro_las_celdas_subutilizadas_son_las_no_visitadas(self):
-        response = client.post(ENDPOINT, json={"historial_7d": self.PUNTOS})
-
-        # A1 (2 puntos, 1 celda: 1.0) y A2 (1 punto: 0.5) superan el umbral -> 398 subutilizadas
-        assert len(response.json()["celdas_subutilizadas"]["celdas"]) == GRID_SIZE * GRID_SIZE - 2
-
-    def test_sin_filtro_las_zonas_usan_la_misma_grilla_que_el_mapa(self):
-        """
-        Sin filtro, la grilla del campo y la del mapa coinciden, asi que cada celda
-        subutilizada debe caer exactamente sobre una celda del mapa de calor.
-        """
-        data = client.post(ENDPOINT, json={"historial_7d": self.PUNTOS}).json()
-
-        centros_mapa = {(round(c["lat"], 9), round(c["lng"], 9)) for c in data["mapa_calor"]}
-        for celda in data["celdas_subutilizadas"]["celdas"]:
-            assert (round(celda["lat"], 9), round(celda["lng"], 9)) in centros_mapa
 
 
 # ===========================================================================

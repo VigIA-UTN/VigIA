@@ -17,7 +17,4 @@ public class GeoAnalyzeResponseDTO {
     private List<MatrizDensidadDTO> mapaCalor;
 
     private List<AlertaAnimalDTO> alertas;
-
-    @JsonProperty("celdas_subutilizadas")
-    private CeldasSubutilizadasDTO celdasSubutilizadas;
 }

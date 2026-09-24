@@ -119,25 +119,24 @@ class MapaCalorServiceImplTest {
     }
 
     @Test
-    @DisplayName("Filtro por animal: manda animal_id y conserva el historial completo del campo")
+    @DisplayName("Filtro por animal: la query trae solo su telemetría y ml-geo recibe ese historial")
     void filtroPorAnimal() {
         usuarioProductor();
         Animal a1 = animal(1L, establecimiento);
-        Animal a2 = animal(2L, establecimiento);
-        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
-                .thenReturn(List.of(telemetria(a1, -34.0, -59.0), telemetria(a2, -35.0, -60.0)));
+        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, 1L))
+                .thenReturn(List.of(telemetria(a1, -34.0, -59.0)));
         when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
 
         service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, 1L, null);
 
         GeoAnalyzeRequestDTO request = requestEnviadoAMl();
-        assertThat(request.getAnimalId()).isEqualTo("1");
+        assertThat(request.getHistorial7d()).extracting("animalId").containsExactly("1");
+        assertThat(request.getAnimalId()).isNull();
         assertThat(request.getAnimalIds()).isNull();
-        assertThat(request.getHistorial7d()).hasSize(2);
     }
 
     @Test
-    @DisplayName("Filtro por rodeo: manda los ids de los animales del rodeo de ese establecimiento")
+    @DisplayName("Filtro por rodeo: la query trae solo la telemetría de los animales del rodeo de ese establecimiento")
     void filtroPorRodeo() {
         usuarioProductor();
         Establecimiento otro = new Establecimiento();
@@ -146,30 +145,30 @@ class MapaCalorServiceImplTest {
         Animal a2 = animal(2L, establecimiento);
         Animal ajeno = animal(3L, otro);
         when(animalRepository.findByRodeoLoteId(5L)).thenReturn(List.of(a1, a2, ajeno));
-        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
+        when(telemetriaRepository.findByEstablecimientoAndAnimalesAndFechaHoraBetween(
+                ESTABLECIMIENTO_ID, DESDE, HASTA, List.of(1L, 2L)))
                 .thenReturn(List.of(telemetria(a1, -34.0, -59.0), telemetria(a2, -35.0, -60.0)));
         when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
 
         service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, null, 5L);
 
         GeoAnalyzeRequestDTO request = requestEnviadoAMl();
-        assertThat(request.getAnimalId()).isNull();
-        assertThat(request.getAnimalIds()).containsExactly("1", "2");
-        assertThat(request.getHistorial7d()).hasSize(2);
+        assertThat(request.getHistorial7d()).extracting("animalId").containsExactly("1", "2");
+        assertThat(request.getAnimalIds()).isNull();
+        verify(telemetriaRepository, never()).findByEstablecimientoAndFechaHoraBetween(any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("Rodeo sin animales: manda lista vacía (mapa vacío), no null (todos)")
+    @DisplayName("Rodeo sin animales: mapa vacío sin consultar telemetría ni ml-geo")
     void rodeoSinAnimales() {
         usuarioProductor();
         when(animalRepository.findByRodeoLoteId(5L)).thenReturn(List.of());
-        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
-                .thenReturn(List.of());
-        when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
 
-        service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, null, 5L);
+        GeoAnalyzeResponseDTO response = service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, null, 5L);
 
-        assertThat(requestEnviadoAMl().getAnimalIds()).isEmpty();
+        assertThat(response.getMapaCalor()).isEmpty();
+        assertThat(response.getAlertas()).isEmpty();
+        verifyNoInteractions(telemetriaRepository, mlGeoClient);
     }
 
     @Test
@@ -199,6 +198,14 @@ class MapaCalorServiceImplTest {
     }
 
     @Test
+    @DisplayName("Desde posterior a hasta: IllegalArgumentException sin llamar a ml-geo")
+    void rangoInvertido() {
+        assertThatThrownBy(() -> service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, HASTA, DESDE, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(telemetriaRepository, mlGeoClient);
+    }
+
+    @Test
     @DisplayName("Establecimiento ajeno: AccessDeniedException sin leer telemetría")
     void establecimientoAjeno() {
         Usuario usuario = new Usuario();
@@ -209,7 +216,6 @@ class MapaCalorServiceImplTest {
 
         assertThatThrownBy(() -> service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, null, 5L))
                 .isInstanceOf(AccessDeniedException.class);
-        verify(telemetriaRepository, never()).findByEstablecimientoAndFechaHoraBetween(any(), any(), any(), any());
-        verifyNoInteractions(mlGeoClient, animalRepository);
+        verifyNoInteractions(telemetriaRepository, mlGeoClient, animalRepository);
     }
 }

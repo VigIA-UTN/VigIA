@@ -4,6 +4,7 @@ import dev.vigia.backend.client.MlGeoClient;
 import dev.vigia.backend.dto.ml.geo.CoordenadaGPSDTO;
 import dev.vigia.backend.dto.ml.geo.GeoAnalyzeRequestDTO;
 import dev.vigia.backend.dto.ml.geo.GeoAnalyzeResponseDTO;
+import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.model.Usuario;
@@ -18,6 +19,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,6 +41,9 @@ public class MapaCalorServiceImpl implements MapaCalorService {
                         throw new IllegalArgumentException(
                                         "Solo se puede filtrar por animal o por rodeo, no por ambos.");
                 }
+                if (desde.isAfter(hasta)) {
+                        throw new IllegalArgumentException("La fecha 'desde' no puede ser posterior a 'hasta'.");
+                }
 
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
@@ -54,8 +59,26 @@ public class MapaCalorServiceImpl implements MapaCalorService {
                         }
                 }
 
-                List<Telemetria> telemetriaList = telemetriaRepository
-                                .findByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta, null);
+                List<Telemetria> telemetriaList;
+                if (rodeoId != null) {
+                        List<Long> animalIds = animalRepository.findByRodeoLoteId(rodeoId).stream()
+                                        .filter(a -> a.getEstablecimiento() != null && establecimientoId
+                                                        .equals(a.getEstablecimiento().getId()))
+                                        .map(Animal::getId)
+                                        .toList();
+                        if (animalIds.isEmpty()) {
+                                return GeoAnalyzeResponseDTO.builder()
+                                                .mapaCalor(new ArrayList<>())
+                                                .alertas(new ArrayList<>())
+                                                .build();
+                        }
+                        telemetriaList = telemetriaRepository.findByEstablecimientoAndAnimalesAndFechaHoraBetween(
+                                        establecimientoId, desde, hasta, animalIds);
+                } else {
+                        telemetriaList = telemetriaRepository
+                                        .findByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta,
+                                                        animalId);
+                }
 
                 List<CoordenadaGPSDTO> coordenadas = telemetriaList.stream()
                                 .filter(t -> t.getLatitud() != null && t.getLongitud() != null)
@@ -68,16 +91,7 @@ public class MapaCalorServiceImpl implements MapaCalorService {
                                                 .build())
                                 .collect(Collectors.toList());
 
-                List<String> animalIds = rodeoId == null ? null
-                                : animalRepository.findByRodeoLoteId(rodeoId).stream()
-                                                .filter(a -> a.getEstablecimiento() != null && establecimientoId
-                                                                .equals(a.getEstablecimiento().getId()))
-                                                .map(a -> a.getId().toString())
-                                                .toList();
-
                 GeoAnalyzeRequestDTO request = GeoAnalyzeRequestDTO.builder()
-                                .animalId(animalId != null ? animalId.toString() : null)
-                                .animalIds(animalIds)
                                 .historial7d(coordenadas)
                                 .build();
 
