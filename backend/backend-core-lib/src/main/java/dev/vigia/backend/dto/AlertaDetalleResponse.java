@@ -19,6 +19,8 @@ public class AlertaDetalleResponse {
     private String animalRaza;
 
     private LocalDateTime tsGeneracion;
+    private Double latitud;
+    private Double longitud;
     private String ventanaOptimaHoras;
     private LocalDateTime ventanaInicioIns;
     private LocalDateTime ventanaFinIns;

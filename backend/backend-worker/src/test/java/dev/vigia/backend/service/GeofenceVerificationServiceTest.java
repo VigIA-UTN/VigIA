@@ -120,12 +120,16 @@ class GeofenceVerificationServiceTest {
             return a;
         });
 
-        geofenceVerificationService.verificarPosicion(animal, -40.0, -60.0, LocalDateTime.now());
+        LocalDateTime horaSalida = LocalDateTime.of(2026, 9, 24, 10, 15, 0);
+        geofenceVerificationService.verificarPosicion(animal, -40.0, -60.0, horaSalida);
 
         ArgumentCaptor<Alerta> captor = ArgumentCaptor.forClass(Alerta.class);
         verify(alertaRepository, times(1)).save(captor.capture());
         Alerta capturada = captor.getValue();
         assertThat(capturada.getDisparador()).isEqualTo(DisparadorAlerta.FUERA_DE_PERIMETRO);
+        assertThat(capturada.getLatitud()).isEqualTo(-40.0);
+        assertThat(capturada.getLongitud()).isEqualTo(-60.0);
+        assertThat(capturada.getTsGeneracion()).isEqualTo(horaSalida);
         assertThat(capturada.getTipo()).isEqualTo("Fuera de Perímetro");
         assertThat(capturada.getSeveridad()).isEqualTo(SeveridadAlerta.ALTA);
         assertThat(capturada.getAccionRecomendada())
@@ -136,6 +140,9 @@ class GeofenceVerificationServiceTest {
                 eventCaptor.capture());
         assertThat(eventCaptor.getValue().getAccionRecomendada())
                 .isEqualTo("Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.");
+        assertThat(eventCaptor.getValue().getLatitud()).isEqualTo(-40.0);
+        assertThat(eventCaptor.getValue().getLongitud()).isEqualTo(-60.0);
+        assertThat(eventCaptor.getValue().getTsGeneracion()).isEqualTo(horaSalida);
     }
 
     @SuppressWarnings("null")

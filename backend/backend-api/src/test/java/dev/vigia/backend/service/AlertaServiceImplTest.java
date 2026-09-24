@@ -231,6 +231,52 @@ public class AlertaServiceImplTest {
 
         @Test
         @SuppressWarnings("null")
+        void obtenerDetalleAlerta_FueraDePerimetro_ExponePosicionYHoraDeSalida() {
+                // Arrange
+                LocalDateTime horaSalida = LocalDateTime.now().minusMinutes(30);
+                mockAlerta.setDisparador(DisparadorAlerta.FUERA_DE_PERIMETRO);
+                mockAlerta.setTsGeneracion(horaSalida);
+                mockAlerta.setLatitud(-34.6037);
+                mockAlerta.setLongitud(-58.3816);
+
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+
+                // Act
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert
+                assertEquals(-34.6037, result.getLatitud());
+                assertEquals(-58.3816, result.getLongitud());
+                assertEquals(horaSalida, result.getTsGeneracion());
+        }
+
+        @Test
+        void listarAlertas_FueraDePerimetro_ExponePosicion() {
+                // Arrange
+                mockAlerta.setDisparador(DisparadorAlerta.FUERA_DE_PERIMETRO);
+                mockAlerta.setLatitud(-34.6037);
+                mockAlerta.setLongitud(-58.3816);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, null, null))
+                                .thenReturn(List.of(mockAlerta));
+
+                // Act
+                List<AlertaResponse> result = alertaService.listarAlertas(EMAIL, ESTABLECIMIENTO_ID, null, null, null);
+
+                // Assert
+                assertEquals(1, result.size());
+                assertEquals(-34.6037, result.get(0).getLatitud());
+                assertEquals(-58.3816, result.get(0).getLongitud());
+                assertEquals(mockAlerta.getTsGeneracion(), result.get(0).getTsGeneracion());
+        }
+
+        @Test
+        @SuppressWarnings("null")
         void obtenerDetalleAlerta_ThrowsAccessDeniedException_WhenAlertNotBelongsToEstablecimiento() {
                 // Arrange
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));

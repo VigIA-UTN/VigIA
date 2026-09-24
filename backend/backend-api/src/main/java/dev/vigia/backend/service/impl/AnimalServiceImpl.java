@@ -559,9 +559,6 @@ public class AnimalServiceImpl implements AnimalService {
 
                 EstadoReproductivo saved = estadoReproductivoRepository.save(estado);
 
-                // Si el estado registrado manualmente es CELO, generamos una Alerta
-                // con DisparadorAlerta.CELO para que el dashboard y el panel de alertas
-                // lo muestre igual que una detección automática del modelo ML.
                 if (request.getEstado() == TipoReproductivo.CELO) {
                         Alerta alertaCelo = new Alerta();
                         alertaCelo.setAnimal(animal);
@@ -757,7 +754,6 @@ public class AnimalServiceImpl implements AnimalService {
                         try {
                                 TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
                         } catch (org.springframework.transaction.NoTransactionException e) {
-                                // Ignorar en unit tests sin proxy
                         }
                         exitosos = 0;
                 }
@@ -877,6 +873,8 @@ public class AnimalServiceImpl implements AnimalService {
                                 .tipo(alerta.getTipo())
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
                                 .severidad(alerta.getSeveridad().name())
                                 .build();

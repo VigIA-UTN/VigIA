@@ -67,11 +67,9 @@ public class AlertaServiceImpl implements AlertaService {
         @Override
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
                         String severidad, EstadoAlerta estado) {
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Verificar que el usuario pertenece al establecimiento
                 List<Establecimiento> establecimientos = establecimientoRepository
                                 .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
@@ -105,11 +103,9 @@ public class AlertaServiceImpl implements AlertaService {
                                 severidadEnum = SeveridadAlerta.BAJA;
                 }
 
-                // 3. Consultar las alertas del establecimiento aplicando filtros
                 List<Alerta> alertas = alertaRepository.findByFiltros(establecimientoId, estado, disparadorEnum,
                                 severidadEnum);
 
-                // 4. Mapear a DTO
                 return alertas.stream()
                                 .map(this::toResponse)
                                 .collect(Collectors.toList());
@@ -119,14 +115,9 @@ public class AlertaServiceImpl implements AlertaService {
         public List<AlertaResponse> listarAlertasCelo(
                         String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
 
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Verificar que el usuario realmente pertenece al establecimiento
-                // seleccionado.
-                // Esto garantiza el aislamiento multi-tenant: un usuario no puede consultar
-                // datos de un establecimiento ajeno aunque conozca su ID.
                 List<Establecimiento> establecimientos = establecimientoRepository
                                 .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
@@ -138,12 +129,10 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                // 3. Consultar alertas del establecimiento seleccionado según filtro
                 List<Alerta> alertas = (estado == null)
                                 ? alertaRepository.findCeloByEstablecimiento(establecimientoId)
                                 : alertaRepository.findCeloByEstablecimientoAndEstado(establecimientoId, estado);
 
-                // 4. Mapear a DTO
                 return alertas.stream()
                                 .map(this::toResponse)
                                 .collect(Collectors.toList());
@@ -153,14 +142,9 @@ public class AlertaServiceImpl implements AlertaService {
         public List<AlertaResponse> listarAlertasSalud(
                         String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
 
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Verificar que el usuario realmente pertenece al establecimiento
-                // seleccionado.
-                // Esto garantiza el aislamiento multi-tenant: un usuario no puede consultar
-                // datos de un establecimiento ajeno aunque conozca su ID.
                 List<Establecimiento> establecimientos = establecimientoRepository
                                 .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
@@ -172,12 +156,9 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                // 3. Consultar alertas del establecimiento seleccionado según filtro
                 List<Alerta> alertas = (estado == null)
                                 ? alertaRepository.findSaludByEstablecimiento(establecimientoId)
                                 : alertaRepository.findSaludByEstablecimientoAndEstado(establecimientoId, estado);
-
-                // 4. Mapear a DTO
                 return alertas.stream()
                                 .map(this::toResponse)
                                 .collect(Collectors.toList());
@@ -185,11 +166,9 @@ public class AlertaServiceImpl implements AlertaService {
 
         @Override
         public AlertaResumenResponse obtenerResumenAlertas(String emailUsuario, Long establecimientoId) {
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Verificar pertenencia al establecimiento
                 List<Establecimiento> establecimientos = establecimientoRepository
                                 .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
@@ -201,7 +180,6 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                // 3. Consultar la BD agrupando por disparador
                 List<Object[]> conteos = alertaRepository.countAlertasActivasPorDisparador(establecimientoId);
 
                 long reproductivo = 0;
@@ -317,6 +295,8 @@ public class AlertaServiceImpl implements AlertaService {
                                 .animalAlias(alerta.getAnimal().getAlias())
                                 .animalRaza(alerta.getAnimal().getRaza())
                                 .tsGeneracion(alerta.getTsGeneracion())
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
                                 .ventanaOptimaHoras(ventanaOptima)
                                 .ventanaInicioIns(alerta.getVentanaInicioIns())
                                 .ventanaFinIns(alerta.getVentanaFinIns())
@@ -431,6 +411,8 @@ public class AlertaServiceImpl implements AlertaService {
                                 .severidad(alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null)
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
                                 .accionRecomendada(alerta.getAccionRecomendada())
                                 .build();
@@ -493,7 +475,6 @@ public class AlertaServiceImpl implements AlertaService {
                 }
                 Alerta actualizado = alertaRepository.save(alerta);
 
-                // Publicar evento para SSE
                 AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                                 .id(actualizado.getId())
                                 .animalId(actualizado.getAnimal().getId())
@@ -691,9 +672,6 @@ public class AlertaServiceImpl implements AlertaService {
                 return this.toResponse(alerta);
         }
 
-        // ── Línea de tiempo
-        // ───────────────────────────────────────────────────────────
-
         @Override
         @Transactional(readOnly = true)
         @SuppressWarnings("null")
@@ -704,16 +682,12 @@ public class AlertaServiceImpl implements AlertaService {
                         LocalDateTime desde,
                         LocalDateTime hasta) {
 
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Obtener el animal
                 Animal animal = animalRepository.findById(animalId)
                                 .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
 
-                // 3. Verificar aislamiento multi-tenant: el animal debe pertenecer a un
-                // establecimiento activo del usuario autenticado
                 Long establecimientoId = animal.getEstablecimiento() != null
                                 ? animal.getEstablecimiento().getId()
                                 : null;
@@ -730,30 +704,22 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento del animal indicado.");
                 }
 
-                // 4. Resolver el filtro de tipo a DisparadorAlerta (solo se aplica a alertas)
                 DisparadorAlerta disparadorEnum = resolverDisparador(tipo);
 
-                // 5. Consultar alertas del animal con filtros
                 List<Alerta> alertas = alertaRepository.findByAnimalConFiltros(
                                 animalId, disparadorEnum, desde, hasta);
-
-                // 6. Consultar intervenciones del animal (solo filtradas por rango de fechas)
                 List<Intervencion> intervenciones = intervencionRepository
                                 .findByAnimalConRango(animalId, desde, hasta);
 
-                // 7. Mapear alertas a eventos de línea de tiempo
                 List<LineaTiempoEventoResponse> eventos = new ArrayList<>();
 
                 alertas.stream()
                                 .map(this::alertaToLineaTiempo)
                                 .forEach(eventos::add);
 
-                // 8. Mapear intervenciones a eventos de línea de tiempo
                 intervenciones.stream()
                                 .map(this::intervencionToLineaTiempo)
                                 .forEach(eventos::add);
-
-                // 9. Ordenar la lista combinada cronológicamente
                 eventos.sort(Comparator.comparing(
                                 LineaTiempoEventoResponse::getFecha,
                                 Comparator.nullsLast(Comparator.naturalOrder())));
