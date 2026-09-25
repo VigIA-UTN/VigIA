@@ -32,5 +32,6 @@ public class AlertaDetalleResponse {
     private Double valorUmbral;
     private String descripcionDatoOrigen;
     private DetalleSanitarioResponse detalleSanitario;
+    private DetalleGeoespacialResponse detalleGeoespacial;
     private String accionRecomendada;
 }

@@ -228,35 +228,38 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           </div>
         </div>
 
-        <div className="d-flex gap-2 mb-3">
+        <div className="d-flex flex-wrap gap-2 mb-3 justify-content-center">
           <button
-            className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
+            className="btn rounded-pill px-2 py-1 fw-semibold d-flex align-items-center gap-1"
             style={{
               backgroundColor: filtroTipo === 'CELO' ? '#13D4FB' : 'transparent',
               color: '#1E3A5F',
-              border: '2px solid #1E3A5F'
+              border: '2px solid #1E3A5F',
+              fontSize: '0.9rem'
             }}
             onClick={() => setFiltroTipo(prev => prev === 'CELO' ? null : 'CELO')}
           >
             <i className="bi bi-search"></i> Celo
           </button>
           <button
-            className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
+            className="btn rounded-pill px-2 py-1 fw-semibold d-flex align-items-center gap-1"
             style={{
               backgroundColor: filtroTipo === 'SALUD' ? '#13D4FB' : 'transparent',
               color: '#1E3A5F',
-              border: '2px solid #1E3A5F'
+              border: '2px solid #1E3A5F',
+              fontSize: '0.9rem'
             }}
             onClick={() => setFiltroTipo(prev => prev === 'SALUD' ? null : 'SALUD')}
           >
             <i className="bi bi-plus-circle"></i> Salud
           </button>
           <button
-            className="btn rounded-pill px-3 py-1 fw-semibold d-flex align-items-center gap-1"
+            className="btn rounded-pill px-2 py-1 fw-semibold d-flex align-items-center gap-1"
             style={{
               backgroundColor: filtroTipo === 'GEO' ? '#13D4FB' : 'transparent',
               color: '#1E3A5F',
-              border: '2px solid #1E3A5F'
+              border: '2px solid #1E3A5F',
+              fontSize: '0.9rem'
             }}
             onClick={() => setFiltroTipo(prev => prev === 'GEO' ? null : 'GEO')}
           >

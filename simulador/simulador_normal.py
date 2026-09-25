@@ -146,6 +146,8 @@ def generar_payload(device_id, estado):
     estado["lat"] += speed * math.cos(estado["heading"])
     estado["lon"] += speed * math.sin(estado["heading"])
 
+    estado["f_cnt"] = estado.get("f_cnt", 0) + 1
+
     # Generamos el formato TTN v3 Webhook
     return {
         "end_device_ids": {
@@ -153,6 +155,7 @@ def generar_payload(device_id, estado):
         },
         "uplink_message": {
             "received_at": datetime.now(timezone.utc).isoformat(),
+            "f_cnt": estado["f_cnt"],
             "decoded_payload": {
                 "type": "GNSSPosition",
                 "latitude": round(estado["lat"], 6),

@@ -17,6 +17,7 @@ import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.DetalleSanitarioResponse;
+import dev.vigia.backend.dto.DetalleGeoespacialResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
@@ -286,6 +287,11 @@ public class AlertaServiceImpl implements AlertaService {
                         detalleSanitario = construirDetalleSanitario(alerta);
                 }
 
+                DetalleGeoespacialResponse detalleGeoespacial = null;
+                if (alerta.getDisparador() == DisparadorAlerta.FUERA_DE_PERIMETRO) {
+                        detalleGeoespacial = construirDetalleGeoespacial(alerta);
+                }
+
                 String descripcionDatoOrigen = construirDescripcionDatoOrigen(alerta, detalleSanitario);
 
                 return AlertaDetalleResponse.builder()
@@ -308,6 +314,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 .valorUmbral(alerta.getValorUmbral())
                                 .descripcionDatoOrigen(descripcionDatoOrigen)
                                 .detalleSanitario(detalleSanitario)
+                                .detalleGeoespacial(detalleGeoespacial)
                                 .accionRecomendada(alerta.getAccionRecomendada())
                                 .build();
         }
@@ -339,6 +346,10 @@ public class AlertaServiceImpl implements AlertaService {
                         }
                         return "Se detectó un patrón de desplazamiento inusual del animal, distinto de su "
                                         + "movimiento habitual en el establecimiento.";
+                }
+
+                if (disparador == DisparadorAlerta.FUERA_DE_PERIMETRO) {
+                        return "El sistema detectó que el animal salió del perímetro asignado.";
                 }
 
                 if (confianzaPct != null) {
@@ -393,6 +404,26 @@ public class AlertaServiceImpl implements AlertaService {
                                 .ventanaHasta(snap != null ? snap.getVentanaHasta() : null)
                                 .serieActividad(snap != null ? snap.getSerieActividad() : null)
                                 .serieDesplazamiento(snap != null ? snap.getSerieDesplazamiento() : null)
+                                .build();
+        }
+
+        private DetalleGeoespacialResponse construirDetalleGeoespacial(Alerta alerta) {
+                Long segundosFuera = null;
+                if (alerta.getEstado() == EstadoAlerta.PENDIENTE) {
+                        segundosFuera = java.time.Duration.between(alerta.getTsGeneracion(), LocalDateTime.now()).getSeconds();
+                } else if (alerta.getTsConfirmacion() != null) {
+                        segundosFuera = java.time.Duration.between(alerta.getTsGeneracion(), alerta.getTsConfirmacion()).getSeconds();
+                }
+
+                String nombreLote = (alerta.getAnimal() != null && alerta.getAnimal().getRodeoLote() != null)
+                                ? alerta.getAnimal().getRodeoLote().getNombre()
+                                : null;
+
+                return DetalleGeoespacialResponse.builder()
+                                .latitudSalida(alerta.getLatitud())
+                                .longitudSalida(alerta.getLongitud())
+                                .nombreLote(nombreLote)
+                                .segundosFuera(segundosFuera)
                                 .build();
         }
 

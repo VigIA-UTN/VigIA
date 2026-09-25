@@ -49,14 +49,29 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   // Contador en vivo del tiempo fuera del perímetro (tick cada segundo)
   const [segundosVivoFuera, setSegundosVivoFuera] = useState<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Add derived estadoVisual early so the useEffect can use it
+  const estadoVisual = detalle ? detalle.estadoActual : alerta.estado;
+
   useEffect(() => {
     if (!isGeoespacial) return;
-    const base = detGeo?.segundosFuera ?? Math.floor((Date.now() - new Date(alerta.tsGeneracion).getTime()) / 1000);
+    
+    if (estadoVisual !== 'PENDIENTE') {
+      setSegundosVivoFuera(detGeo?.segundosFuera ?? 0);
+      return;
+    }
+
+    const tsFixed = alerta.tsGeneracion.endsWith('Z') ? alerta.tsGeneracion : alerta.tsGeneracion + 'Z';
+    const secondsSinceStart = Math.floor((Date.now() - new Date(tsFixed).getTime()) / 1000);
+    
+    // Si está PENDIENTE, usamos nuestra cuenta local en vez del backend para evitar bugs de zona horaria (UTC vs Local)
+    const base = estadoVisual === 'PENDIENTE' ? secondsSinceStart : (detGeo?.segundosFuera ?? secondsSinceStart);
+    
     setSegundosVivoFuera(Math.max(0, base));
     timerRef.current = setInterval(() => setSegundosVivoFuera(s => s + 1), 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGeoespacial, detGeo?.segundosFuera, alerta.tsGeneracion]);
+  }, [isGeoespacial, detGeo?.segundosFuera, alerta.tsGeneracion, estadoVisual]);
 
   useEffect(() => {
     let isMounted = true;
@@ -117,9 +132,9 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   let detectedText = 'Fecha desconocida';
   let windowStart = new Date();
   let windowEnd = new Date();
-  const animalName = detalle?.animalAlias ? `${detalle.animalAlias} (#${alerta.animalId})` : `Vaca #${alerta.animalId}`;
-
-  const estadoVisual = detalle ? detalle.estadoActual : alerta.estado;
+  
+  const caravanaText = detalle?.animalCaravanaOficial ? detalle.animalCaravanaOficial : alerta.animalId;
+  const animalName = detalle?.animalAlias ? `${detalle.animalAlias} (#${caravanaText})` : `Vaca #${caravanaText}`;
 
   const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
   const isSanitaria = disparador.includes('SALUD') || disparador.includes('SANITARI');
@@ -130,7 +145,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   try {
     const ts = detalle ? detalle.tsGeneracion : alerta.tsGeneracion;
     if (ts) {
-      date = new Date(ts);
+      const tsFixed = ts.endsWith('Z') ? ts : ts + 'Z';
+      date = new Date(tsFixed);
       if (isNaN(date.getTime())) throw new Error("Invalid date");
     }
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
