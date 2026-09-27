@@ -235,7 +235,8 @@ public class AnimalServiceImpl implements AnimalService {
                 animal.setRaza(request.getRaza());
 
                 if (request.getCaravanaId() != null) {
-                        if (animal.getCaravana() == null || !animal.getCaravana().getId().equals(request.getCaravanaId())) {
+                        if (animal.getCaravana() == null
+                                        || !animal.getCaravana().getId().equals(request.getCaravanaId())) {
                                 asignarCaravanaInterna(animal, request.getCaravanaId());
                         }
                 }
@@ -558,9 +559,6 @@ public class AnimalServiceImpl implements AnimalService {
 
                 EstadoReproductivo saved = estadoReproductivoRepository.save(estado);
 
-                // Si el estado registrado manualmente es CELO, generamos una Alerta
-                // con DisparadorAlerta.CELO para que el dashboard y el panel de alertas
-                // lo muestre igual que una detección automática del modelo ML.
                 if (request.getEstado() == TipoReproductivo.CELO) {
                         Alerta alertaCelo = new Alerta();
                         alertaCelo.setAnimal(animal);
@@ -756,7 +754,6 @@ public class AnimalServiceImpl implements AnimalService {
                         try {
                                 TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
                         } catch (org.springframework.transaction.NoTransactionException e) {
-                                // Ignorar en unit tests sin proxy
                         }
                         exitosos = 0;
                 }
@@ -876,6 +873,8 @@ public class AnimalServiceImpl implements AnimalService {
                                 .tipo(alerta.getTipo())
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
                                 .severidad(alerta.getSeveridad().name())
                                 .build();
@@ -1048,8 +1047,6 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
-        // ── Historial de pesos ────────────────────────────────────────────────────────
-
         @Override
         @Transactional
         @SuppressWarnings("null")
@@ -1163,6 +1160,7 @@ public class AnimalServiceImpl implements AnimalService {
 
         @Override
         @Transactional
+        @SuppressWarnings("null")
         public AnimalIndicadoresSaludResponse getIndicadoresSalud(Long animalId, String emailProductor) {
                 Usuario usuario = usuarioRepository.findByEmail(emailProductor)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
@@ -1294,9 +1292,11 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         private String getEstadoSalud(Integer valor, Float mean, Float std) {
-                if ((mean - SIGMA_AMARILLO_MOVIMIENTO * std) < valor && valor < (mean + SIGMA_AMARILLO_MOVIMIENTO * std)) {
+                if ((mean - SIGMA_AMARILLO_MOVIMIENTO * std) < valor
+                                && valor < (mean + SIGMA_AMARILLO_MOVIMIENTO * std)) {
                         return "VERDE";
-                } else if ((mean - SIGMA_ROJO_MOVIMIENTO * std) < valor && valor < (mean + SIGMA_ROJO_MOVIMIENTO * std)) {
+                } else if ((mean - SIGMA_ROJO_MOVIMIENTO * std) < valor
+                                && valor < (mean + SIGMA_ROJO_MOVIMIENTO * std)) {
                         return "AMARILLO";
                 } else {
                         return "ROJO";
@@ -1400,17 +1400,22 @@ public class AnimalServiceImpl implements AnimalService {
                 return mapToResponse(animal);
         }
 
+        @SuppressWarnings("null")
         private void asignarCaravanaInterna(Animal animal, Long caravanaId) {
                 Caravana nuevaCaravana = caravanaRepository.findById(caravanaId)
                                 .orElseThrow(() -> new IllegalArgumentException("Caravana no encontrada."));
 
                 if (nuevaCaravana.getEstablecimiento() == null ||
-                                !nuevaCaravana.getEstablecimiento().getId().equals(animal.getEstablecimiento().getId())) {
-                        throw new IllegalArgumentException("La caravana no pertenece al mismo establecimiento que el animal.");
+                                !nuevaCaravana.getEstablecimiento().getId()
+                                                .equals(animal.getEstablecimiento().getId())) {
+                        throw new IllegalArgumentException(
+                                        "La caravana no pertenece al mismo establecimiento que el animal.");
                 }
 
-                if (nuevaCaravana.getEstadoSensor() != null && nuevaCaravana.getEstadoSensor().equals(EstadoSensor.INACTIVO)) {
-                        throw new IllegalArgumentException("La caravana se encuentra inactiva y no puede ser vinculada.");
+                if (nuevaCaravana.getEstadoSensor() != null
+                                && nuevaCaravana.getEstadoSensor().equals(EstadoSensor.INACTIVO)) {
+                        throw new IllegalArgumentException(
+                                        "La caravana se encuentra inactiva y no puede ser vinculada.");
                 }
 
                 Optional<Animal> animalVinculado = animalRepository.findByCaravanaId(nuevaCaravana.getId());
@@ -1423,7 +1428,8 @@ public class AnimalServiceImpl implements AnimalService {
                 }
 
                 if (nuevaCaravana.getEstadoSensor() == EstadoSensor.VINCULADO
-                                && (animalVinculado.isEmpty() || !animalVinculado.get().getId().equals(animal.getId()))) {
+                                && (animalVinculado.isEmpty()
+                                                || !animalVinculado.get().getId().equals(animal.getId()))) {
                         throw new IllegalArgumentException(
                                         "La caravana ya se encuentra vinculada. Debe desvincularla antes de asignarla nuevamente.");
                 }
@@ -1445,7 +1451,8 @@ public class AnimalServiceImpl implements AnimalService {
 
         private void validarPermisoGestionCaravana(Usuario usuario, Establecimiento establecimiento) {
                 if (usuario.getRol().equals(Rol.VETERINARIO)) {
-                        throw new AccessDeniedException("El rol VETERINARIO no tiene permisos para asignar o desvincular caravanas.");
+                        throw new AccessDeniedException(
+                                        "El rol VETERINARIO no tiene permisos para asignar o desvincular caravanas.");
                 }
 
                 boolean tieneAcceso = usuario.getRol().equals(Rol.ADMINISTRADOR) ||

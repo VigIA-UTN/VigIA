@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import type { AlertaResponse, AlertaDetalleResponse, SeveridadNivel } from '../api/alertaApi';
+import { useState, useEffect, useRef } from 'react';
+import type { AlertaResponse, AlertaDetalleResponse, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
 import { updateAlertaEstado, getAlertaDetalle } from '../api/alertaApi';
 import SanitarioAlertDetail, { SeveridadBadge } from './SanitarioAlertDetail';
 import { useAuthStore } from '../store/authStore';
@@ -39,6 +39,35 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
     selectedId ?? null,
     isCelo,
   );
+
+  // Detección del tipo geoespacial
+  const disparadorNorm = (alerta.tipo ?? '').toUpperCase();
+  const isGeoespacial = disparadorNorm.includes('FUERA') || disparadorNorm.includes('PERIMETRO') ||
+    (detalle?.datoDisparador ?? '').toString().toUpperCase() === 'FUERA_DE_PERIMETRO';
+  const detGeo: DetalleGeoespacial | null = detalle?.detalleGeoespacial ?? null;
+
+  // Contador en vivo del tiempo fuera del perímetro (tick cada segundo)
+  const [segundosVivoFuera, setSegundosVivoFuera] = useState<number>(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Add derived estadoVisual early so the useEffect can use it
+  const estadoVisual = detalle ? detalle.estadoActual : alerta.estado;
+
+  useEffect(() => {
+    if (!isGeoespacial) return;
+    
+    if (estadoVisual !== 'PENDIENTE') {
+      setSegundosVivoFuera(detGeo?.segundosFuera ?? 0);
+      return;
+    }
+
+    // tsGeneracion llega en hora local sin offset, igual que en AlertNotificationCard y el popup del mapa
+    const secondsSinceStart = Math.floor((Date.now() - new Date(alerta.tsGeneracion).getTime()) / 1000);
+
+    setSegundosVivoFuera(Math.max(0, secondsSinceStart));
+    timerRef.current = setInterval(() => setSegundosVivoFuera(s => s + 1), 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isGeoespacial, detGeo?.segundosFuera, alerta.tsGeneracion, estadoVisual]);
 
   useEffect(() => {
     let isMounted = true;
@@ -99,9 +128,9 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   let detectedText = 'Fecha desconocida';
   let windowStart = new Date();
   let windowEnd = new Date();
-  const animalName = detalle?.animalAlias ? `${detalle.animalAlias} (#${alerta.animalId})` : `Vaca #${alerta.animalId}`;
-
-  const estadoVisual = detalle ? detalle.estadoActual : alerta.estado;
+  
+  const caravanaText = detalle?.animalCaravanaOficial ? detalle.animalCaravanaOficial : alerta.animalId;
+  const animalName = detalle?.animalAlias ? `${detalle.animalAlias} (#${caravanaText})` : `Vaca #${caravanaText}`;
 
   const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
   const isSanitaria = disparador.includes('SALUD') || disparador.includes('SANITARI');
@@ -147,6 +176,30 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
     startPerc = Math.max(0, ((windowStart.getTime() - grayStart) / totalMs) * 100);
     endPerc = Math.min(100, ((windowEnd.getTime() - grayStart) / totalMs) * 100);
   }
+
+  const textoAccionRecomendada = (detalle: AlertaDetalleResponse | null) => {
+    if (detalle?.accionRecomendada) {
+      return detalle.accionRecomendada;
+    } else if (isSanitaria) {
+      return 'Revisar al animal y realizar seguimiento clínico.';
+    } else if (isGeoespacial) {
+      return 'Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.';
+    } else if (isCelo) {
+      return 'Realizar inseminación artificial dentro de la ventana óptima.';
+    } else {
+      return 'Revisar al animal y realizar seguimiento.';
+    }
+  }
+
+  /** Formatea segundos en "Xh Ym Zs" o "Ym Zs" o "Zs" */
+  const formatTiempoFuera = (seg: number) => {
+    const h = Math.floor(seg / 3600);
+    const m = Math.floor((seg % 3600) / 60);
+    const s = seg % 60;
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
 
   return (
     <div
@@ -235,11 +288,111 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             </div>
 
+            <div>
+              <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
+                <i className="bi bi-info-circle"></i> Acción recomendada
+              </h6>
+              <div className="card border-0 shadow-sm rounded-4">
+                <div className="card-body">
+                  <p className="m-0" style={{ color: '#2D3748', fontSize: '0.95rem' }}>
+                    {textoAccionRecomendada(detalle)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Detalle sanitario (solo alertas de SALUD) */}
             {isSanitaria && detSan && <SanitarioAlertDetail detalle={detSan} />}
 
-            {/* Ventana de inseminacion (solo reproductivo) */}
-            {!isSanitaria && (
+            {/* Detalle geoespacial (solo alertas FUERA_DE_PERIMETRO) */}
+            {isGeoespacial && (
+              <div>
+                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
+                  <i className="bi bi-geo-alt-fill" style={{ color: '#dc3545' }}></i> Detalle de salida del perímetro
+                </h6>
+
+                {/* Contador vivo */}
+                <div
+                  className="card border-0 shadow-sm rounded-4 mb-3"
+                  style={{
+                    background: 'linear-gradient(135deg, #FFF0F0 0%, #FFE0E0 100%)',
+                    border: '1px solid #dc3545',
+                  }}
+                >
+                  <div className="card-body py-3 px-4 d-flex align-items-center gap-3">
+                    <i className="bi bi-clock-history fs-3 urgency-pulse" style={{ color: '#dc3545' }}></i>
+                    <div>
+                      <div
+                        className="fw-bold font-monospace"
+                        style={{ fontSize: '1.6rem', color: '#B00020', letterSpacing: '0.05em' }}
+                      >
+                        {formatTiempoFuera(segundosVivoFuera)}
+                      </div>
+                      <small style={{ color: '#9B1C1C' }}>Tiempo fuera del perímetro</small>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info grid: hora salida, lote, coordenadas */}
+                <div className="card border-0 shadow-sm rounded-4">
+                  <div className="card-body">
+                    <div className="row g-3">
+
+                      {/* Hora de salida */}
+                      <div className="col-6">
+                        <small className="text-muted d-block mb-1"><i className="bi bi-alarm me-1"></i>Hora de salida</small>
+                        <span className="fw-semibold" style={{ color: '#1E3A5F' }}>
+                          {date && !isNaN(date.getTime())
+                            ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                            : '--:--'}
+                        </span>
+                        <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>
+                          {date && !isNaN(date.getTime()) ? date.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                        </small>
+                      </div>
+
+                      {/* Lote */}
+                      <div className="col-6">
+                        <small className="text-muted d-block mb-1"><i className="bi bi-layers me-1"></i>Lote / Rodeo</small>
+                        <span className="fw-semibold" style={{ color: '#1E3A5F' }}>
+                          {detGeo?.nombreLote ?? detalle?.animalRaza ?? '—'}
+                        </span>
+                      </div>
+
+                      {/* Última posición conocida */}
+                      {detGeo?.latitud != null && detGeo?.longitud != null && (
+                        <div className="col-12">
+                          <small className="text-muted d-block mb-1"><i className="bi bi-crosshair me-1"></i>Última posición conocida</small>
+                          <a
+                            href={`https://www.google.com/maps?q=${detGeo.latitud},${detGeo.longitud}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="fw-semibold text-danger text-decoration-none d-flex align-items-center gap-1"
+                            style={{ fontSize: '0.88rem' }}
+                          >
+                            <i className="bi bi-map-fill"></i>
+                            {detGeo.latitud.toFixed(5)}, {detGeo.longitud.toFixed(5)}
+                            <i className="bi bi-box-arrow-up-right ms-1" style={{ fontSize: '0.75rem' }}></i>
+                          </a>
+                          <small className="text-muted d-block mt-1" style={{ fontSize: '0.75rem' }}>Ver en Google Maps</small>
+                        </div>
+                      )}
+
+                      {/* Alertas antiguas sin coordenadas persistidas */}
+                      {(detGeo == null || detGeo.latitud == null) && (
+                        <div className="col-12">
+                          <small className="text-muted d-block mb-1"><i className="bi bi-geo me-1"></i>Última posición conocida</small>
+                          <span className="text-muted fst-italic" style={{ fontSize: '0.85rem' }}>No disponible para esta alerta</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Ventana de inseminacion (solo reproductivo, no sanitario, no geoespacial) */}
+            {!isSanitaria && !isGeoespacial && (
               <div>
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                   <i className="bi bi-clock"></i> Ventana de inseminación
@@ -374,16 +527,6 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             )}
 
-            {/* Recomendacion (solo reproductivo) */}
-            {!isSanitaria && (
-              <div className="p-3 rounded-3 d-flex gap-3 align-items-start" style={{ backgroundColor: '#EEF2FF', color: '#1E3A5F', border: '1px solid #C7D2FE' }}>
-                <i className="bi bi-info-circle-fill fs-5 mt-1" style={{ color: '#6366F1' }}></i>
-                <p className="m-0" style={{ fontSize: '0.95rem' }}>
-                  Se recomienda inseminar a la vaca {animalName} entre las horas indicadas en la ventana de inseminación.
-                </p>
-              </div>
-            )}
-
             {/* Informacion Adicional */}
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
@@ -420,8 +563,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             </div>
 
-            {/* Ultimos Estados Reproductivos (solo reproductivo) */}
-            {!isSanitaria && detalle?.ultimosEstadosReproductivos && detalle.ultimosEstadosReproductivos.length > 0 && (
+            {/* Ultimos Estados Reproductivos (solo reproductivo, no geoespacial) */}
+            {!isSanitaria && !isGeoespacial && detalle?.ultimosEstadosReproductivos && detalle.ultimosEstadosReproductivos.length > 0 && (
               <div>
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                   <i className="bi bi-activity"></i> Últimos estados reproductivos
@@ -499,10 +642,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               onClick={() => handleAccion('CONFIRMADA', false, isSanitaria ? 'Alerta sanitaria atendida' : undefined)}
               disabled={actionLoading}
             >
-              <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : 'Confirmar celo'}
+              <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : isGeoespacial ? 'Confirmar salida' : 'Confirmar celo'}
             </button>
           </div>
-          {!isSanitaria && (
+          {!isSanitaria && !isGeoespacial && (
             <button
               className="btn rounded-3 fw-semibold w-100 py-2 d-flex justify-content-center align-items-center gap-2"
               style={{ backgroundColor: '#198754', color: 'white', border: '1px solid #198754' }}

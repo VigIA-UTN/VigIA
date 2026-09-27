@@ -17,6 +17,7 @@ import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.DetalleSanitarioResponse;
+import dev.vigia.backend.dto.DetalleGeoespacialResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
@@ -67,11 +68,9 @@ public class AlertaServiceImpl implements AlertaService {
         @Override
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
                         String severidad, EstadoAlerta estado) {
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Verificar que el usuario pertenece al establecimiento
                 List<Establecimiento> establecimientos = establecimientoRepository
                                 .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
@@ -105,11 +104,9 @@ public class AlertaServiceImpl implements AlertaService {
                                 severidadEnum = SeveridadAlerta.BAJA;
                 }
 
-                // 3. Consultar las alertas del establecimiento aplicando filtros
                 List<Alerta> alertas = alertaRepository.findByFiltros(establecimientoId, estado, disparadorEnum,
                                 severidadEnum);
 
-                // 4. Mapear a DTO
                 return alertas.stream()
                                 .map(this::toResponse)
                                 .collect(Collectors.toList());
@@ -119,14 +116,9 @@ public class AlertaServiceImpl implements AlertaService {
         public List<AlertaResponse> listarAlertasCelo(
                         String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
 
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Verificar que el usuario realmente pertenece al establecimiento
-                // seleccionado.
-                // Esto garantiza el aislamiento multi-tenant: un usuario no puede consultar
-                // datos de un establecimiento ajeno aunque conozca su ID.
                 List<Establecimiento> establecimientos = establecimientoRepository
                                 .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
@@ -138,12 +130,10 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                // 3. Consultar alertas del establecimiento seleccionado según filtro
                 List<Alerta> alertas = (estado == null)
                                 ? alertaRepository.findCeloByEstablecimiento(establecimientoId)
                                 : alertaRepository.findCeloByEstablecimientoAndEstado(establecimientoId, estado);
 
-                // 4. Mapear a DTO
                 return alertas.stream()
                                 .map(this::toResponse)
                                 .collect(Collectors.toList());
@@ -153,14 +143,9 @@ public class AlertaServiceImpl implements AlertaService {
         public List<AlertaResponse> listarAlertasSalud(
                         String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
 
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Verificar que el usuario realmente pertenece al establecimiento
-                // seleccionado.
-                // Esto garantiza el aislamiento multi-tenant: un usuario no puede consultar
-                // datos de un establecimiento ajeno aunque conozca su ID.
                 List<Establecimiento> establecimientos = establecimientoRepository
                                 .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
@@ -172,12 +157,9 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                // 3. Consultar alertas del establecimiento seleccionado según filtro
                 List<Alerta> alertas = (estado == null)
                                 ? alertaRepository.findSaludByEstablecimiento(establecimientoId)
                                 : alertaRepository.findSaludByEstablecimientoAndEstado(establecimientoId, estado);
-
-                // 4. Mapear a DTO
                 return alertas.stream()
                                 .map(this::toResponse)
                                 .collect(Collectors.toList());
@@ -185,11 +167,9 @@ public class AlertaServiceImpl implements AlertaService {
 
         @Override
         public AlertaResumenResponse obtenerResumenAlertas(String emailUsuario, Long establecimientoId) {
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Verificar pertenencia al establecimiento
                 List<Establecimiento> establecimientos = establecimientoRepository
                                 .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
 
@@ -201,7 +181,6 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                // 3. Consultar la BD agrupando por disparador
                 List<Object[]> conteos = alertaRepository.countAlertasActivasPorDisparador(establecimientoId);
 
                 long reproductivo = 0;
@@ -308,6 +287,11 @@ public class AlertaServiceImpl implements AlertaService {
                         detalleSanitario = construirDetalleSanitario(alerta);
                 }
 
+                DetalleGeoespacialResponse detalleGeoespacial = null;
+                if (alerta.getDisparador() == DisparadorAlerta.FUERA_DE_PERIMETRO) {
+                        detalleGeoespacial = construirDetalleGeoespacial(alerta);
+                }
+
                 String descripcionDatoOrigen = construirDescripcionDatoOrigen(alerta, detalleSanitario);
 
                 return AlertaDetalleResponse.builder()
@@ -317,6 +301,8 @@ public class AlertaServiceImpl implements AlertaService {
                                 .animalAlias(alerta.getAnimal().getAlias())
                                 .animalRaza(alerta.getAnimal().getRaza())
                                 .tsGeneracion(alerta.getTsGeneracion())
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
                                 .ventanaOptimaHoras(ventanaOptima)
                                 .ventanaInicioIns(alerta.getVentanaInicioIns())
                                 .ventanaFinIns(alerta.getVentanaFinIns())
@@ -328,6 +314,8 @@ public class AlertaServiceImpl implements AlertaService {
                                 .valorUmbral(alerta.getValorUmbral())
                                 .descripcionDatoOrigen(descripcionDatoOrigen)
                                 .detalleSanitario(detalleSanitario)
+                                .detalleGeoespacial(detalleGeoespacial)
+                                .accionRecomendada(alerta.getAccionRecomendada())
                                 .build();
         }
 
@@ -358,6 +346,10 @@ public class AlertaServiceImpl implements AlertaService {
                         }
                         return "Se detectó un patrón de desplazamiento inusual del animal, distinto de su "
                                         + "movimiento habitual en el establecimiento.";
+                }
+
+                if (disparador == DisparadorAlerta.FUERA_DE_PERIMETRO) {
+                        return "El sistema detectó que el animal salió del perímetro asignado.";
                 }
 
                 if (confianzaPct != null) {
@@ -415,6 +407,26 @@ public class AlertaServiceImpl implements AlertaService {
                                 .build();
         }
 
+        private DetalleGeoespacialResponse construirDetalleGeoespacial(Alerta alerta) {
+                Long segundosFuera = null;
+                if (alerta.getEstado() == EstadoAlerta.PENDIENTE) {
+                        segundosFuera = java.time.Duration.between(alerta.getTsGeneracion(), LocalDateTime.now()).getSeconds();
+                } else if (alerta.getTsConfirmacion() != null) {
+                        segundosFuera = java.time.Duration.between(alerta.getTsGeneracion(), alerta.getTsConfirmacion()).getSeconds();
+                }
+
+                String nombreLote = (alerta.getAnimal() != null && alerta.getAnimal().getRodeoLote() != null)
+                                ? alerta.getAnimal().getRodeoLote().getNombre()
+                                : null;
+
+                return DetalleGeoespacialResponse.builder()
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
+                                .nombreLote(nombreLote)
+                                .segundosFuera(segundosFuera)
+                                .build();
+        }
+
         private String descripcionGenerica(String severidad, String posibleCausa) {
                 String sev = severidad != null ? severidad.toLowerCase() : "desconocida";
                 String causa = (posibleCausa != null && !posibleCausa.isBlank()) ? posibleCausa : "no determinada";
@@ -430,7 +442,10 @@ public class AlertaServiceImpl implements AlertaService {
                                 .severidad(alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null)
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
+                                .accionRecomendada(alerta.getAccionRecomendada())
                                 .build();
         }
 
@@ -477,7 +492,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 estadoCelo.setEstado(TipoReproductivo.CELO);
                                 estadoCelo.setOrigen(OrigenEstado.MANUAL);
                                 estadoCelo.setFechaRegistro(LocalDateTime.now());
-                                
+
                                 List<EstadoReproductivo> estadosActuales = alerta.getAnimal().getEstadosReproductivos();
                                 if (estadosActuales != null && !estadosActuales.isEmpty()) {
                                         EstadoReproductivo ultimo = estadosActuales.get(0);
@@ -491,7 +506,6 @@ public class AlertaServiceImpl implements AlertaService {
                 }
                 Alerta actualizado = alertaRepository.save(alerta);
 
-                // Publicar evento para SSE
                 AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                                 .id(actualizado.getId())
                                 .animalId(actualizado.getAnimal().getId())
@@ -679,7 +693,8 @@ public class AlertaServiceImpl implements AlertaService {
                 intervencion.setAnimal(alerta.getAnimal());
                 intervencion.setInterventor(usuario);
                 intervencion.setDescripcion(request.getDescripcion().trim());
-                intervencion.setFechaHora(request.getFechaHora() != null ? request.getFechaHora() : LocalDateTime.now());
+                intervencion.setFechaHora(
+                                request.getFechaHora() != null ? request.getFechaHora() : LocalDateTime.now());
                 intervencion.setTipo(request.getTipo());
                 intervencionRepository.save(intervencion);
 
@@ -687,8 +702,6 @@ public class AlertaServiceImpl implements AlertaService {
 
                 return this.toResponse(alerta);
         }
-
-        // ── Línea de tiempo ───────────────────────────────────────────────────────────
 
         @Override
         @Transactional(readOnly = true)
@@ -700,16 +713,12 @@ public class AlertaServiceImpl implements AlertaService {
                         LocalDateTime desde,
                         LocalDateTime hasta) {
 
-                // 1. Validar que el usuario existe
                 usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                // 2. Obtener el animal
                 Animal animal = animalRepository.findById(animalId)
                                 .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
 
-                // 3. Verificar aislamiento multi-tenant: el animal debe pertenecer a un
-                //    establecimiento activo del usuario autenticado
                 Long establecimientoId = animal.getEstablecimiento() != null
                                 ? animal.getEstablecimiento().getId()
                                 : null;
@@ -726,30 +735,22 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento del animal indicado.");
                 }
 
-                // 4. Resolver el filtro de tipo a DisparadorAlerta (solo se aplica a alertas)
                 DisparadorAlerta disparadorEnum = resolverDisparador(tipo);
 
-                // 5. Consultar alertas del animal con filtros
                 List<Alerta> alertas = alertaRepository.findByAnimalConFiltros(
                                 animalId, disparadorEnum, desde, hasta);
-
-                // 6. Consultar intervenciones del animal (solo filtradas por rango de fechas)
                 List<Intervencion> intervenciones = intervencionRepository
                                 .findByAnimalConRango(animalId, desde, hasta);
 
-                // 7. Mapear alertas a eventos de línea de tiempo
                 List<LineaTiempoEventoResponse> eventos = new ArrayList<>();
 
                 alertas.stream()
                                 .map(this::alertaToLineaTiempo)
                                 .forEach(eventos::add);
 
-                // 8. Mapear intervenciones a eventos de línea de tiempo
                 intervenciones.stream()
                                 .map(this::intervencionToLineaTiempo)
                                 .forEach(eventos::add);
-
-                // 9. Ordenar la lista combinada cronológicamente
                 eventos.sort(Comparator.comparing(
                                 LineaTiempoEventoResponse::getFecha,
                                 Comparator.nullsLast(Comparator.naturalOrder())));
@@ -764,19 +765,20 @@ public class AlertaServiceImpl implements AlertaService {
                 }
                 return switch (tipo.trim().toLowerCase()) {
                         case "celo", "reproductivo" -> DisparadorAlerta.CELO;
-                        case "sanitario"            -> DisparadorAlerta.SALUD;
-                        case "geoespacial"           -> DisparadorAlerta.ABIGEATO;
-                        case "perimetro"             -> DisparadorAlerta.FUERA_DE_PERIMETRO;
-                        default                      -> null;
+                        case "sanitario" -> DisparadorAlerta.SALUD;
+                        case "geoespacial" -> DisparadorAlerta.ABIGEATO;
+                        case "perimetro" -> DisparadorAlerta.FUERA_DE_PERIMETRO;
+                        default -> null;
                 };
         }
 
         private String resolverEstadoResolucion(EstadoAlerta estado) {
-                if (estado == null) return "SIN_ATENDER";
+                if (estado == null)
+                        return "SIN_ATENDER";
                 return switch (estado) {
                         case CONFIRMADA -> "CONFIRMADA";
                         case DESCARTADA -> "DESCARTADA";
-                        default         -> "SIN_ATENDER";
+                        default -> "SIN_ATENDER";
                 };
         }
 

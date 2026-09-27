@@ -1763,15 +1763,21 @@ class AnimalControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.animalId").value(animalId))
                                 .andExpect(jsonPath("$.indicadores.length()").value(3))
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("VERDE"))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado")
+                                                .value("VERDE"))
                                 .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].descripcion")
-                                                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.emptyOrNullString())))
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado").value("VERDE"))
+                                                .value(org.hamcrest.Matchers
+                                                                .not(org.hamcrest.Matchers.emptyOrNullString())))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado")
+                                                .value("VERDE"))
                                 .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].descripcion")
-                                                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.emptyOrNullString())))
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de salud')].estado").value("VERDE"))
+                                                .value(org.hamcrest.Matchers
+                                                                .not(org.hamcrest.Matchers.emptyOrNullString())))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de salud')].estado")
+                                                .value("VERDE"))
                                 .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de salud')].descripcion")
-                                                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.emptyOrNullString())));
+                                                .value(org.hamcrest.Matchers
+                                                                .not(org.hamcrest.Matchers.emptyOrNullString())));
         }
 
         @Test
@@ -1787,12 +1793,14 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + animalAmarilloId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("AMARILLO"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado")
+                                                .value("AMARILLO"));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalRojoId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("ROJO"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado")
+                                                .value("ROJO"));
         }
 
         @Test
@@ -1808,12 +1816,14 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + animalAmarilloId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado").value("AMARILLO"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado")
+                                                .value("AMARILLO"));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalRojoId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado").value("ROJO"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado")
+                                                .value("ROJO"));
         }
 
         @Test
@@ -1826,9 +1836,12 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.caravana").value(org.hamcrest.Matchers.nullValue()))
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"))
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado").value("SIN DATOS"))
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de salud')].estado").value("SIN DATOS"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado")
+                                                .value("SIN DATOS"))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado reproductivo')].estado")
+                                                .value("SIN DATOS"))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de salud')].estado")
+                                                .value("SIN DATOS"));
         }
 
         @Test
@@ -1844,12 +1857,14 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + animalAmarilloId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de salud')].estado").value("AMARILLO"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de salud')].estado")
+                                                .value("AMARILLO"));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalRojoId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de salud')].estado").value("ROJO"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de salud')].estado")
+                                                .value("ROJO"));
         }
 
         @Test
@@ -1877,7 +1892,8 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado")
+                                                .value("SIN DATOS"));
         }
 
         @Test
@@ -1885,13 +1901,15 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void getIndicadoresSalud_telemetriaJustoDentroDeLas6Horas_mantieneColor() throws Exception {
                 Long animalId = crearAnimal("Vaca Telemetria Reciente", establecimientoId, rodeoLoteId);
-                // 5h59m de antigüedad: todavía dentro de la ventana de 6hs -> se calcula el color normalmente.
+                // 5h59m de antigüedad: todavía dentro de la ventana de 6hs -> se calcula el
+                // color normalmente.
                 asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).plusMinutes(1));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("VERDE"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado")
+                                                .value("VERDE"));
         }
 
         @Test
@@ -1899,13 +1917,15 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void getIndicadoresSalud_telemetriaSuperaLas6Horas_pasaASinDatos() throws Exception {
                 Long animalId = crearAnimal("Vaca Telemetria Vieja", establecimientoId, rodeoLoteId);
-                // 6h01m de antigüedad: supera la ventana de 6hs -> SIN DATOS, aunque el moveState sea "normal" (VERDE).
+                // 6h01m de antigüedad: supera la ventana de 6hs -> SIN DATOS, aunque el
+                // moveState sea "normal" (VERDE).
                 asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).minusMinutes(1));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"));
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado")
+                                                .value("SIN DATOS"));
         }
 
         @Test
@@ -1913,13 +1933,15 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void getIndicadoresSalud_telemetriaViejaConValorAnomalo_noConservaRojo() throws Exception {
                 Long animalId = crearAnimal("Vaca Telemetria Vieja Rojo", establecimientoId, rodeoLoteId);
-                // moveState muy alejado de la media (daría ROJO), pero la telemetría es de hace más de 6hs.
+                // moveState muy alejado de la media (daría ROJO), pero la telemetría es de hace
+                // más de 6hs.
                 asignarCollarConMoveState(animalId, 500, LocalDateTime.now().minusHours(7));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado").value("SIN DATOS"))
+                                .andExpect(jsonPath("$.indicadores[?(@.nombre == 'Estado de movimiento')].estado")
+                                                .value("SIN DATOS"))
                                 .andExpect(jsonPath("$.indicadores[0].nombre").value("Estado de movimiento"))
                                 .andExpect(jsonPath("$.indicadores[0].descripcion",
                                                 org.hamcrest.Matchers.containsString("6 horas")));
@@ -1982,6 +2004,7 @@ class AnimalControllerTest {
                                 .andExpect(status().isForbidden());
         }
 
+        @SuppressWarnings("null")
         @Test
         @DisplayName("POST /api/v1/animales/{id}/vincular-caravana - Vinculación exitosa por un productor")
         void vincularCaravana_exitoso() throws Exception {
@@ -2019,6 +2042,7 @@ class AnimalControllerTest {
                 assertThat(animalEnDb.getCaravana().getId()).isEqualTo(caravana.getId());
         }
 
+        @SuppressWarnings("null")
         @Test
         @DisplayName("POST /api/v1/animales/{id}/vincular-caravana - Falla con 400 si la caravana ya está vinculada a otro animal")
         void vincularCaravana_yaVinculada_retornaBadRequest() throws Exception {
@@ -2047,6 +2071,7 @@ class AnimalControllerTest {
                                 .andExpect(status().isBadRequest());
         }
 
+        @SuppressWarnings("null")
         @Test
         @DisplayName("POST /api/v1/animales/{id}/vincular-caravana - Falla con 403 para rol VETERINARIO")
         void vincularCaravana_veterinario_retornaForbidden() throws Exception {
@@ -2081,6 +2106,7 @@ class AnimalControllerTest {
                                 .andExpect(status().isForbidden());
         }
 
+        @SuppressWarnings("null")
         @Test
         @DisplayName("DELETE /api/v1/animales/{id}/desvincular-caravana - Desvinculación exitosa por productor")
         void desvincularCaravana_exitoso() throws Exception {

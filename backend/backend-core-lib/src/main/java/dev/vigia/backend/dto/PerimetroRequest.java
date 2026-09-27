@@ -1,6 +1,7 @@
 package dev.vigia.backend.dto;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -10,6 +11,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,4 +38,9 @@ public class PerimetroRequest {
     @Size(min = 3, message = "Se requieren al menos 3 vértices para definir el perímetro")
     @Valid
     private List<CoordenadaDTO> coordenadas;
+
+    @DecimalMin(value = "0.0", message = "La distancia de tolerancia no puede ser negativa")
+    private BigDecimal distanciaToleranciaMetros;
+
+    private Boolean zonaEstricta;
 }

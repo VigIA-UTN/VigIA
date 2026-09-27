@@ -32,6 +32,7 @@ public class CaravanaServiceImpl implements CaravanaService {
     private final AnimalRepository animalRepository;
 
     @Override
+    @SuppressWarnings("null")
     public CaravanaResponse crearCaravana(CaravanaRequest caravanaRequest) {
         Establecimiento establecimiento = establecimientoRepository.findById(caravanaRequest.getEstablecimientoId())
                 .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
@@ -79,7 +80,8 @@ public class CaravanaServiceImpl implements CaravanaService {
         List<Caravana> caravanas;
         if (establecimientoId == null) {
             if (!usuario.getRol().equals(Rol.ADMINISTRADOR)) {
-                throw new AccessDeniedException("Sólo un ADMINISTRADOR puede listar caravanas de todos los establecimientos.");
+                throw new AccessDeniedException(
+                        "Sólo un ADMINISTRADOR puede listar caravanas de todos los establecimientos.");
             }
             caravanas = listarCaravanasDeTodosLosEstablecimientos(estado, codigo);
         } else {
@@ -122,6 +124,7 @@ public class CaravanaServiceImpl implements CaravanaService {
         Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
+        @SuppressWarnings("null")
         Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
                 .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
 
@@ -180,6 +183,7 @@ public class CaravanaServiceImpl implements CaravanaService {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
+        @SuppressWarnings("null")
         Caravana caravana = caravanaRepository.findById(caravanaId)
                 .orElseThrow(() -> new IllegalArgumentException("Caravana no encontrada."));
 
@@ -209,7 +213,8 @@ public class CaravanaServiceImpl implements CaravanaService {
                 .activo(caravana.isActivo())
                 .estadoSensor(caravana.getEstadoSensor())
                 .establecimientoId(caravana.getEstablecimiento() != null ? caravana.getEstablecimiento().getId() : null)
-                .establecimientoNombre(caravana.getEstablecimiento() != null ? caravana.getEstablecimiento().getNombre() : null)
+                .establecimientoNombre(
+                        caravana.getEstablecimiento() != null ? caravana.getEstablecimiento().getNombre() : null)
                 .animalId(animal != null ? animal.getId() : null)
                 .animalAlias(animal != null ? animal.getAlias() : null)
                 .bateria(caravana.getBateria())

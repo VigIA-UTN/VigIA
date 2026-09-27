@@ -28,7 +28,9 @@ public class AlertaEventDTO {
     private Float confianzaModelo;
     private Integer ventanaOptimaHoras;
 
-    // Solo alertas sanitarias (disparador = SALUD).
     private Boolean desvioDetectado;
     private String posibleCausa;
+
+    private Double latitud;
+    private Double longitud;
 }

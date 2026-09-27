@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,19 +33,18 @@ class ApiKeyInterceptorTest {
         interceptor = new ApiKeyInterceptor();
     }
 
+    @SuppressWarnings("null")
     private void configurarApiKey(String apiKey) {
         ReflectionTestUtils.setField(interceptor, "configuredApiKey", apiKey);
     }
 
     @Test
-    @DisplayName("Sin API Key configurada, permite la solicitud sin autenticar (modo inseguro por defecto)")
-    void sinApiKeyConfigurada_permiteSinAutenticar() throws Exception {
+    @DisplayName("Sin API Key configurada, falla al arrancar")
+    void sinApiKeyConfigurada_fallaAlArrancar() {
         configurarApiKey("");
 
-        boolean permitido = interceptor.preHandle(request, response, new Object());
-
-        assertThat(permitido).isTrue();
-        verify(response, never()).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        assertThatThrownBy(() -> interceptor.validarConfiguracion())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test

@@ -64,11 +64,13 @@ public class SseAlertaPublisher {
                         establecimientoId);
                 for (Alerta alerta : perdidas) {
                     try {
-                        sendToEmitter(emitter, alerta.getId(), alerta.getAnimal().getId(), 
+                        sendToEmitter(emitter, alerta.getId(), alerta.getAnimal().getId(),
                                 alerta.getDisparador() != null ? alerta.getDisparador().name() : alerta.getTipo(),
                                 alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null,
                                 alerta.getEstado(),
-                                alerta.getTsGeneracion());
+                                alerta.getTsGeneracion(),
+                                alerta.getLatitud(),
+                                alerta.getLongitud());
                     } catch (Exception e) {
                         log.error("Fallo enviando alerta perdida, cancelando el resto. {}", e.getMessage());
                         list.remove(emitter);
@@ -91,8 +93,9 @@ public class SseAlertaPublisher {
             return;
         }
 
-        // Buscamos el Animal para obtener el establecimientoId. 
-        // No buscamos la Alerta porque podria no estar commiteada aun en la BD del worker!
+        // Buscamos el Animal para obtener el establecimientoId.
+        // No buscamos la Alerta porque podria no estar commiteada aun en la BD del
+        // worker!
         Optional<Animal> animalOpt = animalRepository.findById(alertaEvent.getAnimalId());
         if (animalOpt.isEmpty() || animalOpt.get().getEstablecimiento() == null) {
             log.warn("El animal con ID {} no fue encontrado o no tiene establecimiento.", alertaEvent.getAnimalId());
@@ -109,16 +112,20 @@ public class SseAlertaPublisher {
             return;
         }
 
-        log.info("Enviando evento de alerta ID {} a {} clientes del establecimiento {}", alertaEvent.getId(), list.size(),
+        log.info("Enviando evento de alerta ID {} a {} clientes del establecimiento {}", alertaEvent.getId(),
+                list.size(),
                 establecimientoId);
 
         for (SseEmitter emitter : list) {
             try {
-                sendToEmitter(emitter, alertaEvent.getId(), alertaEvent.getAnimalId(), 
-                        alertaEvent.getDisparador() != null ? alertaEvent.getDisparador().name() : alertaEvent.getTipo(),
+                sendToEmitter(emitter, alertaEvent.getId(), alertaEvent.getAnimalId(),
+                        alertaEvent.getDisparador() != null ? alertaEvent.getDisparador().name()
+                                : alertaEvent.getTipo(),
                         alertaEvent.getSeveridad() != null ? alertaEvent.getSeveridad().name() : null,
                         alertaEvent.getEstado(),
-                        alertaEvent.getTsGeneracion());
+                        alertaEvent.getTsGeneracion(),
+                        alertaEvent.getLatitud(),
+                        alertaEvent.getLongitud());
             } catch (Exception e) {
                 log.error("Error enviando alerta por SSE a un cliente, removiendo emitter.", e);
                 list.remove(emitter);
@@ -127,7 +134,9 @@ public class SseAlertaPublisher {
     }
 
     @SuppressWarnings("null")
-    private void sendToEmitter(SseEmitter emitter, Long id, Long animalId, String tipo, String severidad, EstadoAlerta estado, java.time.LocalDateTime tsGeneracion) throws IOException {
+    private void sendToEmitter(SseEmitter emitter, Long id, Long animalId, String tipo, String severidad,
+            EstadoAlerta estado, java.time.LocalDateTime tsGeneracion, Double latitud, Double longitud)
+            throws IOException {
         AlertaResponse response = AlertaResponse.builder()
                 .id(id)
                 .animalId(animalId)
@@ -135,6 +144,8 @@ public class SseAlertaPublisher {
                 .severidad(severidad)
                 .estado(estado)
                 .tsGeneracion(tsGeneracion)
+                .latitud(latitud)
+                .longitud(longitud)
                 .build();
 
         emitter.send(SseEmitter.event()

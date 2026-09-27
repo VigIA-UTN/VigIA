@@ -34,6 +34,16 @@ export default function MultiSelectRodeos({
     }
   };
 
+  const allSelected = rodeos.length > 0 && selectedIds.length === rodeos.length;
+
+  const handleToggleAll = () => {
+    if (allSelected) {
+      onChange([]);
+    } else {
+      onChange(rodeos.map(r => r.id));
+    }
+  };
+
   // Texto a mostrar en el trigger
   const selectedRodeos = rodeos.filter(r => selectedIds.includes(r.id));
   const displayText = selectedRodeos.length === 0
@@ -95,7 +105,42 @@ export default function MultiSelectRodeos({
               No hay rodeos disponibles
             </div>
           ) : (
-            rodeos.map(rodeo => {
+            <>
+              <div
+                onClick={handleToggleAll}
+                className="d-flex align-items-center gap-2"
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  backgroundColor: allSelected ? '#F0F9FF' : 'transparent',
+                  transition: 'background-color 0.15s',
+                  borderBottom: '1px solid #E4E7EC',
+                  marginBottom: '4px'
+                }}
+                onMouseEnter={e => {
+                  if (!allSelected) (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={e => {
+                  if (!allSelected) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={() => {}} // controlado por onClick del row
+                  style={{
+                    accentColor: '#13D4FB',
+                    cursor: 'pointer',
+                    width: '16px',
+                    height: '16px',
+                  }}
+                />
+                <span style={{ fontSize: '0.9rem', color: '#344054', fontWeight: allSelected ? 600 : 500 }}>
+                  Seleccionar todos los rodeos
+                </span>
+              </div>
+              {rodeos.map(rodeo => {
               const isChecked = selectedIds.includes(rodeo.id);
               return (
                 <div
@@ -132,7 +177,8 @@ export default function MultiSelectRodeos({
                   </span>
                 </div>
               );
-            })
+            })}
+            </>
           )}
         </div>
       )}

@@ -68,6 +68,11 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      DisparadorAlerta disparador,
                      LocalDateTime tsGeneracion);
 
+       Optional<Alerta> findFirstByAnimalAndDisparadorAndTsGeneracionAfterOrderByTsGeneracionDesc(
+                     Animal animal,
+                     DisparadorAlerta disparador,
+                     LocalDateTime tsGeneracion);
+
        @Query("SELECT a.disparador, COUNT(a) FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND a.estado = dev.vigia.backend.model.EstadoAlerta.PENDIENTE " +

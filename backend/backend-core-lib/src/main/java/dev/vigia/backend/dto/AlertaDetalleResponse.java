@@ -19,6 +19,8 @@ public class AlertaDetalleResponse {
     private String animalRaza;
 
     private LocalDateTime tsGeneracion;
+    private Double latitud;
+    private Double longitud;
     private String ventanaOptimaHoras;
     private LocalDateTime ventanaInicioIns;
     private LocalDateTime ventanaFinIns;
@@ -30,4 +32,6 @@ public class AlertaDetalleResponse {
     private Double valorUmbral;
     private String descripcionDatoOrigen;
     private DetalleSanitarioResponse detalleSanitario;
+    private DetalleGeoespacialResponse detalleGeoespacial;
+    private String accionRecomendada;
 }

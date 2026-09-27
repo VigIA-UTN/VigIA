@@ -8,7 +8,16 @@ El backend está dividido en tres módulos principales para separar las responsa
 
 1. **`backend-core-lib`**: Contiene las entidades JPA, repositorios, DTOs y lógica de negocio compartida.
 2. **`backend-api`**: Expone los endpoints RESTful utilizados por el Frontend (consultas de rodeos, alertas, estado de collares, etc.).
-3. **`backend-worker`**: Se encarga del procesamiento de colas (ej. RabbitMQ/Kafka si aplica) y de ejecutar el **Spring Batch**. Este Batch recolecta la telemetría periódicamente y la envía a los microservicios de ML (Celo, Salud, Geo) para inferir alertas.
+3. **`backend-worker`**: Se encarga del procesamiento de colas (ej. RabbitMQ/Kafka si aplica) y de ejecutar el **Spring Batch**. Este Batch recolecta la telemetría periódicamente y la envía a los microservicios de ML para inferir alertas.
+
+### Comunicación con los microservicios de ML
+
+Hay dos caminos distintos hacia los microservicios, según quién dispara el análisis:
+
+- **Batch, desde `backend-worker`** — el Spring Batch junta la telemetría pendiente y la empuja a los microservicios para que generen alertas. Implementado para **Celo** (`CeloDetectorStrategyImpl`) y **Salud** (`SaludDetectorStrategyImpl`).
+- **On-demand, desde `backend-api`** — el usuario pide un análisis y el backend lo resuelve en el momento. Es el caso de **Geo**: `GET /api/v1/mapa-calor` → `MapaCalorServiceImpl` → `MlGeoClient` → `ml-geo`, para el mapa de calor de pastoreo (H0025).
+
+**Pendiente:** el camino batch hacia **Geo** todavía no existe. `ml-geo` ya devuelve por animal el índice de cohesión y la distancia al centroide del rodeo, pero nadie los consume para generar alertas `ABIGEATO`; falta la strategy en el worker, análoga a las de celo y salud.
 
 ## Tecnologías Principales
 - **Java 17**

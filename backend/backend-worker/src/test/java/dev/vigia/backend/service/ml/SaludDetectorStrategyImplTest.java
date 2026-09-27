@@ -7,6 +7,7 @@ import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.EstadoInferencia;
 import dev.vigia.backend.model.PerfilReferencia;
+import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.PerfilReferenciaRepository;
@@ -255,6 +256,8 @@ class SaludDetectorStrategyImplTest {
         assertEquals(Boolean.TRUE, guardada.getDesvioDetectado());
         assertEquals("Enfermedad moderada / Cojera clínica", guardada.getPosibleCausa());
         assertEquals("SALUD", guardada.getTipo());
+        assertEquals("Apartar al animal para revisión clínica y evaluar tratamiento. Causa sospechada: Enfermedad moderada / Cojera clínica (riesgo medio).",
+                guardada.getAccionRecomendada());
 
         // La serie comparativa se congela como JSON en la alerta (no se recalcula on-read).
         assertNotNull(guardada.getSerieComparativaJson());
@@ -275,6 +278,8 @@ class SaludDetectorStrategyImplTest {
         dev.vigia.backend.dto.ml.AlertaEventDTO evento = eventCaptor.getValue();
         assertEquals(Boolean.TRUE, evento.getDesvioDetectado());
         assertEquals("Enfermedad moderada / Cojera clínica", evento.getPosibleCausa());
+        assertEquals("Apartar al animal para revisión clínica y evaluar tratamiento. Causa sospechada: Enfermedad moderada / Cojera clínica (riesgo medio).",
+                evento.getAccionRecomendada());
     }
 
     @SuppressWarnings("null")
@@ -314,5 +319,36 @@ class SaludDetectorStrategyImplTest {
 
         assertEquals(EstadoInferencia.COMPLETADO, lista.get(0).getEstadoInferenciaSalud());
         verify(telemetriaRepository).saveAll(anyList());
+    }
+
+    @Test
+    void buildAccionRecomendada_severidadAlta() {
+        assertEquals("Atención veterinaria urgente y aislamiento en enfermería. Causa sospechada: Problema severo (riesgo alto).",
+                saludDetectorStrategy.buildAccionRecomendada("Problema severo", SeveridadAlerta.ALTA));
+    }
+
+    @Test
+    void buildAccionRecomendada_severidadMedia() {
+        assertEquals("Apartar al animal para revisión clínica y evaluar tratamiento. Causa sospechada: Enfermedad moderada (riesgo medio).",
+                saludDetectorStrategy.buildAccionRecomendada("Enfermedad moderada", SeveridadAlerta.MEDIA));
+    }
+
+    @Test
+    void buildAccionRecomendada_severidadBaja() {
+        assertEquals("Monitorear la evolución y el comportamiento del animal en los próximos rodeos. Causa sospechada: Enfermedad leve / Inicio (riesgo bajo).",
+                saludDetectorStrategy.buildAccionRecomendada("Enfermedad leve / Inicio", SeveridadAlerta.BAJA));
+    }
+
+    @Test
+    void buildAccionRecomendada_causaNulaOVacia_noMuestraNull() {
+        String esperado = "Atención veterinaria urgente y aislamiento en enfermería. Causa sospechada: no determinada (riesgo alto).";
+        assertEquals(esperado, saludDetectorStrategy.buildAccionRecomendada(null, SeveridadAlerta.ALTA));
+        assertEquals(esperado, saludDetectorStrategy.buildAccionRecomendada("   ", SeveridadAlerta.ALTA));
+    }
+
+    @Test
+    void buildAccionRecomendada_severidadNula_textoGenerico() {
+        assertEquals("Revisar al animal y realizar seguimiento clínico. Causa sospechada: no determinada.",
+                saludDetectorStrategy.buildAccionRecomendada(null, null));
     }
 }

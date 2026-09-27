@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Polygon;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,10 +20,10 @@ class PerimetroTest {
                 new CoordenadaDTO(-34.0, -58.0),
                 new CoordenadaDTO(-34.0, -57.0),
                 new CoordenadaDTO(-35.0, -57.0),
-                new CoordenadaDTO(-35.0, -58.0)
-        ));
+                new CoordenadaDTO(-35.0, -58.0)));
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("Debe instanciar Perímetro con estado activo y validar sus invariantes")
     void debeInstanciarPerimetroValido() {
@@ -91,6 +92,7 @@ class PerimetroTest {
         assertThat(perimetro.getLotes()).containsExactly(lote2);
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("Debe actualizar polígono completo validándolo")
     void debeActualizarPoligonoCompleto() {
@@ -101,11 +103,80 @@ class PerimetroTest {
                 new CoordenadaDTO(-30.0, -60.0),
                 new CoordenadaDTO(-30.0, -59.0),
                 new CoordenadaDTO(-31.0, -59.0),
-                new CoordenadaDTO(-31.0, -60.0)
-        ));
+                new CoordenadaDTO(-31.0, -60.0)));
 
         perimetro.actualizarArea(nuevoPoly);
         assertThat(perimetro.getArea()).isEqualTo(nuevoPoly);
         assertThat(perimetro.getFechaModificacion()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Debe crearse con tolerancia 0 y zona no estricta por defecto")
+    void debeTenerUmbralPorDefecto() {
+        Perimetro perimetro = new Perimetro(new Establecimiento(), "Potrero", crearPoligonoValido());
+
+        assertThat(perimetro.getDistanciaToleranciaMetros()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(perimetro.isZonaEstricta()).isFalse();
+        assertThat(perimetro.getToleranciaEfectivaMetros()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("Debe configurar tolerancia y zona estricta")
+    void debeConfigurarUmbral() {
+        Perimetro perimetro = new Perimetro(new Establecimiento(), "Potrero", crearPoligonoValido());
+
+        perimetro.configurarUmbral(new BigDecimal("25.50"), true);
+
+        assertThat(perimetro.getDistanciaToleranciaMetros()).isEqualByComparingTo("25.50");
+        assertThat(perimetro.isZonaEstricta()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Debe fallar si la tolerancia es negativa o nula")
+    void debeFallarConToleranciaInvalida() {
+        Perimetro perimetro = new Perimetro(new Establecimiento(), "Potrero", crearPoligonoValido());
+
+        assertThatThrownBy(() -> perimetro.configurarUmbral(new BigDecimal("-1"), false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no puede ser negativa");
+        assertThatThrownBy(() -> perimetro.configurarUmbral(null, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no puede ser nula");
+
+        assertThat(perimetro.getDistanciaToleranciaMetros()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("La tolerancia efectiva debe ignorarse en zona estricta")
+    void toleranciaEfectivaIgnoradaEnZonaEstricta() {
+        Perimetro perimetro = new Perimetro(new Establecimiento(), "Potrero", crearPoligonoValido());
+
+        perimetro.configurarUmbral(new BigDecimal("50"), false);
+        assertThat(perimetro.getToleranciaEfectivaMetros()).isEqualByComparingTo("50");
+
+        perimetro.configurarUmbral(new BigDecimal("50"), true);
+        assertThat(perimetro.getToleranciaEfectivaMetros()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(perimetro.getDistanciaToleranciaMetros()).isEqualByComparingTo("50");
+    }
+
+    @Test
+    @DisplayName("Debe admitir distancias dentro de la tolerancia y rechazar las que la superan")
+    void admiteDistanciaSegunTolerancia() {
+        Perimetro perimetro = new Perimetro(new Establecimiento(), "Potrero", crearPoligonoValido());
+        perimetro.configurarUmbral(new BigDecimal("50"), false);
+
+        assertThat(perimetro.admiteDistancia(0)).isTrue();
+        assertThat(perimetro.admiteDistancia(50)).isTrue();
+        assertThat(perimetro.admiteDistancia(50.01)).isFalse();
+    }
+
+    @Test
+    @DisplayName("En zona estricta solo debe admitir puntos dentro del polígono")
+    void admiteDistanciaEnZonaEstricta() {
+        Perimetro perimetro = new Perimetro(new Establecimiento(), "Potrero", crearPoligonoValido());
+        perimetro.configurarUmbral(new BigDecimal("50"), true);
+
+        assertThat(perimetro.admiteDistancia(0)).isTrue();
+        assertThat(perimetro.admiteDistancia(1)).isFalse();
     }
 }

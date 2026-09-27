@@ -1,4 +1,5 @@
 import type { AlertaResponse } from '../api/alertaApi';
+import SidebarCard, { type Categoria, type Severidad } from './SidebarCard';
 
 interface AlertNotificationCardProps {
   alerta: AlertaResponse;
@@ -7,98 +8,105 @@ interface AlertNotificationCardProps {
   isUnread?: boolean;
 }
 
+const ESTADO_ANIMAL: Record<Severidad, string> = { BAJA: 'NORMAL', MEDIA: 'BORDE', ALTA: 'CRITICO' };
+const ICONO: Record<string, string> = {
+  CELO: 'bi-arrow-through-heart',
+  SALUD: 'bi-heart-pulse',
+  GEOESPACIAL: 'bi-globe-americas',
+  ABIGEATO: 'bi-globe-americas',
+};
+// Colores alineados con las tarjetas de resumen de MapPage (Reproductivo/Sanitario/Geoespacial).
+const CATEGORIA: Record<string, Categoria> = {
+  CELO: { label: 'Reproductivo', color: '#0d6efd', icono: 'bi-arrow-through-heart' },
+  SALUD: { label: 'Sanitario', color: '#198754', icono: 'bi-heart-pulse' },
+  GEOESPACIAL: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
+  ABIGEATO: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
+};
+
+function haceCuanto(ts: string) {
+  const min = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+  if (isNaN(min)) return '';
+  if (min < 1) return 'Ahora';
+  if (min < 60) return `Hace ${min} m`;
+  if (min < 1440) return `Hace ${Math.floor(min / 60)} h`;
+  return `Hace ${Math.floor(min / 1440)} d`;
+}
+
+function tiempoFueraBadge(ts: string) {
+  const min = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+  if (isNaN(min) || min < 0) return 'Fuera ahora';
+  if (min < 1) return 'Fuera hace menos de 1 min';
+  if (min < 60) return `Fuera hace ${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (m === 0) return `Fuera hace ${h}h`;
+  return `Fuera hace ${h}h ${m}m`;
+}
+
+const textoAccionRecomendada = (alerta: AlertaResponse | null) => {
+  if (alerta?.accionRecomendada) {
+    return alerta.accionRecomendada;
+  } else if (alerta && alerta.tipo === 'SALUD') {
+    return 'Revisar al animal y realizar seguimiento clínico.';
+  } else if (alerta && alerta.tipo === 'CELO') {
+    return 'Realizar inseminación artificial dentro de la ventana óptima.';
+  } else {
+    return 'Revisar al animal y realizar seguimiento.';
+  }
+}
+
 export default function AlertNotificationCard({
   alerta,
   onClick,
   isMenuOpen = false,
   isUnread = false,
 }: AlertNotificationCardProps) {
-  const isResolved = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
-  const isClickable = true;
-
+  const resuelta = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
   // Severidad: el backend manda ALTA/MEDIA/BAJA. Fallback por tipo mientras no llegue.
-  const gravedad: 'ALTA' | 'MEDIA' | 'BAJA' =
-    (alerta.severidad as 'ALTA' | 'MEDIA' | 'BAJA') ??
-    (alerta.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
+  const severidad: Severidad = alerta.severidad ?? (alerta.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
+  const tipoNorm = (alerta.tipo ?? '').toUpperCase();
+  const isGeoespacial = tipoNorm.includes('FUERA') || tipoNorm.includes('PERIMETRO') || tipoNorm === 'GEOESPACIAL';
 
-  const severityMap = {
-    ALTA: {
-      stripColor: '#E53E3E',
-      iconBg: '#FED7D7',
-      iconColor: '#C53030',
-      iconClass: 'bi-exclamation-octagon-fill',
-    },
-    MEDIA: {
-      stripColor: '#D69E2E',
-      iconBg: '#FEFCBF',
-      iconColor: '#B7791F',
-      iconClass: 'bi-exclamation-triangle-fill',
-    },
-    BAJA: {
-      stripColor: '#38A169',
-      iconBg: '#C6F6D5',
-      iconColor: '#276749',
-      iconClass: 'bi-info-circle-fill',
-    },
-  };
-  const sev = severityMap[gravedad] || severityMap['MEDIA'];
-
-  // Estado resuelto: icono y colores neutrales
-  const resolvedIconClass = alerta.estado === 'CONFIRMADA' ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-  const resolvedIconColor = alerta.estado === 'CONFIRMADA' ? '#38A169' : '#A0AEC0';
-  const resolvedIconBg = alerta.estado === 'CONFIRMADA' ? '#C6F6D5' : '#EDF2F7';
-
-  const formatTime = (ts: string) => {
-    const date = new Date(ts);
-    if (isNaN(date.getTime())) return '--:--';
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const cuerpoPrincipal = isGeoespacial ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <i
+        className="bi bi-geo-alt-fill"
+        style={{ color: '#dc3545', fontSize: '0.95rem', animation: 'geoPulse 1.4s ease-in-out infinite' }}
+      />
+      <span style={{ color: '#B00020', fontWeight: 600, fontSize: '0.88rem' }}>
+        {tiempoFueraBadge(alerta.tsGeneracion)}
+      </span>
+    </div>
+  ) : (
+    <div
+      title={textoAccionRecomendada(alerta)}
+      style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+    >
+      {textoAccionRecomendada(alerta)}
+    </div>
+  );
 
   return (
-    <div
-      className={`card border-0 rounded-4 ${isClickable ? 'alerta-clickable' : ''}`}
-      style={{
-        overflow: 'hidden',
-        cursor: isClickable ? 'pointer' : 'default',
-        transition: 'transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease',
-        boxShadow: isMenuOpen ? '0 0 0 2px #1E3A5F' : isResolved ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-        backgroundColor: isMenuOpen ? '#E2E8F0' : isResolved ? '#F7FAFC' : 'white',
-        opacity: isResolved ? 0.72 : 1,
-      }}
-      onClick={() => onClick(alerta)}
-    >
-      <div className="d-flex h-100">
-        {isUnread && (
-          <div style={{ width: '6px', backgroundColor: sev.stripColor, flexShrink: 0 }}></div>
-        )}
-        <div className="card-body p-3 d-flex gap-3 w-100 align-items-center">
-          <div
-            className="rounded-3 d-flex align-items-center justify-content-center"
-            style={{
-              width: '45px', height: '45px', flexShrink: 0,
-              backgroundColor: isResolved ? resolvedIconBg : sev.iconBg,
-            }}
-          >
-            <i
-              className={`bi ${isResolved ? resolvedIconClass : sev.iconClass} fs-4`}
-              style={{ color: isResolved ? resolvedIconColor : sev.iconColor }}
-            ></i>
-          </div>
-          <div className="w-100">
-            <div className="d-flex justify-content-between align-items-start mb-1">
-              <h6 className={`m-0 fw-bold lh-sm ${isResolved ? 'text-muted' : ''}`} style={{ fontSize: '0.9rem' }}>
-                #{alerta.animalId} en estado {alerta.estado}
-              </h6>
-              <small className="text-muted" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap', marginLeft: '8px' }}>
-                {formatTime(alerta.tsGeneracion)}
-              </small>
-            </div>
-            <small className="text-muted lh-sm d-block" style={{ fontSize: '0.8rem' }}>
-              {alerta.tipo === 'CELO' ? `Se estima alerta de ${alerta.tipo.toLowerCase()}` : `Alerta de ${alerta.tipo?.toLowerCase() || 'desconocida'}`}
-            </small>
-          </div>
-        </div>
-      </div>
-    </div>
+    <>
+      <SidebarCard
+        severidad={severidad}
+        icono={ICONO[alerta.tipo] ?? 'bi-exclamation-triangle-fill'}
+        categoria={CATEGORIA[alerta.tipo]}
+        titulo={`#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
+        cuerpo={cuerpoPrincipal}
+        timestamp={haceCuanto(alerta.tsGeneracion)}
+        acento={isUnread}
+        apagada={resuelta}
+        seleccionada={isMenuOpen}
+        onClick={() => onClick(alerta)}
+        acciones={<i className="bi bi-chevron-right" style={{ color: '#98A2B3' }} />}
+      />
+      <style>{`
+        @keyframes geoPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.5; transform: scale(1.3); }
+        }
+      `}</style>
+    </>
   );
 }

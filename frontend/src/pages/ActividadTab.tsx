@@ -1,4 +1,3 @@
-import 'leaflet'; // sets window.L, which leaflet.heat patches
 import axios from 'axios';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import {
@@ -7,7 +6,7 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Cell
 } from 'recharts';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import { Modal, Button, Form, Spinner, Alert } from 'react-bootstrap';
 import {
     getMetricasAnimal,
@@ -17,12 +16,11 @@ import {
     type RegistroPesoResponse
 } from '../api/animalesApi';
 import 'leaflet/dist/leaflet.css';
-import 'leaflet.heat';
-
-// leaflet.heat patches L globally — no named exports
-type HeatLatLngTuple = [number, number, number?];
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createHeatLayer = (points: HeatLatLngTuple[], opts: object) => (window as any).L.heatLayer(points, opts);
+import HeatmapLayer from '../components/heatmap/HeatmapLayer';
+import HeatmapPanel from '../components/heatmap/HeatmapPanel';
+import { useHeatPoints } from '../components/heatmap/useHeatPoints';
+import { lastDaysRange } from '../components/heatmap/heatmapFilters';
+import type { HeatFilter, HeatLatLngTuple } from '../components/heatmap/types';
 
 // ─── Custom Tooltip ──────────────────────────────────────────────────────────
 
@@ -56,41 +54,56 @@ function CustomTooltip({ active, payload, label, unit }: TooltipProps) {
     );
 }
 
-// ─── Heatmap Layer Component ─────────────────────────────────────────────────
-
-function HeatmapLayer({ points }: { points: HeatLatLngTuple[] }) {
-    const map = useMap();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const layerRef = useRef<any>(null);
-
-    useEffect(() => {
-        if (!map) return;
-        if (layerRef.current) {
-            map.removeLayer(layerRef.current);
-        }
-        layerRef.current = createHeatLayer(points, {
-            radius: 28,
-            blur: 20,
-            maxZoom: 17,
-            gradient: { 0.2: '#66C6EB', 0.5: '#F6C343', 0.8: '#F28C38', 1.0: '#E53E3E' },
-        }).addTo(map);
-
-        return () => {
-            if (layerRef.current) map.removeLayer(layerRef.current);
-        };
-    }, [map, points]);
-
-    return null;
-}
-
-// invalidate size when tab becomes visible
+// keep the map in sync with its container (tab becoming visible, expand/collapse, window resize).
+// Debounced: invalidateSize redraws tiles and the heat canvas, so it must run once after the resize settles, not per frame.
 function MapInvalidator() {
     const map = useMap();
     useEffect(() => {
-        setTimeout(() => map.invalidateSize(), 200);
+        let timer: number | undefined;
+        const observer = new ResizeObserver(() => {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => map.invalidateSize({ animate: false }), 120);
+        });
+        observer.observe(map.getContainer());
+        return () => { window.clearTimeout(timer); observer.disconnect(); };
     }, [map]);
     return null;
 }
+
+const PANEL_MAX_WIDTH = 462;
+const PANEL_INSET = 16;
+/** Horizontal space the overlaid panel covers on the left of the map. */
+const panelCover = () => Math.min(PANEL_MAX_WIDTH, window.innerWidth - 40) + PANEL_INSET * 2;
+
+/**
+ * The map is always full width and the panel floats over its left side, so the map never resizes.
+ * Zooms to the heat inside the visible (uncovered) area, and re-centres it with one cheap pan when the panel toggles.
+ */
+function MapInset({ points, expanded }: { points: HeatLatLngTuple[]; expanded: boolean }) {
+    const map = useMap();
+    const expandedRef = useRef(expanded);
+    const first = useRef(true);
+
+    useEffect(() => {
+        expandedRef.current = expanded;
+        if (first.current) { first.current = false; return; }
+        map.panBy([expanded ? panelCover() / 2 : -panelCover() / 2, 0], { duration: 0.25 });
+    }, [map, expanded]);
+
+    useEffect(() => {
+        if (points.length === 0) return;
+        map.fitBounds(points.map(p => [p[0], p[1]] as [number, number]), {
+            maxZoom: 17,
+            paddingTopLeft: [(expandedRef.current ? 0 : panelCover()) + 24, 24],
+            paddingBottomRight: [24, 24],
+        });
+    }, [map, points]);
+    return null;
+}
+
+const NO_ITEMS: never[] = [];
+const noop = () => undefined;
+const DEFAULT_CENTER: [number, number] = [-36.622, -64.292];
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
@@ -147,9 +160,10 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 
 interface ActividadTabProps {
     animalId: number;
+    establecimientoId: number;
 }
 
-export default function ActividadTab({ animalId }: ActividadTabProps) {
+export default function ActividadTab({ animalId, establecimientoId }: ActividadTabProps) {
     const [metricas, setMetricas] = useState<AnimalMetricaResponse[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -219,24 +233,15 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
         });
     }, [metricas]);
 
-    const heatPoints = useMemo(() => {
-        const points: HeatLatLngTuple[] = [];
-        metricas.forEach(m => {
-            if (!m.sinDatos && m.latitud != null && m.longitud != null) {
-                points.push([m.latitud, m.longitud, 0.8]);
-            }
-        });
-        return points;
-    }, [metricas]);
-
-    const mapCenter: [number, number] = useMemo(() => {
-        if (heatPoints.length > 0) {
-            const avgLat = heatPoints.reduce((sum, p) => sum + p[0], 0) / heatPoints.length;
-            const avgLng = heatPoints.reduce((sum, p) => sum + p[1], 0) / heatPoints.length;
-            return [avgLat, avgLng];
-        }
-        return [-36.622, -64.292];
-    }, [heatPoints]);
+    // Mapa de calor: posiciones reales de este animal; solo el período es editable
+    const [heatRange, setHeatRange] = useState(() => lastDaysRange(7));
+    // mapa ampliado: oculta el panel (calendario) y el mapa ocupa todo el ancho
+    const [mapExpanded, setMapExpanded] = useState(() => window.innerWidth < 900); // en pantallas angostas el panel taparía el mapa
+    const heatFilter = useMemo<HeatFilter>(
+        () => ({ scope: 'animal', rodeoId: null, animalId, perimetro: false, ...heatRange }),
+        [animalId, heatRange],
+    );
+    const { points: heatPoints, loading: heatLoading, error: heatError } = useHeatPoints(heatFilter, { establecimientoId });
 
     const handleSubmitPeso = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -341,40 +346,71 @@ export default function ActividadTab({ animalId }: ActividadTabProps) {
             {/* ── Gráfico 2: Mapa de Calor de Posición ── */}
             <ChartCard
                 title="Mapa de Calor — Posición"
-                subtitle="Zonas por las que más tiempo estuvo el animal · últimos 7 días"
+                subtitle="Zonas por las que más tiempo estuvo el animal en el período elegido"
             >
-                <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#718096' }}>Intensidad:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {[
-                            { color: '#66C6EB', label: 'Baja' },
-                            { color: '#F6C343', label: 'Media' },
-                            { color: '#F28C38', label: 'Alta' },
-                            { color: '#E53E3E', label: 'Muy alta' },
-                        ].map(({ color, label }) => (
-                            <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 10, fontSize: '0.79rem', color: '#718096' }}>
-                                <span style={{ width: 12, height: 12, borderRadius: 2, background: color, display: 'inline-block' }} />
-                                {label}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-                <div style={{ borderRadius: 10, overflow: 'hidden', height: 340, border: '1px solid #E2E8F0' }}>
+                <div style={{ position: 'relative', height: 480, borderRadius: 10, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
                     <MapContainer
-                        center={mapCenter}
+                        center={DEFAULT_CENTER}
                         zoom={15}
-                        style={{ height: '100%', width: '100%' }}
-                        zoomControl={true}
+                        style={{ height: '100%', width: '100%', background: '#1E3A5F' }}
+                        zoomControl={false}
+                        attributionControl={false}
                         scrollWheelZoom={false}
                     >
+                        <ZoomControl position="bottomright" />
                         <TileLayer
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                         />
                         <HeatmapLayer points={heatPoints} />
+                        <MapInset points={heatPoints} expanded={mapExpanded} />
                         <MapInvalidator />
                     </MapContainer>
+
+                    {/* panel over the map; only opacity/transform animate, so toggling never resizes or redraws the map */}
+                    <div
+                        aria-hidden={mapExpanded}
+                        style={{
+                            position: 'absolute', top: PANEL_INSET, bottom: PANEL_INSET, left: PANEL_INSET, zIndex: 1000,
+                            display: 'flex', pointerEvents: 'none',
+                            opacity: mapExpanded ? 0 : 1,
+                            transform: mapExpanded ? 'translateX(-16px)' : 'translateX(0)',
+                            visibility: mapExpanded ? 'hidden' : 'visible',
+                            transition: `opacity 200ms ease, transform 200ms ease, visibility 0s linear ${mapExpanded ? '200ms' : '0s'}`,
+                        }}
+                    >
+                        <HeatmapPanel
+                            fixedAnimal
+                            enabled
+                            onEnabledChange={noop}
+                            filter={heatFilter}
+                            onFilterChange={f => setHeatRange({ from: f.from, to: f.to })}
+                            rodeos={NO_ITEMS}
+                            animals={NO_ITEMS}
+                            loading={heatLoading}
+                            error={heatError}
+                            pointCount={heatPoints.length}
+                        />
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setMapExpanded(v => !v)}
+                        aria-label={mapExpanded ? 'Mostrar filtros' : 'Ampliar mapa'}
+                        aria-pressed={mapExpanded}
+                        title={mapExpanded ? 'Mostrar filtros' : 'Ampliar mapa'}
+                        style={{
+                            position: 'absolute', top: 10, right: 10, zIndex: 1001, width: 34, height: 34,
+                            border: 0, borderRadius: 8, background: '#1E3A5F', color: '#fff', cursor: 'pointer',
+                            boxShadow: '0 1px 5px rgba(0,0,0,0.4)',
+                        }}
+                    >
+                        <i className={`bi ${mapExpanded ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}`} />
+                    </button>
                 </div>
+                <p style={{ margin: '8px 0 0', fontSize: '0.7rem', color: '#A0AEC0' }}>
+                    Imágenes: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP y la comunidad de usuarios de GIS.
+                </p>
             </ChartCard>
 
             {/* ── Gráfico 3: Evolución de Peso ── */}

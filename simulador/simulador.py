@@ -64,7 +64,9 @@ SPEED_MULT_CELO_MAX = 4.0
 # componentes casi se cancelan, a veces se suman al máximo, así que la misma
 # "intensidad de celo" produce probabilidades muy dispares corrida a corrida
 # (medido: 0.27 a 0.93 con el generador viejo, promedio 0.74 — por debajo del
-# CELO_THRESHOLD=0.892 configurado en .env la mayoría de las veces). Usando un
+# CELO_THRESHOLD=0.892 configurado en .env en ese momento la mayoría de las
+# veces; el valor actual de CELO_THRESHOLD es otro, ver infra/.env.example).
+# Usando un
 # rumbo que persiste entre ticks y un paso de magnitud fija (speed*cos/sin),
 # igual que en entrenamiento, la probabilidad queda estable en ~0.996-0.998.
 # ---------------------------------------------------------------------------
@@ -180,7 +182,7 @@ for i in range(1, NUM_ANIMALES + 1):
         "heading": random.uniform(0, 2 * math.pi),  # rumbo inicial, para el random walk correlacionado
     }
 
-def generar_payload(device_id, estado):
+def generar_payload(device_id, estado, f_cnt):
     en_celo = device_id == FORZAR_CELO_DEVICE_ID
     enferma = device_id == FORZAR_SALUD_DEVICE_ID
 
@@ -230,6 +232,7 @@ def generar_payload(device_id, estado):
             "dev_eui": device_id
         },
         "uplink_message": {
+            "f_cnt": f_cnt,
             "received_at": datetime.now(timezone.utc).isoformat(),
             "decoded_payload": {
                 "type": "GNSSPosition",
@@ -317,7 +320,9 @@ def inyectar_historial_salud():
         estado["lon"] += speed * math.sin(estado["heading"])
 
         payload = {
-            "device_id": FORZAR_SALUD_DEVICE_ID,
+            "end_device_ids": {
+            "dev_eui": device_id
+            },
             "timestamp": past_time.replace(tzinfo=None).isoformat(),
             "payload": {
                 "latitud": round(estado["lat"], 6),
@@ -340,17 +345,22 @@ def main():
     print(f"Escenario forzado de desvío sanitario: {FORZAR_SALUD_DEVICE_ID}")
 
     inyectar_historial_salud()
-
+    f_cnt = 1
     while True:
         inicio_ciclo = time.time()
         exitos = 0
         errores = 0
 
+        headers = {}
+        api_key = os.getenv("TTN_WEBHOOK_API_KEY")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
         print(f"\n--- Iniciando ciclo de envío ({datetime.now().isoformat()}) ---")
         for device_id, estado in animales.items():
-            payload = generar_payload(device_id, estado)
+            payload = generar_payload(device_id, estado, f_cnt)
             try:
-                response = requests.post(API_URL, json=payload, timeout=5)
+                response = requests.post(API_URL, json=payload, timeout=5, headers=headers)
                 if response.status_code in [200, 201, 202]:
                     exitos += 1
                 else:
@@ -367,6 +377,8 @@ def main():
         if tiempo_espera > 0:
             print(f"Esperando {tiempo_espera:.2f} segundos para el próximo ciclo...")
             time.sleep(tiempo_espera)
+        
+        f_cnt += 1
 
 if __name__ == "__main__":
     main()

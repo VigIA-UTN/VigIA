@@ -12,7 +12,7 @@ interface PerimetroSidebarProps {
   onToggleActivo: (perimetro: PerimetroResponse) => void;
   onStartEdit: (perimetro: PerimetroResponse) => void;
   onCancelEdit: () => void;
-  onSaveEdit: (nombre: string, loteIds: number[], descripcion?: string) => Promise<void>;
+  onSaveEdit: (nombre: string, loteIds: number[], zonaEstricta: boolean, distanciaToleranciaMetros: number, descripcion?: string) => Promise<void>;
   onCreateNew: () => void;
   editingPerimetro: PerimetroResponse | null;
   coordenadasEditadas: CoordenadaDTO[];
@@ -154,10 +154,6 @@ export default function PerimetroSidebar({
       </div>
 
       <style>{`
-        .perimetro-card-clickable:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15) !important;
-        }
         @keyframes slideInLeft {
           from { opacity: 0; transform: translateX(-20px); }
           to   { opacity: 1; transform: translateX(0); }

@@ -14,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,39 +39,41 @@ public class GeofenceVerificationService {
 
         RodeoLote lote = animal.getRodeoLote();
         if (lote == null) {
-            // Animal sin lote asignado, no posee geocercas activas configuradas
             return;
         }
 
-        // 1. Verificar si el lote tiene perímetros activos asignados
         List<Perimetro> perimetrosActivos = perimetroRepository.findPerimetrosActivosByLoteId(lote.getId());
         if (perimetrosActivos.isEmpty()) {
             return;
         }
 
-        // 2. Ejecutar chequeo espacial ST_Contains optimizado en DB (Point-in-polygon)
-        List<Perimetro> perimetrosContenedores = perimetroRepository.findPerimetrosQueContienen(
-                lote.getId(), latitud, longitud);
-
-        // Si el punto está contenido en al menos uno de los perímetros activos del lote, está dentro
-        if (!perimetrosContenedores.isEmpty()) {
-            log.debug("Animal {} en posición ({}, {}) se encuentra dentro del perímetro del lote {}",
+        if (estaDentroDeAlgunPerimetro(perimetrosActivos, lote.getId(), latitud, longitud)) {
+            log.debug("Animal {} en posición ({}, {}) se encuentra dentro del perímetro (o su tolerancia) del lote {}",
                     animal.getId(), latitud, longitud, lote.getId());
             return;
         }
 
-        // 3. Animal FUERA de perímetro. Aplicar política anti-flooding / cooldown
         LocalDateTime limiteCooldown = LocalDateTime.now().minusHours(cooldownHours);
-        boolean tieneAlertaReciente = alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(
-                animal, DisparadorAlerta.FUERA_DE_PERIMETRO, limiteCooldown);
+        Optional<Alerta> alertaReciente = alertaRepository
+                .findFirstByAnimalAndDisparadorAndTsGeneracionAfterOrderByTsGeneracionDesc(
+                        animal, DisparadorAlerta.FUERA_DE_PERIMETRO, limiteCooldown);
 
-        if (tieneAlertaReciente) {
-            log.info("Animal {} está fuera de perímetro pero ya posee una alerta reciente de salida (últimas {}hs). Se omite duplicado.",
-                    animal.getId(), cooldownHours);
+        if (alertaReciente.isPresent()) {
+            Alerta activa = alertaReciente.get();
+            if (activa.getEstado() == EstadoAlerta.PENDIENTE) {
+                activa.setLatitud(latitud);
+                activa.setLongitud(longitud);
+                alertaRepository.save(activa);
+                log.info("Animal {} sigue fuera de perímetro. Se actualiza la posición de la alerta {}.",
+                        animal.getId(), activa.getId());
+            } else {
+                log.info(
+                        "Animal {} está fuera de perímetro pero ya posee una alerta reciente de salida (últimas {}hs). Se omite duplicado.",
+                        animal.getId(), cooldownHours);
+            }
             return;
         }
 
-        // 4. Crear Alerta de salida de perímetro
         log.warn("¡ALERTA! Animal {} (Caravana: {}) fuera del perímetro asignado para el lote '{}'",
                 animal.getId(),
                 animal.getCaravana() != null ? animal.getCaravana().getCodigo() : "N/A",
@@ -80,6 +86,8 @@ public class GeofenceVerificationService {
         alerta.setTipo("Fuera de Perímetro");
         alerta.setSeveridad(SeveridadAlerta.ALTA);
         alerta.setTsGeneracion(tsAlerta);
+        alerta.setLatitud(latitud);
+        alerta.setLongitud(longitud);
         alerta.setDisparador(DisparadorAlerta.FUERA_DE_PERIMETRO);
         alerta.setValorUmbral(1.0);
         alerta.setValorDetectado(0.0);
@@ -89,7 +97,6 @@ public class GeofenceVerificationService {
 
         alerta = alertaRepository.save(alerta);
 
-        // 5. Publicar evento en RabbitMQ para notificaciones y websockets SSE
         AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                 .id(alerta.getId())
                 .animalId(animal.getId())
@@ -102,9 +109,24 @@ public class GeofenceVerificationService {
                 .estado(alerta.getEstado())
                 .accionRecomendada(alerta.getAccionRecomendada())
                 .posibleCausa(alerta.getPosibleCausa())
+                .latitud(alerta.getLatitud())
+                .longitud(alerta.getLongitud())
                 .build();
 
         rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
         log.info("Alerta de salida de perímetro emitida con ID: {} para animal {}", alerta.getId(), animal.getId());
+    }
+
+    private boolean estaDentroDeAlgunPerimetro(List<Perimetro> perimetrosActivos, Long loteId,
+            double latitud, double longitud) {
+        Map<Long, Perimetro> perimetrosPorId = perimetrosActivos.stream()
+                .collect(Collectors.toMap(Perimetro::getId, Function.identity(), (a, b) -> a));
+
+        return perimetroRepository.calcularDistanciasAPerimetrosActivos(loteId, latitud, longitud).stream()
+                .anyMatch(d -> {
+                    Perimetro perimetro = perimetrosPorId.get(d.getPerimetroId());
+                    return perimetro != null && d.getDistanciaMetros() != null
+                            && perimetro.admiteDistancia(d.getDistanciaMetros());
+                });
     }
 }

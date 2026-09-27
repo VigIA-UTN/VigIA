@@ -76,6 +76,7 @@ class TTNWebhookRequestDTOTest {
 
         assertThat(dto.getUplinkMessage()).isNotNull();
         assertThat(dto.getUplinkMessage().getFCnt()).isEqualTo(42);
+        assertThat(dto.getUplinkMessage().getSessionKeyId()).isEqualTo("AXAAAAAAAAAAAAAAAAAAAA==");
         assertThat(dto.getUplinkMessage().getReceivedAt()).isEqualTo("2026-01-01T00:00:00.000000000Z");
 
         TTNWebhookRequestDTO.DecodedPayload decoded = dto.getUplinkMessage().getDecodedPayload();

@@ -21,11 +21,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,204 +35,245 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("PerimetroController — Tests")
 class PerimetroControllerTest {
 
-    @MockBean
-    private ConnectionFactory connectionFactory;
+        @MockBean
+        private ConnectionFactory connectionFactory;
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+        @Autowired
+        private UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private EstablecimientoRepository establecimientoRepository;
+        @Autowired
+        private EstablecimientoRepository establecimientoRepository;
 
-    @Autowired
-    private RodeoLoteRepository rodeoLoteRepository;
+        @Autowired
+        private RodeoLoteRepository rodeoLoteRepository;
 
-    @Autowired
-    private PerimetroRepository perimetroRepository;
+        @Autowired
+        private PerimetroRepository perimetroRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+        @Autowired
+        private PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @Autowired
-    private AuthService authService;
+        @Autowired
+        private AuthService authService;
 
-    private Long establecimientoId;
-    private Long loteId;
-    private String productorToken;
+        private Long establecimientoId;
+        private Long loteId;
+        private String productorToken;
 
-    @BeforeEach
-    @SuppressWarnings("null")
-    void setUp() throws Exception {
-        perimetroRepository.deleteAll();
-        rodeoLoteRepository.deleteAll();
-        establecimientoRepository.deleteAll();
-        usuarioRepository.deleteAll();
-        usuarioRepository.flush();
-        authService.clearCacheForTests();
+        @BeforeEach
+        @SuppressWarnings("null")
+        void setUp() throws Exception {
+                perimetroRepository.deleteAll();
+                rodeoLoteRepository.deleteAll();
+                establecimientoRepository.deleteAll();
+                usuarioRepository.deleteAll();
+                usuarioRepository.flush();
+                authService.clearCacheForTests();
 
-        // 1. Productor
-        Usuario productor = new Usuario();
-        productor.setEmail("productor@vigia.dev");
-        productor.setPasswordHash(passwordEncoder.encode("prod123"));
-        productor.setNombre("Productor");
-        productor.setRol(Rol.PRODUCTOR);
-        productor.setActivo(true);
-        productor = usuarioRepository.save(productor);
+                // 1. Productor
+                Usuario productor = new Usuario();
+                productor.setEmail("productor@vigia.dev");
+                productor.setPasswordHash(passwordEncoder.encode("prod123"));
+                productor.setNombre("Productor");
+                productor.setRol(Rol.PRODUCTOR);
+                productor.setActivo(true);
+                productor = usuarioRepository.save(productor);
 
-        // 2. Establecimiento
-        Establecimiento establecimiento = new Establecimiento();
-        establecimiento.setNombre("Establecimiento Test");
-        establecimiento.setLatitud(-34.0);
-        establecimiento.setLongitud(-58.0);
-        establecimiento.setActivo(true);
-        establecimiento.setFechaAlta(LocalDate.now());
-        establecimiento.setEmpleados(new ArrayList<>());
-        Empleado vinculo = new Empleado(establecimiento, productor);
-        establecimiento.getEmpleados().add(vinculo);
-        establecimiento = establecimientoRepository.save(establecimiento);
-        establecimientoId = establecimiento.getId();
+                // 2. Establecimiento
+                Establecimiento establecimiento = new Establecimiento();
+                establecimiento.setNombre("Establecimiento Test");
+                establecimiento.setLatitud(-34.0);
+                establecimiento.setLongitud(-58.0);
+                establecimiento.setActivo(true);
+                establecimiento.setFechaAlta(LocalDate.now());
+                establecimiento.setEmpleados(new ArrayList<>());
+                Empleado vinculo = new Empleado(establecimiento, productor);
+                establecimiento.getEmpleados().add(vinculo);
+                establecimiento = establecimientoRepository.save(establecimiento);
+                establecimientoId = establecimiento.getId();
 
-        // 3. RodeoLote
-        RodeoLote lote = new RodeoLote(establecimiento);
-        lote.setNombre("Lote Alpha");
-        lote = rodeoLoteRepository.save(lote);
-        loteId = lote.getId();
+                // 3. RodeoLote
+                RodeoLote lote = new RodeoLote(establecimiento);
+                lote.setNombre("Lote Alpha");
+                lote = rodeoLoteRepository.save(lote);
+                loteId = lote.getId();
 
-        // 4. Token
-        AuthRequest body = new AuthRequest("productor@vigia.dev", "prod123");
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isOk())
-                .andReturn();
-        productorToken = objectMapper.readTree(result.getResponse().getContentAsString()).get("token").asText();
-    }
+                // 4. Token
+                AuthRequest body = new AuthRequest("productor@vigia.dev", "prod123");
+                MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                productorToken = objectMapper.readTree(result.getResponse().getContentAsString()).get("token").asText();
+        }
 
-    @AfterEach
-    void tearDown() {
-        perimetroRepository.deleteAll();
-    }
+        @AfterEach
+        void tearDown() {
+                perimetroRepository.deleteAll();
+        }
 
-    private List<CoordenadaDTO> getCoordenadasValidas() {
-        return List.of(
-                new CoordenadaDTO(-34.0, -58.0),
-                new CoordenadaDTO(-34.0, -57.0),
-                new CoordenadaDTO(-35.0, -57.0),
-                new CoordenadaDTO(-35.0, -58.0)
-        );
-    }
+        private List<CoordenadaDTO> getCoordenadasValidas() {
+                return List.of(
+                                new CoordenadaDTO(-34.0, -58.0),
+                                new CoordenadaDTO(-34.0, -57.0),
+                                new CoordenadaDTO(-35.0, -57.0),
+                                new CoordenadaDTO(-35.0, -58.0));
+        }
 
-    @Test
-    @DisplayName("POST /api/v1/perimetros - Productor crea perímetro exitosamente")
-    void crearPerimetro_success() throws Exception {
-        PerimetroRequest request = PerimetroRequest.builder()
-                .establecimientoId(establecimientoId)
-                .nombre("Perímetro Norte")
-                .descripcion("Potrero norte con acceso a aguada")
-                .loteIds(List.of(loteId))
-                .coordenadas(getCoordenadasValidas())
-                .build();
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/perimetros - Productor crea perímetro exitosamente")
+        void crearPerimetro_success() throws Exception {
+                PerimetroRequest request = PerimetroRequest.builder()
+                                .establecimientoId(establecimientoId)
+                                .nombre("Perímetro Norte")
+                                .descripcion("Potrero norte con acceso a aguada")
+                                .loteIds(List.of(loteId))
+                                .coordenadas(getCoordenadasValidas())
+                                .build();
 
-        mockMvc.perform(post("/api/v1/perimetros")
-                .header("Authorization", "Bearer " + productorToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.nombre").value("Perímetro Norte"))
-                .andExpect(jsonPath("$.activo").value(true))
-                .andExpect(jsonPath("$.loteIds[0]").value(loteId))
-                .andExpect(jsonPath("$.coordenadas").isArray());
-    }
+                mockMvc.perform(post("/api/v1/perimetros")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.id").isNumber())
+                                .andExpect(jsonPath("$.nombre").value("Perímetro Norte"))
+                                .andExpect(jsonPath("$.activo").value(true))
+                                .andExpect(jsonPath("$.loteIds[0]").value(loteId))
+                                .andExpect(jsonPath("$.coordenadas").isArray());
+        }
 
-    @Test
-    @DisplayName("POST /api/v1/perimetros - Rechaza creación si faltan coordenadas (menos de 3)")
-    void crearPerimetro_invalido_menosDe3Puntos() throws Exception {
-        PerimetroRequest request = PerimetroRequest.builder()
-                .establecimientoId(establecimientoId)
-                .nombre("Perímetro Invalido")
-                .coordenadas(List.of(
-                        new CoordenadaDTO(-34.0, -58.0),
-                        new CoordenadaDTO(-34.0, -57.0)
-                ))
-                .build();
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/perimetros - Rechaza creación si faltan coordenadas (menos de 3)")
+        void crearPerimetro_invalido_menosDe3Puntos() throws Exception {
+                PerimetroRequest request = PerimetroRequest.builder()
+                                .establecimientoId(establecimientoId)
+                                .nombre("Perímetro Invalido")
+                                .coordenadas(List.of(
+                                                new CoordenadaDTO(-34.0, -58.0),
+                                                new CoordenadaDTO(-34.0, -57.0)))
+                                .build();
 
-        mockMvc.perform(post("/api/v1/perimetros")
-                .header("Authorization", "Bearer " + productorToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
+                mockMvc.perform(post("/api/v1/perimetros")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+        }
 
-    @Test
-    @DisplayName("GET /api/v1/perimetros - Listar perímetros de un establecimiento")
-    void listarPerimetros_success() throws Exception {
-        // Crear uno primero
-        PerimetroRequest request = PerimetroRequest.builder()
-                .establecimientoId(establecimientoId)
-                .nombre("Perímetro 1")
-                .coordenadas(getCoordenadasValidas())
-                .build();
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/perimetros - Expone tolerancia y zona estricta en la respuesta")
+        void crearPerimetro_conUmbral() throws Exception {
+                PerimetroRequest request = PerimetroRequest.builder()
+                                .establecimientoId(establecimientoId)
+                                .nombre("Perímetro Tolerante")
+                                .coordenadas(getCoordenadasValidas())
+                                .distanciaToleranciaMetros(new BigDecimal("25.5"))
+                                .zonaEstricta(false)
+                                .build();
 
-        mockMvc.perform(post("/api/v1/perimetros")
-                .header("Authorization", "Bearer " + productorToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated());
+                mockMvc.perform(post("/api/v1/perimetros")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.distanciaToleranciaMetros").value(25.5))
+                                .andExpect(jsonPath("$.zonaEstricta").value(false));
+        }
 
-        mockMvc.perform(get("/api/v1/perimetros")
-                .param("establecimientoId", establecimientoId.toString())
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].nombre").value("Perímetro 1"));
-    }
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/perimetros - Rechaza tolerancia negativa")
+        void crearPerimetro_toleranciaNegativa() throws Exception {
+                PerimetroRequest request = PerimetroRequest.builder()
+                                .establecimientoId(establecimientoId)
+                                .nombre("Perímetro Invalido")
+                                .coordenadas(getCoordenadasValidas())
+                                .distanciaToleranciaMetros(new BigDecimal("-1"))
+                                .build();
 
-    @Test
-    @DisplayName("PATCH /api/v1/perimetros/{id}/desactivar y activar - Cambia estado")
-    void activarDesactivar_success() throws Exception {
-        PerimetroRequest request = PerimetroRequest.builder()
-                .establecimientoId(establecimientoId)
-                .nombre("Perímetro Temporal")
-                .coordenadas(getCoordenadasValidas())
-                .build();
+                mockMvc.perform(post("/api/v1/perimetros")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+        }
 
-        MvcResult result = mockMvc.perform(post("/api/v1/perimetros")
-                .header("Authorization", "Bearer " + productorToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andReturn();
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("GET /api/v1/perimetros - Listar perímetros de un establecimiento")
+        void listarPerimetros_success() throws Exception {
+                // Crear uno primero
+                PerimetroRequest request = PerimetroRequest.builder()
+                                .establecimientoId(establecimientoId)
+                                .nombre("Perímetro 1")
+                                .coordenadas(getCoordenadasValidas())
+                                .build();
 
-        long id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+                mockMvc.perform(post("/api/v1/perimetros")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated());
 
-        // Desactivar
-        mockMvc.perform(patch("/api/v1/perimetros/" + id + "/desactivar")
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isOk());
+                mockMvc.perform(get("/api/v1/perimetros")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$").isArray())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].nombre").value("Perímetro 1"));
+        }
 
-        // Verificar
-        mockMvc.perform(get("/api/v1/perimetros/" + id)
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.activo").value(false));
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("PATCH /api/v1/perimetros/{id}/desactivar y activar - Cambia estado")
+        void activarDesactivar_success() throws Exception {
+                PerimetroRequest request = PerimetroRequest.builder()
+                                .establecimientoId(establecimientoId)
+                                .nombre("Perímetro Temporal")
+                                .coordenadas(getCoordenadasValidas())
+                                .build();
 
-        // Activar
-        mockMvc.perform(patch("/api/v1/perimetros/" + id + "/activar")
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isOk());
+                MvcResult result = mockMvc.perform(post("/api/v1/perimetros")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andReturn();
 
-        // Verificar activo
-        mockMvc.perform(get("/api/v1/perimetros/" + id)
-                .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.activo").value(true));
-    }
+                long id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+
+                // Desactivar
+                mockMvc.perform(patch("/api/v1/perimetros/" + id + "/desactivar")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk());
+
+                // Verificar
+                mockMvc.perform(get("/api/v1/perimetros/" + id)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.activo").value(false));
+
+                // Activar
+                mockMvc.perform(patch("/api/v1/perimetros/" + id + "/activar")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk());
+
+                // Verificar activo
+                mockMvc.perform(get("/api/v1/perimetros/" + id)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.activo").value(true));
+        }
 }

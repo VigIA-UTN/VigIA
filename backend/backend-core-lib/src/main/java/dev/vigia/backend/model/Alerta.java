@@ -44,6 +44,12 @@ public class Alerta {
     @Column(name = "ts_generacion", nullable = false)
     private LocalDateTime tsGeneracion;
 
+    @Column(name = "latitud")
+    private Double latitud;
+
+    @Column(name = "longitud")
+    private Double longitud;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DisparadorAlerta disparador;
