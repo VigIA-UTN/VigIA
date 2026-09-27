@@ -29,13 +29,19 @@ export default function PerimetroCard({
         .join(', ')
     : 'Sin rodeos asignados';
 
+  const umbral = perimetro.zonaEstricta
+    ? 'Zona estricta'
+    : perimetro.distanciaToleranciaMetros > 0
+      ? `Tolerancia ${perimetro.distanciaToleranciaMetros} m`
+      : null;
+
   return (
     <SidebarCard
       severidad="PERIMETRO"
       icono={perimetro.activo ? 'bi-bounding-box-circles' : 'bi-bounding-box'}
       titulo={perimetro.nombre}
       cuerpo={perimetro.descripcion || undefined}
-      detalle={nombresRodeos}
+      detalle={umbral ? `${nombresRodeos} · ${umbral}` : nombresRodeos}
       acento={perimetro.activo}
       apagada={!perimetro.activo}
       seleccionada={isEditing}

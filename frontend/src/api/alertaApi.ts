@@ -106,14 +106,12 @@ export interface DetalleSanitario {
 
 /** Bloque geoespacial del detalle de alerta (solo cuando datoDisparador === 'FUERA_DE_PERIMETRO'). */
 export interface DetalleGeoespacial {
-  /** Latitud donde el animal salió del perímetro. Puede ser null en alertas antiguas. */
-  latitudSalida: number | null;
-  /** Longitud donde el animal salió del perímetro. Puede ser null en alertas antiguas. */
-  longitudSalida: number | null;
+  /** Latitud de la última posición conocida (se actualiza mientras la alerta está pendiente). Puede ser null en alertas antiguas. */
+  latitud: number | null;
+  /** Longitud de la última posición conocida (se actualiza mientras la alerta está pendiente). Puede ser null en alertas antiguas. */
+  longitud: number | null;
   /** Nombre del lote/rodeo al que pertenece el animal. */
   nombreLote: string | null;
-  /** Nombre del perímetro violado (si está disponible). */
-  nombrePerimetro: string | null;
   /** Segundos transcurridos desde que el animal salió del perímetro (calculado en el backend). */
   segundosFuera: number | null;
 }

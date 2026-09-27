@@ -158,4 +158,25 @@ class PerimetroTest {
         assertThat(perimetro.getToleranciaEfectivaMetros()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(perimetro.getDistanciaToleranciaMetros()).isEqualByComparingTo("50");
     }
+
+    @Test
+    @DisplayName("Debe admitir distancias dentro de la tolerancia y rechazar las que la superan")
+    void admiteDistanciaSegunTolerancia() {
+        Perimetro perimetro = new Perimetro(new Establecimiento(), "Potrero", crearPoligonoValido());
+        perimetro.configurarUmbral(new BigDecimal("50"), false);
+
+        assertThat(perimetro.admiteDistancia(0)).isTrue();
+        assertThat(perimetro.admiteDistancia(50)).isTrue();
+        assertThat(perimetro.admiteDistancia(50.01)).isFalse();
+    }
+
+    @Test
+    @DisplayName("En zona estricta solo debe admitir puntos dentro del polígono")
+    void admiteDistanciaEnZonaEstricta() {
+        Perimetro perimetro = new Perimetro(new Establecimiento(), "Potrero", crearPoligonoValido());
+        perimetro.configurarUmbral(new BigDecimal("50"), true);
+
+        assertThat(perimetro.admiteDistancia(0)).isTrue();
+        assertThat(perimetro.admiteDistancia(1)).isFalse();
+    }
 }

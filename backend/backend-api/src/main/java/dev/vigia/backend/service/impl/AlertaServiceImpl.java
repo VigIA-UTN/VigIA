@@ -420,8 +420,8 @@ public class AlertaServiceImpl implements AlertaService {
                                 : null;
 
                 return DetalleGeoespacialResponse.builder()
-                                .latitudSalida(alerta.getLatitud())
-                                .longitudSalida(alerta.getLongitud())
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
                                 .nombreLote(nombreLote)
                                 .segundosFuera(segundosFuera)
                                 .build();

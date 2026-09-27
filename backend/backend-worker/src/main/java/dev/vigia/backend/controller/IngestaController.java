@@ -166,7 +166,7 @@ public class IngestaController {
 
             try {
                 telemetria.setFechaHora(java.time.Instant.parse(uplink.getReceivedAt())
-                        .atZone(java.time.ZoneId.of("UTC")).toLocalDateTime());
+                        .atZone(java.time.ZoneId.systemDefault()).toLocalDateTime());
             } catch (Exception e) {
                 // Solo pisamos la fecha si es una fila nueva, para no arruinar la del heartbeat
                 // si actualizamos

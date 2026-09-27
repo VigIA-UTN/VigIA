@@ -61,16 +61,12 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       return;
     }
 
-    const tsFixed = alerta.tsGeneracion.endsWith('Z') ? alerta.tsGeneracion : alerta.tsGeneracion + 'Z';
-    const secondsSinceStart = Math.floor((Date.now() - new Date(tsFixed).getTime()) / 1000);
-    
-    // Si está PENDIENTE, usamos nuestra cuenta local en vez del backend para evitar bugs de zona horaria (UTC vs Local)
-    const base = estadoVisual === 'PENDIENTE' ? secondsSinceStart : (detGeo?.segundosFuera ?? secondsSinceStart);
-    
-    setSegundosVivoFuera(Math.max(0, base));
+    // tsGeneracion llega en hora local sin offset, igual que en AlertNotificationCard y el popup del mapa
+    const secondsSinceStart = Math.floor((Date.now() - new Date(alerta.tsGeneracion).getTime()) / 1000);
+
+    setSegundosVivoFuera(Math.max(0, secondsSinceStart));
     timerRef.current = setInterval(() => setSegundosVivoFuera(s => s + 1), 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGeoespacial, detGeo?.segundosFuera, alerta.tsGeneracion, estadoVisual]);
 
   useEffect(() => {
@@ -145,8 +141,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   try {
     const ts = detalle ? detalle.tsGeneracion : alerta.tsGeneracion;
     if (ts) {
-      const tsFixed = ts.endsWith('Z') ? ts : ts + 'Z';
-      date = new Date(tsFixed);
+      date = new Date(ts);
       if (isNaN(date.getTime())) throw new Error("Invalid date");
     }
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -364,29 +359,29 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                         </span>
                       </div>
 
-                      {/* Coordenadas de salida */}
-                      {detGeo?.latitudSalida != null && detGeo?.longitudSalida != null && (
+                      {/* Última posición conocida */}
+                      {detGeo?.latitud != null && detGeo?.longitud != null && (
                         <div className="col-12">
-                          <small className="text-muted d-block mb-1"><i className="bi bi-crosshair me-1"></i>Posición al salir del perímetro</small>
+                          <small className="text-muted d-block mb-1"><i className="bi bi-crosshair me-1"></i>Última posición conocida</small>
                           <a
-                            href={`https://www.google.com/maps?q=${detGeo.latitudSalida},${detGeo.longitudSalida}`}
+                            href={`https://www.google.com/maps?q=${detGeo.latitud},${detGeo.longitud}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="fw-semibold text-danger text-decoration-none d-flex align-items-center gap-1"
                             style={{ fontSize: '0.88rem' }}
                           >
                             <i className="bi bi-map-fill"></i>
-                            {detGeo.latitudSalida.toFixed(5)}, {detGeo.longitudSalida.toFixed(5)}
+                            {detGeo.latitud.toFixed(5)}, {detGeo.longitud.toFixed(5)}
                             <i className="bi bi-box-arrow-up-right ms-1" style={{ fontSize: '0.75rem' }}></i>
                           </a>
                           <small className="text-muted d-block mt-1" style={{ fontSize: '0.75rem' }}>Ver en Google Maps</small>
                         </div>
                       )}
 
-                      {/* Si no hay coords persistidas, mostramos la posición actual del tracker */}
-                      {(detGeo == null || detGeo.latitudSalida == null) && (
+                      {/* Alertas antiguas sin coordenadas persistidas */}
+                      {(detGeo == null || detGeo.latitud == null) && (
                         <div className="col-12">
-                          <small className="text-muted d-block mb-1"><i className="bi bi-geo me-1"></i>Posición de salida</small>
+                          <small className="text-muted d-block mb-1"><i className="bi bi-geo me-1"></i>Última posición conocida</small>
                           <span className="text-muted fst-italic" style={{ fontSize: '0.85rem' }}>No disponible para esta alerta</span>
                         </div>
                       )}

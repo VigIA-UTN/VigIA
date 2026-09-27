@@ -251,6 +251,52 @@ public class AlertaServiceImplTest {
                 assertEquals(-34.6037, result.getLatitud());
                 assertEquals(-58.3816, result.getLongitud());
                 assertEquals(horaSalida, result.getTsGeneracion());
+                assertNotNull(result.getDetalleGeoespacial());
+                assertEquals(-34.6037, result.getDetalleGeoespacial().getLatitud());
+                assertEquals(-58.3816, result.getDetalleGeoespacial().getLongitud());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_FueraDePerimetro_Pendiente_CalculaTiempoFueraHastaAhora() {
+                // Arrange
+                mockAlerta.setDisparador(DisparadorAlerta.FUERA_DE_PERIMETRO);
+                mockAlerta.setTsGeneracion(LocalDateTime.now().minusHours(2).minusMinutes(15));
+
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+
+                // Act
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert: 2h 15m = 8100 s (margen por el tiempo de ejecución del test)
+                long segundosFuera = result.getDetalleGeoespacial().getSegundosFuera();
+                assertTrue(segundosFuera >= 8100 && segundosFuera <= 8105,
+                                "segundosFuera fuera de rango: " + segundosFuera);
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_FueraDePerimetro_Resuelta_FijaTiempoFueraAlMomentoDeResolucion() {
+                // Arrange
+                LocalDateTime horaSalida = LocalDateTime.now().minusDays(1);
+                mockAlerta.setDisparador(DisparadorAlerta.FUERA_DE_PERIMETRO);
+                mockAlerta.setTsGeneracion(horaSalida);
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                mockAlerta.setTsConfirmacion(horaSalida.plusMinutes(45));
+
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+
+                // Act
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert
+                assertEquals(45 * 60L, result.getDetalleGeoespacial().getSegundosFuera());
         }
 
         @Test

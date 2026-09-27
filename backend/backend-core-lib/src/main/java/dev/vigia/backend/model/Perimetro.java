@@ -136,6 +136,10 @@ public class Perimetro {
         return zonaEstricta ? BigDecimal.ZERO : distanciaToleranciaMetros;
     }
 
+    public boolean admiteDistancia(double distanciaMetros) {
+        return BigDecimal.valueOf(distanciaMetros).compareTo(getToleranciaEfectivaMetros()) <= 0;
+    }
+
     public void asignarLote(RodeoLote lote) {
         if (lote != null) {
             this.lotes.add(lote);

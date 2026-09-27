@@ -5,16 +5,15 @@ import lombok.Data;
 
 /**
  * Detalle específico para alertas de tipo FUERA_DE_PERIMETRO.
- * Expone la posición exacta donde el animal salió del perímetro,
+ * Expone la última posición conocida del animal mientras el episodio está activo,
  * el lote al que pertenece y el tiempo transcurrido desde la salida.
  */
 @Data
 @Builder
 public class DetalleGeoespacialResponse {
 
-    private Double latitudSalida;
-    private Double longitudSalida;
+    private Double latitud;
+    private Double longitud;
     private String nombreLote;
-    private String nombrePerimetro;
     private Long segundosFuera;
 }
