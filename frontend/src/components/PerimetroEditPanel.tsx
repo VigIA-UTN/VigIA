@@ -8,7 +8,7 @@ interface PerimetroEditPanelProps {
   perimetro: PerimetroResponse;
   rodeos: RodeoLoteResponse[];
   coordenadasEditadas: CoordenadaDTO[];
-  onSave: (nombre: string, loteIds: number[], descripcion?: string) => Promise<void>;
+  onSave: (nombre: string, loteIds: number[], zonaEstricta: boolean, distanciaToleranciaMetros: number, descripcion?: string) => Promise<void>;
   onCancel: () => void;
   isSaving?: boolean;
 }
@@ -24,6 +24,8 @@ export default function PerimetroEditPanel({
   const [nombre, setNombre] = useState(perimetro.nombre);
   const [descripcion, setDescripcion] = useState(perimetro.descripcion || '');
   const [selectedRodeoIds, setSelectedRodeoIds] = useState<number[]>(perimetro.loteIds || []);
+  const [isPerimetroEstricto, setIsPerimetroEstricto] = useState(perimetro.zonaEstricta || false);
+  const [tolerancia, setTolerancia] = useState(perimetro.distanciaToleranciaMetros || 0);
   const [error, setError] = useState<string | null>(null);
 
   const handleFinish = async () => {
@@ -37,7 +39,7 @@ export default function PerimetroEditPanel({
     }
     setError(null);
     try {
-      await onSave(nombre.trim(), selectedRodeoIds, descripcion.trim() || undefined);
+      await onSave(nombre.trim(), selectedRodeoIds, isPerimetroEstricto, tolerancia, descripcion.trim() || undefined);
     } catch (e: unknown) {
       if (axios.isAxiosError(e) && e.response?.data) {
         setError(typeof e.response.data === 'string' ? e.response.data : 'Error guardando perímetro');
@@ -162,6 +164,67 @@ export default function PerimetroEditPanel({
           onChange={setSelectedRodeoIds}
         />
       </div>
+      {error && (
+        <div
+          className="alert alert-danger p-2 mb-0"
+          style={{ fontSize: '0.85rem', borderRadius: '8px' }}
+        >
+          {error}
+        </div>
+      )}
+      {/* Sección Perimetro estricto */}
+      <div className='d-flex align-items-center '>
+        <label
+          style={{
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            color: '#475467',
+            marginRight: '6px',
+          }}
+        >
+          Perimetro estricto
+        </label>
+        <input
+          type="checkbox"
+          checked={isPerimetroEstricto}
+          onChange={(e) => setIsPerimetroEstricto(e.target.checked)}
+        />
+      </div>
+      {error && (
+        <div
+          className="alert alert-danger p-2 mb-0"
+          style={{ fontSize: '0.85rem', borderRadius: '8px' }}
+        >
+          {error}
+        </div>
+      )}
+      {/* Sección Distancia de Tolerancia */}
+      {!isPerimetroEstricto && (<div>
+        <label
+          style={{
+            display: 'block',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            color: '#475467',
+            marginBottom: '6px',
+          }}
+        >
+          Distancia de tolerancia (metros)
+        </label>
+        <input
+          type="number"
+          value={tolerancia}
+          onChange={(e) => setTolerancia(Number(e.target.value))}
+          className="form-control"
+          min={0}
+          style={{
+            borderRadius: '8px',
+            border: '1px solid #D0D5DD',
+            padding: '8px 12px',
+            fontSize: '0.95rem',
+          }}
+        />
+      </div>)}
       {error && (
         <div
           className="alert alert-danger p-2 mb-0"

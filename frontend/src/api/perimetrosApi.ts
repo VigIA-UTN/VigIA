@@ -17,6 +17,8 @@ export interface PerimetroResponse {
   fechaCreacion?: string;
   fechaModificacion?: string;
   version?: number;
+  zonaEstricta: boolean;
+  distanciaToleranciaMetros: number;
 }
 
 export interface PerimetroRequest {
@@ -25,6 +27,8 @@ export interface PerimetroRequest {
   establecimientoId: number;
   loteIds: number[];
   coordenadas: CoordenadaDTO[];
+  zonaEstricta: boolean;
+  distanciaToleranciaMetros: number;
 }
 
 export async function getPerimetros(establecimientoId: number): Promise<PerimetroResponse[]> {

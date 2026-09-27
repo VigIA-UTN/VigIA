@@ -110,8 +110,8 @@ function determinarIcono(animal: AnimalMapa, selected: boolean) {
   const severidades = animal.alertasAnimal.map(a => a.severidad);
   const estado = animal.sinDatosRecientes ? 'sindatos'
     : severidades.includes('ALTA') ? 'critico'
-    : severidades.includes('MEDIA') || severidades.includes('BAJA') ? 'borde'
-    : 'normal';
+      : severidades.includes('MEDIA') || severidades.includes('BAJA') ? 'borde'
+        : 'normal';
   return PIN_ICONS[estado][selected ? 1 : 0];
 }
 
@@ -395,12 +395,14 @@ export default function MapPage() {
       activo: true,
       loteIds: [],
       coordenadas: defaultCoords,
+      distanciaToleranciaMetros: 0,
+      zonaEstricta: false,
     };
     setEditingPerimetro(nuevo);
     setCoordenadasEditadas(defaultCoords);
   };
 
-  const handleSaveEditPerimetro = async (nombre: string, loteIds: number[], descripcion?: string) => {
+  const handleSaveEditPerimetro = async (nombre: string, loteIds: number[], zonaEstricta: boolean, distanciaToleranciaMetros: number, descripcion?: string) => {
     if (!editingPerimetro || !selectedId) return;
     setIsSavingPerimetro(true);
     try {
@@ -411,6 +413,8 @@ export default function MapPage() {
           establecimientoId: selectedId,
           loteIds,
           coordenadas: coordenadasEditadas,
+          distanciaToleranciaMetros,
+          zonaEstricta,
         });
         setPerimetros(prev => [...prev, saved]);
       } else {
@@ -420,6 +424,8 @@ export default function MapPage() {
           establecimientoId: selectedId,
           loteIds,
           coordenadas: coordenadasEditadas,
+          distanciaToleranciaMetros,
+          zonaEstricta,
         });
         setPerimetros(prev => prev.map(p => (p.id === updated.id ? updated : p)));
       }

@@ -182,7 +182,7 @@ for i in range(1, NUM_ANIMALES + 1):
         "heading": random.uniform(0, 2 * math.pi),  # rumbo inicial, para el random walk correlacionado
     }
 
-def generar_payload(device_id, estado):
+def generar_payload(device_id, estado, f_cnt):
     en_celo = device_id == FORZAR_CELO_DEVICE_ID
     enferma = device_id == FORZAR_SALUD_DEVICE_ID
 
@@ -232,6 +232,7 @@ def generar_payload(device_id, estado):
             "dev_eui": device_id
         },
         "uplink_message": {
+            "f_cnt": f_cnt,
             "received_at": datetime.now(timezone.utc).isoformat(),
             "decoded_payload": {
                 "type": "GNSSPosition",
@@ -344,7 +345,7 @@ def main():
     print(f"Escenario forzado de desvío sanitario: {FORZAR_SALUD_DEVICE_ID}")
 
     inyectar_historial_salud()
-
+    f_cnt = 1
     while True:
         inicio_ciclo = time.time()
         exitos = 0
@@ -357,7 +358,7 @@ def main():
 
         print(f"\n--- Iniciando ciclo de envío ({datetime.now().isoformat()}) ---")
         for device_id, estado in animales.items():
-            payload = generar_payload(device_id, estado)
+            payload = generar_payload(device_id, estado, f_cnt)
             try:
                 response = requests.post(API_URL, json=payload, timeout=5, headers=headers)
                 if response.status_code in [200, 201, 202]:
@@ -376,6 +377,8 @@ def main():
         if tiempo_espera > 0:
             print(f"Esperando {tiempo_espera:.2f} segundos para el próximo ciclo...")
             time.sleep(tiempo_espera)
+        
+        f_cnt += 1
 
 if __name__ == "__main__":
     main()
