@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { AlertaResponse, AlertaDetalleResponse, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
 import { updateAlertaEstado, getAlertaDetalle } from '../api/alertaApi';
 import SanitarioAlertDetail, { SeveridadBadge } from './SanitarioAlertDetail';
+import DiagnosticoSection from './DiagnosticoSection';
 import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useVentanaInseminacion, formatCountdown } from '../hooks/useVentanaInseminacion';
@@ -26,7 +27,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   const { rol } = useAuthStore();
-  const { selectedId } = useEstablecimientoStore();
+  const { selectedId, establecimientos } = useEstablecimientoStore();
+  const establecimientoNombre = establecimientos.find((e) => e.id === selectedId)?.nombre;
   const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR';
 
   // Ventana optima de inseminacion con countdown en tiempo real.
@@ -130,7 +132,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   let windowEnd = new Date();
   
   const caravanaText = detalle?.animalCaravanaOficial ? detalle.animalCaravanaOficial : alerta.animalId;
-  const animalName = detalle?.animalAlias ? `${detalle.animalAlias} (#${caravanaText})` : `Vaca #${caravanaText}`;
+  const animalName = detalle?.animalAlias || 'Vaca';
 
   const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
   const isSanitaria = disparador.includes('SALUD') || disparador.includes('SANITARI');
@@ -234,12 +236,12 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
         <div className="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
           <div style={{ minWidth: 0 }}>
             <h2 className="m-0 fw-bold text-break" style={{ color: '#1E3A5F' }}>{animalName}</h2>
-            <p className="m-0 text-muted fs-6">Animal en seguimiento</p>
+            <p className="m-0 text-muted fs-6">#{caravanaText}</p>
           </div>
           {sevHeader ? (
             <SeveridadBadge severidad={sevHeader} />
           ) : (
-            <div className="px-3 py-1 rounded-pill d-flex align-items-center gap-2" style={{ backgroundColor: '#FDECEC', color: '#B00020', border: '1px solid #B00020', fontWeight: 'bold' }}>
+            <div className="d-flex align-items-center gap-2" style={{ color: '#B00020', fontWeight: 'bold' }}>
               ALTO <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#B00020' }}></div>
             </div>
           )}
@@ -273,7 +275,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
             {/* Dato de origen — misma seccion para cualquier tipo de alerta */}
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                <i className="bi bi-search"></i> Dato de origen
+                Dato de origen
               </h6>
               <div className="card border-0 shadow-sm rounded-4">
                 <div className="card-body">
@@ -281,16 +283,13 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                     {detalle?.descripcionDatoOrigen ||
                       'El sistema detectó un comportamiento que se aparta de lo habitual para este animal.'}
                   </p>
-                  <small className="text-muted d-block mt-2">
-                    <i className="bi bi-calendar-event me-1"></i>{detectedText}
-                  </small>
                 </div>
               </div>
             </div>
 
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                <i className="bi bi-info-circle"></i> Acción recomendada
+                Acción recomendada
               </h6>
               <div className="card border-0 shadow-sm rounded-4">
                 <div className="card-body">
@@ -303,6 +302,18 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
             {/* Detalle sanitario (solo alertas de SALUD) */}
             {isSanitaria && detSan && <SanitarioAlertDetail detalle={detSan} />}
+
+            {/* Diagnóstico veterinario + historial clínico (solo alertas de SALUD) */}
+            {isSanitaria && (
+              <DiagnosticoSection
+                alertaId={alerta.id}
+                animalId={detalle?.animalId ?? alerta.animalId}
+                animalAlias={detalle?.animalAlias}
+                animalCaravanaOficial={detalle?.animalCaravanaOficial}
+                establecimientoNombre={establecimientoNombre}
+                showForm={rol === 'VETERINARIO' && estadoVisual === 'CONFIRMADA'}
+              />
+            )}
 
             {/* Detalle geoespacial (solo alertas FUERA_DE_PERIMETRO) */}
             {isGeoespacial && (
@@ -395,7 +406,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
             {!isSanitaria && !isGeoespacial && (
               <div>
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                  <i className="bi bi-clock"></i> Ventana de inseminación
+                  Ventana de inseminación
                 </h6>
 
                 {/* Barra de horarios inicio-fin */}
@@ -530,7 +541,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
             {/* Informacion Adicional */}
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                <i className="bi bi-info-square"></i> Información adicional
+                Información adicional
               </h6>
               <div className="card border-0 shadow-sm rounded-4">
                 <div className="card-body d-flex justify-content-between">
@@ -601,25 +612,27 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             )}
 
-            {/* Notas */}
-            <div>
-              <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                <i className="bi bi-journal-text"></i> Notas
-              </h6>
-              <div className="position-relative">
-                <textarea
-                  className="form-control rounded-4 shadow-sm border-0"
-                  rows={3}
-                  placeholder="Agregá una nota (opcional)..."
-                  value={notas}
-                  onChange={(e) => setNotas(e.target.value)}
-                  style={{ resize: 'none', paddingRight: '15px', paddingBottom: '30px' }}
-                ></textarea>
-                <small className="text-muted position-absolute" style={{ bottom: '10px', right: '15px' }}>
-                  {notas.length}/200
-                </small>
+            {/* Notas — oculto para VETERINARIO */}
+            {rol !== 'VETERINARIO' && (
+              <div>
+                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
+                  Notas
+                </h6>
+                <div className="position-relative">
+                  <textarea
+                    className="form-control rounded-4 shadow-sm border-0"
+                    rows={3}
+                    placeholder="Agregá una nota (opcional)..."
+                    value={notas}
+                    onChange={(e) => setNotas(e.target.value)}
+                    style={{ resize: 'none', paddingRight: '15px', paddingBottom: '30px' }}
+                  ></textarea>
+                  <small className="text-muted position-absolute" style={{ bottom: '10px', right: '15px' }}>
+                    {notas.length}/200
+                  </small>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>

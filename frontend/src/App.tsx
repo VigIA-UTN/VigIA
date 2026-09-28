@@ -15,6 +15,7 @@ import { useAuthStore } from './store/authStore';
 import EmpleadosPage from './pages/EmpleadosPage';
 import AnimalesPage from './pages/AnimalesPage';
 import AnimalDetailPage from './pages/AnimalDetailPage';
+import DiagnosticosPage from './pages/DiagnosticosPage';
 import AlertasPage from './pages/AlertasPage';
 import DashboardPage from './pages/DashboardPage';
 import PerfilPage from './pages/PerfilPage';
@@ -119,6 +120,14 @@ function App() {
           element={
             <ProtectedRoute roles={['PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
               <AnimalDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/diagnosticos"
+          element={
+            <ProtectedRoute roles={['VETERINARIO']}>
+              <DiagnosticosPage />
             </ProtectedRoute>
           }
         />
