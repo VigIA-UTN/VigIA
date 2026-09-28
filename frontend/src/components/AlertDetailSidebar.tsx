@@ -132,7 +132,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   let windowEnd = new Date();
   
   const caravanaText = detalle?.animalCaravanaOficial ? detalle.animalCaravanaOficial : alerta.animalId;
-  const animalName = detalle?.animalAlias ? `${detalle.animalAlias} (#${caravanaText})` : `Vaca #${caravanaText}`;
+  const animalName = detalle?.animalAlias || 'Vaca';
 
   const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
   const isSanitaria = disparador.includes('SALUD') || disparador.includes('SANITARI');
@@ -236,6 +236,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
         <div className="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
           <div style={{ minWidth: 0 }}>
             <h2 className="m-0 fw-bold text-break" style={{ color: '#1E3A5F' }}>{animalName}</h2>
+            <p className="m-0 text-muted fs-6">#{caravanaText}</p>
           </div>
           {sevHeader ? (
             <SeveridadBadge severidad={sevHeader} />
