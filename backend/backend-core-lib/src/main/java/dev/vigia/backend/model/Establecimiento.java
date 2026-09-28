@@ -36,5 +36,10 @@ public class Establecimiento {
     private boolean activo = true;
 
     private LocalDate fechaAlta;
+
+    private Integer diasDeteccionAnestro = 45;
+
+    @Enumerated(EnumType.STRING)
+    private SeveridadAlerta severidadAnestro = SeveridadAlerta.MEDIA;
 }
 

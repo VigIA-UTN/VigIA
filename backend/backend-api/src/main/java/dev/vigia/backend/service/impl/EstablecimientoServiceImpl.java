@@ -5,6 +5,7 @@ import dev.vigia.backend.service.EstablecimientoService;
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.dto.EstablecimientoResponse;
 import dev.vigia.backend.model.Establecimiento;
+import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,8 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         est.setLongitud(request.getLongitud());
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
+        est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
+        est.setSeveridadAnestro(SeveridadAlerta.valueOf(request.getSeveridadAnestro()));
 
         Establecimiento saved = establecimientoRepository.save(est);
         return mapToResponse(saved);
@@ -57,6 +60,8 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         est.setNombre(request.getNombre());
         est.setLatitud(request.getLatitud());
         est.setLongitud(request.getLongitud());
+        est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
+        est.setSeveridadAnestro(SeveridadAlerta.valueOf(request.getSeveridadAnestro()));
         return mapToResponse(establecimientoRepository.save(est));
     }
 
@@ -84,6 +89,8 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 .longitud(est.getLongitud())
                 .activo(est.isActivo())
                 .fechaAlta(est.getFechaAlta())
+                .diasDeteccionAnestro(est.getDiasDeteccionAnestro())
+                .severidadAnestro(est.getSeveridadAnestro())
                 .build();
     }
 }

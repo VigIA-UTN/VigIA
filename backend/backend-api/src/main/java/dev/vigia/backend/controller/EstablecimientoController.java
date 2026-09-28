@@ -81,8 +81,9 @@ public class EstablecimientoController {
      * @return 200 con el establecimiento actualizado
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<EstablecimientoResponse> updateEstablecimiento(@PathVariable Long id, @RequestBody EstablecimientoRequest request) {
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR')")
+    public ResponseEntity<EstablecimientoResponse> updateEstablecimiento(@PathVariable Long id,
+            @RequestBody EstablecimientoRequest request) {
         return ResponseEntity.ok(establecimientoService.updateEstablecimiento(id, request));
     }
 

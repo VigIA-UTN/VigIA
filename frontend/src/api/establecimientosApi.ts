@@ -13,6 +13,8 @@ export interface EstablecimientoResponse {
   longitud: number;
   activo: boolean;
   fechaAlta: string;
+  diasDeteccionAnestro: number;
+  severidadAnestro: string;
 }
 
 export async function getEstablecimientos(): Promise<EstablecimientoResponse[]> {

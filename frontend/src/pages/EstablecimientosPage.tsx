@@ -21,6 +21,8 @@ const schema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
   latitud: z.number({ message: 'Debe ser un número válido' }),
   longitud: z.number({ message: 'Debe ser un número válido' }),
+  diasDeteccionAnestro: z.number({ message: 'Debe ser un número válido' }),
+  severidadAnestro: z.string(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -186,6 +188,8 @@ export default function EstablecimientosPage() {
                           nombre: est.nombre,
                           latitud: est.latitud,
                           longitud: est.longitud,
+                          diasDeteccionAnestro: est.diasDeteccionAnestro,
+                          severidadAnestro: est.severidadAnestro,
                         });
                         setShowUpdateModal(true);
                       }}
@@ -282,6 +286,38 @@ export default function EstablecimientosPage() {
                 {errors.longitud?.message}
               </Form.Control.Feedback>
             </Form.Group>
+            {
+              (rol == 'PRODUCTOR' || rol == 'VETERINARIO') && (
+                <>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Dias deteccion anestro</Form.Label>
+                    <Form.Control
+                      type="number"
+                      placeholder="Ej: 45"
+                      {...register('diasDeteccionAnestro', { valueAsNumber: true })}
+                      isInvalid={!!errors.diasDeteccionAnestro}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      {errors.diasDeteccionAnestro?.message}
+                    </Form.Control.Feedback>
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Severidad de alerta de anestro</Form.Label>
+                    <Form.Select
+                      {...register('severidadAnestro')}
+                      isInvalid={!!errors.severidadAnestro}
+                    >
+                      <option value="BAJA">BAJA</option>
+                      <option value="MEDIA">MEDIA</option>
+                      <option value="ALTA">ALTA</option>
+                    </Form.Select>
+                    <Form.Control.Feedback type="invalid">
+                      {errors.severidadAnestro?.message}
+                    </Form.Control.Feedback>
+                  </Form.Group>
+                </>
+              )
+            }
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={handleCloseModal}>
@@ -322,10 +358,10 @@ export default function EstablecimientosPage() {
                   step="any"
                   placeholder="Ej: -34.6037"
                   {...registerUpdate('latitud', { valueAsNumber: true })}
-                  isInvalid={!!errors.latitud}
+                  isInvalid={!!errorsUpdate.latitud}
                 />
                 <Form.Control.Feedback type="invalid">
-                  {errors.latitud?.message}
+                  {errorsUpdate.latitud?.message}
                 </Form.Control.Feedback>
               </Form.Group>
 
@@ -336,12 +372,45 @@ export default function EstablecimientosPage() {
                   step="any"
                   placeholder="Ej: -58.3816"
                   {...registerUpdate('longitud', { valueAsNumber: true })}
-                  isInvalid={!!errors.longitud}
+                  isInvalid={!!errorsUpdate.longitud}
                 />
                 <Form.Control.Feedback type="invalid">
-                  {errors.longitud?.message}
+                  {errorsUpdate.longitud?.message}
                 </Form.Control.Feedback>
               </Form.Group>
+              {
+                (rol == 'PRODUCTOR' || rol == 'VETERINARIO') && (
+                  <>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Dias deteccion anestro</Form.Label>
+                      <Form.Control
+                        type="number"
+                        placeholder="Ej: 45"
+                        min="1"
+                        {...registerUpdate('diasDeteccionAnestro', { valueAsNumber: true })}
+                        isInvalid={!!errorsUpdate.diasDeteccionAnestro}
+                      />
+                      <Form.Control.Feedback type="invalid">
+                        {errorsUpdate.diasDeteccionAnestro?.message}
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Severidad de alerta de anestro</Form.Label>
+                      <Form.Select
+                        {...registerUpdate('severidadAnestro')}
+                        isInvalid={!!errorsUpdate.severidadAnestro}
+                      >
+                        <option value="BAJA">BAJA</option>
+                        <option value="MEDIA">MEDIA</option>
+                        <option value="ALTA">ALTA</option>
+                      </Form.Select>
+                      <Form.Control.Feedback type="invalid">
+                        {errorsUpdate.severidadAnestro?.message}
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                  </>
+                )
+              }
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onClick={handleCloseUpdateModal}>
@@ -382,6 +451,17 @@ export default function EstablecimientosPage() {
                 <Popup>Establecimiento: {establecimientoDetail.nombre}</Popup>
               </Marker>
             </MapContainer>
+
+            {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
+              <>
+                <div className="location pb-2">
+                  <strong>Dias para deteccion de anestro:</strong> {establecimientoDetail.diasDeteccionAnestro}
+                </div>
+                <div className="location pb-2">
+                  <strong>Severidad de alerta de anestro:</strong> {establecimientoDetail.severidadAnestro}
+                </div>
+              </>
+            )}
 
             <hr />
             <div className="d-flex justify-content-between align-items-center mb-3">
