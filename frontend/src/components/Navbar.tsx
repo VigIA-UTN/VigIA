@@ -14,6 +14,7 @@ function NavScroll() {
     const { rol, logout } = useAuthStore();
     const isAdmin = rol === 'ADMINISTRADOR';
     const isProductor = rol === 'PRODUCTOR';
+    const isVeterinario = rol === 'VETERINARIO';
     const navigate = useNavigate();
 
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -158,6 +159,11 @@ function NavScroll() {
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/animales')}>
                                 <i className="bi bi-heart-pulse me-2" />Animales
                             </button>
+                            {isVeterinario && (
+                                <button className="mobile-drawer-link" onClick={() => handleNavLink('/diagnosticos')}>
+                                    <i className="bi bi-clipboard2-pulse me-2" />Diagnósticos
+                                </button>
+                            )}
                             {isProductor && (
                                 <>
                                     <button className="mobile-drawer-link" onClick={() => handleNavLink('/empleados')}>
@@ -266,6 +272,9 @@ function NavScroll() {
                                         </>
                                     )}
                                     <Nav.Link as={Link} to="/animales" className="mx-2 fw-semibold">Animales</Nav.Link>
+                                    {isVeterinario && (
+                                        <Nav.Link as={Link} to="/diagnosticos" className="mx-2 fw-semibold">Diagnósticos</Nav.Link>
+                                    )}
                                 </>
                             )}
                         </Nav>

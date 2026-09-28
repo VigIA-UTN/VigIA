@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { AlertaResponse, AlertaDetalleResponse, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
 import { updateAlertaEstado, getAlertaDetalle } from '../api/alertaApi';
 import SanitarioAlertDetail, { SeveridadBadge } from './SanitarioAlertDetail';
+import DiagnosticoSection from './DiagnosticoSection';
 import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useVentanaInseminacion, formatCountdown } from '../hooks/useVentanaInseminacion';
@@ -26,7 +27,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   const { rol } = useAuthStore();
-  const { selectedId } = useEstablecimientoStore();
+  const { selectedId, establecimientos } = useEstablecimientoStore();
+  const establecimientoNombre = establecimientos.find((e) => e.id === selectedId)?.nombre;
   const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR';
 
   // Ventana optima de inseminacion con countdown en tiempo real.
@@ -303,6 +305,18 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
             {/* Detalle sanitario (solo alertas de SALUD) */}
             {isSanitaria && detSan && <SanitarioAlertDetail detalle={detSan} />}
+
+            {/* Diagnóstico veterinario + historial clínico (solo alertas de SALUD) */}
+            {isSanitaria && (
+              <DiagnosticoSection
+                alertaId={alerta.id}
+                animalId={detalle?.animalId ?? alerta.animalId}
+                animalAlias={detalle?.animalAlias}
+                animalCaravanaOficial={detalle?.animalCaravanaOficial}
+                establecimientoNombre={establecimientoNombre}
+                showForm={rol === 'VETERINARIO' && estadoVisual === 'CONFIRMADA'}
+              />
+            )}
 
             {/* Detalle geoespacial (solo alertas FUERA_DE_PERIMETRO) */}
             {isGeoespacial && (
