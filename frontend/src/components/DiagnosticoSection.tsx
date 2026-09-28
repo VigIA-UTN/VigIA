@@ -64,20 +64,19 @@ export default function DiagnosticoSection({
       {showForm && (
         <div>
           <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-            <i className="bi bi-clipboard2-pulse" /> Cargar diagnóstico
+            Cargar diagnóstico
           </h6>
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body d-flex flex-column gap-3">
               <label className="d-flex flex-column gap-2">
                 <span style={{ fontSize: '0.85rem', color: '#5A6670' }}>Diagnóstico</span>
                 <textarea
-                  className="form-control rounded-3 shadow-sm border-0"
+                  className="form-control rounded-4 diag-input"
                   rows={2}
                   maxLength={200}
-                  placeholder="Ej.: Neumonía bacteriana leve"
                   value={diag}
                   onChange={(e) => { setDiag(e.target.value); setError(false); }}
-                  style={{ resize: 'none', boxShadow: error ? 'inset 0 0 0 2px #FB5151' : undefined }}
+                  style={{ resize: 'none', borderColor: error ? '#FB5151' : undefined, borderWidth: error ? 2 : undefined }}
                 />
                 {error && <span style={{ color: '#D50000', fontSize: '0.85rem' }}>Ingresá el diagnóstico.</span>}
               </label>
@@ -87,10 +86,9 @@ export default function DiagnosticoSection({
                   <span>{trat.length}/500</span>
                 </span>
                 <textarea
-                  className="form-control rounded-3 shadow-sm border-0"
+                  className="form-control rounded-4 diag-input"
                   rows={3}
                   maxLength={500}
-                  placeholder="Medicación, dosis, duración y controles"
                   value={trat}
                   onChange={(e) => setTrat(e.target.value)}
                   style={{ resize: 'none' }}
@@ -98,7 +96,7 @@ export default function DiagnosticoSection({
               </label>
               <button
                 className="btn rounded-3 fw-semibold py-2"
-                style={{ backgroundColor: '#198754', color: 'white', border: '1px solid #198754' }}
+                style={{ backgroundColor: '#94C11E', color: 'white', border: '1px solid #94C11E' }}
                 onClick={handleSubmit}
               >
                 Registrar diagnóstico
@@ -111,11 +109,8 @@ export default function DiagnosticoSection({
       <div>
         <div className="d-flex justify-content-between align-items-baseline mb-3">
           <h6 className="fw-bold m-0 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-            <i className="bi bi-journal-medical" /> Historial clínico
+            Historial clínico
           </h6>
-          <small style={{ color: '#5A6670' }}>
-            {historial.length} registro{historial.length === 1 ? '' : 's'} · solo lectura
-          </small>
         </div>
         {historial.length === 0 ? (
           <div className="card border-0 shadow-sm rounded-4">
@@ -139,6 +134,19 @@ export default function DiagnosticoSection({
           </div>
         )}
       </div>
+
+      <style>{`
+        .diag-input {
+          border: 1px solid #1E3A5F;
+          box-shadow: none;
+        }
+        .diag-input:focus {
+          outline: none;
+          box-shadow: none;
+          border-color: #94C11E;
+          border-width: 2px;
+        }
+      `}</style>
     </>
   );
 }
