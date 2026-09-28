@@ -5,6 +5,7 @@ import dev.vigia.backend.dto.AuthRequest;
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
+import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.repository.EstablecimientoRepository;
@@ -139,6 +140,8 @@ class EstablecimientoControllerTest {
         request.setNombre("Nuevo Est");
         request.setLatitud(-35.0);
         request.setLongitud(-59.0);
+        request.setDiasDeteccionAnestro(10);
+        request.setSeveridadAnestro(SeveridadAlerta.MEDIA.name());
 
         mockMvc.perform(post("/api/v1/establecimientos")
                 .header("Authorization", "Bearer " + adminToken)
