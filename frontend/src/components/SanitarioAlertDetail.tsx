@@ -5,7 +5,7 @@ import type { BloqueComparativo, DetalleSanitario, SeveridadNivel } from '../api
 
 // ─── Severidad ───────────────────────────────────────────────────────────────
 
-export const SEVERIDAD_STYLE: Record<SeveridadNivel, { bg: string; fg: string; dot: string; label: string }> = {
+const SEVERIDAD_STYLE: Record<SeveridadNivel, { bg: string; fg: string; dot: string; label: string }> = {
   ALTA: { bg: '#FED7D7', fg: '#C53030', dot: '#C53030', label: 'ALTA' },
   MEDIA: { bg: '#FEFCBF', fg: '#B7791F', dot: '#B7791F', label: 'MEDIA' },
   BAJA: { bg: '#C6F6D5', fg: '#276749', dot: '#276749', label: 'BAJA' },
