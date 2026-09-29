@@ -343,3 +343,13 @@
 }
 
 .est-anestro-pill--active { font-weight: 700; }
+
+/* Caja de info en modal de detalle */
+.est-anestro-info {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: #f0f7ff;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+}

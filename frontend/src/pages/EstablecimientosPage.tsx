@@ -495,11 +495,14 @@ export default function EstablecimientosPage() {
                   {errorAnestro && <Alert variant="danger" className="py-2">{errorAnestro}</Alert>}
                   {anestroSaved && <Alert variant="success" className="py-2">✓ Guardado correctamente</Alert>}
                   <form onSubmit={handleSubmitAnestro(onSaveAnestro)} noValidate>
-                    <div className="d-flex gap-3 align-items-start flex-wrap mb-3">
-                      {/* Campo días */}
-                      <div style={{ flex: '0 0 180px' }}>
-                        <label className="form-label fw-semibold" style={{ fontSize: '0.85rem' }}>Días sin ciclo</label>
-                        <div className="input-group input-group-sm">
+
+                    {/* Fila 1: input días + info box al lado */}
+                    <div className="d-flex gap-3 align-items-center mb-3">
+
+                      {/* Input días */}
+                      <div style={{ flexShrink: 0 }}>
+                        <label className="form-label fw-bold mb-1" style={{ fontSize: '0.95rem', color: '#1E3A5F' }}>Días sin ciclo</label>
+                        <div className="input-group input-group-sm" style={{ maxWidth: 170 }}>
                           <input
                             type="number"
                             className={`form-control ${errorsAnestro.diasDeteccionAnestro ? 'is-invalid' : ''}`}
@@ -510,32 +513,43 @@ export default function EstablecimientosPage() {
                           <span className="input-group-text">días</span>
                         </div>
                         {errorsAnestro.diasDeteccionAnestro && (
-                          <div className="text-danger" style={{ fontSize: '0.75rem' }}>{errorsAnestro.diasDeteccionAnestro.message}</div>
+                          <div className="text-danger mt-1" style={{ fontSize: '0.75rem' }}>{errorsAnestro.diasDeteccionAnestro.message}</div>
                         )}
                       </div>
-                      {/* Toggle severidad */}
-                      <div style={{ flex: 1, minWidth: 220 }}>
-                        <label className="form-label fw-semibold" style={{ fontSize: '0.85rem' }}>Prioridad de la alerta</label>
-                        <div className="est-anestro-toggle">
-                          {(['BAJA', 'MEDIA', 'ALTA'] as const).map(nivel => {
-                            const cfg = SEVERIDAD_CFG[nivel];
-                            const isActive = sevActual === nivel;
-                            return (
-                              <button
-                                key={nivel}
-                                type="button"
-                                className={`est-anestro-pill ${isActive ? 'est-anestro-pill--active' : ''}`}
-                                style={isActive ? { backgroundColor: cfg.bg, color: cfg.color, borderColor: cfg.color } : {}}
-                                onClick={() => setAnestroValue('severidadAnestro', nivel, { shouldDirty: true })}
-                              >
-                                <i className={`bi ${cfg.icon}`} style={isActive ? { color: cfg.color } : {}} />
-                                {cfg.label}
-                              </button>
-                            );
-                          })}
-                        </div>
+
+                      {/* Info box al lado, mismo alto que el input */}
+                      <div className="est-anestro-info" style={{ flex: 1 }}>
+                        <i className="bi bi-info-circle-fill" style={{ color: '#3B8D99', flexShrink: 0 }} />
+                        <p className="mb-0" style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.4 }}>
+                          Días sin ciclo reproductivo antes de generar una alerta. Defecto: <strong>45 días</strong>.
+                        </p>
                       </div>
                     </div>
+
+                    {/* Fila 2: toggle severidad */}
+                    <div className="mb-3">
+                      <label className="form-label fw-bold mb-1" style={{ fontSize: '0.95rem', color: '#1E3A5F' }}>Prioridad de la alerta</label>
+                      <div className="est-anestro-toggle">
+                        {(['BAJA', 'MEDIA', 'ALTA'] as const).map(nivel => {
+                          const cfg = SEVERIDAD_CFG[nivel];
+                          const isActive = sevActual === nivel;
+                          return (
+                            <button
+                              key={nivel}
+                              type="button"
+                              className={`est-anestro-pill ${isActive ? 'est-anestro-pill--active' : ''}`}
+                              style={isActive ? { backgroundColor: cfg.bg, color: cfg.color, borderColor: cfg.color } : {}}
+                              onClick={() => setAnestroValue('severidadAnestro', nivel, { shouldDirty: true })}
+                            >
+                              <i className={`bi ${cfg.icon}`} style={isActive ? { color: cfg.color } : {}} />
+                              {cfg.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 4. Guardar */}
                     <div className="d-flex justify-content-end">
                       <button
                         type="submit"
