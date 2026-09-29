@@ -4,6 +4,8 @@ export interface EstablecimientoRequest {
   nombre: string;
   latitud: number;
   longitud: number;
+  diasDeteccionAnestro?: number;
+  severidadAnestro?: string;
 }
 
 export interface EstablecimientoResponse {

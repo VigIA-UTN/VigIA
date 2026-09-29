@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Button, Modal, Form, Spinner, Alert } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -28,6 +29,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function EstablecimientosPage() {
+  const navigate = useNavigate();
   const rol = useAuthStore(state => state.rol);
   const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -200,6 +202,16 @@ export default function EstablecimientosPage() {
                     </div>
 
                     <div className="card-actions">
+                      {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
+                        <Button
+                          variant="light"
+                          className="btn-vigia-secondary w-100"
+                          onClick={() => navigate(`/establecimientos/${est.id}/configuracion`)}
+                        >
+                          <i className="bi bi-gear-fill me-2" />
+                          Configuración
+                        </Button>
+                      )}
                       <Button variant="light" className="btn-vigia-success w-100" onClick={async () => {
                         setEstablecimientoDetail(est);
                         setShowDetailModal(true);

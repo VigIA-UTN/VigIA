@@ -1,0 +1,454 @@
+/* ── Layout de página ───────────────────────────────────────────────────── */
+.cfg-page {
+  padding: 2rem 2rem 4rem;
+  max-width: 860px;
+  margin: 0 auto;
+  min-height: calc(100vh - 120px);
+}
+
+/* ── Breadcrumb ─────────────────────────────────────────────────────────── */
+.cfg-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1.8rem;
+  font-size: 0.88rem;
+}
+
+.cfg-breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #3B8D99;
+  cursor: pointer;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+
+.cfg-breadcrumb-link:hover {
+  color: #1E3A5F;
+  text-decoration: underline;
+}
+
+.cfg-breadcrumb-sep {
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.cfg-breadcrumb-current {
+  color: #6b7280;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.cfg-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+/* Ícono gear: solo el símbolo, sin fondo */
+.cfg-header-gear {
+  font-size: 2.2rem;
+  color: #1E3A5F;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.cfg-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1E3A5F;
+  margin: 0 0 0.1rem;
+}
+
+.cfg-subtitle {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* ── Toast de confirmación ──────────────────────────────────────────────── */
+.cfg-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: #1E3A5F;
+  color: #fff;
+  padding: 0.8rem 1.4rem;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: 0.93rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transform: translateY(calc(100% + 2rem));
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s;
+  z-index: 2000;
+}
+
+.cfg-toast-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.cfg-toast i { color: #8CC63F; }
+
+/* ── Alerta de error ────────────────────────────────────────────────────── */
+.cfg-alert {
+  padding: 0.85rem 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 1.4rem;
+  display: flex;
+  align-items: center;
+  font-size: 0.93rem;
+}
+
+.cfg-alert-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+/* ── Card única ─────────────────────────────────────────────────────────── */
+.cfg-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
+  border: 1px solid #e8ecf0;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.cfg-card-body {
+  display: flex;
+  align-items: stretch;
+}
+
+/* Divisor vertical entre columnas */
+.cfg-divider {
+  width: 1px;
+  background: #e8ecf0;
+  flex-shrink: 0;
+}
+
+/* Columnas */
+.cfg-col {
+  flex: 1;
+  padding: 1.8rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.cfg-col-header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.cfg-col-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.cfg-col-icon--blue {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #2563eb;
+}
+
+.cfg-col-icon--amber {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #d97706;
+}
+
+.cfg-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1E3A5F;
+  margin: 0 0 0.1rem;
+}
+
+.cfg-card-subtitle {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* ── Campo de formulario ────────────────────────────────────────────────── */
+.cfg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.cfg-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.cfg-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background: #fff;
+}
+
+.cfg-input-wrapper:focus-within {
+  border-color: #1E3A5F;
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+
+.cfg-input-wrapper--error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.cfg-input {
+  border: none;
+  outline: none;
+  padding: 0.65rem 0.9rem;
+  font-size: 1rem;
+  flex: 1;
+  background: transparent;
+  color: #111827;
+  -moz-appearance: textfield;
+}
+
+.cfg-input::-webkit-outer-spin-button,
+.cfg-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.cfg-input-suffix {
+  padding: 0.65rem 0.9rem;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.85rem;
+  border-left: 1.5px solid #d1d5db;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.cfg-field-error {
+  font-size: 0.8rem;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  animation: cfg-shake 0.3s ease;
+}
+
+@keyframes cfg-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+/* ── Toggle pill de severidad ───────────────────────────────────────────── */
+.cfg-toggle-group {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
+.cfg-toggle-pill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.5rem;
+  border: none;
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  border-right: 1px solid #e5e7eb;
+  position: relative;
+}
+
+.cfg-toggle-pill:last-child {
+  border-right: none;
+}
+
+.cfg-toggle-pill:hover:not(.cfg-toggle-pill--active) {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.cfg-toggle-pill--active {
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+.cfg-toggle-icon {
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+
+/* ── Preview de severidad activa ────────────────────────────────────────── */
+.cfg-severity-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1.5px solid;
+  background: #f9fafb;
+  align-self: flex-start;
+  transition: border-color 0.2s;
+}
+
+/* ── Caja de ayuda ──────────────────────────────────────────────────────── */
+.cfg-help-box {
+  display: flex;
+  gap: 0.75rem;
+  background: #f0f7ff;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-top: auto;
+}
+
+.cfg-help-icon {
+  color: #3B8D99;
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.cfg-help-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1E3A5F;
+  margin: 0 0 0.25rem;
+}
+
+.cfg-help-text {
+  font-size: 0.8rem;
+  color: #4b5563;
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── Botones de acción ──────────────────────────────────────────────────── */
+.cfg-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+}
+
+.cfg-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 1.6rem;
+  border-radius: 10px;
+  font-size: 0.93rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+
+.cfg-btn:active { transform: scale(0.97); }
+
+.cfg-btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+.cfg-btn-cancel:hover { background: #e5e7eb; }
+
+.cfg-btn-save {
+  background: linear-gradient(135deg, #8CC63F, #7ab332);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(140, 198, 63, 0.35);
+}
+.cfg-btn-save:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7ab332, #6a9d2a);
+  box-shadow: 0 4px 16px rgba(140, 198, 63, 0.45);
+}
+.cfg-btn-save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Spinners ───────────────────────────────────────────────────────────── */
+.cfg-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #1E3A5F;
+  border-radius: 50%;
+  animation: cfg-spin 0.8s linear infinite;
+}
+
+.cfg-spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2.5px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: cfg-spin 0.7s linear infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes cfg-spin { to { transform: rotate(360deg); } }
+
+/* ── Estados vacíos ─────────────────────────────────────────────────────── */
+.cfg-loading,
+.cfg-error-state,
+.cfg-access-denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 5rem 2rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.cfg-error-icon { font-size: 3rem; color: #ef4444; }
+.cfg-lock-icon  { font-size: 3rem; color: #9ca3af; }
+
+.cfg-btn-back {
+  background: #1E3A5F;
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.4rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background-color 0.15s;
+}
+.cfg-btn-back:hover { background: #152b47; }
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .cfg-card-body {
+    flex-direction: column;
+  }
+  .cfg-divider {
+    width: auto;
+    height: 1px;
+  }
+}
