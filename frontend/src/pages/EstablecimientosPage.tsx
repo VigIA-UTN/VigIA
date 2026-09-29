@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import { Container, Row, Col, Button, Modal, Form, Spinner, Alert } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -44,7 +44,6 @@ const SEVERIDAD_CFG: Record<string, { label: string; color: string; bg: string; 
 };
 
 export default function EstablecimientosPage() {
-  const navigate = useNavigate();
   const rol = useAuthStore(state => state.rol);
   const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +90,8 @@ export default function EstablecimientosPage() {
     resolver: zodResolver(anestroSchema),
     defaultValues: { diasDeteccionAnestro: 45, severidadAnestro: 'MEDIA' },
   });
+
+  const sevActual = watchAnestro('severidadAnestro');
 
   useEffect(() => {
     const fetchEstablecimientos = async () => {
@@ -483,10 +484,8 @@ export default function EstablecimientosPage() {
               </Marker>
             </MapContainer>
 
-            {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (() => {
-              const sevActual = watchAnestro('severidadAnestro');
-              return (
-                <>
+            {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
+              <>
                   <hr />
                   <div className="d-flex align-items-center gap-2 mb-3">
                     <i className="bi bi-gear-fill" style={{ color: '#1E3A5F' }} />
@@ -562,8 +561,7 @@ export default function EstablecimientosPage() {
                     </div>
                   </form>
                 </>
-              );
-            })()}
+            )}
 
             <hr />
             <div className="d-flex justify-content-between align-items-center mb-3">
