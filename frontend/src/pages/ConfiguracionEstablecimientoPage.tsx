@@ -23,11 +23,9 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-// ── Defaults ──────────────────────────────────────────────────────────────────
 const DEFAULT_DIAS = 45;
 const DEFAULT_SEVERIDAD = 'MEDIA';
 
-// ── Config de severidad ───────────────────────────────────────────────────────
 const SEVERIDAD_CONFIG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
   BAJA:  { label: 'Baja',  color: '#2B7295', bg: '#e8f4f8', icon: 'bi-bell' },
   MEDIA: { label: 'Media', color: '#c47c0a', bg: '#fef3c7', icon: 'bi-bell-fill' },
@@ -48,7 +46,6 @@ export default function ConfiguracionEstablecimientoPage() {
   const {
     register,
     handleSubmit,
-    watch,
     reset,
     control,
     formState: { errors, isDirty },
@@ -59,10 +56,6 @@ export default function ConfiguracionEstablecimientoPage() {
       severidadAnestro: DEFAULT_SEVERIDAD,
     },
   });
-
-  const severidadActual = watch('severidadAnestro');
-
-  // ── Carga ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const numId = Number(id);
@@ -86,8 +79,6 @@ export default function ConfiguracionEstablecimientoPage() {
     };
     fetchData();
   }, [id, navigate, reset]);
-
-  // ── Guardar ───────────────────────────────────────────────────────────────
 
   const onSubmit = async (data: FormData) => {
     if (!establecimiento) return;
@@ -174,7 +165,7 @@ export default function ConfiguracionEstablecimientoPage() {
         <span className="cfg-breadcrumb-current">Configuración de Anestro</span>
       </div>
 
-      {/* Header — ícono sin fondo, solo la ruedita */}
+      {/* Header */}
       <div className="cfg-header">
         <i className="bi bi-gear-fill cfg-header-gear" />
         <div className="cfg-header-text">
@@ -194,7 +185,7 @@ export default function ConfiguracionEstablecimientoPage() {
         </div>
       )}
 
-      {/* Toast de guardado */}
+      {/* Toast */}
       <div className={`cfg-toast ${saved ? 'cfg-toast-visible' : ''}`}>
         <i className="bi bi-check-circle-fill me-2" />
         Cambios guardados correctamente
@@ -203,12 +194,14 @@ export default function ConfiguracionEstablecimientoPage() {
       {/* Formulario */}
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
 
-        {/* ── Card única horizontal ──────────────────────────────────────── */}
+        {/* ── Card única ────────────────────────────────────────────────── */}
         <div className="cfg-card">
+
+          {/* Fila superior: días | divisor | prioridad */}
           <div className="cfg-card-body">
 
-            {/* Columna izquierda: días */}
-            <div className="cfg-col cfg-col-dias">
+            {/* Columna: días */}
+            <div className="cfg-col">
               <div className="cfg-col-header">
                 <div className="cfg-col-icon cfg-col-icon--blue">
                   <i className="bi bi-calendar-check" />
@@ -242,26 +235,13 @@ export default function ConfiguracionEstablecimientoPage() {
                   </span>
                 )}
               </div>
-
-              {/* Caja de ayuda — solo en días */}
-              <div className="cfg-help-box">
-                <i className="bi bi-info-circle-fill cfg-help-icon" />
-                <div>
-                  <p className="cfg-help-title">¿Qué controla este parámetro?</p>
-                  <p className="cfg-help-text">
-                    Define cuántos días consecutivos sin actividad de ciclo reproductivo
-                    deben transcurrir para que el sistema genere una alerta de anestro.
-                    El valor por defecto es <strong>{DEFAULT_DIAS} días</strong>.
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Divisor vertical */}
             <div className="cfg-divider" />
 
-            {/* Columna derecha: prioridad */}
-            <div className="cfg-col cfg-col-prioridad">
+            {/* Columna: prioridad */}
+            <div className="cfg-col">
               <div className="cfg-col-header">
                 <div className="cfg-col-icon cfg-col-icon--amber">
                   <i className="bi bi-bell-fill" />
@@ -274,8 +254,6 @@ export default function ConfiguracionEstablecimientoPage() {
 
               <div className="cfg-field">
                 <label className="cfg-label">Nivel de prioridad</label>
-
-                {/* Toggle pill */}
                 <Controller
                   control={control}
                   name="severidadAnestro"
@@ -289,11 +267,7 @@ export default function ConfiguracionEstablecimientoPage() {
                             key={nivel}
                             type="button"
                             className={`cfg-toggle-pill ${isActive ? 'cfg-toggle-pill--active' : ''}`}
-                            style={isActive ? {
-                              backgroundColor: cfg.bg,
-                              color: cfg.color,
-                              borderColor: cfg.color,
-                            } : {}}
+                            style={isActive ? { backgroundColor: cfg.bg, color: cfg.color, borderColor: cfg.color } : {}}
                             onClick={() => field.onChange(nivel)}
                           >
                             <i
@@ -307,7 +281,6 @@ export default function ConfiguracionEstablecimientoPage() {
                     </div>
                   )}
                 />
-
                 {errors.severidadAnestro && (
                   <span className="cfg-field-error">
                     <i className="bi bi-exclamation-circle me-1" />
@@ -315,21 +288,24 @@ export default function ConfiguracionEstablecimientoPage() {
                   </span>
                 )}
               </div>
-
-              {/* Preview dinámico de la opción activa */}
-              {(() => {
-                const cfg = SEVERIDAD_CONFIG[severidadActual] ?? SEVERIDAD_CONFIG['MEDIA'];
-                return (
-                  <div className="cfg-severity-preview" style={{ borderColor: cfg.color }}>
-                    <i className={`bi ${cfg.icon}`} style={{ color: cfg.color, fontSize: '1.1rem' }} />
-                    <span style={{ color: cfg.color, fontWeight: 600, fontSize: '0.88rem' }}>
-                      Prioridad {cfg.label}
-                    </span>
-                  </div>
-                );
-              })()}
             </div>
           </div>
+
+          {/* Fila inferior: caja de info a todo el ancho */}
+          <div className="cfg-card-footer">
+            <div className="cfg-help-box">
+              <i className="bi bi-info-circle-fill cfg-help-icon" />
+              <div>
+                <p className="cfg-help-title">¿Qué controla este parámetro?</p>
+                <p className="cfg-help-text">
+                  Define cuántos días consecutivos sin actividad de ciclo reproductivo
+                  deben transcurrir para que el sistema genere una alerta de anestro.
+                  El valor por defecto es <strong>{DEFAULT_DIAS} días</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         {/* Acciones */}
@@ -347,11 +323,7 @@ export default function ConfiguracionEstablecimientoPage() {
             className="cfg-btn cfg-btn-save"
             disabled={saving || !isDirty}
           >
-            {saving ? (
-              <><span className="cfg-spinner-sm" />Guardando…</>
-            ) : (
-              <><i className="bi bi-floppy-fill me-2" />Guardar cambios</>
-            )}
+            {saving ? <><span className="cfg-spinner-sm" />Guardando…</> : 'Guardar Cambios'}
           </button>
         </div>
       </form>

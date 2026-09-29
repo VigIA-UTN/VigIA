@@ -127,6 +127,17 @@
   align-items: stretch;
 }
 
+/* Footer de la card: ocupa todo el ancho */
+.cfg-card-footer {
+  border-top: 1px solid #e8ecf0;
+  padding: 0;
+}
+
+.cfg-card-footer .cfg-help-box {
+  border-radius: 0 0 16px 16px;
+  margin: 0;
+}
+
 /* Divisor vertical entre columnas */
 .cfg-divider {
   width: 1px;
@@ -375,13 +386,14 @@
 .cfg-btn-cancel:hover { background: #e5e7eb; }
 
 .cfg-btn-save {
-  background: linear-gradient(135deg, #8CC63F, #7ab332);
+  background-color: #1E3A5F;
   color: #fff;
-  box-shadow: 0 3px 10px rgba(140, 198, 63, 0.35);
+  box-shadow: 0 3px 10px rgba(30, 58, 95, 0.25);
 }
 .cfg-btn-save:hover:not(:disabled) {
-  background: linear-gradient(135deg, #7ab332, #6a9d2a);
-  box-shadow: 0 4px 16px rgba(140, 198, 63, 0.45);
+  background-color: #132a47;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(30, 58, 95, 0.35);
 }
 .cfg-btn-save:disabled {
   opacity: 0.55;
