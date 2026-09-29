@@ -136,7 +136,7 @@ function ChartCard({
                 gap: 8,
             }}>
                 <div>
-                    <h5 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#1E3A5F' }}>{title}</h5>
+                    <h5 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: '#1E3A5F' }}>{title}</h5>
                     {subtitle && <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#A0AEC0' }}>{subtitle}</p>}
                 </div>
                 {action && <div>{action}</div>}

@@ -137,7 +137,7 @@
 }
 
 .tab-content-animated {
-    animation: tab-fade-in 0.25s ease forwards;
+    animation: tab-fade-in 0.25s ease;
 }
 
 /* ── Historial: acento de origen del dato (auto vs manual) ── */

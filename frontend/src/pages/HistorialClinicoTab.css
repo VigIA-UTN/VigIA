@@ -7,7 +7,7 @@
 .hc-filters { padding: 20px 22px; display: flex; flex-direction: column; gap: 18px; margin-bottom: 28px; }
 .hc-filters-row { display: flex; flex-wrap: wrap; gap: 18px 32px; align-items: flex-start; }
 .hc-field { display: flex; flex-direction: column; gap: 10px; }
-.hc-label { font-size: 15px; font-weight: 500; color: var(--hc-muted); letter-spacing: .04em; }
+.hc-label { font-size: 15px; font-weight: 600; color: var(--hc-navy); letter-spacing: .04em; }
 .hc-label-sm { font-size: 12px; font-weight: 500; color: var(--hc-muted); margin-bottom: 5px; }
 .hc-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .hc-chip { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 8px; border: 0; border-radius: 10px;
