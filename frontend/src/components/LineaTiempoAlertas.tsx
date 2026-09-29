@@ -62,18 +62,6 @@ function severidadClass(sev: string | null): string {
   return 'sev-none';
 }
 
-function estadoClass(estado: string | null): string {
-  if (estado === 'CONFIRMADA') return 'estado-confirmada';
-  if (estado === 'DESCARTADA') return 'estado-descartada';
-  return 'estado-sin-atender';
-}
-
-function estadoLabel(estado: string | null): string {
-  if (estado === 'CONFIRMADA') return 'Confirmada';
-  if (estado === 'DESCARTADA') return 'Descartada';
-  return 'Sin atender';
-}
-
 const DAY_MS = 86400000;
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -95,8 +83,6 @@ const estadoToEvento = (e: EstadoReproductivoResponse): TimelineEvento => ({
   tipoEvento: 'ESTADO', id: e.id, fecha: e.fechaRegistro, tipo: e.estado, severidad: null, estadoResolucion: null,
   tipoIntervencion: null, descripcion: null, interventor: e.registradoPor, alertaAsociadaId: null, estadoRepro: e,
 });
-
-const ORIGEN_LABEL: Record<string, string> = { AUTOMATICO: 'Automático', MANUAL: 'Manual', CARGA_MASIVA: 'Carga masiva' };
 
 // ── Popup card ────────────────────────────────────────────────────────────────
 
@@ -144,11 +130,6 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
               <div className="lt-popup-fecha">{formatDateTime(evento.fecha)}</div>
             </div>
           </div>
-          <div className="lt-popup-chips">
-            <span className="lt-chip lt-chip--estado estado-sin-atender">
-              {ORIGEN_LABEL[evento.estadoRepro.origen ?? ''] ?? '—'}
-            </span>
-          </div>
           <div className="lt-popup-desc">
             Último parto: <strong>{formatDateOnly(evento.estadoRepro.fechaUltimoParto)}</strong><br />
             Última inseminación: <strong>{formatDateOnly(evento.estadoRepro.fechaUltimaInseminacion)}</strong>
@@ -173,22 +154,6 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
               </div>
               <div className="lt-popup-fecha">{formatDateTime(evento.fecha)}</div>
             </div>
-          </div>
-
-          {/* Chips */}
-          <div className="lt-popup-chips">
-            {evento.severidad && (
-              <span className={`lt-chip lt-chip--sev ${severidadClass(evento.severidad)}`}>
-                <i className="bi bi-exclamation-triangle-fill me-1" />
-                Severidad {evento.severidad.charAt(0) + evento.severidad.slice(1).toLowerCase()}
-              </span>
-            )}
-            <span className={`lt-chip lt-chip--estado ${estadoClass(evento.estadoResolucion)}`}>
-              {evento.estadoResolucion === 'CONFIRMADA' && <i className="bi bi-check-circle-fill me-1" />}
-              {evento.estadoResolucion === 'DESCARTADA' && <i className="bi bi-x-circle-fill me-1" />}
-              {evento.estadoResolucion === 'SIN_ATENDER' && <i className="bi bi-clock-fill me-1" />}
-              {estadoLabel(evento.estadoResolucion)}
-            </span>
           </div>
 
           {/* Descripción contextual */}

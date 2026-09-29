@@ -30,6 +30,8 @@
   --lt-rail-min-height: 480px;
   --lt-event-col-width: 180px;
   --lt-popup-width: 280px;
+  /* margen lateral: el popup (centrado en el nodo) nunca sobresale del scroll */
+  --lt-rail-pad: max(40px, calc((var(--lt-popup-width) - var(--lt-event-col-width)) / 2 + 8px));
 }
 
 /* ── Section wrapper ──────────────────────────────────────────── */
@@ -221,17 +223,17 @@
 .lt-rail-container {
   position: relative;
   min-height: var(--lt-rail-min-height);
-  min-width: calc(var(--lt-event-col-width) * max(var(--event-count, 1), 4) + 80px);
+  min-width: calc(var(--lt-event-col-width) * max(var(--event-count, 1), 4) + 2 * var(--lt-rail-pad));
   display: flex;
   align-items: center;
-  padding: 0 40px;
+  padding: 0 var(--lt-rail-pad);
 }
 
 /* ── Eje horizontal ───────────────────────────────────────────── */
 .lt-axis {
   position: absolute;
-  left: 40px;
-  right: 40px;
+  left: var(--lt-rail-pad);
+  right: var(--lt-rail-pad);
   top: 50%;
   transform: translateY(-50%);
   height: 3px;
@@ -262,17 +264,17 @@
 }
 
 .lt-axis-label--start {
-  left: 40px;
+  left: var(--lt-rail-pad);
 }
 
 .lt-axis-label--end {
-  right: 40px;
+  right: var(--lt-rail-pad);
 }
 
 /* ── Nodo wrapper (posicionado a lo largo del eje) ─────────────── */
 .lt-nodo-wrapper {
   position: absolute;
-  left: calc(40px + (var(--nodo-index, 0) + 0.5) * var(--lt-event-col-width));
+  left: calc(var(--lt-rail-pad) + (var(--nodo-index, 0) + 0.5) * var(--lt-event-col-width));
   top: 50%;
   transform: translate(-50%, -50%);
   display: flex;
@@ -309,23 +311,23 @@
 
 /* Colores de nodo según severidad/tipo */
 .lt-nodo--alerta.sev-alta {
-  background: linear-gradient(135deg, #e53e3e, #c53030);
+  background: #e53e3e;
 }
 
 .lt-nodo--alerta.sev-media {
-  background: linear-gradient(135deg, #ed8936, #dd6b20);
+  background: #ed8936;
 }
 
 .lt-nodo--alerta.sev-baja {
-  background: linear-gradient(135deg, #48bb78, #38a169);
+  background: #48bb78;
 }
 
 .lt-nodo--alerta.sev-none {
-  background: linear-gradient(135deg, var(--lt-teal), var(--lt-azul-medio));
+  background: var(--lt-teal);
 }
 
 .lt-nodo--intervencion {
-  background: linear-gradient(135deg, #9f7aea, #6b46c1);
+  background: #9f7aea;
 }
 
 /* ── Label flotante (encima o debajo del nodo) ─────────────────── */
@@ -688,7 +690,7 @@
 }
 /* ── Estados reproductivos ───────────────────────────────────── */
 .lt-count-estado { background: var(--lt-estado-bg); color: var(--lt-estado); }
-.lt-nodo--estado { background: linear-gradient(135deg, #2dd4bf, #0d9488); }
+.lt-nodo--estado { background: #2dd4bf; }
 .lt-popup--estado { border-top: 4px solid var(--lt-estado); }
 .lt-popup-icon-wrap--estado { background: var(--lt-estado); }
 .lt-legend-dot--estado { background: var(--lt-estado); }
