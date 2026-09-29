@@ -12,13 +12,11 @@ import './ConfiguracionEstablecimientoPage.css';
 
 const schema = z.object({
   diasDeteccionAnestro: z
-    .number({ invalid_type_error: 'Debe ser un número entero' })
+    .number({ message: 'Debe ser un número entero' })
     .int('Debe ser un número entero')
     .min(1, 'Debe ser al menos 1 día')
     .max(365, 'No puede superar los 365 días'),
-  severidadAnestro: z.enum(['BAJA', 'MEDIA', 'ALTA'], {
-    errorMap: () => ({ message: 'Seleccioná una prioridad válida' }),
-  }),
+  severidadAnestro: z.enum(['BAJA', 'MEDIA', 'ALTA']),
 });
 
 type FormData = z.infer<typeof schema>;

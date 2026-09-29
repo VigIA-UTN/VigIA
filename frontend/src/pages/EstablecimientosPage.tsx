@@ -29,7 +29,7 @@ type FormData = z.infer<typeof schema>;
 // Schema para configuración de anestro en el modal de detalle
 const anestroSchema = z.object({
   diasDeteccionAnestro: z
-    .number({ invalid_type_error: 'Debe ser un número entero' })
+    .number({ message: 'Debe ser un número entero' })
     .int('Debe ser un número entero')
     .min(1, 'Mínimo 1 día')
     .max(365, 'Máximo 365 días'),
