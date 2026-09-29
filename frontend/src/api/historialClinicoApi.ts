@@ -80,3 +80,18 @@ export async function getHistorialClinico(animalId: number): Promise<HistorialEv
     await new Promise(r => setTimeout(r, 300));
     return [...MOCK].sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
+
+export interface IntervencionManualRequest {
+    tipo: 'TRATAMIENTO' | 'VACUNACION' | 'REVISION_VETERINARIA' | 'OTRO';
+    fechaHora: string; // YYYY-MM-DDTHH:mm
+    descripcion: string;
+}
+
+/**
+ * Registro de una intervención sin alerta asociada.
+ * TODO backend: no existe endpoint (hoy solo `/alertas/intervenir/{alertaId}`); reemplazar por un POST real.
+ */
+export async function registrarIntervencion(animalId: number, request: IntervencionManualRequest): Promise<void> {
+    void animalId; void request; // stub
+    await new Promise(r => setTimeout(r, 300));
+}

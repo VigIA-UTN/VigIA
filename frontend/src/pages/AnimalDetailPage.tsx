@@ -1,25 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Button, Spinner, Alert, Card, Row, Col, Form, Modal, Badge } from 'react-bootstrap';
+import { Container, Button, Spinner, Alert, Card, Row, Col, Form, Badge } from 'react-bootstrap';
 import {
     getAnimalById,
     updateAnimal,
-    getHistorialEstados,
-    registrarEstadoReproductivo,
-    editarEstadoReproductivo,
-    getHistorialSalud,
-    registrarEstadoSalud,
-    ESTADO_REPRODUCTIVO_LABEL,
     ESTADO_SALUD_LABEL,
     type AnimalResponse,
     type AnimalRequest,
-    type EstadoReproductivoResponse,
-    type EstadoReproductivoRequest,
-    type TipoReproductivo,
-    type TipoEstadoSalud,
-    type EstadoSaludResponse,
-    getIntervenciones,
-    type IntervencionResponse
 } from '../api/animalesApi';
 import { getRodeoLotes, type RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { useAuthStore } from '../store/authStore';
@@ -27,16 +14,13 @@ import { formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
 import './AnimalDetailPage.css';
 import './AnimalesPage.css';
 import ActividadTab from './ActividadTab';
+import ReproduccionTab from './ReproduccionTab';
 import HistorialClinicoTab from './HistorialClinicoTab';
 import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
 import AnimalIndicadoresSalud from '../components/AnimalIndicadoresSalud';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import type { AlertaResponse } from '../api/alertaApi';
-import LineaTiempoAlertas from '../components/LineaTiempoAlertas';
-
-const TIPOS_REPRODUCTIVOS: TipoReproductivo[] = ['VACIA', 'GESTANTE', 'CELO', 'ANESTRO'];
-
-const TIPOS_ESTADO_SALUD: TipoEstadoSalud[] = ['SANO', 'EN_OBSERVACION', 'ENFERMO'];
+import { formatFechaLocal } from '../utils/fechas';
 
 function estadoSaludBadge(estado: string | null | undefined) {
     if (!estado) return <span className="badge bg-secondary">—</span>;
@@ -46,66 +30,6 @@ function estadoSaludBadge(estado: string | null | undefined) {
         ENFERMO: 'bg-danger',
     };
     return <Badge bg="" className={`${map[estado] || 'bg-secondary'}`}>{ESTADO_SALUD_LABEL[estado] ?? estado}</Badge>;
-}
-
-/**
- * Badge de origen del dato (automático vs manual), con ícono y etiqueta legible.
- * Se usa tanto en el historial reproductivo como en el de salud. Acepta el valor
- * crudo (`MANUAL` | `CARGA_MASIVA` | `AUTOMATICO`) o el normalizado.
- */
-function origenBadge(origen: string | null | undefined) {
-    switch (origen) {
-        case 'AUTOMATICO':
-            return <Badge bg="" className="bg-info"><i className="bi bi-robot me-1" />Automático</Badge>;
-        case 'MANUAL':
-            return <Badge bg="" className="bg-primary"><i className="bi bi-person-fill me-1" />Manual</Badge>;
-        case 'CARGA_MASIVA':
-            return <Badge bg="" className="bg-primary"><i className="bi bi-upload me-1" />Carga masiva</Badge>;
-        default:
-            return <span className="badge bg-secondary">—</span>;
-    }
-}
-
-interface SaludForm {
-    estado: TipoEstadoSalud | '';
-    diagnosticoNotas: string;
-    tratamientoIndicado: string;
-    fecha: string;
-}
-
-const INTERVENCION_TIPO_LABELS: Record<string, string> = {
-    TRATAMIENTO: 'Tratamiento',
-    VACUNACION: 'Vacunación',
-    REVISION_VETERINARIA: 'Revisión veterinaria',
-    INSEMINACION: 'Inseminación',
-    OTRO: 'Otro',
-};
-
-function estadoReproductivoBadge(estado: string | null | undefined) {
-    if (!estado) return <span className="badge bg-secondary">—</span>;
-    const map: Record<string, string> = {
-        GESTANTE: 'bg-success',
-        CELO: 'bg-danger',
-        VACIA: 'bg-secondary',
-        ANESTRO: 'bg-info',
-        POSIBLE_CELO: 'bg-warning text-dark',
-        INSEMINADA: 'bg-primary',
-        PARIDA: 'bg-success',
-    };
-    return <Badge bg="" className={`${map[estado] || 'bg-secondary'}`}>{ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado}</Badge>;
-}
-
-function formatFechaLocal(iso: string | null | undefined) {
-    if (!iso) return '—';
-    const [y, m, d] = iso.split('-');
-    if (d) return `${d.substring(0, 2)}/${m}/${y}`;
-    return `${m}/${y}`;
-}
-
-function formatDateTime(dt: string | null | undefined) {
-    if (!dt) return '—';
-    const date = new Date(dt);
-    return date.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function CaravanaVinculadaInfo({ animal }: { animal: AnimalResponse }) {
@@ -160,19 +84,6 @@ function CaravanaVinculadaInfo({ animal }: { animal: AnimalResponse }) {
     );
 }
 
-const EMPTY_ESTADO_FORM: EstadoReproductivoRequest = {
-    estado: 'VACIA',
-    fechaUltimoParto: null,
-    fechaUltimaInseminacion: null,
-};
-
-const EMPTY_SALUD_FORM: SaludForm = {
-    estado: '',
-    diagnosticoNotas: '',
-    tratamientoIndicado: '',
-    fecha: '',
-};
-
 export default function AnimalDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -189,75 +100,12 @@ export default function AnimalDetailPage() {
     const [form, setForm] = useState<Partial<AnimalRequest>>({});
     const [rodeoLotes, setRodeoLotes] = useState<RodeoLoteResponse[]>([]);
 
-    // Historial de estados reproductivos
-    const [historial, setHistorial] = useState<EstadoReproductivoResponse[]>([]);
-    const [loadingHistorial, setLoadingHistorial] = useState(false);
-
-    // Intervenciones
-    const [intervenciones, setIntervenciones] = useState<IntervencionResponse[]>([]);
-    const [loadingIntervenciones, setLoadingIntervenciones] = useState(false);
-
-    // Modal de estado reproductivo
-    const [showEstadoModal, setShowEstadoModal] = useState(false);
-    const [editingEstado, setEditingEstado] = useState<EstadoReproductivoResponse | null>(null); // null = nuevo, not null = editar
-    const [estadoForm, setEstadoForm] = useState<EstadoReproductivoRequest>(EMPTY_ESTADO_FORM);
-    const [submittingEstado, setSubmittingEstado] = useState(false);
-    const [estadoFormError, setEstadoFormError] = useState<string | null>(null);
-    const [estadoSuccess, setEstadoSuccess] = useState<string | null>(null);
-
-    // Historial de estados de salud
-    const [saludHistorial, setSaludHistorial] = useState<EstadoSaludResponse[]>([]);
-    const [loadingSalud, setLoadingSalud] = useState(false);
-
-    // Modal de estado de salud
-    const [showSaludModal, setShowSaludModal] = useState(false);
-    const [saludForm, setSaludForm] = useState<SaludForm>(EMPTY_SALUD_FORM);
-    const [submittingSalud, setSubmittingSalud] = useState(false);
-    const [saludFormError, setSaludFormError] = useState<string | null>(null);
-    const [saludSuccess, setSaludSuccess] = useState<string | null>(null);
-
     // Tab state — 'actividad' is the default
-    const [activeTab, setActiveTab] = useState<'actividad' | 'ficha' | 'historial'>('actividad');
+    const [activeTab, setActiveTab] = useState<'actividad' | 'ficha' | 'reproduccion' | 'historial'>('actividad');
 
     // NUEVO: para manejar el modal de intervención desde la pestaña actividad
     const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
     const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
-
-    const fetchHistorial = async (animalId: number) => {
-        setLoadingHistorial(true);
-        try {
-            const data = await getHistorialEstados(animalId);
-            setHistorial(data);
-        } catch {
-            // no-op: historial is optional
-        } finally {
-            setLoadingHistorial(false);
-        }
-    };
-
-    const fetchIntervencionesData = async (animalId: number) => {
-        setLoadingIntervenciones(true);
-        try {
-            const data = await getIntervenciones(animalId);
-            setIntervenciones(data);
-        } catch {
-            // no-op: intervenciones is optional
-        } finally {
-            setLoadingIntervenciones(false);
-        }
-    };
-
-    const fetchSalud = async (animalId: number) => {
-        setLoadingSalud(true);
-        try {
-            const data = await getHistorialSalud(animalId);
-            setSaludHistorial(data);
-        } catch {
-            // no-op: historial de salud is optional
-        } finally {
-            setLoadingSalud(false);
-        }
-    };
 
     useEffect(() => {
         if (!id) return;
@@ -280,9 +128,6 @@ export default function AnimalDetailPage() {
                     setRodeoLotes(lotes.filter(l => l.activo));
                 }
 
-                fetchHistorial(data.id);
-                fetchIntervencionesData(data.id);
-                fetchSalud(data.id);
             } catch (err) {
                 const e = err as { response?: { data?: { message?: string } } };
                 setError(e.response?.data?.message || 'Error al cargar la ficha del animal.');
@@ -310,166 +155,6 @@ export default function AnimalDetailPage() {
             setFormError(e.response?.data?.message || 'Error al actualizar animal');
         } finally {
             setSubmitting(false);
-        }
-    };
-
-    const formatDateForInput = (dateStr: string | null | undefined) => {
-        if (!dateStr) return null;
-        return dateStr.split('T')[0];
-    };
-
-    const openNuevoEstadoModal = () => {
-        setEditingEstado(null);
-        const lastEstado = historial.length > 0 ? historial[0] : null;
-        setEstadoForm({
-            estado: 'VACIA',
-            fechaUltimoParto: formatDateForInput(lastEstado?.fechaUltimoParto),
-            fechaUltimaInseminacion: formatDateForInput(lastEstado?.fechaUltimaInseminacion),
-        });
-        setEstadoFormError(null);
-        setEstadoSuccess(null);
-        setShowEstadoModal(true);
-    };
-
-    const openEditarEstadoModal = (estado: EstadoReproductivoResponse) => {
-        setEditingEstado(estado);
-        setEstadoForm({
-            estado: (estado.estado ?? 'VACIA') as TipoReproductivo,
-            fechaUltimoParto: formatDateForInput(estado.fechaUltimoParto),
-            fechaUltimaInseminacion: formatDateForInput(estado.fechaUltimaInseminacion),
-        });
-        setEstadoFormError(null);
-        setEstadoSuccess(null);
-        setShowEstadoModal(true);
-    };
-
-    const handleEstadoFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setEstadoForm(prev => ({ ...prev, [name]: value || null }));
-    };
-
-    const handleSubmitEstado = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!id) return;
-        setEstadoFormError(null);
-        setEstadoSuccess(null);
-
-        if (estadoForm.fechaUltimoParto && estadoForm.fechaUltimaInseminacion) {
-            const fParto = new Date(estadoForm.fechaUltimoParto);
-            const fInsem = new Date(estadoForm.fechaUltimaInseminacion);
-            if (fInsem > fParto && estadoForm.estado !== 'GESTANTE') {
-                setEstadoFormError('La fecha de última inseminación no puede ser posterior al último parto sin un estado de gestación.');
-                return;
-            }
-        }
-
-        if (estadoForm.fechaUltimoParto) {
-            const referenceIndex = editingEstado ? 1 : 0;
-            const refEstado = historial.length > referenceIndex ? historial[referenceIndex] : null;
-            if (refEstado?.fechaUltimoParto) {
-                const fPartoNuevo = new Date(estadoForm.fechaUltimoParto);
-                const fPartoAnterior = new Date(refEstado.fechaUltimoParto);
-                if (fPartoNuevo < fPartoAnterior) {
-                    setEstadoFormError(
-                        `La fecha de último parto no puede ser anterior a la ya registrada (${refEstado.fechaUltimoParto.split('-').reverse().join('/')}).`
-                    );
-                    return;
-                }
-            }
-        }
-
-        setSubmittingEstado(true);
-        try {
-            if (editingEstado) {
-                await editarEstadoReproductivo(Number(id), editingEstado.id, estadoForm);
-            } else {
-                await registrarEstadoReproductivo(Number(id), estadoForm);
-            }
-            // Guardado exitoso: mostrar éxito y cerrar modal
-            setEstadoSuccess(editingEstado ? 'Estado actualizado correctamente.' : 'Estado registrado correctamente.');
-            // Refresh animal e historial (en bloque separado para que un fallo no tape el éxito)
-            try {
-                const [updatedAnimal, updatedHistorial] = await Promise.all([
-                    getAnimalById(Number(id)),
-                    getHistorialEstados(Number(id)),
-                ]);
-                setAnimal(updatedAnimal);
-                setHistorial(updatedHistorial);
-            } catch {
-                // Si el refresh falla, recargamos historial aparte
-                await fetchHistorial(Number(id));
-            }
-            setTimeout(() => {
-                setShowEstadoModal(false);
-                setEstadoSuccess(null);
-            }, 1200);
-        } catch (err) {
-            const e = err as { response?: { data?: { message?: string } | string } };
-            setEstadoFormError(
-                typeof e.response?.data === 'string'
-                    ? e.response.data
-                    : e.response?.data?.message || 'Error al guardar el estado reproductivo.'
-            );
-        } finally {
-            setSubmittingEstado(false);
-        }
-    };
-
-    const openNuevoSaludModal = () => {
-        setSaludForm({ ...EMPTY_SALUD_FORM, fecha: new Date().toISOString().split('T')[0] });
-        setSaludFormError(null);
-        setSaludSuccess(null);
-        setShowSaludModal(true);
-    };
-
-    const handleSaludFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setSaludForm(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSubmitSalud = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!id) return;
-        setSaludFormError(null);
-        setSaludSuccess(null);
-
-        if (!saludForm.estado) {
-            setSaludFormError('El estado general es obligatorio.');
-            return;
-        }
-
-        setSubmittingSalud(true);
-        try {
-            await registrarEstadoSalud(Number(id), {
-                estado: saludForm.estado,
-                diagnosticoNotas: saludForm.diagnosticoNotas.trim() || null,
-                tratamientoIndicado: saludForm.tratamientoIndicado.trim() || null,
-                fecha: saludForm.fecha || null,
-            });
-            setSaludSuccess('Estado de salud registrado correctamente.');
-            try {
-                const [updatedAnimal, updatedSalud] = await Promise.all([
-                    getAnimalById(Number(id)),
-                    getHistorialSalud(Number(id)),
-                ]);
-                setAnimal(updatedAnimal);
-                setSaludHistorial(updatedSalud);
-            } catch {
-                await fetchSalud(Number(id));
-            }
-            setTimeout(() => {
-                setShowSaludModal(false);
-                setSaludSuccess(null);
-            }, 1200);
-        } catch (err) {
-            const e = err as { response?: { data?: { message?: string } | string } };
-            setSaludFormError(
-                typeof e.response?.data === 'string'
-                    ? e.response.data
-                    : e.response?.data?.message || 'Error al guardar el estado de salud.'
-            );
-        } finally {
-            setSubmittingSalud(false);
         }
     };
 
@@ -559,6 +244,12 @@ export default function AnimalDetailPage() {
                         Ficha
                     </button>
                     <button
+                        className={`animal-tab-btn${activeTab === 'reproduccion' ? ' active' : ''}`}
+                        onClick={() => { setActiveTab('reproduccion'); setIsEditing(false); }}
+                    >
+                        Reproducción
+                    </button>
+                    <button
                         className={`animal-tab-btn${activeTab === 'historial' ? ' active' : ''}`}
                         onClick={() => { setActiveTab('historial'); setIsEditing(false); }}
                     >
@@ -596,19 +287,23 @@ export default function AnimalDetailPage() {
                                 alerta={intervencionAlerta}
                                 mode="fixed"
                                 onClose={() => setIsIntervencionOpen(false)}
-                                onSuccess={() => {
-                                    fetchIntervencionesData(animal.id);
-                                    setIsIntervencionOpen(false);
-                                }}
+                                onSuccess={() => setIsIntervencionOpen(false)}
                             />
                         )}
+                    </div>
+                )}
+
+                {/* ── Tab: Reproducción ── */}
+                {activeTab === 'reproduccion' && (
+                    <div key="reproduccion" className="tab-content-animated">
+                        <ReproduccionTab key={animal.id} animal={animal} rol={rol} onAnimalUpdated={setAnimal} />
                     </div>
                 )}
 
                 {/* ── Tab: Historial clínico ── */}
                 {activeTab === 'historial' && (
                     <div key="historial" className="tab-content-animated">
-                        <HistorialClinicoTab key={animal.id} animalId={animal.id} />
+                        <HistorialClinicoTab key={animal.id} animalId={animal.id} rol={rol} onAnimalUpdated={setAnimal} />
                     </div>
                 )}
 
@@ -689,7 +384,7 @@ export default function AnimalDetailPage() {
                                                 <li><strong>Rodeo/Lote:</strong> {animal.rodeoLoteNombre || (animal.rodeoLoteId ? `#${String(animal.rodeoLoteId).padStart(2, '0')}` : '—')}</li>
                                                 <li><strong>Fecha Alta en VigIA:</strong> {formatFechaLocal(animal.fechaAlta)}</li>
                                                 <li><strong>Estado Actual:</strong> <span className={`badge ${animal.estadoActual === 'ACTIVO' ? 'bg-success' : animal.estadoActual === 'CON_ALERTA' ? 'bg-warning text-dark' : 'bg-secondary'}`}>{animal.estadoActual}</span></li>
-                                                <li><strong>Estado de Salud:</strong> {estadoSaludBadge(saludHistorial[0]?.estado ?? animal.estadoSalud)}</li>
+                                                <li><strong>Estado de Salud:</strong> {estadoSaludBadge(animal.estadoSalud)}</li>
                                                 <li className="flex-column align-items-stretch border-bottom-0 pb-0 mt-3">
                                                     <div className="w-100 mb-1"><strong>Caravana vinculada:</strong></div>
                                                     <div className="w-100"><CaravanaVinculadaInfo animal={animal} /></div>
@@ -705,296 +400,8 @@ export default function AnimalDetailPage() {
                     {/* ── Indicadores de Salud ── */}
                     <AnimalIndicadoresSalud animalId={animal.id} />
 
-                    {/* ── Línea de Tiempo de Alertas ── */}
-                    <LineaTiempoAlertas animalId={animal.id} />
-
-                    {/* ── Sección Historial Reproductivo ── */}
-                    <Card className="shadow-sm border-0 animal-card">
-                        <Card.Body>
-                            <div className="d-flex justify-content-between align-items-center mb-3">
-                                <h4 className="section-title mb-0">Historial Reproductivo</h4>
-                                {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
-                                    <Button className="btn-vigia-success btn-sm px-3" onClick={openNuevoEstadoModal}>
-                                        <i className="bi bi-plus-lg me-1" /> Registrar estado
-                                    </Button>
-                                )}
-                            </div>
-
-                            {loadingHistorial ? (
-                                <div className="text-center py-3">
-                                    <Spinner animation="border" size="sm" style={{ color: '#1E3A5F' }} />
-                                </div>
-                            ) : historial.length === 0 ? (
-                                <p className="text-muted text-center py-3">Sin registros reproductivos aún.</p>
-                            ) : (
-                                <div className="table-responsive">
-                                    <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
-                                        <thead>
-                                            <tr>
-                                                <th>Estado</th>
-                                                <th>Último Parto</th>
-                                                <th>Última Inseminación</th>
-                                                <th>Origen</th>
-                                                <th>Registrado por</th>
-                                                <th>Fecha Registro</th>
-                                                {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && <th className="text-center">Acciones</th>}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {historial.map((h, idx) => {
-                                                const origen = h.origen;
-                                                // Las inseminaciones provienen de `intervenciones` (id de otra tabla), no se editan acá.
-                                                const editable = h.estado !== 'INSEMINADA';
-                                                const rowOrigenClass = origen === 'AUTOMATICO' ? 'hist-row-auto' : 'hist-row-manual';
-                                                return (
-                                                    <tr key={`${h.id}-${h.fechaRegistro}`} className={`${idx === 0 ? 'fw-semibold ' : ''}${rowOrigenClass}`}>
-                                                        <td>{estadoReproductivoBadge(h.estado)}</td>
-                                                        <td>{formatFechaLocal(h.fechaUltimoParto)}</td>
-                                                        <td>{formatFechaLocal(h.fechaUltimaInseminacion)}</td>
-                                                        <td>{origenBadge(origen)}</td>
-                                                        <td>{h.registradoPor || '—'}</td>
-                                                        <td>{formatDateTime(h.fechaRegistro)}</td>
-                                                        {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
-                                                            <td className="text-center">
-                                                                {idx === 0 && editable && (
-                                                                    <Button
-                                                                        variant="outline-primary"
-                                                                        size="sm"
-                                                                        onClick={() => openEditarEstadoModal(h)}
-                                                                    >
-                                                                        <i className="bi bi-pencil" /> Editar
-                                                                    </Button>
-                                                                )}
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </Card.Body>
-                    </Card>
-
-                    {/* ── Sección Estado de Salud ── */}
-                    <Card className="shadow-sm border-0 animal-card mt-4">
-                        <Card.Body>
-                            <div className="d-flex justify-content-between align-items-center mb-3">
-                                <h4 className="section-title mb-0">Estado de Salud</h4>
-                                {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
-                                    <Button className="btn-vigia-success btn-sm px-3" onClick={openNuevoSaludModal}>
-                                        <i className="bi bi-plus-lg me-1" /> Registrar estado
-                                    </Button>
-                                )}
-                            </div>
-
-                            {loadingSalud ? (
-                                <div className="text-center py-3">
-                                    <Spinner animation="border" size="sm" style={{ color: '#1E3A5F' }} />
-                                </div>
-                            ) : saludHistorial.length === 0 ? (
-                                <p className="text-muted text-center py-3">Sin registros de salud aún.</p>
-                            ) : (
-                                <div className="table-responsive">
-                                    <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
-                                        <thead>
-                                            <tr>
-                                                <th>Fecha Revisión</th>
-                                                <th>Estado</th>
-                                                <th>Diagnóstico / Notas</th>
-                                                <th>Tratamiento</th>
-                                                <th>Origen</th>
-                                                <th>Registrado por</th>
-                                                <th>Fecha Registro</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {saludHistorial.map((s, idx) => (
-                                                <tr key={s.id} className={idx === 0 ? 'fw-semibold' : ''}>
-                                                    <td>{formatFechaLocal(s.fechaRevision)}</td>
-                                                    <td>{estadoSaludBadge(s.estado)}</td>
-                                                    <td>{s.diagnosticoNotas || '—'}</td>
-                                                    <td>{s.tratamientoIndicado || '—'}</td>
-                                                    <td>{origenBadge(s.origen)}</td>
-                                                    <td>{s.registradoPor || '—'}</td>
-                                                    <td>{formatDateTime(s.fechaRegistro)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </Card.Body>
-                    </Card>
-
-                    {/* ── Sección Intervenciones ── */}
-                    <Card className="shadow-sm border-0 animal-card mt-4">
-                        <Card.Body>
-                            <div className="d-flex justify-content-between align-items-center mb-3">
-                                <h4 className="section-title mb-0">Intervenciones</h4>
-                            </div>
-
-                            {loadingIntervenciones ? (
-                                <div className="text-center py-3">
-                                    <Spinner animation="border" size="sm" style={{ color: '#1E3A5F' }} />
-                                </div>
-                            ) : intervenciones.length === 0 ? (
-                                <p className="text-muted text-center py-3">No hay intervenciones registradas para este animal.</p>
-                            ) : (
-                                <div className="table-responsive">
-                                    <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
-                                        <thead>
-                                            <tr>
-                                                <th>Fecha y Hora</th>
-                                                <th>Tipo</th>
-                                                <th>ID Alerta</th>
-                                                <th>Interventor</th>
-                                                <th>Descripción</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {intervenciones.map((intv) => (
-                                                <tr key={intv.id}>
-                                                    <td>{formatDateTime(intv.fechaHora)}</td>
-                                                    <td>{INTERVENCION_TIPO_LABELS[intv.tipo] ?? intv.tipo ?? '—'}</td>
-                                                    <td>{intv.alertaId ? `#${intv.alertaId}` : '—'}</td>
-                                                    <td>{intv.interventor || '—'}</td>
-                                                    <td>{intv.descripcion}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </Card.Body>
-                    </Card>
-
                 </div>)}
             </Container>
-
-            {/* ── Modal Registrar / Editar Estado Reproductivo ── */}
-            <Modal show={showEstadoModal} onHide={() => setShowEstadoModal(false)} centered dialogClassName="modal-nuevo-animal">
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        {editingEstado ? 'Editar Estado Reproductivo' : 'Registrar Estado Reproductivo'}
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {estadoFormError && <Alert variant="danger">{estadoFormError}</Alert>}
-                    {estadoSuccess && <Alert variant="success">{estadoSuccess}</Alert>}
-                    <Form onSubmit={handleSubmitEstado} id="form-estado-reproductivo">
-                        <Form.Group className="mb-3">
-                            <Form.Label>Estado Reproductivo*</Form.Label>
-                            <Form.Select name="estado" value={estadoForm.estado} onChange={handleEstadoFormChange} required>
-                                {TIPOS_REPRODUCTIVOS.map(t => (
-                                    <option key={t} value={t}>{ESTADO_REPRODUCTIVO_LABEL[t] ?? t}</option>
-                                ))}
-                            </Form.Select>
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Fecha Último Parto</Form.Label>
-                            <Form.Control
-                                type="date"
-                                name="fechaUltimoParto"
-                                value={estadoForm.fechaUltimoParto ?? ''}
-                                onChange={handleEstadoFormChange}
-                                max={new Date().toISOString().split('T')[0]}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Fecha Última Inseminación</Form.Label>
-                            <Form.Control
-                                type="date"
-                                name="fechaUltimaInseminacion"
-                                value={estadoForm.fechaUltimaInseminacion ?? ''}
-                                onChange={handleEstadoFormChange}
-                                max={new Date().toISOString().split('T')[0]}
-                            />
-                        </Form.Group>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button
-                        type="submit"
-                        form="form-estado-reproductivo"
-                        disabled={submittingEstado || !!estadoSuccess}
-                        className="btn-guardar-animal"
-                    >
-                        {submittingEstado
-                            ? <Spinner as="span" animation="border" size="sm" />
-                            : editingEstado ? 'Actualizar' : 'Registrar'
-                        }
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-
-            {/* ── Modal Registrar Estado de Salud ── */}
-            <Modal show={showSaludModal} onHide={() => setShowSaludModal(false)} centered dialogClassName="modal-nuevo-animal">
-                <Modal.Header closeButton>
-                    <Modal.Title>Registrar Estado de Salud</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {saludFormError && <Alert variant="danger">{saludFormError}</Alert>}
-                    {saludSuccess && <Alert variant="success">{saludSuccess}</Alert>}
-                    <Form onSubmit={handleSubmitSalud} id="form-estado-salud">
-                        <Form.Group className="mb-3">
-                            <Form.Label>Fecha de revisión</Form.Label>
-                            <Form.Control
-                                type="date"
-                                name="fecha"
-                                value={saludForm.fecha}
-                                onChange={handleSaludFormChange}
-                                max={new Date().toISOString().split('T')[0]}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Estado General*</Form.Label>
-                            <Form.Select name="estado" value={saludForm.estado} onChange={handleSaludFormChange} required>
-                                <option value="" disabled>Seleccioná un estado</option>
-                                {TIPOS_ESTADO_SALUD.map(t => (
-                                    <option key={t} value={t}>{ESTADO_SALUD_LABEL[t] ?? t}</option>
-                                ))}
-                            </Form.Select>
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Diagnóstico / Notas</Form.Label>
-                            <Form.Control
-                                as="textarea"
-                                rows={3}
-                                name="diagnosticoNotas"
-                                value={saludForm.diagnosticoNotas}
-                                onChange={handleSaludFormChange}
-                                maxLength={1000}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Tratamiento indicado</Form.Label>
-                            <Form.Control
-                                as="textarea"
-                                rows={2}
-                                name="tratamientoIndicado"
-                                value={saludForm.tratamientoIndicado}
-                                onChange={handleSaludFormChange}
-                                maxLength={1000}
-                            />
-                        </Form.Group>
-                    </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button
-                        type="submit"
-                        form="form-estado-salud"
-                        disabled={submittingSalud || !!saludSuccess || !saludForm.estado}
-                        className="btn-guardar-animal"
-                    >
-                        {submittingSalud
-                            ? <Spinner as="span" animation="border" size="sm" />
-                            : 'Registrar'
-                        }
-                    </Button>
-                </Modal.Footer>
-            </Modal>
         </div>
     );
 }

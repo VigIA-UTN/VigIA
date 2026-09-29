@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Spinner } from 'react-bootstrap';
-import { getHistorialClinico, type HistorialEvento, type HistorialTipo } from '../api/historialClinicoApi';
+import { Spinner, Button, Modal, Form, Alert } from 'react-bootstrap';
+import { getHistorialClinico, registrarIntervencion, type HistorialEvento, type HistorialTipo, type IntervencionManualRequest } from '../api/historialClinicoApi';
+import {
+    getAnimalById,
+    registrarEstadoSalud,
+    ESTADO_SALUD_LABEL,
+    type AnimalResponse,
+    type TipoEstadoSalud,
+} from '../api/animalesApi';
 import DateRangeCalendar from '../components/heatmap/DateRangeCalendar';
 import { dayStart, lastDaysRange } from '../components/heatmap/heatmapFilters';
 import '../components/heatmap/heatmap.css';
 import './HistorialClinicoTab.css';
+import './AnimalDetailPage.css';
+import './AnimalesPage.css';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const TIPOS: [HistorialTipo, string][] = [['alerta', 'Alertas'], ['diagnostico', 'Diagnósticos'], ['intervencion', 'Intervenciones']];
@@ -12,6 +21,17 @@ const PRESETS: [string, string][] = [['30', '30 días'], ['90', '90 días'], ['3
 const ESTADO = { SANO: ['SANO', '#00BA4A'], EN_OBSERVACION: ['EN OBSERVACIÓN', '#FFC700'], ENFERMO: ['ENFERMO', '#D50000'] } as const;
 const ORIGEN = { AUTOMATICO: ['Automático', 'bi-cpu'], MANUAL: ['Manual', 'bi-person-fill'], CARGA_MASIVA: ['Carga masiva', 'bi-upload'] } as const;
 const INTV_ICON: Record<string, string> = { TRATAMIENTO: 'bi-capsule', VACUNACION: 'bi-shield-plus', REVISION_VETERINARIA: 'bi-search-heart', INSEMINACION: 'bi-eyedropper', OTRO: 'bi-wrench' };
+
+const TIPOS_ESTADO_SALUD: TipoEstadoSalud[] = ['SANO', 'EN_OBSERVACION', 'ENFERMO'];
+const TIPOS_INTERVENCION: [IntervencionManualRequest['tipo'], string][] = [
+    ['TRATAMIENTO', 'Tratamiento'], ['VACUNACION', 'Vacunación'], ['REVISION_VETERINARIA', 'Revisión veterinaria'], ['OTRO', 'Otro'],
+];
+const hoyIso = () => new Date().toISOString().split('T')[0];
+const ahoraLocal = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+const errMsg = (err: unknown, fallback: string) => {
+    const e = err as { response?: { data?: { message?: string } | string } };
+    return typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || fallback;
+};
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const fmtDia = (t: number) => { const d = new Date(t); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; };
@@ -24,7 +44,14 @@ function TipoIcon({ ev, size = 40 }: { ev: HistorialEvento; size?: number }) {
     return <div className={cls} style={{ width: size, height: size }}><i className={`bi ${icon}`} /></div>;
 }
 
-export default function HistorialClinicoTab({ animalId }: { animalId: number }) {
+interface Props {
+    animalId: number;
+    rol: string | null | undefined;
+    onAnimalUpdated: (a: AnimalResponse) => void;
+}
+
+export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: Props) {
+    const canEdit = rol === 'PRODUCTOR' || rol === 'VETERINARIO';
     const hoy = dayStart(new Date());
     const [eventos, setEventos] = useState<HistorialEvento[]>([]);
     const [loading, setLoading] = useState(true);
@@ -38,6 +65,70 @@ export default function HistorialClinicoTab({ animalId }: { animalId: number }) 
     const [calKey, setCalKey] = useState(0); // recentra el calendario tras un preset
     const calRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState<Record<string, boolean>>({});
+
+    // Modal: registrar estado de salud (API real)
+    const [showSalud, setShowSalud] = useState(false);
+    const [saludForm, setSaludForm] = useState({ estado: '' as TipoEstadoSalud | '', diagnosticoNotas: '', tratamientoIndicado: '', fecha: '' });
+    const [saludBusy, setSaludBusy] = useState(false);
+    const [saludError, setSaludError] = useState<string | null>(null);
+    const [saludOk, setSaludOk] = useState<string | null>(null);
+
+    // Modal: registrar intervención (submit simulado)
+    const [showIntv, setShowIntv] = useState(false);
+    const [intvForm, setIntvForm] = useState<{ tipo: IntervencionManualRequest['tipo'] | ''; fechaHora: string; descripcion: string }>({ tipo: '', fechaHora: '', descripcion: '' });
+    const [intvBusy, setIntvBusy] = useState(false);
+    const [intvError, setIntvError] = useState<string | null>(null);
+    const [intvOk, setIntvOk] = useState<string | null>(null);
+
+    const openSalud = () => {
+        setSaludForm({ estado: '', diagnosticoNotas: '', tratamientoIndicado: '', fecha: hoyIso() });
+        setSaludError(null); setSaludOk(null); setShowSalud(true);
+    };
+    const onSaludChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+        setSaludForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+    const submitSalud = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!saludForm.estado) { setSaludError('El estado general es obligatorio.'); return; }
+        setSaludError(null); setSaludBusy(true);
+        try {
+            await registrarEstadoSalud(animalId, {
+                estado: saludForm.estado,
+                diagnosticoNotas: saludForm.diagnosticoNotas.trim() || null,
+                tratamientoIndicado: saludForm.tratamientoIndicado.trim() || null,
+                fecha: saludForm.fecha || null,
+            });
+            setSaludOk('Estado de salud registrado correctamente.');
+            try { onAnimalUpdated(await getAnimalById(animalId)); } catch { /* el éxito ya se mostró */ }
+            setTimeout(() => { setShowSalud(false); setSaludOk(null); }, 1200);
+        } catch (err) {
+            setSaludError(errMsg(err, 'Error al guardar el estado de salud.'));
+        } finally {
+            setSaludBusy(false);
+        }
+    };
+
+    const openIntv = () => {
+        setIntvForm({ tipo: '', fechaHora: ahoraLocal(), descripcion: '' });
+        setIntvError(null); setIntvOk(null); setShowIntv(true);
+    };
+    const onIntvChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+        setIntvForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+    const submitIntv = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!intvForm.tipo || !intvForm.descripcion.trim()) { setIntvError('El tipo y la descripción son obligatorios.'); return; }
+        setIntvError(null); setIntvBusy(true);
+        try {
+            await registrarIntervencion(animalId, { tipo: intvForm.tipo, fechaHora: intvForm.fechaHora, descripcion: intvForm.descripcion.trim() });
+            setIntvOk('Intervención registrada (simulada: aún no hay endpoint).');
+            setTimeout(() => { setShowIntv(false); setIntvOk(null); }, 1500);
+        } catch (err) {
+            setIntvError(errMsg(err, 'Error al registrar la intervención.'));
+        } finally {
+            setIntvBusy(false);
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -92,6 +183,12 @@ export default function HistorialClinicoTab({ animalId }: { animalId: number }) 
 
     return (
         <div className="hc-root">
+            {canEdit && (
+                <div className="hc-actions">
+                    <Button className="btn-vigia-success btn-sm px-3" onClick={openSalud}><i className="bi bi-plus-lg me-1" /> Registrar estado de salud</Button>
+                    <Button className="btn-vigia-success btn-sm px-3" onClick={openIntv}><i className="bi bi-plus-lg me-1" /> Registrar intervención</Button>
+                </div>
+            )}
             <div className="hc-card hc-filters">
                 <div className="hc-filters-row">
                     <div className="hc-field">
@@ -217,6 +314,70 @@ export default function HistorialClinicoTab({ animalId }: { animalId: number }) 
                     })}
                 </section>
             ))}
+
+            <Modal show={showSalud} onHide={() => setShowSalud(false)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton><Modal.Title>Registrar Estado de Salud</Modal.Title></Modal.Header>
+                <Modal.Body>
+                    {saludError && <Alert variant="danger">{saludError}</Alert>}
+                    {saludOk && <Alert variant="success">{saludOk}</Alert>}
+                    <Form onSubmit={submitSalud} id="form-estado-salud">
+                        <Form.Group className="mb-3">
+                            <Form.Label>Fecha de revisión</Form.Label>
+                            <Form.Control type="date" name="fecha" value={saludForm.fecha} onChange={onSaludChange} max={hoyIso()} />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Estado General*</Form.Label>
+                            <Form.Select name="estado" value={saludForm.estado} onChange={onSaludChange} required>
+                                <option value="" disabled>Seleccioná un estado</option>
+                                {TIPOS_ESTADO_SALUD.map(t => <option key={t} value={t}>{ESTADO_SALUD_LABEL[t] ?? t}</option>)}
+                            </Form.Select>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Diagnóstico / Notas</Form.Label>
+                            <Form.Control as="textarea" rows={3} name="diagnosticoNotas" value={saludForm.diagnosticoNotas} onChange={onSaludChange} maxLength={1000} />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Tratamiento indicado</Form.Label>
+                            <Form.Control as="textarea" rows={2} name="tratamientoIndicado" value={saludForm.tratamientoIndicado} onChange={onSaludChange} maxLength={1000} />
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button type="submit" form="form-estado-salud" disabled={saludBusy || !!saludOk || !saludForm.estado} className="btn-guardar-animal">
+                        {saludBusy ? <Spinner as="span" animation="border" size="sm" /> : 'Registrar'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Modal show={showIntv} onHide={() => setShowIntv(false)} centered dialogClassName="modal-nuevo-animal">
+                <Modal.Header closeButton><Modal.Title>Registrar Intervención</Modal.Title></Modal.Header>
+                <Modal.Body>
+                    {intvError && <Alert variant="danger">{intvError}</Alert>}
+                    {intvOk && <Alert variant="success">{intvOk}</Alert>}
+                    <Form onSubmit={submitIntv} id="form-intervencion">
+                        <Form.Group className="mb-3">
+                            <Form.Label>Tipo*</Form.Label>
+                            <Form.Select name="tipo" value={intvForm.tipo} onChange={onIntvChange} required>
+                                <option value="" disabled>Seleccioná un tipo</option>
+                                {TIPOS_INTERVENCION.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                            </Form.Select>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Fecha y hora</Form.Label>
+                            <Form.Control type="datetime-local" name="fechaHora" value={intvForm.fechaHora} onChange={onIntvChange} max={ahoraLocal()} />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Descripción*</Form.Label>
+                            <Form.Control as="textarea" rows={3} name="descripcion" value={intvForm.descripcion} onChange={onIntvChange} maxLength={1000} required />
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button type="submit" form="form-intervencion" disabled={intvBusy || !!intvOk} className="btn-guardar-animal">
+                        {intvBusy ? <Spinner as="span" animation="border" size="sm" /> : 'Registrar'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 }

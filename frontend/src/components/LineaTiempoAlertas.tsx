@@ -1,26 +1,25 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { Spinner, Form } from 'react-bootstrap';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { Spinner } from 'react-bootstrap';
 import {
   getLineaTiempoAlertas,
+  ESTADO_REPRODUCTIVO_LABEL,
+  type EstadoReproductivoResponse,
   type LineaTiempoEventoResponse,
   type LineaTiempoFiltros,
 } from '../api/animalesApi';
+import DateRangeCalendar from './heatmap/DateRangeCalendar';
+import { dayStart } from './heatmap/heatmapFilters';
+import './heatmap/heatmap.css';
 import './LineaTiempoAlertas.css';
 
 // ── Label maps ────────────────────────────────────────────────────────────────
 
 const TIPO_ALERTA_LABEL: Record<string, string> = {
   CELO: 'Celo',
-  SALUD: 'Sanitaria',
-  ABIGEATO: 'Abigeato',
-  FUERA_DE_PERIMETRO: 'Fuera de perímetro',
 };
 
 const TIPO_ALERTA_ICON: Record<string, string> = {
   CELO: 'bi-heart-pulse-fill',
-  SALUD: 'bi-shield-fill-exclamation',
-  ABIGEATO: 'bi-geo-alt-fill',
-  FUERA_DE_PERIMETRO: 'bi-bounding-box-circles',
 };
 
 const TIPO_INTERVENCION_LABEL: Record<string, string> = {
@@ -38,14 +37,6 @@ const TIPO_INTERVENCION_ICON: Record<string, string> = {
   INSEMINACION: 'bi-eyedropper',
   OTRO: 'bi-clipboard2-pulse-fill',
 };
-
-const FILTER_OPTIONS = [
-  { value: '', label: 'Todos los tipos' },
-  { value: 'celo', label: 'Celo (Reproductivo)' },
-  { value: 'sanitario', label: 'Sanitaria' },
-  { value: 'geoespacial', label: 'Geoespacial (Abigeato)' },
-  { value: 'perimetro', label: 'Fuera de perímetro' },
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -83,23 +74,41 @@ function estadoLabel(estado: string | null): string {
   return 'Sin atender';
 }
 
-/** Convert a local datetime-local input value (YYYY-MM-DDTHH:mm) to ISO-8601 for the API */
-function localToIso(val: string): string {
-  if (!val) return '';
-  // datetime-local gives YYYY-MM-DDTHH:mm; add :00 for seconds
-  return val.length === 16 ? `${val}:00` : val;
+const DAY_MS = 86400000;
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** Día (timestamp de inicio de día) -> ISO-8601 local para la API; `finDelDia` usa 23:59:59. */
+function diaToIso(ts: number, finDelDia = false): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${finDelDia ? '23:59:59' : '00:00:00'}`;
 }
+
+const fmtDia = (ts: number) => { const d = new Date(ts); return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`; };
+
+/** Evento de la línea de tiempo: los del backend más los estados reproductivos registrados por el usuario. */
+type TimelineEvento = Omit<LineaTiempoEventoResponse, 'tipoEvento'> & {
+  tipoEvento: 'ALERTA' | 'INTERVENCION' | 'ESTADO';
+  estadoRepro?: EstadoReproductivoResponse;
+};
+
+const estadoToEvento = (e: EstadoReproductivoResponse): TimelineEvento => ({
+  tipoEvento: 'ESTADO', id: e.id, fecha: e.fechaRegistro, tipo: e.estado, severidad: null, estadoResolucion: null,
+  tipoIntervencion: null, descripcion: null, interventor: e.registradoPor, alertaAsociadaId: null, estadoRepro: e,
+});
+
+const ORIGEN_LABEL: Record<string, string> = { AUTOMATICO: 'Automático', MANUAL: 'Manual', CARGA_MASIVA: 'Carga masiva' };
 
 // ── Popup card ────────────────────────────────────────────────────────────────
 
 interface PopupProps {
-  evento: LineaTiempoEventoResponse;
+  evento: TimelineEvento;
   onClose: () => void;
   position: 'above' | 'below';
 }
 
 function EventoPopup({ evento, onClose, position }: PopupProps) {
   const isAlerta = evento.tipoEvento === 'ALERTA';
+  const isEstado = evento.tipoEvento === 'ESTADO';
   const ref = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -116,13 +125,42 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
   return (
     <div
       ref={ref}
-      className={`lt-popup ${position === 'above' ? 'lt-popup--above' : 'lt-popup--below'} ${isAlerta ? 'lt-popup--alerta' : 'lt-popup--intervencion'}`}
+      className={`lt-popup ${position === 'above' ? 'lt-popup--above' : 'lt-popup--below'} ${isAlerta ? 'lt-popup--alerta' : isEstado ? 'lt-popup--estado' : 'lt-popup--intervencion'}`}
     >
       <button className="lt-popup-close" onClick={onClose} aria-label="Cerrar">
         <i className="bi bi-x" />
       </button>
 
-      {isAlerta ? (
+      {isEstado && evento.estadoRepro ? (
+        <>
+          <div className="lt-popup-header">
+            <span className="lt-popup-icon-wrap lt-popup-icon-wrap--estado">
+              <i className="bi bi-flag-fill" />
+            </span>
+            <div>
+              <div className="lt-popup-title">
+                Estado reproductivo: {ESTADO_REPRODUCTIVO_LABEL[evento.estadoRepro.estado ?? ''] ?? evento.estadoRepro.estado ?? '—'}
+              </div>
+              <div className="lt-popup-fecha">{formatDateTime(evento.fecha)}</div>
+            </div>
+          </div>
+          <div className="lt-popup-chips">
+            <span className="lt-chip lt-chip--estado estado-sin-atender">
+              {ORIGEN_LABEL[evento.estadoRepro.origen ?? ''] ?? '—'}
+            </span>
+          </div>
+          <div className="lt-popup-desc">
+            Último parto: <strong>{formatDateOnly(evento.estadoRepro.fechaUltimoParto)}</strong><br />
+            Última inseminación: <strong>{formatDateOnly(evento.estadoRepro.fechaUltimaInseminacion)}</strong>
+          </div>
+          {evento.interventor && (
+            <div className="lt-popup-interventor">
+              <i className="bi bi-person-circle me-1" />
+              {evento.interventor}
+            </div>
+          )}
+        </>
+      ) : isAlerta ? (
         <>
           {/* Header */}
           <div className="lt-popup-header">
@@ -159,24 +197,6 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
               <>
                 <i className="bi bi-info-circle me-1" />
                 Detección automática de signos de celo. La ventana óptima de inseminación es de 6 a 24 hs desde la generación.
-              </>
-            )}
-            {evento.tipo === 'SALUD' && (
-              <>
-                <i className="bi bi-info-circle me-1" />
-                Desvío en indicadores sanitarios respecto al perfil de referencia del animal.
-              </>
-            )}
-            {evento.tipo === 'ABIGEATO' && (
-              <>
-                <i className="bi bi-info-circle me-1" />
-                Patrón de desplazamiento inusual detectado. Posible riesgo de abigeato o extravío.
-              </>
-            )}
-            {evento.tipo === 'FUERA_DE_PERIMETRO' && (
-              <>
-                <i className="bi bi-info-circle me-1" />
-                El animal fue detectado fuera de los límites del perímetro configurado.
               </>
             )}
           </div>
@@ -229,7 +249,7 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
 // ── Nodo de la línea de tiempo ────────────────────────────────────────────────
 
 interface NodoProps {
-  evento: LineaTiempoEventoResponse;
+  evento: TimelineEvento;
   position: 'above' | 'below';
   index: number;
 }
@@ -237,10 +257,11 @@ interface NodoProps {
 function EventoNodo({ evento, position, index }: NodoProps) {
   const [open, setOpen] = useState(false);
   const isAlerta = evento.tipoEvento === 'ALERTA';
+  const isEstado = evento.tipoEvento === 'ESTADO';
 
   const nodeClass = [
     'lt-nodo',
-    isAlerta ? `lt-nodo--alerta ${severidadClass(evento.severidad)}` : 'lt-nodo--intervencion',
+    isAlerta ? `lt-nodo--alerta ${severidadClass(evento.severidad)}` : isEstado ? 'lt-nodo--estado' : 'lt-nodo--intervencion',
   ].join(' ');
 
   const labelClass = [
@@ -250,11 +271,15 @@ function EventoNodo({ evento, position, index }: NodoProps) {
 
   const label = isAlerta
     ? TIPO_ALERTA_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? 'Alerta'
-    : TIPO_INTERVENCION_LABEL[evento.tipoIntervencion ?? ''] ?? 'Intervención';
+    : isEstado
+      ? ESTADO_REPRODUCTIVO_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? 'Estado'
+      : TIPO_INTERVENCION_LABEL[evento.tipoIntervencion ?? ''] ?? 'Intervención';
 
   const icon = isAlerta
     ? TIPO_ALERTA_ICON[evento.tipo?.toUpperCase() ?? ''] ?? 'bi-bell-fill'
-    : TIPO_INTERVENCION_ICON[evento.tipoIntervencion?.toUpperCase() ?? ''] ?? 'bi-clipboard2-pulse-fill';
+    : isEstado
+      ? 'bi-flag-fill'
+      : TIPO_INTERVENCION_ICON[evento.tipoIntervencion?.toUpperCase() ?? ''] ?? 'bi-clipboard2-pulse-fill';
 
   return (
     <div className="lt-nodo-wrapper" style={{ '--nodo-index': index } as React.CSSProperties}>
@@ -294,24 +319,36 @@ function EventoNodo({ evento, position, index }: NodoProps) {
 
 interface Props {
   animalId: number;
+  /** Estados reproductivos del animal; se muestran como nodos propios (INSEMINADA se omite: ya figura como intervención). */
+  estados?: EstadoReproductivoResponse[];
 }
 
-export default function LineaTiempoAlertas({ animalId }: Props) {
-  const [eventos, setEventos] = useState<LineaTiempoEventoResponse[]>([]);
+export default function LineaTiempoAlertas({ animalId, estados }: Props) {
+  const [remotos, setRemotos] = useState<LineaTiempoEventoResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Filtros
-  const [tipo, setTipo] = useState('');
-  const [desde, setDesde] = useState('');
-  const [hasta, setHasta] = useState('');
+  const [desde, setDesde] = useState<number | null>(null);
+  const [hasta, setHasta] = useState<number | null>(null);
+  const [calOpen, setCalOpen] = useState(false);
+  const calRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!calOpen) return;
+    const close = (e: MouseEvent) => { if (!calRef.current?.contains(e.target as Node)) setCalOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [calOpen]);
 
   const fetchData = useCallback(async (filtros: LineaTiempoFiltros) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getLineaTiempoAlertas(animalId, filtros);
-      setEventos(data);
+      const data = await getLineaTiempoAlertas(animalId, { ...filtros, tipo: 'celo' });
+      // Solo celo: alertas de celo e inseminaciones (el backend no filtra intervenciones por tipo)
+      setRemotos(data.filter(e =>
+        e.tipoEvento === 'ALERTA' ? e.tipo === 'CELO' : e.tipoIntervencion === 'INSEMINACION'));
     } catch {
       setError('No se pudo cargar la línea de tiempo.');
     } finally {
@@ -321,15 +358,22 @@ export default function LineaTiempoAlertas({ animalId }: Props) {
 
   useEffect(() => {
     const f: LineaTiempoFiltros = {};
-    if (tipo) f.tipo = tipo;
-    if (desde) f.desde = localToIso(desde);
-    if (hasta) f.hasta = localToIso(hasta);
+    if (desde != null) f.desde = diaToIso(desde);
+    if (hasta != null) f.hasta = diaToIso(hasta, true);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData(f);
-  }, [tipo, desde, hasta, fetchData]);
+  }, [desde, hasta, fetchData]);
 
-  const totalAlertas = eventos.filter(e => e.tipoEvento === 'ALERTA').length;
-  const totalIntervenciones = eventos.filter(e => e.tipoEvento === 'INTERVENCION').length;
+  const eventos = useMemo<TimelineEvento[]>(() => {
+    const deMs = desde ?? -Infinity;
+    const haMs = hasta != null ? hasta + DAY_MS - 1 : Infinity;
+    const propios = (estados ?? [])
+      .filter(e => e.estado !== 'INSEMINADA')
+      .map(estadoToEvento)
+      .filter(e => { const t = new Date(e.fecha).getTime(); return t >= deMs && t <= haMs; });
+    return [...(remotos as TimelineEvento[]), ...propios]
+      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+  }, [remotos, estados, desde, hasta]);
 
   return (
     <section className="lt-section">
@@ -337,71 +381,36 @@ export default function LineaTiempoAlertas({ animalId }: Props) {
       <div className="lt-header">
         <div className="lt-header-left">
           <h3 className="lt-title">
-            <i className="bi bi-clock-history me-2" />
-            Línea de Tiempo
+            Línea de tiempo reproductiva
           </h3>
-          {!loading && !error && (
-            <div className="lt-counts">
-              <span className="lt-count-badge lt-count-alerta">
-                <i className="bi bi-bell-fill me-1" />{totalAlertas} alerta{totalAlertas !== 1 ? 's' : ''}
-              </span>
-              <span className="lt-count-badge lt-count-intervencion">
-                <i className="bi bi-clipboard2-pulse-fill me-1" />{totalIntervenciones} intervención{totalIntervenciones !== 1 ? 'es' : ''}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
       {/* ── Filtros ── */}
       <div className="lt-filters">
-        <div className="lt-filter-group">
-          <label htmlFor="lt-tipo" className="lt-filter-label">
-            <i className="bi bi-funnel me-1" />Tipo de alerta
-          </label>
-          <Form.Select
-            id="lt-tipo"
-            size="sm"
-            value={tipo}
-            onChange={e => setTipo(e.target.value)}
-            className="lt-filter-select"
-          >
-            {FILTER_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </Form.Select>
+        <div className="lt-filter-group" ref={calRef}>
+          <span className="lt-filter-label">
+            <i className="bi bi-calendar-event me-1" />Período
+          </span>
+          <button type="button" className="lt-date-btn" aria-expanded={calOpen} onClick={() => setCalOpen(o => !o)}>
+            <i className="bi bi-calendar3" />
+            {desde == null && hasta == null ? 'Todo el historial' : `${desde != null ? fmtDia(desde) : '…'} → ${hasta != null ? fmtDia(hasta) : '…'}`}
+          </button>
+          {calOpen && (
+            <div className="hm-panel lt-cal-pop">
+              <DateRangeCalendar
+                from={desde ?? hasta ?? dayStart(new Date())}
+                to={hasta ?? desde ?? dayStart(new Date())}
+                onChange={(f, t) => { setDesde(f); setHasta(t); if (f !== t) setCalOpen(false); }}
+              />
+            </div>
+          )}
         </div>
 
-        <div className="lt-filter-group">
-          <label htmlFor="lt-desde" className="lt-filter-label">
-            <i className="bi bi-calendar-event me-1" />Desde
-          </label>
-          <input
-            id="lt-desde"
-            type="datetime-local"
-            className="lt-filter-input"
-            value={desde}
-            onChange={e => setDesde(e.target.value)}
-          />
-        </div>
-
-        <div className="lt-filter-group">
-          <label htmlFor="lt-hasta" className="lt-filter-label">
-            <i className="bi bi-calendar-check me-1" />Hasta
-          </label>
-          <input
-            id="lt-hasta"
-            type="datetime-local"
-            className="lt-filter-input"
-            value={hasta}
-            onChange={e => setHasta(e.target.value)}
-          />
-        </div>
-
-        {(tipo || desde || hasta) && (
+        {(desde != null || hasta != null) && (
           <button
             className="lt-filter-clear"
-            onClick={() => { setTipo(''); setDesde(''); setHasta(''); }}
+            onClick={() => { setDesde(null); setHasta(null); }}
           >
             <i className="bi bi-x-circle me-1" />Limpiar filtros
           </button>
@@ -427,7 +436,7 @@ export default function LineaTiempoAlertas({ animalId }: Props) {
         <div className="lt-state-wrapper lt-state--empty">
           <i className="bi bi-hourglass me-2" />
           Sin eventos registrados
-          {(tipo || desde || hasta) ? ' con los filtros aplicados.' : ' para este animal.'}
+          {(desde != null || hasta != null) ? ' con los filtros aplicados.' : ' para este animal.'}
         </div>
       )}
 
@@ -456,28 +465,6 @@ export default function LineaTiempoAlertas({ animalId }: Props) {
             <div className="lt-axis-label lt-axis-label--end">
               {formatDateOnly(eventos[eventos.length - 1].fecha)}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Leyenda ── */}
-      {!loading && !error && eventos.length > 0 && (
-        <div className="lt-legend">
-          <div className="lt-legend-item">
-            <span className="lt-legend-dot lt-legend-dot--alta" />
-            <span>Severidad Alta</span>
-          </div>
-          <div className="lt-legend-item">
-            <span className="lt-legend-dot lt-legend-dot--media" />
-            <span>Severidad Media</span>
-          </div>
-          <div className="lt-legend-item">
-            <span className="lt-legend-dot lt-legend-dot--baja" />
-            <span>Severidad Baja</span>
-          </div>
-          <div className="lt-legend-item">
-            <span className="lt-legend-dot lt-legend-dot--intervencion" />
-            <span>Intervención</span>
           </div>
         </div>
       )}

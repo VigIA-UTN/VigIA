@@ -18,6 +18,8 @@
   --lt-baja-bg: rgba(56, 161, 105, 0.12);
 
   --lt-intervencion: #6b46c1;
+  --lt-estado: #0d9488;
+  --lt-estado-bg: rgba(13, 148, 136, 0.12);
   --lt-intervencion-bg: rgba(107, 70, 193, 0.12);
 
   --lt-line-color: #cbd5e0;
@@ -101,6 +103,7 @@
 }
 
 .lt-filter-group {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -683,3 +686,14 @@
     --lt-popup-width: 230px;
   }
 }
+/* ── Estados reproductivos ───────────────────────────────────── */
+.lt-count-estado { background: var(--lt-estado-bg); color: var(--lt-estado); }
+.lt-nodo--estado { background: linear-gradient(135deg, #2dd4bf, #0d9488); }
+.lt-popup--estado { border-top: 4px solid var(--lt-estado); }
+.lt-popup-icon-wrap--estado { background: var(--lt-estado); }
+.lt-legend-dot--estado { background: var(--lt-estado); }
+
+/* ── Selector de período (mismo calendario que el heatmap) ───── */
+.lt-date-btn { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid #cbd5e0; border-radius: 8px; background: #fff; font-size: 0.9rem; color: #2d3748; cursor: pointer; }
+.lt-date-btn[aria-expanded="true"] { border-color: var(--lt-azul-medio, #1e3a5f); }
+.lt-cal-pop { position: absolute; top: calc(100% + 8px); left: 0; z-index: 20; max-height: none; overflow: visible; }
