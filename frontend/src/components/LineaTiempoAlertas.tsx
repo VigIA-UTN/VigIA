@@ -8,7 +8,7 @@ import {
   type LineaTiempoFiltros,
 } from '../api/animalesApi';
 import DateRangeCalendar from './heatmap/DateRangeCalendar';
-import { dayStart } from './heatmap/heatmapFilters';
+import { dayStart, lastDaysRange } from './heatmap/heatmapFilters';
 import './heatmap/heatmap.css';
 import './LineaTiempoAlertas.css';
 
@@ -63,6 +63,7 @@ function severidadClass(sev: string | null): string {
 }
 
 const DAY_MS = 86400000;
+const PRESETS: [string, string][] = [['30', '30 días'], ['90', '90 días'], ['365', '12 meses'], ['todo', 'Todo']];
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** Día (timestamp de inicio de día) -> ISO-8601 local para la API; `finDelDia` usa 23:59:59. */
@@ -298,6 +299,8 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
   const [hasta, setHasta] = useState<number | null>(null);
   const [calOpen, setCalOpen] = useState(false);
   const calRef = useRef<HTMLDivElement>(null);
+  const presetActivo = desde == null && hasta == null ? 'todo'
+    : PRESETS.find(([k]) => k !== 'todo' && desde === lastDaysRange(Number(k)).from && hasta === lastDaysRange(Number(k)).to)?.[0];
 
   useEffect(() => {
     if (!calOpen) return;
@@ -353,10 +356,17 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
 
       {/* ── Filtros ── */}
       <div className="lt-filters">
+        <div className="lt-presets">
+          {PRESETS.map(([k, l]) => (
+            <button key={k} type="button" className={presetActivo === k ? 'on' : ''}
+              onClick={() => {
+                const r = k === 'todo' ? null : lastDaysRange(Number(k));
+                setDesde(r?.from ?? null); setHasta(r?.to ?? null);
+              }}>{l}</button>
+          ))}
+        </div>
+
         <div className="lt-filter-group" ref={calRef}>
-          <span className="lt-filter-label">
-            <i className="bi bi-calendar-event me-1" />Período
-          </span>
           <button type="button" className="lt-date-btn" aria-expanded={calOpen} onClick={() => setCalOpen(o => !o)}>
             <i className="bi bi-calendar3" />
             {desde == null && hasta == null ? 'Todo el historial' : `${desde != null ? fmtDia(desde) : '…'} → ${hasta != null ? fmtDia(hasta) : '…'}`}
@@ -371,15 +381,6 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
             </div>
           )}
         </div>
-
-        {(desde != null || hasta != null) && (
-          <button
-            className="lt-filter-clear"
-            onClick={() => { setDesde(null); setHasta(null); }}
-          >
-            <i className="bi bi-x-circle me-1" />Limpiar filtros
-          </button>
-        )}
       </div>
 
       {/* ── Estados ── */}
