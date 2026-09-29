@@ -161,10 +161,17 @@ public class InmutabilidadTablasTest {
     @Test
     @DisplayName("Diagnósticos: INSERT permitido, UPDATE bloqueado con mensaje de acción prohibida")
     void testDiagnosticosBloqueoUpdate() throws SQLException {
+        Long animalId = obtenerAnimalValido();
+        Long alertaId = obtenerAlertaValida();
+        Long veterinarioId = obtenerUsuarioValido();
+
         long idGenerado;
         try (PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO diagnosticos (animal_id, diagnostico, fecha) " +
-                        "VALUES (1, 'Diagnóstico clínico de prueba', NOW()) RETURNING id")) {
+                "INSERT INTO diagnosticos (animal_id, alerta_id, veterinario_id, diagnostico, indicaciones, fecha) " +
+                        "VALUES (?, ?, ?, 'Diagnóstico clínico de prueba', 'Indicaciones de prueba', NOW()) RETURNING id")) {
+            ps.setLong(1, animalId);
+            ps.setLong(2, alertaId);
+            ps.setLong(3, veterinarioId);
             ResultSet rs = ps.executeQuery();
             assertThat(rs.next()).isTrue();
             idGenerado = rs.getLong(1);
@@ -186,10 +193,17 @@ public class InmutabilidadTablasTest {
     @Test
     @DisplayName("Diagnósticos: INSERT permitido, DELETE bloqueado con mensaje de acción prohibida")
     void testDiagnosticosBloqueoDelete() throws SQLException {
+        Long animalId = obtenerAnimalValido();
+        Long alertaId = obtenerAlertaValida();
+        Long veterinarioId = obtenerUsuarioValido();
+
         long idGenerado;
         try (PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO diagnosticos (animal_id, diagnostico, fecha) " +
-                        "VALUES (1, 'Diagnóstico clínico para borrar', NOW()) RETURNING id")) {
+                "INSERT INTO diagnosticos (animal_id, alerta_id, veterinario_id, diagnostico, indicaciones, fecha) " +
+                        "VALUES (?, ?, ?, 'Diagnóstico clínico para borrar', 'Indicaciones de prueba', NOW()) RETURNING id")) {
+            ps.setLong(1, animalId);
+            ps.setLong(2, alertaId);
+            ps.setLong(3, veterinarioId);
             ResultSet rs = ps.executeQuery();
             assertThat(rs.next()).isTrue();
             idGenerado = rs.getLong(1);
@@ -211,10 +225,17 @@ public class InmutabilidadTablasTest {
     @Test
     @DisplayName("Bypass opcional: permite UPDATE y DELETE cuando la variable de sesión está activa")
     void testBypassPermiteModificaciones() throws SQLException {
+        Long animalId = obtenerAnimalValido();
+        Long alertaId = obtenerAlertaValida();
+        Long veterinarioId = obtenerUsuarioValido();
+
         long idGenerado;
         try (PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO diagnosticos (animal_id, diagnostico, fecha) " +
-                        "VALUES (1, 'Diagnóstico con bypass', NOW()) RETURNING id")) {
+                "INSERT INTO diagnosticos (animal_id, alerta_id, veterinario_id, diagnostico, indicaciones, fecha) " +
+                        "VALUES (?, ?, ?, 'Diagnóstico con bypass', 'Indicaciones de prueba', NOW()) RETURNING id")) {
+            ps.setLong(1, animalId);
+            ps.setLong(2, alertaId);
+            ps.setLong(3, veterinarioId);
             ResultSet rs = ps.executeQuery();
             assertThat(rs.next()).isTrue();
             idGenerado = rs.getLong(1);
@@ -253,6 +274,15 @@ public class InmutabilidadTablasTest {
     private Long obtenerUsuarioValido() throws SQLException {
         try (Statement st = connection.createStatement();
                 ResultSet rs = st.executeQuery("SELECT id FROM usuarios LIMIT 1")) {
+            if (rs.next())
+                return rs.getLong(1);
+        }
+        return 1L;
+    }
+
+    private Long obtenerAlertaValida() throws SQLException {
+        try (Statement st = connection.createStatement();
+                ResultSet rs = st.executeQuery("SELECT id FROM alertas LIMIT 1")) {
             if (rs.next())
                 return rs.getLong(1);
         }
