@@ -27,6 +27,7 @@ import { formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
 import './AnimalDetailPage.css';
 import './AnimalesPage.css';
 import ActividadTab from './ActividadTab';
+import HistorialClinicoTab from './HistorialClinicoTab';
 import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
 import AnimalIndicadoresSalud from '../components/AnimalIndicadoresSalud';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
@@ -216,7 +217,7 @@ export default function AnimalDetailPage() {
     const [saludSuccess, setSaludSuccess] = useState<string | null>(null);
 
     // Tab state — 'actividad' is the default
-    const [activeTab, setActiveTab] = useState<'actividad' | 'ficha'>('actividad');
+    const [activeTab, setActiveTab] = useState<'actividad' | 'ficha' | 'historial'>('actividad');
 
     // NUEVO: para manejar el modal de intervención desde la pestaña actividad
     const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
@@ -557,6 +558,12 @@ export default function AnimalDetailPage() {
                     >
                         Ficha
                     </button>
+                    <button
+                        className={`animal-tab-btn${activeTab === 'historial' ? ' active' : ''}`}
+                        onClick={() => { setActiveTab('historial'); setIsEditing(false); }}
+                    >
+                        Historial clínico
+                    </button>
                 </div>
 
                 {formError && <Alert variant="danger">{formError}</Alert>}
@@ -595,6 +602,13 @@ export default function AnimalDetailPage() {
                                 }}
                             />
                         )}
+                    </div>
+                )}
+
+                {/* ── Tab: Historial clínico ── */}
+                {activeTab === 'historial' && (
+                    <div key="historial" className="tab-content-animated">
+                        <HistorialClinicoTab key={animal.id} animalId={animal.id} />
                     </div>
                 )}
 
