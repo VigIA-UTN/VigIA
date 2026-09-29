@@ -1,0 +1,270 @@
+package dev.vigia.backend.repository;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+@DisplayName("Validación de bloqueos de Update y Delete (Inmutabilidad en BD)")
+public class InmutabilidadTablasTest {
+
+    private static final String DB_URL = System.getProperty("DB_URL", "jdbc:postgresql://localhost:5432/vigia");
+    private static final String DB_USER = System.getProperty("DB_USER", "vigia_user");
+    private static final String DB_PASS = System.getProperty("DB_PASSWORD", "vigia_dev_password");
+
+    private Connection connection;
+
+    @BeforeAll
+    static void verificarDisponibilidadPostgreSQL() {
+        boolean disponible = false;
+        try (Connection c = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+            disponible = true;
+        } catch (Exception e) {
+            disponible = false;
+        }
+        assumeTrue(disponible, "Base de datos PostgreSQL no disponible en " + DB_URL + " - Se omite el test");
+    }
+
+    @BeforeEach
+    void setUp() throws SQLException {
+        connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+        connection.setAutoCommit(true);
+
+        try (Statement st = connection.createStatement()) {
+            // Asegurar que la función del trigger existe
+            st.execute(
+                    """
+                                CREATE OR REPLACE FUNCTION trg_bloquear_modificacion_inmutable()
+                                RETURNS TRIGGER AS $$
+                                BEGIN
+                                    IF current_setting('vigia.bypass_immutable_triggers', true) = 'true' THEN
+                                        IF TG_OP = 'DELETE' THEN
+                                            RETURN OLD;
+                                        ELSE
+                                            RETURN NEW;
+                                        END IF;
+                                    END IF;
+
+                                    IF TG_OP = 'UPDATE' THEN
+                                        RAISE EXCEPTION 'Acción prohibida: no se permite modificar registros en la tabla %', TG_TABLE_NAME;
+                                    ELSIF TG_OP = 'DELETE' THEN
+                                        RAISE EXCEPTION 'Acción prohibida: no se permite eliminar registros en la tabla %', TG_TABLE_NAME;
+                                    END IF;
+                                    RETURN NULL;
+                                END;
+                                $$ LANGUAGE plpgsql;
+                            """);
+
+            // Asegurar que la tabla intervenciones tiene el trigger activo
+            st.execute("""
+                        DROP TRIGGER IF EXISTS trg_bloquear_modificacion_intervenciones ON intervenciones;
+                        CREATE TRIGGER trg_bloquear_modificacion_intervenciones
+                            BEFORE UPDATE OR DELETE ON intervenciones
+                            FOR EACH ROW
+                            EXECUTE FUNCTION trg_bloquear_modificacion_inmutable();
+                    """);
+
+            // Asegurar que la tabla diagnosticos tiene el trigger activo
+            st.execute("""
+                        DROP TRIGGER IF EXISTS trg_bloquear_modificacion_diagnosticos ON diagnosticos;
+                        CREATE TRIGGER trg_bloquear_modificacion_diagnosticos
+                            BEFORE UPDATE OR DELETE ON diagnosticos
+                            FOR EACH ROW
+                            EXECUTE FUNCTION trg_bloquear_modificacion_inmutable();
+                    """);
+        }
+    }
+
+    @AfterEach
+    void tearDown() throws SQLException {
+        if (connection != null && !connection.isClosed()) {
+            try (Statement st = connection.createStatement()) {
+                st.execute("RESET vigia.bypass_immutable_triggers");
+            } catch (Exception ignored) {
+            }
+            connection.close();
+        }
+    }
+
+    @Test
+    @DisplayName("Intervenciones: INSERT permitido, UPDATE bloqueado con mensaje de acción prohibida")
+    void testIntervencionesBloqueoUpdate() throws SQLException {
+        Long animalId = obtenerAnimalValido();
+        Long usuarioId = obtenerUsuarioValido();
+
+        long idGenerado;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO intervenciones (animal_id, interventor_id, descripcion, fecha_hora, tipo) " +
+                        "VALUES (?, ?, 'Intervención de prueba test update', NOW(), 'TRATAMIENTO') RETURNING id")) {
+            ps.setLong(1, animalId);
+            ps.setLong(2, usuarioId);
+            ResultSet rs = ps.executeQuery();
+            assertThat(rs.next()).isTrue();
+            idGenerado = rs.getLong(1);
+        }
+
+        // Intento de UPDATE debe fallar
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE intervenciones SET descripcion = 'Descripción modificada' WHERE id = ?")) {
+            ps.setLong(1, idGenerado);
+            assertThatThrownBy(ps::executeUpdate)
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("Acción prohibida")
+                    .hasMessageContaining("intervenciones");
+        }
+
+        limpiarRegistro("intervenciones", idGenerado);
+    }
+
+    @Test
+    @DisplayName("Intervenciones: INSERT permitido, DELETE bloqueado con mensaje de acción prohibida")
+    void testIntervencionesBloqueoDelete() throws SQLException {
+        Long animalId = obtenerAnimalValido();
+        Long usuarioId = obtenerUsuarioValido();
+
+        long idGenerado;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO intervenciones (animal_id, interventor_id, descripcion, fecha_hora, tipo) " +
+                        "VALUES (?, ?, 'Intervención de prueba test delete', NOW(), 'TRATAMIENTO') RETURNING id")) {
+            ps.setLong(1, animalId);
+            ps.setLong(2, usuarioId);
+            ResultSet rs = ps.executeQuery();
+            assertThat(rs.next()).isTrue();
+            idGenerado = rs.getLong(1);
+        }
+
+        // Intento de DELETE debe fallar
+        try (PreparedStatement ps = connection.prepareStatement(
+                "DELETE FROM intervenciones WHERE id = ?")) {
+            ps.setLong(1, idGenerado);
+            assertThatThrownBy(ps::executeUpdate)
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("Acción prohibida")
+                    .hasMessageContaining("intervenciones");
+        }
+
+        limpiarRegistro("intervenciones", idGenerado);
+    }
+
+    @Test
+    @DisplayName("Diagnósticos: INSERT permitido, UPDATE bloqueado con mensaje de acción prohibida")
+    void testDiagnosticosBloqueoUpdate() throws SQLException {
+        long idGenerado;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO diagnosticos (animal_id, diagnostico, fecha) " +
+                        "VALUES (1, 'Diagnóstico clínico de prueba', NOW()) RETURNING id")) {
+            ResultSet rs = ps.executeQuery();
+            assertThat(rs.next()).isTrue();
+            idGenerado = rs.getLong(1);
+        }
+
+        // Intento de UPDATE debe fallar
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE diagnosticos SET diagnostico = 'Diagnóstico alterado' WHERE id = ?")) {
+            ps.setLong(1, idGenerado);
+            assertThatThrownBy(ps::executeUpdate)
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("Acción prohibida")
+                    .hasMessageContaining("diagnosticos");
+        }
+
+        limpiarRegistro("diagnosticos", idGenerado);
+    }
+
+    @Test
+    @DisplayName("Diagnósticos: INSERT permitido, DELETE bloqueado con mensaje de acción prohibida")
+    void testDiagnosticosBloqueoDelete() throws SQLException {
+        long idGenerado;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO diagnosticos (animal_id, diagnostico, fecha) " +
+                        "VALUES (1, 'Diagnóstico clínico para borrar', NOW()) RETURNING id")) {
+            ResultSet rs = ps.executeQuery();
+            assertThat(rs.next()).isTrue();
+            idGenerado = rs.getLong(1);
+        }
+
+        // Intento de DELETE debe fallar
+        try (PreparedStatement ps = connection.prepareStatement(
+                "DELETE FROM diagnosticos WHERE id = ?")) {
+            ps.setLong(1, idGenerado);
+            assertThatThrownBy(ps::executeUpdate)
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("Acción prohibida")
+                    .hasMessageContaining("diagnosticos");
+        }
+
+        limpiarRegistro("diagnosticos", idGenerado);
+    }
+
+    @Test
+    @DisplayName("Bypass opcional: permite UPDATE y DELETE cuando la variable de sesión está activa")
+    void testBypassPermiteModificaciones() throws SQLException {
+        long idGenerado;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO diagnosticos (animal_id, diagnostico, fecha) " +
+                        "VALUES (1, 'Diagnóstico con bypass', NOW()) RETURNING id")) {
+            ResultSet rs = ps.executeQuery();
+            assertThat(rs.next()).isTrue();
+            idGenerado = rs.getLong(1);
+        }
+
+        try (Statement st = connection.createStatement()) {
+            st.execute("SET vigia.bypass_immutable_triggers = 'true'");
+        }
+
+        // UPDATE con bypass debe funcionar sin error
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE diagnosticos SET diagnostico = 'Diagnóstico modificado vía bypass' WHERE id = ?")) {
+            ps.setLong(1, idGenerado);
+            int updated = ps.executeUpdate();
+            assertThat(updated).isEqualTo(1);
+        }
+
+        // DELETE con bypass debe funcionar sin error
+        try (PreparedStatement ps = connection.prepareStatement(
+                "DELETE FROM diagnosticos WHERE id = ?")) {
+            ps.setLong(1, idGenerado);
+            int deleted = ps.executeUpdate();
+            assertThat(deleted).isEqualTo(1);
+        }
+    }
+
+    private Long obtenerAnimalValido() throws SQLException {
+        try (Statement st = connection.createStatement();
+                ResultSet rs = st.executeQuery("SELECT id FROM animales LIMIT 1")) {
+            if (rs.next())
+                return rs.getLong(1);
+        }
+        return 1L;
+    }
+
+    private Long obtenerUsuarioValido() throws SQLException {
+        try (Statement st = connection.createStatement();
+                ResultSet rs = st.executeQuery("SELECT id FROM usuarios LIMIT 1")) {
+            if (rs.next())
+                return rs.getLong(1);
+        }
+        return 1L;
+    }
+
+    private void limpiarRegistro(String tabla, long id) {
+        try (Statement st = connection.createStatement()) {
+            st.execute("SET vigia.bypass_immutable_triggers = 'true'");
+            st.execute("DELETE FROM " + tabla + " WHERE id = " + id);
+            st.execute("RESET vigia.bypass_immutable_triggers");
+        } catch (SQLException ignored) {
+        }
+    }
+}

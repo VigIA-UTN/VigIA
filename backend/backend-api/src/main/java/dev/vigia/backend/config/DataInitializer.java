@@ -70,11 +70,16 @@ public class DataInitializer implements CommandLineRunner {
     private final TelemetriaRepository telemetriaRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Override
     @SuppressWarnings("null")
     public void run(String... args) {
         log.info("[DataInitializer] Limpiando la base de datos para entorno de desarrollo...");
+        try {
+            jdbcTemplate.execute("SET vigia.bypass_immutable_triggers = 'true'");
+        } catch (Exception ignored) {
+        }
         telemetriaRepository.deleteAll();
         intervencionRepository.deleteAll();
         alertaRepository.deleteAll();

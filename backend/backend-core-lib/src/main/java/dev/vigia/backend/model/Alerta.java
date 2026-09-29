@@ -1,7 +1,10 @@
 package dev.vigia.backend.model;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -12,6 +15,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -93,4 +98,8 @@ public class Alerta {
 
     @Column(name = "serie_comparativa_json", columnDefinition = "TEXT")
     private String serieComparativaJson;
+
+    @OneToMany(mappedBy = "alerta", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("fecha DESC")
+    private List<Diagnostico> diagnosticos = new ArrayList<>();
 }
