@@ -42,6 +42,18 @@ public class InmutabilidadTablasTest {
         connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
         connection.setAutoCommit(true);
 
+        // Verificar que las tablas requeridas existen (pueden no existir si Flyway no corrió, ej: CI sin schema)
+        try (Statement st = connection.createStatement()) {
+            ResultSet rs = st.executeQuery(
+                    "SELECT COUNT(*) FROM information_schema.tables " +
+                    "WHERE table_schema = 'public' AND table_name IN ('intervenciones', 'diagnosticos')");
+            rs.next();
+            int tablesFound = rs.getInt(1);
+            assumeTrue(tablesFound == 2,
+                    "Las tablas 'intervenciones' y/o 'diagnosticos' no existen en la BD - " +
+                    "Ejecutar las migraciones Flyway antes de correr este test");
+        }
+
         try (Statement st = connection.createStatement()) {
             // Asegurar que la función del trigger existe
             st.execute(
