@@ -77,6 +77,7 @@ class PerimetroServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe crear un perímetro exitosamente cuando el productor pertenece al establecimiento")
     void crearPerimetroExitoso() {
         PerimetroRequest request = PerimetroRequest.builder()
@@ -107,6 +108,7 @@ class PerimetroServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe fallar con AccessDeniedException si el usuario no pertenece al establecimiento")
     void crearPerimetroUsuarioSinAcceso() {
         Usuario ajeno = new Usuario();
@@ -130,6 +132,7 @@ class PerimetroServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe fallar si se intenta asignar un lote de otro establecimiento")
     void crearPerimetroConLoteDeOtroEstablecimiento() {
         Establecimiento otroEstablecimiento = new Establecimiento();
@@ -157,6 +160,7 @@ class PerimetroServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe desactivar y activar perímetro cambiando el estado activo")
     void desactivarYActivarPerimetro() {
         Perimetro perimetro = new Perimetro(establecimiento, "Potrero",
@@ -174,6 +178,7 @@ class PerimetroServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe crear perímetro con tolerancia y zona estricta indicadas")
     void crearPerimetroConUmbral() {
         PerimetroRequest request = PerimetroRequest.builder()
@@ -195,6 +200,7 @@ class PerimetroServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe crear perímetro con tolerancia 0 y zona no estricta si no se indican")
     void crearPerimetroConUmbralPorDefecto() {
         PerimetroRequest request = PerimetroRequest.builder()
@@ -214,6 +220,7 @@ class PerimetroServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe fallar al crear perímetro con tolerancia negativa")
     void crearPerimetroConToleranciaNegativa() {
         PerimetroRequest request = PerimetroRequest.builder()
@@ -234,6 +241,7 @@ class PerimetroServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe actualizar tolerancia y zona estricta cuando se envían")
     void actualizarPerimetroConUmbral() {
         Perimetro perimetro = new Perimetro(establecimiento, "Potrero",
@@ -259,6 +267,7 @@ class PerimetroServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe conservar tolerancia y zona estricta si no se envían al actualizar")
     void actualizarPerimetroSinUmbralConservaValores() {
         Perimetro perimetro = new Perimetro(establecimiento, "Potrero",

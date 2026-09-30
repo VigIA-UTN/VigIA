@@ -167,6 +167,7 @@ class MapaCalorControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Filtro por rodeo: a ml-geo solo llega la telemetría de los animales del rodeo")
     void filtroPorRodeoFiltraLaTelemetria() throws Exception {
         Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
@@ -188,11 +189,12 @@ class MapaCalorControllerTest {
     }
 
     @Test
-    @DisplayName("Filtro por animal: a ml-geo solo llega la telemetría de ese animal")
+    @SuppressWarnings("null")
+    @DisplayName("Filtro por animal: envía la telemetría del rodeo (o establecimiento) y setea el animal_id")
     void filtroPorAnimalFiltraLaTelemetria() throws Exception {
         Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
         Animal elegido = crearAnimalConTelemetria(est, null, "DEV-ELEGIDO");
-        crearAnimalConTelemetria(est, null, "DEV-OTRO");
+        Animal otro = crearAnimalConTelemetria(est, null, "DEV-OTRO");
         when(mlGeoClient.analyze(any())).thenReturn(respuestaDeMlGeo());
 
         mockMvc.perform(get(ENDPOINT)
@@ -201,8 +203,13 @@ class MapaCalorControllerTest {
                 .header("Authorization", "Bearer " + productorToken))
                 .andExpect(status().isOk());
 
-        assertThat(historialEnviadoAMlGeo()).extracting(CoordenadaGPSDTO::getAnimalId)
-                .containsExactly(elegido.getId().toString());
+        ArgumentCaptor<GeoAnalyzeRequestDTO> captor = ArgumentCaptor.forClass(GeoAnalyzeRequestDTO.class);
+        verify(mlGeoClient).analyze(captor.capture());
+        GeoAnalyzeRequestDTO request = captor.getValue();
+
+        assertThat(request.getHistorial7d()).extracting(CoordenadaGPSDTO::getAnimalId)
+                .containsExactlyInAnyOrder(elegido.getId().toString(), otro.getId().toString());
+        assertThat(request.getAnimalId()).isEqualTo(elegido.getId().toString());
     }
 
     @Test
