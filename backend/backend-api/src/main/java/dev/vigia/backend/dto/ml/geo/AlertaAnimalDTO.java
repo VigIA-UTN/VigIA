@@ -22,4 +22,7 @@ public class AlertaAnimalDTO {
 
     @JsonProperty("alerta_aislamiento")
     private Boolean alertaAislamiento;
+
+    @JsonProperty("tiempo_fuera_grupo_s")
+    private Long tiempoFueraGrupoS;
 }

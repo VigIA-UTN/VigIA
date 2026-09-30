@@ -39,6 +39,7 @@ class AlertaAnimal(BaseModel):
     # Distancia cruda al centroide del resto del rodeo, en metros
     distancia_centroide_m: float
     alerta_aislamiento: bool
+    tiempo_fuera_grupo_s: float
 
 class MatrizDensidad(BaseModel):
     lat: float
@@ -111,6 +112,50 @@ def _indice_cohesion(distancia_m):
     """
     return UMBRAL_AISLAMIENTO_METROS / (UMBRAL_AISLAMIENTO_METROS + distancia_m)
 
+def _compute_isolation_times(historial_7d: List[CoordenadaGPS], max_gap_s: float = 3600.0) -> dict:
+    """
+    Returns a dict: animal_id -> total_isolation_time_in_seconds.
+    A point is isolated if distance to the centroid of OTHER animals' last known positions
+    (within max_gap_s) is > UMBRAL_AISLAMIENTO_METROS.
+    """
+    pts = sorted(historial_7d, key=lambda x: _ts(x))
+    last_pos = {}
+    isolation_time = defaultdict(float)
+    last_iso_time = {} 
+    last_point_time = {} 
+    
+    for p in pts:
+        t = _ts(p).timestamp()
+        
+        last_pos[p.animal_id] = p
+        
+        otros_lat = []
+        otros_lng = []
+        for a_id, op in last_pos.items():
+            if a_id != p.animal_id:
+                if t - _ts(op).timestamp() <= max_gap_s:
+                    otros_lat.append(op.lat)
+                    otros_lng.append(op.lng)
+                    
+        is_isolated = False
+        if otros_lat:
+            avg_lat = sum(otros_lat) / len(otros_lat)
+            avg_lng = sum(otros_lng) / len(otros_lng)
+            dist = _haversine(p.lat, p.lng, avg_lat, avg_lng)
+            if dist > UMBRAL_AISLAMIENTO_METROS:
+                is_isolated = True
+                
+        if p.animal_id in last_point_time:
+            dt = t - last_point_time[p.animal_id]
+            if dt <= max_gap_s:
+                if last_iso_time.get(p.animal_id, False):
+                    isolation_time[p.animal_id] += dt
+        
+        last_point_time[p.animal_id] = t
+        last_iso_time[p.animal_id] = is_isolated
+        
+    return isolation_time
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "ml-geo"}
@@ -157,6 +202,8 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
 
         animales = list(ultimas_posiciones.values())
         alertas = []
+        
+        iso_times = _compute_isolation_times(payload.historial_7d)
 
         if len(animales) == 1:
             # Con un solo animal, no hay aislamiento posible respecto a un rodeo
@@ -164,7 +211,8 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
                 animal_id=animales[0].animal_id,
                 indice_cohesion=_indice_cohesion(0.0),
                 distancia_centroide_m=0.0,
-                alerta_aislamiento=False
+                alerta_aislamiento=False,
+                tiempo_fuera_grupo_s=0.0
             ))
         elif len(animales) > 1:
             for a in animales:
@@ -178,7 +226,8 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
                     animal_id=a.animal_id,
                     indice_cohesion=_indice_cohesion(distancia_centroide),
                     distancia_centroide_m=distancia_centroide,
-                    alerta_aislamiento=distancia_centroide > UMBRAL_AISLAMIENTO_METROS
+                    alerta_aislamiento=distancia_centroide > UMBRAL_AISLAMIENTO_METROS,
+                    tiempo_fuera_grupo_s=iso_times.get(a.animal_id, 0.0)
                 ))
 
         aisladas = sum(1 for a in alertas if a.alerta_aislamiento)

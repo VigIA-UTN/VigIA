@@ -75,10 +75,25 @@ public class MapaCalorServiceImpl implements MapaCalorService {
                         }
                         telemetriaList = telemetriaRepository.findByEstablecimientoAndAnimalesAndFechaHoraBetween(
                                         establecimientoId, desde, hasta, animalIds);
+                } else if (animalId != null) {
+                        Animal animal = animalRepository.findById(animalId)
+                                        .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado"));
+                        
+                        if (animal.getRodeoLote() != null) {
+                                List<Long> animalIds = animalRepository.findByRodeoLoteId(animal.getRodeoLote().getId()).stream()
+                                                .filter(a -> a.getEstablecimiento() != null && establecimientoId
+                                                                .equals(a.getEstablecimiento().getId()))
+                                                .map(Animal::getId)
+                                                .toList();
+                                telemetriaList = telemetriaRepository.findByEstablecimientoAndAnimalesAndFechaHoraBetween(
+                                                establecimientoId, desde, hasta, animalIds);
+                        } else {
+                                telemetriaList = telemetriaRepository
+                                                .findByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta, null);
+                        }
                 } else {
                         telemetriaList = telemetriaRepository
-                                        .findByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta,
-                                                        animalId);
+                                        .findByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta, null);
                 }
 
                 List<CoordenadaGPSDTO> coordenadas = telemetriaList.stream()
@@ -93,6 +108,7 @@ public class MapaCalorServiceImpl implements MapaCalorService {
                                 .collect(Collectors.toList());
 
                 GeoAnalyzeRequestDTO request = GeoAnalyzeRequestDTO.builder()
+                                .animalId(animalId != null ? animalId.toString() : null)
                                 .historial7d(coordenadas)
                                 .build();
 
