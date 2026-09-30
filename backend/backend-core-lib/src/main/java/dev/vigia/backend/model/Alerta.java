@@ -29,6 +29,9 @@ import lombok.Setter;
 @NoArgsConstructor
 public class Alerta {
 
+    /** Tipo de las alertas de AnestroDetectorService (disparador CELO, sin ventana de inseminación). */
+    public static final String TIPO_ANESTRO = "Anestro Detectado";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { AlertaResponse, AlertaDetalleResponse, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
-import { updateAlertaEstado, getAlertaDetalle } from '../api/alertaApi';
+import { updateAlertaEstado, getAlertaDetalle, esAnestro } from '../api/alertaApi';
 import SanitarioAlertDetail, { SeveridadBadge } from './SanitarioAlertDetail';
 import DiagnosticoSection from './DiagnosticoSection';
 import { useAuthStore } from '../store/authStore';
@@ -35,7 +35,9 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   // El backend puede devolver 'CELO', 'Celo Detectado' o 'reproductivo'
   // segun venga del listado general o del endpoint especifico de celo.
   const tipoNorm = (alerta.tipo ?? '').toLowerCase();
-  const isCelo = tipoNorm === 'celo' || tipoNorm === 'reproductivo' || tipoNorm.includes('celo');
+  // El anestro llega con disparador CELO pero no tiene ventana: sin countdown ni archivado automático.
+  const isAnestro = esAnestro(alerta);
+  const isCelo = (tipoNorm === 'celo' || tipoNorm === 'reproductivo' || tipoNorm.includes('celo')) && !isAnestro;
   const { ventana, segundosRestantes, loading: loadingVentana } = useVentanaInseminacion(
     isCelo ? alerta.id : null,
     selectedId ?? null,
@@ -186,6 +188,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       return 'Revisar al animal y realizar seguimiento clínico.';
     } else if (isGeoespacial) {
       return 'Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.';
+    } else if (isAnestro) {
+      return 'Revisión veterinaria: el animal no registra celo en el período configurado.';
     } else if (isCelo) {
       return 'Realizar inseminación artificial dentro de la ventana óptima.';
     } else {
@@ -403,7 +407,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
             )}
 
             {/* Ventana de inseminacion (solo reproductivo, no sanitario, no geoespacial) */}
-            {!isSanitaria && !isGeoespacial && (
+            {!isSanitaria && !isGeoespacial && !isAnestro && (
               <div>
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                   Ventana de inseminación
@@ -655,10 +659,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               onClick={() => handleAccion('CONFIRMADA', false, isSanitaria ? 'Alerta sanitaria atendida' : undefined)}
               disabled={actionLoading}
             >
-              <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : isGeoespacial ? 'Confirmar salida' : 'Confirmar celo'}
+              <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : isGeoespacial ? 'Confirmar salida' : isAnestro ? 'Confirmar anestro' : 'Confirmar celo'}
             </button>
           </div>
-          {!isSanitaria && !isGeoespacial && (
+          {!isSanitaria && !isGeoespacial && !isAnestro && (
             <button
               className="btn rounded-3 fw-semibold w-100 py-2 d-flex justify-content-center align-items-center gap-2"
               style={{ backgroundColor: '#198754', color: 'white', border: '1px solid #198754' }}

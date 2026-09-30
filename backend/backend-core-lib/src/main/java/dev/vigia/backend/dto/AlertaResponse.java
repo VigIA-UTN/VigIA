@@ -11,6 +11,8 @@ import lombok.Data;
 public class AlertaResponse {
     private Long id;
     private String tipo;
+    // Tipo crudo de la alerta ("Anestro Detectado", "Celo Detectado", ...); tipo lleva el disparador.
+    private String subtipo;
     private String severidad;
     private EstadoAlerta estado;
     private Long animalId;

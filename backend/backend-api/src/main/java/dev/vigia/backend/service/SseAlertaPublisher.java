@@ -66,11 +66,13 @@ public class SseAlertaPublisher {
                     try {
                         sendToEmitter(emitter, alerta.getId(), alerta.getAnimal().getId(),
                                 alerta.getDisparador() != null ? alerta.getDisparador().name() : alerta.getTipo(),
+                                alerta.getTipo(),
                                 alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null,
                                 alerta.getEstado(),
                                 alerta.getTsGeneracion(),
                                 alerta.getLatitud(),
-                                alerta.getLongitud());
+                                alerta.getLongitud(),
+                                alerta.getAccionRecomendada());
                     } catch (Exception e) {
                         log.error("Fallo enviando alerta perdida, cancelando el resto. {}", e.getMessage());
                         list.remove(emitter);
@@ -121,11 +123,13 @@ public class SseAlertaPublisher {
                 sendToEmitter(emitter, alertaEvent.getId(), alertaEvent.getAnimalId(),
                         alertaEvent.getDisparador() != null ? alertaEvent.getDisparador().name()
                                 : alertaEvent.getTipo(),
+                        alertaEvent.getTipo(),
                         alertaEvent.getSeveridad() != null ? alertaEvent.getSeveridad().name() : null,
                         alertaEvent.getEstado(),
                         alertaEvent.getTsGeneracion(),
                         alertaEvent.getLatitud(),
-                        alertaEvent.getLongitud());
+                        alertaEvent.getLongitud(),
+                        alertaEvent.getAccionRecomendada());
             } catch (Exception e) {
                 log.error("Error enviando alerta por SSE a un cliente, removiendo emitter.", e);
                 list.remove(emitter);
@@ -134,18 +138,21 @@ public class SseAlertaPublisher {
     }
 
     @SuppressWarnings("null")
-    private void sendToEmitter(SseEmitter emitter, Long id, Long animalId, String tipo, String severidad,
-            EstadoAlerta estado, java.time.LocalDateTime tsGeneracion, Double latitud, Double longitud)
+    private void sendToEmitter(SseEmitter emitter, Long id, Long animalId, String tipo, String subtipo, String severidad,
+            EstadoAlerta estado, java.time.LocalDateTime tsGeneracion, Double latitud, Double longitud,
+            String accionRecomendada)
             throws IOException {
         AlertaResponse response = AlertaResponse.builder()
                 .id(id)
                 .animalId(animalId)
                 .tipo(tipo)
+                .subtipo(subtipo)
                 .severidad(severidad)
                 .estado(estado)
                 .tsGeneracion(tsGeneracion)
                 .latitud(latitud)
                 .longitud(longitud)
+                .accionRecomendada(accionRecomendada)
                 .build();
 
         emitter.send(SseEmitter.event()

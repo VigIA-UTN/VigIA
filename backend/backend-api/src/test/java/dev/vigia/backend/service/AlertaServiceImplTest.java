@@ -41,6 +41,8 @@ import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
@@ -72,6 +74,9 @@ public class AlertaServiceImplTest {
 
         @Mock
         private RabbitTemplate rabbitTemplate;
+
+        @Mock
+        private AnimalRepository animalRepository;
 
         @Spy
         private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -135,6 +140,21 @@ public class AlertaServiceImplTest {
                 assertEquals("Planificar inseminación artificial dentro de la ventana óptima.",
                                 result.get(0).getAccionRecomendada());
                 verify(alertaRepository, times(1)).findCeloByEstablecimiento(ESTABLECIMIENTO_ID);
+        }
+
+        @Test
+        void listarAlertasCelo_Anestro_ExponeSubtipoYMantieneTipoCelo() {
+                mockAlerta.setTipo("Anestro Detectado");
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findCeloByEstablecimiento(ESTABLECIMIENTO_ID))
+                                .thenReturn(List.of(mockAlerta));
+
+                AlertaResponse result = alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null).get(0);
+
+                assertEquals("CELO", result.getTipo());
+                assertEquals("Anestro Detectado", result.getSubtipo());
         }
 
         @Test
@@ -484,6 +504,84 @@ public class AlertaServiceImplTest {
                 assertTrue(result.getDescripcionDatoOrigen().contains("85%"));
         }
 
+        /** Convierte mockAlerta (CELO) en una alerta de anestro como la genera AnestroDetectorService. */
+        private void prepararAlertaAnestro() {
+                mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
+                mockAlerta.setValorDetectado(60.0);
+                mockAlerta.setValorUmbral(45.0);
+                mockAlerta.setVentanaInicioIns(null);
+                mockAlerta.setVentanaFinIns(null);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+        }
+
+        @Test
+        void obtenerDetalleAlerta_Anestro_DescribeDiasSinCelo() {
+                prepararAlertaAnestro();
+
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                assertEquals("El animal no registra celo hace 60 días (umbral: 45 días).",
+                                result.getDescripcionDatoOrigen());
+        }
+
+        @Test
+        void obtenerEstadoVentanaInseminacion_Anestro_Rechaza() {
+                prepararAlertaAnestro();
+
+                assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.obtenerEstadoVentanaInseminacion(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID));
+        }
+
+        @Test
+        void obtenerLineaTiempoAlertas_Anestro_ExponeSubtipoYMantieneTipoCelo() {
+                mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByAnimalConFiltros(10L, DisparadorAlerta.CELO, null, null))
+                                .thenReturn(List.of(mockAlerta));
+
+                LineaTiempoEventoResponse evento = alertaService
+                                .obtenerLineaTiempoAlertas(EMAIL, 10L, "celo", null, null).get(0);
+
+                assertEquals("CELO", evento.getTipo());
+                assertEquals(Alerta.TIPO_ANESTRO, evento.getSubtipo());
+        }
+
+        @Test
+        void obtenerLineaTiempoAlertas_Anestro_ExponeDiasSinCicloYEstadoArchivada() {
+                mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
+                mockAlerta.setEstado(EstadoAlerta.ARCHIVADA);
+                mockAlerta.setAccionRecomendada(
+                                "Se requiere revisión veterinaria inmediata. El animal lleva 60 días sin ciclo registrado.");
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByAnimalConFiltros(10L, DisparadorAlerta.CELO, null, null))
+                                .thenReturn(List.of(mockAlerta));
+
+                LineaTiempoEventoResponse evento = alertaService
+                                .obtenerLineaTiempoAlertas(EMAIL, 10L, "celo", null, null).get(0);
+
+                assertEquals("Se requiere revisión veterinaria inmediata. El animal lleva 60 días sin ciclo registrado.",
+                                evento.getDescripcion());
+                assertEquals("ARCHIVADA", evento.getEstadoResolucion());
+        }
+
+        @Test
+        void archivarAlertaPorVencimiento_Anestro_RechazaYNoGuarda() {
+                prepararAlertaAnestro();
+
+                assertThrows(IllegalArgumentException.class,
+                                () -> alertaService.archivarAlertaPorVencimiento(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID));
+                verify(alertaRepository, never()).save(any());
+        }
+
         @Test
         @SuppressWarnings("null")
         void obtenerDetalleAlerta_SALUD_snapshotCorrupto_noRompe() {
@@ -533,6 +631,44 @@ public class AlertaServiceImplTest {
                                 result.getAccionRecomendada());
                 verify(alertaRepository, times(1)).save(mockAlerta);
                 verify(intervencionRepository, never()).save(any(Intervencion.class));
+        }
+
+        @Test
+        void actualizarEstadoAlerta_ConfirmarAnestro_RegistraEstadoAnestro() {
+                mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
+
+                alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, null);
+
+                ArgumentCaptor<EstadoReproductivo> captor = ArgumentCaptor.forClass(EstadoReproductivo.class);
+                verify(estadoReproductivoRepository).save(captor.capture());
+                assertEquals(TipoReproductivo.ANESTRO, captor.getValue().getEstado());
+                assertEquals(OrigenEstado.MANUAL, captor.getValue().getOrigen());
+
+                // El evento SSE de actualización conserva el texto con los días (la tarjeta se reemplaza con él)
+                ArgumentCaptor<Object> evento = ArgumentCaptor.forClass(Object.class);
+                verify(rabbitTemplate).convertAndSend(anyString(), anyString(), evento.capture());
+                assertEquals(mockAlerta.getAccionRecomendada(),
+                                ((dev.vigia.backend.dto.ml.AlertaEventDTO) evento.getValue()).getAccionRecomendada());
+        }
+
+        @Test
+        void actualizarEstadoAlerta_ConfirmarCelo_RegistraEstadoCelo() {
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
+
+                alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA, null);
+
+                ArgumentCaptor<EstadoReproductivo> captor = ArgumentCaptor.forClass(EstadoReproductivo.class);
+                verify(estadoReproductivoRepository).save(captor.capture());
+                assertEquals(TipoReproductivo.CELO, captor.getValue().getEstado());
         }
 
         @Test

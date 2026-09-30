@@ -3,8 +3,12 @@ package dev.vigia.backend.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +40,13 @@ public class AnestroDetectorService {
     private final AlertaRepository alertaRepository;
     private final RabbitTemplate rabbitTemplate;
 
+    private static final Set<TipoReproductivo> ESTADOS_DE_CICLO = EnumSet.of(
+            TipoReproductivo.CELO, TipoReproductivo.INSEMINADA, TipoReproductivo.GESTANTE, TipoReproductivo.PARIDA);
+
+    // Días sin volver a alertar tras descartar un anestro.
+    @Value("${vigia.batch.anestro-silencio-dias:21}")
+    private int silencioDias;
+
     @Scheduled(cron = "${vigia.batch.anestro-cron:0 0 2 * * *}") // Por defecto, corre a las 2 AM
     @Transactional
     public void detectarAnestro() {
@@ -58,64 +69,90 @@ public class AnestroDetectorService {
                 List<EstadoReproductivo> estados = animal.getEstadosReproductivos();
                 EstadoReproductivo ultimoEstado = (estados != null && !estados.isEmpty()) ? estados.get(0) : null;
 
-                if (ultimoEstado != null && (ultimoEstado.getEstado() == TipoReproductivo.GESTANTE || ultimoEstado.getEstado() == TipoReproductivo.INSEMINADA)) {
-                    continue; // Gestantes e inseminadas no ciclan/no se evalúan para anestro
-                }
-
                 if (ultimoEstado != null && ultimoEstado.getEstado() == TipoReproductivo.ANESTRO) {
-                    // Ya está en anestro, podemos omitir o regenerar alerta si la anterior se archivó?
-                    // Asumimos que si ya está en estado ANESTRO, ya se emitió la alerta en su momento.
-                    // Para evitar spamear, validamos si tiene una alerta pendiente.
-                    continue;
+                    continue; // Anestro ya confirmado: no se re-alerta hasta que registren otro estado
                 }
 
-                LocalDate fechaReferencia = null;
+                // Gestantes e inseminadas no ciclan: no califican para anestro
+                boolean gestanteOInseminada = ultimoEstado != null
+                        && (ultimoEstado.getEstado() == TipoReproductivo.GESTANTE || ultimoEstado.getEstado() == TipoReproductivo.INSEMINADA);
+                long diasSinCiclo = gestanteOInseminada ? 0
+                        : ChronoUnit.DAYS.between(fechaReferencia(animal, estados), LocalDate.now());
+                Optional<Alerta> ultimaAlerta = alertaRepository
+                        .findFirstByAnimal_IdAndTipoOrderByTsGeneracionDesc(animal.getId(), Alerta.TIPO_ANESTRO);
 
-                if (ultimoEstado != null) {
-                    if (ultimoEstado.getFechaUltParto() != null) {
-                        fechaReferencia = ultimoEstado.getFechaUltParto();
-                    } else if (ultimoEstado.getFechaUltInseminacion() != null) {
-                        fechaReferencia = ultimoEstado.getFechaUltInseminacion();
-                    } else {
-                        fechaReferencia = ultimoEstado.getFechaRegistro().toLocalDate();
-                    }
-                } else {
-                    // Si no tiene registros, usar la fecha de nacimiento + 1 año, o fecha de alta
-                    if (animal.getFechaNacimiento() != null) {
-                        fechaReferencia = animal.getFechaNacimiento().plusYears(1);
-                    } else if (animal.getFechaAlta() != null) {
-                        fechaReferencia = animal.getFechaAlta();
-                    } else {
-                        fechaReferencia = LocalDate.now();
-                    }
-                }
-
-                long diasSinCiclo = ChronoUnit.DAYS.between(fechaReferencia, LocalDate.now());
-
-                if (diasSinCiclo >= diasUmbral) {
-                    // Verificar si ya tiene una alerta de anestro pendiente
-                    boolean tieneAlertaPendiente = false;
-                    List<Alerta> alertasActivas = alertaRepository.alertasAnimalActivas(animal.getId());
-                    for (Alerta a : alertasActivas) {
-                        if ("Anestro Detectado".equals(a.getTipo())) {
-                            tieneAlertaPendiente = true;
-                            break;
-                        }
-                    }
-
-                    if (!tieneAlertaPendiente) {
-                        generarAlertaAnestro(animal, est, diasSinCiclo);
-                    }
+                if (diasSinCiclo < diasUmbral) {
+                    // Ya no califica (registraron celo, inseminación, preñez...): se cierra el anestro pendiente
+                    ultimaAlerta.filter(a -> a.getEstado() == EstadoAlerta.PENDIENTE).ifPresent(this::archivarPorCiclo);
+                } else if (!silenciada(ultimaAlerta)) {
+                    generarAlertaAnestro(animal, est, diasSinCiclo);
                 }
             }
         }
         log.info("Detección programada de Anestro finalizada");
     }
 
+    /**
+     * Última evidencia de que el animal cicla, en todo el historial: parto, inseminación o un estado
+     * CELO/INSEMINADA/GESTANTE/PARIDA. Sin evidencia, cae al último registro, nacimiento + 1 año o alta.
+     */
+    private LocalDate fechaReferencia(Animal animal, List<EstadoReproductivo> estados) {
+        LocalDate ref = null;
+        for (EstadoReproductivo e : estados == null ? List.<EstadoReproductivo>of() : estados) {
+            ref = masReciente(ref, e.getFechaUltParto());
+            ref = masReciente(ref, e.getFechaUltInseminacion());
+            if (ESTADOS_DE_CICLO.contains(e.getEstado()) && e.getFechaRegistro() != null) {
+                ref = masReciente(ref, e.getFechaRegistro().toLocalDate());
+            }
+        }
+        if (ref != null) {
+            return ref;
+        }
+        if (estados != null && !estados.isEmpty() && estados.get(0).getFechaRegistro() != null) {
+            return estados.get(0).getFechaRegistro().toLocalDate();
+        }
+        if (animal.getFechaNacimiento() != null) {
+            return animal.getFechaNacimiento().plusYears(1);
+        }
+        return animal.getFechaAlta() != null ? animal.getFechaAlta() : LocalDate.now();
+    }
+
+    private static LocalDate masReciente(LocalDate a, LocalDate b) {
+        return a == null || (b != null && b.isAfter(a)) ? b : a;
+    }
+
+    /** No alertar si ya hay un anestro pendiente o si el último se descartó hace menos de silencioDias. */
+    private boolean silenciada(Optional<Alerta> ultimaAlerta) {
+        return ultimaAlerta
+                .map(a -> a.getEstado() == EstadoAlerta.PENDIENTE
+                        || (a.getEstado() == EstadoAlerta.DESCARTADA && a.getTsConfirmacion() != null
+                                && a.getTsConfirmacion().isAfter(LocalDateTime.now().minusDays(silencioDias))))
+                .orElse(false);
+    }
+
+    private void archivarPorCiclo(Alerta alerta) {
+        alerta.setEstado(EstadoAlerta.ARCHIVADA);
+        alerta.setMotivoDescarte("ciclo_registrado");
+        alerta.setTsConfirmacion(LocalDateTime.now());
+        alertaRepository.save(alerta);
+
+        rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "alerta.update", AlertaEventDTO.builder()
+                .id(alerta.getId())
+                .animalId(alerta.getAnimal().getId())
+                .tipo(alerta.getTipo())
+                .disparador(alerta.getDisparador())
+                .severidad(alerta.getSeveridad())
+                .estado(alerta.getEstado())
+                .tsGeneracion(alerta.getTsGeneracion())
+                .accionRecomendada(alerta.getAccionRecomendada())
+                .build());
+        log.info("Alerta de anestro {} archivada: el animal {} registró un ciclo", alerta.getId(), alerta.getAnimal().getId());
+    }
+
     private void generarAlertaAnestro(Animal animal, Establecimiento est, long diasSinCiclo) {
         Alerta alerta = new Alerta();
         alerta.setAnimal(animal);
-        alerta.setTipo("Anestro Detectado");
+        alerta.setTipo(Alerta.TIPO_ANESTRO);
         alerta.setSeveridad(est.getSeveridadAnestro());
         alerta.setTsGeneracion(LocalDateTime.now());
         alerta.setDisparador(DisparadorAlerta.CELO);
@@ -139,6 +176,7 @@ public class AnestroDetectorService {
                 .valorUmbral(alerta.getValorUmbral())
                 .valorDetectado(alerta.getValorDetectado())
                 .estado(alerta.getEstado())
+                .accionRecomendada(alerta.getAccionRecomendada())
                 .build();
 
         rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);

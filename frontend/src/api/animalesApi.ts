@@ -343,6 +343,8 @@ export interface LineaTiempoEventoResponse {
   id: number;
   fecha: string
   tipo: string | null;
+  /** Tipo crudo de la alerta ('Anestro Detectado', ...); `tipo` lleva el disparador. */
+  subtipo?: string | null;
   severidad: 'ALTA' | 'MEDIA' | 'BAJA' | null;
   estadoResolucion: string | null;
   tipoIntervencion: string | null;

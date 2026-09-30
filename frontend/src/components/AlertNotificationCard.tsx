@@ -1,4 +1,4 @@
-import type { AlertaResponse } from '../api/alertaApi';
+import { esAnestro, type AlertaResponse } from '../api/alertaApi';
 import SidebarCard, { type Categoria, type Severidad } from './SidebarCard';
 
 interface AlertNotificationCardProps {
@@ -46,6 +46,8 @@ function tiempoFueraBadge(ts: string) {
 const textoAccionRecomendada = (alerta: AlertaResponse | null) => {
   if (alerta?.accionRecomendada) {
     return alerta.accionRecomendada;
+  } else if (alerta && esAnestro(alerta)) {
+    return 'Revisión veterinaria: el animal no registra celo en el período configurado.';
   } else if (alerta && alerta.tipo === 'SALUD') {
     return 'Revisar al animal y realizar seguimiento clínico.';
   } else if (alerta && alerta.tipo === 'CELO') {
@@ -64,6 +66,9 @@ export default function AlertNotificationCard({
   const resuelta = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
   // Severidad: el backend manda ALTA/MEDIA/BAJA. Fallback por tipo mientras no llegue.
   const severidad: Severidad = alerta.severidad ?? (alerta.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
+  const anestro = esAnestro(alerta);
+  // El mapper de AnimalServiceImpl manda el tipo crudo; el anestro se estiliza como reproductivo igual.
+  const clave = anestro ? 'CELO' : alerta.tipo;
   const tipoNorm = (alerta.tipo ?? '').toUpperCase();
   const isGeoespacial = tipoNorm.includes('FUERA') || tipoNorm.includes('PERIMETRO') || tipoNorm === 'GEOESPACIAL';
 
@@ -90,9 +95,9 @@ export default function AlertNotificationCard({
     <>
       <SidebarCard
         severidad={severidad}
-        icono={ICONO[alerta.tipo] ?? 'bi-exclamation-triangle-fill'}
-        categoria={CATEGORIA[alerta.tipo]}
-        titulo={`#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
+        icono={anestro ? 'bi-hourglass-split' : ICONO[clave] ?? 'bi-exclamation-triangle-fill'}
+        categoria={CATEGORIA[clave]}
+        titulo={anestro ? `#${alerta.animalId} en anestro` : `#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
         cuerpo={cuerpoPrincipal}
         timestamp={haceCuanto(alerta.tsGeneracion)}
         acento={isUnread}
