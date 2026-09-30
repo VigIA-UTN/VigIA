@@ -126,7 +126,7 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
   return (
     <div
       ref={ref}
-      className={`lt-popup ${position === 'above' ? 'lt-popup--above' : 'lt-popup--below'} ${isAlerta ? 'lt-popup--alerta' : isEstado ? 'lt-popup--estado' : 'lt-popup--intervencion'}`}
+      className={`lt-popup ${position === 'above' ? 'lt-popup--above' : 'lt-popup--below'} ${isAlerta ? `lt-popup--alerta ${severidadClass(evento.severidad)}` : isEstado ? 'lt-popup--estado' : 'lt-popup--intervencion'}`}
     >
       <button className="lt-popup-close" onClick={onClose} aria-label="Cerrar">
         <i className="bi bi-x" />
@@ -279,12 +279,8 @@ function EventoNodo({ evento, position, index }: NodoProps) {
     <div className="lt-nodo-wrapper" style={{ '--nodo-index': index } as React.CSSProperties}>
       {/* Label flotante */}
       <div className={labelClass} onClick={() => setOpen(o => !o)}>
-        <span className="lt-nodo-label-type">
-          <i className={`bi ${icon} me-1`} />
-          {label}
-        </span>
+        <span className="lt-nodo-label-type">{label}</span>
         <span className="lt-nodo-label-time">{formatDateOnly(evento.fecha)}</span>
-        <span className="lt-nodo-label-cta">Más info</span>
       </div>
 
       {/* Punto sobre la línea */}
@@ -320,6 +316,7 @@ interface Props {
 export default function LineaTiempoAlertas({ animalId, estados }: Props) {
   const [remotos, setRemotos] = useState<LineaTiempoEventoResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cargado, setCargado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filtros
@@ -349,6 +346,7 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
       setError('No se pudo cargar la línea de tiempo.');
     } finally {
       setLoading(false);
+      setCargado(true);
     }
   }, [animalId]);
 
@@ -412,10 +410,13 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
       </div>
 
       {/* ── Estados ── */}
-      {loading && (
-        <div className="lt-state-wrapper">
-          <Spinner animation="border" style={{ color: '#3B8D99' }} />
-          <span className="ms-3 text-secondary">Cargando eventos…</span>
+      {/* Primera carga: esqueleto con la misma altura que el rail para que la página no salte */}
+      {!cargado && (
+        <div className="lt-scroll-wrapper lt-skeleton">
+          <div className="lt-rail-container">
+            <div className="lt-axis" />
+            <Spinner animation="border" className="lt-skeleton-spinner" />
+          </div>
         </div>
       )}
 
@@ -426,8 +427,9 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
         </div>
       )}
 
-      {!loading && !error && eventos.length === 0 && (
-        <div className="lt-state-wrapper lt-state--empty">
+      {/* Recargas: se mantiene el contenido anterior atenuado hasta que llegan los datos */}
+      {cargado && !error && eventos.length === 0 && (
+        <div className={`lt-state-wrapper lt-state--empty${loading ? ' lt-refrescando' : ''}`}>
           <i className="bi bi-hourglass me-2" />
           Sin eventos registrados
           {(desde != null || hasta != null) ? ' con los filtros aplicados.' : ' para este animal.'}
@@ -435,8 +437,8 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
       )}
 
       {/* ── Rail de la línea de tiempo ── */}
-      {!loading && !error && eventos.length > 0 && (
-        <div className="lt-scroll-wrapper">
+      {cargado && !error && eventos.length > 0 && (
+        <div className={`lt-scroll-wrapper${loading ? ' lt-refrescando' : ''}`}>
           <div className="lt-rail-container" style={{ '--event-count': eventos.length } as React.CSSProperties}>
 
             {/* Eje horizontal */}
