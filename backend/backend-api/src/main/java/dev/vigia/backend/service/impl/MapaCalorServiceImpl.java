@@ -34,6 +34,7 @@ public class MapaCalorServiceImpl implements MapaCalorService {
         private final MlGeoClient mlGeoClient;
 
         @Override
+        @SuppressWarnings("null")
         public GeoAnalyzeResponseDTO obtenerMapaCalor(String emailUsuario, Long establecimientoId, LocalDateTime desde,
                         LocalDateTime hasta, Long animalId, Long rodeoId) {
 

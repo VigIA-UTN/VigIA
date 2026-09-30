@@ -117,6 +117,7 @@ public class GeofenceVerificationService {
         log.info("Alerta de salida de perímetro emitida con ID: {} para animal {}", alerta.getId(), animal.getId());
     }
 
+    @SuppressWarnings("null")
     private boolean estaDentroDeAlgunPerimetro(List<Perimetro> perimetrosActivos, Long loteId,
             double latitud, double longitud) {
         Map<Long, Perimetro> perimetrosPorId = perimetrosActivos.stream()
