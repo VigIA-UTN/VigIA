@@ -3,6 +3,8 @@ import axiosClient from './axiosClient';
 export interface AlertaResponse {
   id: number;
   tipo: string;
+  /** Tipo crudo de la alerta ('Anestro Detectado', 'Celo Detectado', ...); `tipo` lleva el disparador. */
+  subtipo?: string | null;
   animalId: number;
   tsGeneracion: string;
   estado: string;
@@ -10,6 +12,10 @@ export interface AlertaResponse {
   gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';
   accionRecomendada: string;
 }
+
+/** Alerta de anestro: disparador CELO, pero sin ventana de inseminación. Mira tipo por el mapper que manda el tipo crudo. */
+export const esAnestro = (a: { subtipo?: string | null; tipo?: string | null }) =>
+  /anestro/i.test(a.subtipo ?? a.tipo ?? '');
 
 export async function getAlertas(
   establecimientoId: number,

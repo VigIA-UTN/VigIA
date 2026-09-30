@@ -871,6 +871,7 @@ public class AnimalServiceImpl implements AnimalService {
                 return AlertaResponse.builder()
                                 .id(alerta.getId())
                                 .tipo(alerta.getTipo())
+                                .subtipo(alerta.getTipo())
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
                                 .latitud(alerta.getLatitud())

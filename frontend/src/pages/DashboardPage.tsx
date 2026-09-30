@@ -8,7 +8,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { getAnimales, ESTADO_REPRODUCTIVO_LABEL } from '../api/animalesApi';
 import type { AnimalResponse } from '../api/animalesApi';
-import { getAlertas, getVentanaInseminacion } from '../api/alertaApi';
+import { getAlertas, getVentanaInseminacion, esAnestro } from '../api/alertaApi';
 import type { AlertaResponse, VentanaInseminacionResponse } from '../api/alertaApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
@@ -62,6 +62,9 @@ function formatHorasRestantes(seg: number): string {
     if (h > 0) return `${h}h ${m}min restantes`;
     return `${m}min restantes`;
 }
+
+// Celo con ventana de inseminación: el anestro llega con tipo CELO pero no la tiene.
+const esCeloConVentana = (a: AlertaResponse) => a.tipo === 'CELO' && !esAnestro(a);
 
 // ── Urgencia para ranking (menor = más urgente) ───────────────────────────────
 function urgencia(a: AlertaResponse, ventana?: VentanaInseminacionResponse): number {
@@ -183,7 +186,7 @@ export default function DashboardPage() {
             setTodasAlertas60d(todas);
 
             // Fetch ventanas para cada alerta de celo PENDIENTE
-            const celoPendientes = pendientes.filter(a => a.tipo === 'CELO');
+            const celoPendientes = pendientes.filter(esCeloConVentana);
             const ventanaResults = await Promise.allSettled(
                 celoPendientes.map(a => getVentanaInseminacion(a.id, selectedId))
             );
@@ -273,7 +276,7 @@ export default function DashboardPage() {
     const celoArchivadasRecientes = useMemo(() => {
         const hace30d = 30 * 24 * 60 * 60 * 1000;
         return alertasArchivadasCelo.filter(
-            a => Date.now() - new Date(a.tsGeneracion).getTime() <= hace30d
+            a => esCeloConVentana(a) && Date.now() - new Date(a.tsGeneracion).getTime() <= hace30d
         ).length;
     }, [alertasArchivadasCelo]);
 
@@ -554,13 +557,13 @@ export default function DashboardPage() {
 
         // Celo detectado: total alertas de celo en 30d
         const celoDetectado = todasAlertas60d.filter(a =>
-            a.tipo === 'CELO' &&
+            esCeloConVentana(a) &&
             Date.now() - new Date(a.tsGeneracion).getTime() <= hace30d
         ).length;
 
         // Atendido: celo CONFIRMADA en 30d
         const celoAtendido = todasAlertas60d.filter(a =>
-            a.tipo === 'CELO' && a.estado === 'CONFIRMADA' &&
+            esCeloConVentana(a) && a.estado === 'CONFIRMADA' &&
             Date.now() - new Date(a.tsGeneracion).getTime() <= hace30d
         ).length;
 
@@ -1693,7 +1696,8 @@ export default function DashboardPage() {
                                             : alerta.tipo === 'FUERA_DE_PERIMETRO' ? 'dash-tipo-perimetro'
                                                 : 'dash-tipo-collar';
 
-                                    const tipoLabel = alerta.tipo === 'CELO' ? 'CELO'
+                                    const tipoLabel = esAnestro(alerta) ? 'ANESTRO'
+                                        : alerta.tipo === 'CELO' ? 'CELO'
                                         : alerta.tipo === 'SALUD' ? 'SALUD'
                                             : alerta.tipo === 'FUERA_DE_PERIMETRO' ? 'PERÍMETRO'
                                                 : 'COLLAR';

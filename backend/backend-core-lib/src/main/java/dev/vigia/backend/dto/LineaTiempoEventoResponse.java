@@ -19,6 +19,8 @@ public class LineaTiempoEventoResponse {
     private LocalDateTime fecha;
 
     private String tipo;
+    // Tipo crudo de la alerta ("Anestro Detectado", ...); tipo lleva el disparador.
+    private String subtipo;
     private String severidad;
 
     private String estadoResolucion;

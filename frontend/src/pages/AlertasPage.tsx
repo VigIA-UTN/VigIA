@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Container, Spinner, Alert, Form, Button } from 'react-bootstrap';
-import { getAlertas, type AlertaResponse } from '../api/alertaApi';
+import { getAlertas, esAnestro, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
@@ -288,7 +288,7 @@ export default function AlertasPage() {
                                             return (
                                                 <tr key={a.id}>
                                                     <td className="fw-medium">#{a.animalId}</td>
-                                                    <td><span className={`tipo-badge tipo-${tipoLower}`}>{a.tipo || 'CELO'}</span></td>
+                                                    <td><span className={`tipo-badge tipo-${tipoLower}`}>{esAnestro(a) ? 'ANESTRO' : a.tipo || 'CELO'}</span></td>
                                                     <td className="text-center">
                                                         <span className={`severidad-badge ${getSeveridadClass(sev)}`}>
                                                             {sev}

@@ -7,6 +7,7 @@ import {
   type LineaTiempoEventoResponse,
   type LineaTiempoFiltros,
 } from '../api/animalesApi';
+import { esAnestro } from '../api/alertaApi';
 import DateRangeCalendar from './heatmap/DateRangeCalendar';
 import { dayStart, lastDaysRange } from './heatmap/heatmapFilters';
 import './heatmap/heatmap.css';
@@ -16,10 +17,20 @@ import './LineaTiempoAlertas.css';
 
 const TIPO_ALERTA_LABEL: Record<string, string> = {
   CELO: 'Celo',
+  ANESTRO: 'Anestro',
 };
 
 const TIPO_ALERTA_ICON: Record<string, string> = {
   CELO: 'bi-heart-pulse-fill',
+  ANESTRO: 'bi-hourglass-split',
+};
+
+// estadoResolucion del backend: PENDIENTE llega como SIN_ATENDER.
+const ESTADO_ALERTA_LABEL: Record<string, string> = {
+  SIN_ATENDER: 'Pendiente',
+  CONFIRMADA: 'Confirmada',
+  DESCARTADA: 'Descartada',
+  ARCHIVADA: 'Archivada',
 };
 
 const TIPO_INTERVENCION_LABEL: Record<string, string> = {
@@ -85,6 +96,9 @@ const estadoToEvento = (e: EstadoReproductivoResponse): TimelineEvento => ({
   tipoIntervencion: null, descripcion: null, interventor: e.registradoPor, alertaAsociadaId: null, estadoRepro: e,
 });
 
+/** Clave de las alertas para los mapas de label/ícono: el anestro llega con tipo CELO. */
+const claveAlerta = (e: TimelineEvento) => (esAnestro(e) ? 'ANESTRO' : (e.tipo ?? '').toUpperCase());
+
 // ── Popup card ────────────────────────────────────────────────────────────────
 
 interface PopupProps {
@@ -147,11 +161,11 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
           {/* Header */}
           <div className="lt-popup-header">
             <span className={`lt-popup-icon-wrap lt-popup-icon-wrap--alerta ${severidadClass(evento.severidad)}`}>
-              <i className={`bi ${TIPO_ALERTA_ICON[evento.tipo ?? ''] ?? 'bi-bell-fill'}`} />
+              <i className={`bi ${TIPO_ALERTA_ICON[claveAlerta(evento)] ?? 'bi-bell-fill'}`} />
             </span>
             <div>
               <div className="lt-popup-title">
-                Alerta {TIPO_ALERTA_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? '—'}
+                Alerta {TIPO_ALERTA_LABEL[claveAlerta(evento)] ?? evento.tipo ?? '—'}
               </div>
               <div className="lt-popup-fecha">{formatDateTime(evento.fecha)}</div>
             </div>
@@ -159,13 +173,27 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
 
           {/* Descripción contextual */}
           <div className="lt-popup-desc">
-            {evento.tipo === 'CELO' && (
+            {claveAlerta(evento) === 'CELO' && (
               <>
                 <i className="bi bi-info-circle me-1" />
                 Detección automática de signos de celo. La ventana óptima de inseminación es de 6 a 24 hs desde la generación.
               </>
             )}
+            {claveAlerta(evento) === 'ANESTRO' && (
+              <>
+                <i className="bi bi-info-circle me-1" />
+                {/* descripcion = acción recomendada del detector, con los días sin ciclo */}
+                {evento.descripcion ?? 'El animal superó el umbral de días sin celo registrado. Se recomienda revisión veterinaria.'}
+              </>
+            )}
           </div>
+
+          {evento.estadoResolucion && (
+            <div className="lt-popup-interventor">
+              <i className="bi bi-check2-circle me-1" />
+              Estado: <strong>{ESTADO_ALERTA_LABEL[evento.estadoResolucion] ?? evento.estadoResolucion}</strong>
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -236,13 +264,13 @@ function EventoNodo({ evento, position, index }: NodoProps) {
   ].join(' ');
 
   const label = isAlerta
-    ? TIPO_ALERTA_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? 'Alerta'
+    ? TIPO_ALERTA_LABEL[claveAlerta(evento)] ?? evento.tipo ?? 'Alerta'
     : isEstado
       ? ESTADO_REPRODUCTIVO_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? 'Estado'
       : TIPO_INTERVENCION_LABEL[evento.tipoIntervencion ?? ''] ?? 'Intervención';
 
   const icon = isAlerta
-    ? TIPO_ALERTA_ICON[evento.tipo?.toUpperCase() ?? ''] ?? 'bi-bell-fill'
+    ? TIPO_ALERTA_ICON[claveAlerta(evento)] ?? 'bi-bell-fill'
     : isEstado
       ? 'bi-flag-fill'
       : TIPO_INTERVENCION_ICON[evento.tipoIntervencion?.toUpperCase() ?? ''] ?? 'bi-clipboard2-pulse-fill';

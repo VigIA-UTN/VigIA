@@ -282,6 +282,44 @@ public class DataInitializer implements CommandLineRunner {
         log.info("[DataInitializer] ✅ Animal VIGIA-ARG-009 con historial reproductivo de demo "
                 + "(parto, vacía, celo ml, inseminación, gestante) + una revisión veterinaria con estado de salud.");
 
+        // ── Acto 6: Anestro (demo de la alerta de anestro) ─────────────────────
+        // Animales dedicados (VIGIA-ARG-010/011/012). Las alertas se siembran igual que
+        // las genera AnestroDetectorService (tipo "Anestro Detectado", disparador CELO,
+        // sin ventana de inseminación) con el umbral del establecimiento (45 días por defecto).
+        int umbralAnestro = est.getDiasDeteccionAnestro();
+
+        // 010 — PENDIENTE: tarjeta del sidebar, detalle, dashboard, tabla y línea de tiempo.
+        Animal anestroPendiente = crearAnimal(est, lote1, "10010", "Demo Anestro — pendiente", "Angus",
+                LocalDate.of(2019, 9, 1), "VIGIA-ARG-010", caravanaRepository, animalRepository);
+        sembrarEstadoReproductivo(anestroPendiente, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                LocalDate.now().minusDays(120), hoyDt.minusDays(120));
+        sembrarAlertaAnestro(est, anestroPendiente, EstadoAlerta.PENDIENTE, 119, hoyDt.minusDays(1), null, null);
+
+        // 011 — CONFIRMADA: queda en estado ANESTRO (como al confirmar desde la UI),
+        // así el detector no la vuelve a alertar y la línea de tiempo muestra alerta + estado.
+        Animal anestroConfirmado = crearAnimal(est, lote1, "11011", "Demo Anestro — confirmado", "Hereford",
+                LocalDate.of(2020, 2, 1), "VIGIA-ARG-011", caravanaRepository, animalRepository);
+        sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                LocalDate.now().minusDays(150), hoyDt.minusDays(150));
+        sembrarAlertaAnestro(est, anestroConfirmado, EstadoAlerta.CONFIRMADA, 138, hoyDt.minusDays(12),
+                hoyDt.minusDays(10), vet);
+        sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.ANESTRO, OrigenEstado.MANUAL, vet,
+                LocalDate.now().minusDays(150), hoyDt.minusDays(10));
+
+        // 012 — SIN ALERTA pero califica (parto hace 90 días; la VACIA posterior no reinicia
+        // el conteo): la primera corrida del detector le genera la alerta en vivo por SSE.
+        // Para no esperar a las 2 AM: correr el worker con --vigia.batch.anestro-cron="0 * * * * *".
+        Animal anestroCandidato = crearAnimal(est, lote1, "12012", "Demo Anestro — sin alerta", "Brangus",
+                LocalDate.of(2020, 4, 1), "VIGIA-ARG-012", caravanaRepository, animalRepository);
+        sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                LocalDate.now().minusDays(90), hoyDt.minusDays(90));
+        sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA, productor,
+                null, hoyDt.minusDays(30));
+
+        log.info("[DataInitializer] ✅ Demo de anestro (umbral {} días): VIGIA-ARG-010 alerta PENDIENTE, "
+                + "VIGIA-ARG-011 CONFIRMADA + estado ANESTRO, VIGIA-ARG-012 sin alerta (la genera el detector).",
+                umbralAnestro);
+
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
         log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");
@@ -340,6 +378,26 @@ public class DataInitializer implements CommandLineRunner {
         estado.setOrigen(OrigenEstado.MANUAL);
         estado.setFechaRegistro(fechaHora);
         estadoReproductivoRepository.save(estado);
+    }
+
+    /** Alerta de anestro con los mismos campos y textos que AnestroDetectorService.generarAlertaAnestro. */
+    private void sembrarAlertaAnestro(Establecimiento est, Animal animal, EstadoAlerta estado, long diasSinCiclo,
+                                      LocalDateTime tsGeneracion, LocalDateTime tsConfirmacion, Usuario usuario) {
+        Alerta alerta = new Alerta();
+        alerta.setAnimal(animal);
+        alerta.setTipo(Alerta.TIPO_ANESTRO);
+        alerta.setDisparador(DisparadorAlerta.CELO);
+        alerta.setSeveridad(est.getSeveridadAnestro());
+        alerta.setEstado(estado);
+        alerta.setTsGeneracion(tsGeneracion);
+        alerta.setValorUmbral((double) est.getDiasDeteccionAnestro());
+        alerta.setValorDetectado((double) diasSinCiclo);
+        alerta.setAccionRecomendada("Se requiere revisión veterinaria inmediata. El animal lleva "
+                + diasSinCiclo + " días sin ciclo registrado.");
+        alerta.setPosibleCausa("Anestro prolongado (>" + est.getDiasDeteccionAnestro() + " días)");
+        alerta.setTsConfirmacion(tsConfirmacion);
+        alerta.setUsuarioConfirmacion(usuario);
+        alertaRepository.save(alerta);
     }
 
     private void sembrarRevisionConEstadoSalud(Animal animal, Usuario vet, TipoEstadoSalud estadoSalud,

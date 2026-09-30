@@ -327,6 +327,11 @@ public class AlertaServiceImpl implements AlertaService {
                 Integer confianzaPct = formatConfianzaPct(alerta.getValorDetectado());
                 DisparadorAlerta disparador = alerta.getDisparador();
 
+                if (Alerta.TIPO_ANESTRO.equals(alerta.getTipo())) {
+                        return String.format("El animal no registra celo hace %d días (umbral: %d días).",
+                                        Math.round(alerta.getValorDetectado()), Math.round(alerta.getValorUmbral()));
+                }
+
                 if (disparador == DisparadorAlerta.CELO) {
                         if (confianzaPct != null) {
                                 return String.format(
@@ -439,6 +444,7 @@ public class AlertaServiceImpl implements AlertaService {
                 return AlertaResponse.builder()
                                 .id(alerta.getId())
                                 .tipo(alerta.getDisparador() != null ? alerta.getDisparador().name() : alerta.getTipo())
+                                .subtipo(alerta.getTipo())
                                 .severidad(alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null)
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
@@ -489,7 +495,10 @@ public class AlertaServiceImpl implements AlertaService {
                                 EstadoReproductivo estadoCelo = new EstadoReproductivo();
                                 estadoCelo.setAnimal(alerta.getAnimal());
                                 estadoCelo.setUsuarioRegistrador(usuario);
-                                estadoCelo.setEstado(TipoReproductivo.CELO);
+                                // Confirmar un anestro deja el animal en ANESTRO: el detector no lo vuelve a alertar.
+                                estadoCelo.setEstado(Alerta.TIPO_ANESTRO.equals(alerta.getTipo())
+                                                ? TipoReproductivo.ANESTRO
+                                                : TipoReproductivo.CELO);
                                 estadoCelo.setOrigen(OrigenEstado.MANUAL);
                                 estadoCelo.setFechaRegistro(LocalDateTime.now());
 
@@ -510,8 +519,9 @@ public class AlertaServiceImpl implements AlertaService {
                                 .id(actualizado.getId())
                                 .animalId(actualizado.getAnimal().getId())
                                 .estado(actualizado.getEstado())
-                                .tipo(actualizado.getDisparador() != null ? actualizado.getDisparador().name()
-                                                : actualizado.getTipo())
+                                .tipo(actualizado.getTipo())
+                                .disparador(actualizado.getDisparador())
+                                .accionRecomendada(actualizado.getAccionRecomendada())
                                 .tsGeneracion(actualizado.getTsGeneracion())
                                 .build();
                 rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
@@ -543,6 +553,10 @@ public class AlertaServiceImpl implements AlertaService {
                 if (alerta.getAnimal() == null || alerta.getAnimal().getEstablecimiento() == null ||
                                 !alerta.getAnimal().getEstablecimiento().getId().equals(establecimientoId)) {
                         throw new AccessDeniedException("La alerta no pertenece al establecimiento indicado.");
+                }
+
+                if (Alerta.TIPO_ANESTRO.equals(alerta.getTipo())) {
+                        throw new IllegalArgumentException("Las alertas de anestro no tienen ventana de inseminación.");
                 }
 
                 if (alerta.getEstado() != EstadoAlerta.PENDIENTE) {
@@ -595,6 +609,9 @@ public class AlertaServiceImpl implements AlertaService {
 
                 if (alerta.getDisparador() != DisparadorAlerta.CELO) {
                         throw new IllegalArgumentException("La alerta no es de tipo CELO.");
+                }
+                if (Alerta.TIPO_ANESTRO.equals(alerta.getTipo())) {
+                        throw new IllegalArgumentException("Las alertas de anestro no tienen ventana de inseminación.");
                 }
 
                 LocalDateTime now = LocalDateTime.now();
@@ -778,6 +795,7 @@ public class AlertaServiceImpl implements AlertaService {
                 return switch (estado) {
                         case CONFIRMADA -> "CONFIRMADA";
                         case DESCARTADA -> "DESCARTADA";
+                        case ARCHIVADA -> "ARCHIVADA";
                         default -> "SIN_ATENDER";
                 };
         }
@@ -790,10 +808,12 @@ public class AlertaServiceImpl implements AlertaService {
                                 .tipo(alerta.getDisparador() != null
                                                 ? alerta.getDisparador().name()
                                                 : alerta.getTipo())
+                                .subtipo(alerta.getTipo())
                                 .severidad(alerta.getSeveridad() != null
                                                 ? alerta.getSeveridad().name()
                                                 : null)
                                 .estadoResolucion(resolverEstadoResolucion(alerta.getEstado()))
+                                .descripcion(alerta.getAccionRecomendada())
                                 .build();
         }
 

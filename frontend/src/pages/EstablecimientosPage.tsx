@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 import { Container, Row, Col, Button, Modal, Form, Spinner, Alert } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -83,7 +83,7 @@ export default function EstablecimientosPage() {
     register: registerAnestro,
     handleSubmit: handleSubmitAnestro,
     reset: resetAnestro,
-    watch: watchAnestro,
+    control: controlAnestro,
     setValue: setAnestroValue,
     formState: { errors: errorsAnestro, isDirty: isAnestroD },
   } = useForm<AnestroFormData>({
@@ -91,7 +91,7 @@ export default function EstablecimientosPage() {
     defaultValues: { diasDeteccionAnestro: 45, severidadAnestro: 'MEDIA' },
   });
 
-  const sevActual = watchAnestro('severidadAnestro');
+  const sevActual = useWatch({ control: controlAnestro, name: 'severidadAnestro' });
 
   useEffect(() => {
     const fetchEstablecimientos = async () => {
