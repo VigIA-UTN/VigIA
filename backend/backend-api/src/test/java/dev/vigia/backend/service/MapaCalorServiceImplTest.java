@@ -123,7 +123,9 @@ class MapaCalorServiceImplTest {
     void filtroPorAnimal() {
         usuarioProductor();
         Animal a1 = animal(1L, establecimiento);
-        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, 1L))
+        // El animal no tiene rodeo, por lo que hace un fallback a consultar el establecimiento
+        when(animalRepository.findById(1L)).thenReturn(Optional.of(a1));
+        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
                 .thenReturn(List.of(telemetria(a1, -34.0, -59.0)));
         when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
 
@@ -131,7 +133,7 @@ class MapaCalorServiceImplTest {
 
         GeoAnalyzeRequestDTO request = requestEnviadoAMl();
         assertThat(request.getHistorial7d()).extracting("animalId").containsExactly("1");
-        assertThat(request.getAnimalId()).isNull();
+        assertThat(request.getAnimalId()).isEqualTo("1");
         assertThat(request.getAnimalIds()).isNull();
     }
 
