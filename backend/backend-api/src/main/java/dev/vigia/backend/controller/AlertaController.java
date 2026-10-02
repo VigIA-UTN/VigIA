@@ -20,6 +20,8 @@ import org.springframework.http.MediaType;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.DiagnosticoRequest;
+import dev.vigia.backend.dto.DiagnosticoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.EstadoAlerta;
@@ -315,6 +317,68 @@ public class AlertaController {
             if ("Alerta no encontrada".equals(e.getMessage())) {
                 return ResponseEntity.status(404).body(e.getMessage());
             }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * POST /api/v1/alertas/{id}/diagnosticos
+     * <p>
+     * Registra un diagnóstico veterinario sobre una alerta sanitaria confirmada.
+     * No modifica el estado de la alerta.
+     *
+     * @param alertaId       ID de la alerta diagnosticada
+     * @param request        diagnóstico e indicación o tratamiento
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con el diagnóstico registrado, 400 si hay error, 403 si acceso
+     *         denegado, 404 si la alerta no existe
+     */
+    @PostMapping("/{id}/diagnosticos")
+    @PreAuthorize("hasRole('VETERINARIO')")
+    public ResponseEntity<?> registrarDiagnostico(
+            @PathVariable("id") Long alertaId,
+            @RequestBody DiagnosticoRequest request,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            DiagnosticoResponse response = alertaService.registrarDiagnostico(email, alertaId, request);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Alerta no encontrada".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * GET /api/v1/alertas/diagnosticos?animalId={id}&establecimientoId={id}
+     * <p>
+     * Lista los diagnósticos de los establecimientos a los que pertenece el
+     * usuario, del más reciente al más antiguo. Ambos filtros son opcionales.
+     *
+     * @param animalId          (opcional) solo los diagnósticos de este animal
+     * @param establecimientoId (opcional) solo los de este establecimiento
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista, 403 si el usuario no pertenece al establecimiento
+     *         indicado
+     */
+    @GetMapping("/diagnosticos")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarDiagnosticos(
+            @RequestParam(name = "animalId", required = false) Long animalId,
+            @RequestParam(name = "establecimientoId", required = false) Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<DiagnosticoResponse> response = alertaService.listarDiagnosticos(email, animalId,
+                    establecimientoId);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

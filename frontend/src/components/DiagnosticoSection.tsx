@@ -1,13 +1,10 @@
-import { useMemo, useState } from 'react';
-import { crearDiagnostico, getDiagnosticosPorAnimal } from '../api/diagnosticoApi';
-import { useAuthStore } from '../store/authStore';
+import { useEffect, useState } from 'react';
+import type { DiagnosticoResponse } from '../api/diagnosticoApi';
+import { crearDiagnostico, getDiagnosticos, mensajeErrorDiagnostico } from '../api/diagnosticoApi';
 
 interface DiagnosticoSectionProps {
   alertaId: number;
   animalId: number;
-  animalAlias?: string;
-  animalCaravanaOficial?: string;
-  establecimientoNombre?: string;
   /** Mostrar el formulario de carga (solo rol VETERINARIO). El historial siempre se muestra. */
   showForm: boolean;
 }
@@ -18,45 +15,56 @@ function formatFecha(iso: string) {
   return d.toLocaleString([], { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function DiagnosticoSection({
-  alertaId,
-  animalId,
-  animalAlias,
-  animalCaravanaOficial,
-  establecimientoNombre,
-  showForm,
-}: DiagnosticoSectionProps) {
-  const email = useAuthStore((s) => s.email);
+export default function DiagnosticoSection({ alertaId, animalId, showForm }: DiagnosticoSectionProps) {
   const [diag, setDiag] = useState('');
   const [trat, setTrat] = useState('');
   const [error, setError] = useState(false);
-  const [version, setVersion] = useState(0);
+  const [enviando, setEnviando] = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
-  const historial = useMemo(
-    () => getDiagnosticosPorAnimal(animalId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `version` forces a re-read of the mock store after a submit
-    [animalId, version],
-  );
+  const [historial, setHistorial] = useState<DiagnosticoResponse[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(true);
+  const [errorHistorial, setErrorHistorial] = useState(false);
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    let isMounted = true;
+    const fetchHistorial = async () => {
+      setLoadingHistorial(true);
+      setErrorHistorial(false);
+      try {
+        const data = await getDiagnosticos({ animalId });
+        if (isMounted) setHistorial(data);
+      } catch (err) {
+        console.error('Error cargando historial clínico:', err);
+        if (isMounted) setErrorHistorial(true);
+      } finally {
+        if (isMounted) setLoadingHistorial(false);
+      }
+    };
+    fetchHistorial();
+    return () => {
+      isMounted = false;
+    };
+  }, [animalId]);
+
+  const handleSubmit = async () => {
     if (!diag.trim()) {
       setError(true);
       return;
     }
-    crearDiagnostico({
-      alertaId,
-      animalId,
-      animalAlias: animalAlias ?? `Vaca #${animalId}`,
-      animalCaravanaOficial: animalCaravanaOficial ?? '',
-      establecimientoNombre: establecimientoNombre ?? '',
-      diagnostico: diag.trim(),
-      tratamiento: trat.trim() || '—',
-      veterinarioNombre: email ?? 'Veterinario',
-    });
-    setVersion((v) => v + 1);
-    setDiag('');
-    setTrat('');
-    setError(false);
+    setEnviando(true);
+    setErrorEnvio(null);
+    try {
+      const nuevo = await crearDiagnostico(alertaId, { diagnostico: diag.trim(), tratamiento: trat.trim() });
+      setHistorial((h) => [nuevo, ...h]);
+      setDiag('');
+      setTrat('');
+      setError(false);
+    } catch (err) {
+      setErrorEnvio(mensajeErrorDiagnostico(err));
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
@@ -98,9 +106,11 @@ export default function DiagnosticoSection({
                 className="btn rounded-3 fw-semibold py-2"
                 style={{ backgroundColor: '#94C11E', color: 'white', border: '1px solid #94C11E' }}
                 onClick={handleSubmit}
+                disabled={enviando}
               >
-                Registrar diagnóstico
+                {enviando ? 'Registrando...' : 'Registrar diagnóstico'}
               </button>
+              {errorEnvio && <span role="alert" style={{ color: '#D50000', fontSize: '0.85rem' }}>{errorEnvio}</span>}
             </div>
           </div>
         </div>
@@ -112,7 +122,20 @@ export default function DiagnosticoSection({
             Historial clínico
           </h6>
         </div>
-        {historial.length === 0 ? (
+        {loadingHistorial ? (
+          <div className="d-flex align-items-center gap-2 text-muted">
+            <div className="spinner-border spinner-border-sm" role="status"><span className="visually-hidden">Cargando...</span></div>
+            <small>Cargando historial clínico...</small>
+          </div>
+        ) : errorHistorial ? (
+          <div className="card border-0 shadow-sm rounded-4">
+            <div className="card-body">
+              <p className="m-0" style={{ fontSize: '0.95rem', color: '#D50000' }}>
+                No se pudo cargar el historial clínico.
+              </p>
+            </div>
+          </div>
+        ) : historial.length === 0 ? (
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body">
               <p className="m-0" style={{ fontSize: '0.95rem', color: '#5A6670' }}>
@@ -127,7 +150,7 @@ export default function DiagnosticoSection({
                 <div className="card-body d-flex flex-column gap-1">
                   <small style={{ color: '#5A6670' }}>{formatFecha(h.fechaRegistro)} · {h.veterinarioNombre}</small>
                   <span style={{ fontSize: '1.05rem', fontWeight: 500, color: '#1E3A5F' }}>{h.diagnostico}</span>
-                  <p className="m-0" style={{ fontSize: '0.95rem', color: '#263238' }}>{h.tratamiento}</p>
+                  <p className="m-0" style={{ fontSize: '0.95rem', color: '#263238' }}>{h.tratamiento || '—'}</p>
                 </div>
               </div>
             ))}

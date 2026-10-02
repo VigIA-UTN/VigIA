@@ -3,7 +3,7 @@ package dev.vigia.backend.model;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "diagnosticos")
@@ -35,7 +35,7 @@ public class Diagnostico {
     private String indicaciones;
 
     @Column(name = "fecha", nullable = false)
-    private LocalDate fecha;
+    private LocalDateTime fecha;
 
     @Column(name = "observaciones", columnDefinition = "TEXT")
     private String observaciones;

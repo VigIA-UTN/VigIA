@@ -14,6 +14,7 @@ import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.dto.RegistroPesoRequest;
 import dev.vigia.backend.dto.RegistroPesoResponse;
@@ -44,6 +45,8 @@ public interface AnimalService {
         List<EstadoReproductivoResponse> listarEstadosReproductivos(Long animalId, String emailUsuario);
 
         List<IntervencionResponse> listarIntervenciones(Long animalId, String emailUsuario);
+
+        IntervencionResponse registrarIntervencion(Long animalId, String emailUsuario, IntervencionRequest request);
 
         EstadoSaludResponse registrarEstadoSalud(Long animalId, String emailProductor,
                         EstadoSaludRequest request);

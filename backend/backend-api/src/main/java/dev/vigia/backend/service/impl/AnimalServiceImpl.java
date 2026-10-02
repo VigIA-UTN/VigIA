@@ -40,6 +40,7 @@ import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.dto.RegistroPesoRequest;
 import dev.vigia.backend.dto.RegistroPesoResponse;
@@ -53,6 +54,8 @@ import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.PerfilReferencia;
 import dev.vigia.backend.model.EstadoSalud;
+import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.RegistroPeso;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
@@ -844,27 +847,83 @@ public class AnimalServiceImpl implements AnimalService {
                 }
 
                 return intervencionRepository.findByAnimalIdOrderByFechaHoraDesc(animalId).stream()
-                                .map(i -> {
-                                        String interventorStr = i.getInterventor().getNombre();
-                                        if (i.getInterventor().getApellido() != null
-                                                        && !i.getInterventor().getApellido().isEmpty()) {
-                                                interventorStr += " " + i.getInterventor().getApellido();
-                                        }
-                                        if (interventorStr == null || interventorStr.isBlank()) {
-                                                interventorStr = i.getInterventor().getEmail();
-                                        }
-
-                                        return dev.vigia.backend.dto.IntervencionResponse.builder()
-                                                        .id(i.getId())
-                                                        .alertaId(i.getAlerta() != null ? i.getAlerta().getId() : null)
-                                                        .animalId(i.getAnimal().getId())
-                                                        .interventor(interventorStr)
-                                                        .descripcion(i.getDescripcion())
-                                                        .fechaHora(i.getFechaHora())
-                                                        .tipo(i.getTipo())
-                                                        .build();
-                                })
+                                .map(this::toIntervencionResponse)
                                 .collect(Collectors.toList());
+        }
+
+        /**
+         * Registra una intervención sobre un animal sin alerta asociada. No genera
+         * estados derivados (a diferencia de intervenir una alerta).
+         */
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public IntervencionResponse registrarIntervencion(Long animalId, String emailUsuario,
+                        IntervencionRequest request) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                if (animal.getEstadoActual() == EstadoAnimal.INACTIVO) {
+                        throw new IllegalArgumentException(
+                                        "No se pueden registrar intervenciones en animales inactivos.");
+                }
+
+                if (request.getTipo() == null) {
+                        throw new IllegalArgumentException("El tipo de intervención es obligatorio.");
+                }
+                if (request.getTipo() == TipoIntervencion.INSEMINACION) {
+                        throw new IllegalArgumentException(
+                                        "Las inseminaciones no se registran como intervención manual.");
+                }
+
+                String descripcion = request.getDescripcion() != null ? request.getDescripcion().trim() : "";
+                if (descripcion.isEmpty()) {
+                        throw new IllegalArgumentException("La descripción es obligatoria.");
+                }
+                if (descripcion.length() > 1000) {
+                        throw new IllegalArgumentException("La descripción no puede superar los 1000 caracteres.");
+                }
+
+                LocalDateTime ahora = LocalDateTime.now();
+                // 1 min de tolerancia por diferencias de reloj entre navegador y servidor.
+                if (request.getFechaHora() != null && request.getFechaHora().isAfter(ahora.plusMinutes(1))) {
+                        throw new IllegalArgumentException("La fecha y hora de la intervención no puede ser futura.");
+                }
+
+                Intervencion intervencion = new Intervencion();
+                intervencion.setAnimal(animal);
+                intervencion.setInterventor(usuario);
+                intervencion.setTipo(request.getTipo());
+                intervencion.setDescripcion(descripcion);
+                intervencion.setFechaHora(request.getFechaHora() != null ? request.getFechaHora() : ahora);
+
+                return toIntervencionResponse(intervencionRepository.save(intervencion));
+        }
+
+        private IntervencionResponse toIntervencionResponse(Intervencion i) {
+                String interventorStr = i.getInterventor().getNombre();
+                if (i.getInterventor().getApellido() != null
+                                && !i.getInterventor().getApellido().isEmpty()) {
+                        interventorStr += " " + i.getInterventor().getApellido();
+                }
+                if (interventorStr == null || interventorStr.isBlank()) {
+                        interventorStr = i.getInterventor().getEmail();
+                }
+
+                return IntervencionResponse.builder()
+                                .id(i.getId())
+                                .alertaId(i.getAlerta() != null ? i.getAlerta().getId() : null)
+                                .animalId(i.getAnimal().getId())
+                                .interventor(interventorStr)
+                                .descripcion(i.getDescripcion())
+                                .fechaHora(i.getFechaHora())
+                                .tipo(i.getTipo())
+                                .build();
         }
 
         private AlertaResponse alertaToAlertaResponse(Alerta alerta) {

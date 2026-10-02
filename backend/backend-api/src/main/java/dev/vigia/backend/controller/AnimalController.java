@@ -31,6 +31,7 @@ import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.dto.RegistroPesoRequest;
@@ -326,6 +327,38 @@ public class AnimalController {
             List<IntervencionResponse> response = animalService.listarIntervenciones(animalId, email);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * POST /api/v1/animales/{id}/intervenciones
+     * <p>
+     * Registra una intervención (tratamiento, vacunación, revisión veterinaria u
+     * otra) sobre un animal, sin alerta asociada.
+     *
+     * @param animalId       ID del animal
+     * @param request        tipo, fecha/hora (opcional) y descripción
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 201 con la intervención creada, 400 si hay error, 403 si acceso
+     *         denegado, 404 si el animal no existe
+     */
+    @PostMapping("/{id}/intervenciones")
+    @PreAuthorize("hasRole('VETERINARIO')")
+    public ResponseEntity<?> registrarIntervencion(
+            @PathVariable("id") Long animalId,
+            @RequestBody IntervencionRequest request,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            IntervencionResponse response = animalService.registrarIntervencion(animalId, email, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Animal no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

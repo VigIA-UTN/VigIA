@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AuthRequest;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.Diagnostico;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
@@ -15,6 +16,7 @@ import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.DiagnosticoRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
@@ -76,6 +78,8 @@ class AlertaControllerTest {
     private InvitacionRepository invitacionRepository;
     @Autowired
     private EstadoReproductivoRepository estadoReproductivoRepository;
+    @Autowired
+    private DiagnosticoRepository diagnosticoRepository;
 
     private Long alertaId;
     private Long alertaOtroEstId;
@@ -684,6 +688,255 @@ class AlertaControllerTest {
     }
 
     // =========================================================================
+    // Diagnósticos
+    // =========================================================================
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta sanitaria confirmada → 200 con vínculo a alerta y dato de origen, sin cambiar la alerta")
+    @SuppressWarnings("null")
+    void registrarDiagnostico_veterinario_alertaSaludConfirmada_returns200() throws Exception {
+        Animal animal = alertaRepository.findById(alertaId).orElseThrow().getAnimal();
+        Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
+        LocalDateTime tsConfirmacion = LocalDateTime.of(2026, 9, 30, 8, 15);
+
+        Alerta salud = new Alerta();
+        salud.setAnimal(animal);
+        salud.setDisparador(DisparadorAlerta.SALUD);
+        salud.setTipo("SALUD");
+        salud.setSeveridad(SeveridadAlerta.ALTA);
+        salud.setEstado(EstadoAlerta.CONFIRMADA);
+        salud.setTsGeneracion(LocalDateTime.now());
+        salud.setTsConfirmacion(tsConfirmacion);
+        salud.setUsuarioConfirmacion(productor);
+        salud.setValorUmbral(0.5);
+        salud.setValorDetectado(0.9);
+        salud = alertaRepository.save(salud);
+
+        mockMvc.perform(post("/api/v1/alertas/{id}/diagnosticos", salud.getId())
+                .header("Authorization", "Bearer " + veterinarioToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"diagnostico\":\"Neumonía leve\",\"tratamiento\":\"Oxitetraciclina LA 20 mg/kg IM\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.alertaId").value(salud.getId()))
+                .andExpect(jsonPath("$.animalId").value(animal.getId()))
+                .andExpect(jsonPath("$.animalCaravanaOficial").value("CAR-001"))
+                .andExpect(jsonPath("$.establecimientoNombre").value("Estancia Test"))
+                .andExpect(jsonPath("$.diagnostico").value("Neumonía leve"))
+                .andExpect(jsonPath("$.tratamiento").value("Oxitetraciclina LA 20 mg/kg IM"))
+                .andExpect(jsonPath("$.veterinarioNombre").value("veterinario"))
+                .andExpect(jsonPath("$.disparador").value("SALUD"))
+                .andExpect(jsonPath("$.datoOrigen").isNotEmpty())
+                .andExpect(jsonPath("$.fechaRegistro").value(org.hamcrest.Matchers.matchesPattern(
+                        "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}.*")));
+
+        Alerta despues = alertaRepository.findById(salud.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(EstadoAlerta.CONFIRMADA, despues.getEstado());
+        org.junit.jupiter.api.Assertions.assertEquals(tsConfirmacion, despues.getTsConfirmacion());
+        org.junit.jupiter.api.Assertions.assertEquals(productor.getId(), despues.getUsuarioConfirmacion().getId());
+        org.junit.jupiter.api.Assertions.assertEquals(1, diagnosticoRepository.count());
+    }
+
+    private static final String DIAGNOSTICO_OK = "{\"diagnostico\":\"Neumonía leve\",\"tratamiento\":\"Reposo\"}";
+
+    @Test
+    @DisplayName("Registrar diagnóstico como PRODUCTOR → 403")
+    void registrarDiagnostico_productor_returns403() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(productorToken, id, DIAGNOSTICO_OK).andExpect(status().isForbidden());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico como CAMPERO → 403")
+    void registrarDiagnostico_campero_returns403() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(camperoToken, id, DIAGNOSTICO_OK).andExpect(status().isForbidden());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico como ADMINISTRADOR → 403")
+    void registrarDiagnostico_administrador_returns403() throws Exception {
+        crearUsuario("admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+        String adminToken = getTokenFor("admin@vigia.dev", "admin123");
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(adminToken, id, DIAGNOSTICO_OK).andExpect(status().isForbidden());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta de otro establecimiento → 403")
+    @SuppressWarnings("null")
+    void registrarDiagnostico_alertaDeOtroEstablecimiento_returns403() throws Exception {
+        Animal animalAjeno = alertaRepository.findById(alertaOtroEstId).orElseThrow().getAnimal();
+        Long id = crearAlerta(animalAjeno, DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isForbidden());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta de CELO confirmada → 400")
+    void registrarDiagnostico_alertaNoSanitaria_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.CELO, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta sanitaria PENDIENTE → 400")
+    void registrarDiagnostico_alertaPendiente_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.PENDIENTE);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta sanitaria DESCARTADA → 400")
+    void registrarDiagnostico_alertaDescartada_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.DESCARTADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico vacío → 400")
+    void registrarDiagnostico_diagnosticoVacio_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, "{\"diagnostico\":\"   \",\"tratamiento\":\"Reposo\"}")
+                .andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sin campo diagnostico → 400")
+    void registrarDiagnostico_sinDiagnostico_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, "{\"tratamiento\":\"Reposo\"}").andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico de más de 200 caracteres → 400")
+    void registrarDiagnostico_diagnosticoMuyLargo_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        String body = "{\"diagnostico\":\"" + "a".repeat(201) + "\"}";
+        postDiagnostico(veterinarioToken, id, body).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar tratamiento de más de 500 caracteres → 400")
+    void registrarDiagnostico_tratamientoMuyLargo_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        String body = "{\"diagnostico\":\"Neumonía\",\"tratamiento\":\"" + "a".repeat(501) + "\"}";
+        postDiagnostico(veterinarioToken, id, body).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sin tratamiento → 200 con tratamiento vacío")
+    void registrarDiagnostico_sinTratamiento_returns200() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, "{\"diagnostico\":\"Neumonía leve\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tratamiento").value(""));
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta inexistente → 404")
+    void registrarDiagnostico_alertaInexistente_returns404() throws Exception {
+        postDiagnostico(veterinarioToken, 999999L, DIAGNOSTICO_OK).andExpect(status().isNotFound());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos de un animal → más reciente primero, mismo formato que el POST")
+    void listarDiagnosticos_porAnimal_masRecientePrimero() throws Exception {
+        Animal animal = animalPropio();
+        Long id = crearAlerta(animal, DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, "{\"diagnostico\":\"Primero\"}").andExpect(status().isOk());
+        postDiagnostico(veterinarioToken, id, "{\"diagnostico\":\"Segundo\",\"tratamiento\":\"Control\"}")
+                .andExpect(status().isOk());
+
+        getDiagnosticos(veterinarioToken, "animalId", animal.getId().toString())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].diagnostico").value("Segundo"))
+                .andExpect(jsonPath("$[0].tratamiento").value("Control"))
+                .andExpect(jsonPath("$[0].alertaId").value(id))
+                .andExpect(jsonPath("$[0].animalCaravanaOficial").value("CAR-001"))
+                .andExpect(jsonPath("$[0].establecimientoNombre").value("Estancia Test"))
+                .andExpect(jsonPath("$[0].veterinarioNombre").value("veterinario"))
+                .andExpect(jsonPath("$[0].disparador").value("SALUD"))
+                .andExpect(jsonPath("$[0].datoOrigen").isNotEmpty())
+                .andExpect(jsonPath("$[1].diagnostico").value("Primero"));
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos sin filtros como PRODUCTOR → ve los de su establecimiento")
+    void listarDiagnosticos_sinFiltros_productorDelEstablecimiento() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isOk());
+
+        getDiagnosticos(productorToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].alertaId").value(id));
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos filtrando por establecimiento propio → 200")
+    @SuppressWarnings("null")
+    void listarDiagnosticos_establecimientoPropio_returns200() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isOk());
+
+        getDiagnosticos(veterinarioToken, "establecimientoId", establecimientoId.toString())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos de otro establecimiento → no se ven (animal ajeno vacío, sin filtros no aparecen)")
+    @SuppressWarnings("null")
+    void listarDiagnosticos_deOtroEstablecimiento_noSeVen() throws Exception {
+        Alerta alertaAjena = alertaRepository.findById(alertaOtroEstId).orElseThrow();
+        Diagnostico ajeno = new Diagnostico();
+        ajeno.setAlerta(alertaAjena);
+        ajeno.setAnimal(alertaAjena.getAnimal());
+        ajeno.setVeterinario(usuarioRepository.findByEmail("veterinario@vigia.dev").orElseThrow());
+        ajeno.setDiagnostico("Diagnóstico ajeno");
+        ajeno.setIndicaciones("");
+        ajeno.setFecha(LocalDateTime.now());
+        diagnosticoRepository.save(ajeno);
+
+        getDiagnosticos(veterinarioToken, "animalId", alertaAjena.getAnimal().getId().toString())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        getDiagnosticos(veterinarioToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos de un establecimiento ajeno → 403")
+    @SuppressWarnings("null")
+    void listarDiagnosticos_establecimientoAjeno_returns403() throws Exception {
+        Long otroEstId = alertaRepository.findById(alertaOtroEstId).orElseThrow()
+                .getAnimal().getEstablecimiento().getId();
+        getDiagnosticos(veterinarioToken, "establecimientoId", otroEstId.toString())
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos como ADMINISTRADOR → 403")
+    void listarDiagnosticos_administrador_returns403() throws Exception {
+        crearUsuario("admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+        getDiagnosticos(getTokenFor("admin@vigia.dev", "admin123")).andExpect(status().isForbidden());
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 
@@ -696,6 +949,42 @@ class AlertaControllerTest {
         u.setActivo(true);
         u.setFechaAlta(LocalDate.now());
         return usuarioRepository.save(u);
+    }
+
+    @SuppressWarnings("null")
+    private Animal animalPropio() {
+        return alertaRepository.findById(alertaId).orElseThrow().getAnimal();
+    }
+
+    private Long crearAlerta(Animal animal, DisparadorAlerta disparador, EstadoAlerta estado) {
+        Alerta a = new Alerta();
+        a.setAnimal(animal);
+        a.setDisparador(disparador);
+        a.setEstado(estado);
+        a.setTsGeneracion(LocalDateTime.now());
+        a.setValorUmbral(0.5);
+        a.setValorDetectado(0.9);
+        return alertaRepository.save(a).getId();
+    }
+
+    @SuppressWarnings("null")
+    private org.springframework.test.web.servlet.ResultActions postDiagnostico(String token, Long alertaId, String body)
+            throws Exception {
+        return mockMvc.perform(post("/api/v1/alertas/{id}/diagnosticos", alertaId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body));
+    }
+
+    @SuppressWarnings("null")
+    private org.springframework.test.web.servlet.ResultActions getDiagnosticos(String token, String... params)
+            throws Exception {
+        var req = MockMvcRequestBuilders.get("/api/v1/alertas/diagnosticos")
+                .header("Authorization", "Bearer " + token);
+        for (int i = 0; i < params.length; i += 2) {
+            req.param(params[i], params[i + 1]);
+        }
+        return mockMvc.perform(req);
     }
 
     @SuppressWarnings("null")

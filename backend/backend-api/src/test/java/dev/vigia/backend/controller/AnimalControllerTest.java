@@ -1509,6 +1509,193 @@ class AnimalControllerTest {
         }
 
         @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Veterinario registra intervención sin alerta → 201")
+        @SuppressWarnings("null")
+        void registrarIntervencion_veterinario_returns201() throws Exception {
+                Long animalId = crearAnimal("Vaca Intervencion", establecimientoId, rodeoLoteId);
+                String fechaHora = LocalDateTime.now().minusDays(1).withSecond(0).withNano(0).toString();
+                long estadosSaludAntes = estadoSaludRepository.count();
+                long estadosReproAntes = estadoReproductivoRepository.count();
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/intervenciones")
+                                .header("Authorization", "Bearer " + veterinarioToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"tipo\":\"TRATAMIENTO\",\"fechaHora\":\"" + fechaHora
+                                                + "\",\"descripcion\":\"  Pediluvio con sulfato de cobre 5 %  \"}"))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.id").isNumber())
+                                .andExpect(jsonPath("$.alertaId").doesNotExist())
+                                .andExpect(jsonPath("$.animalId").value(animalId))
+                                .andExpect(jsonPath("$.interventor").value("Veterinario"))
+                                .andExpect(jsonPath("$.tipo").value("TRATAMIENTO"))
+                                .andExpect(jsonPath("$.descripcion").value("Pediluvio con sulfato de cobre 5 %"))
+                                .andExpect(jsonPath("$.fechaHora").value(org.hamcrest.Matchers.startsWith(fechaHora)));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/intervenciones")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].descripcion").value("Pediluvio con sulfato de cobre 5 %"));
+
+                assertThat(estadoSaludRepository.count()).isEqualTo(estadosSaludAntes);
+                assertThat(estadoReproductivoRepository.count()).isEqualTo(estadosReproAntes);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Sin fechaHora usa la hora actual")
+        @SuppressWarnings("null")
+        void registrarIntervencion_sinFechaHora_usaAhora() throws Exception {
+                Long animalId = crearAnimal("Vaca Intervencion Sin Fecha", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/intervenciones")
+                                .header("Authorization", "Bearer " + veterinarioToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"tipo\":\"VACUNACION\",\"descripcion\":\"Antiaftosa 2 ml SC\"}"))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.fechaHora").value(org.hamcrest.Matchers.startsWith(
+                                                LocalDate.now().toString())));
+        }
+
+        private static final String INTERVENCION_OK = "{\"tipo\":\"TRATAMIENTO\",\"descripcion\":\"Ivermectina 1 %\"}";
+
+        @SuppressWarnings("null")
+        private org.springframework.test.web.servlet.ResultActions postIntervencion(String token, Long animalId,
+                        String body) throws Exception {
+                return mockMvc.perform(post("/api/v1/animales/" + animalId + "/intervenciones")
+                                .header("Authorization", "Bearer " + token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - PRODUCTOR → 403")
+        void registrarIntervencion_productor_returns403() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Productor", establecimientoId, rodeoLoteId);
+                postIntervencion(productorToken, animalId, INTERVENCION_OK).andExpect(status().isForbidden());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - CAMPERO → 403")
+        void registrarIntervencion_campero_returns403() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Campero", establecimientoId, rodeoLoteId);
+                postIntervencion(camperoToken, animalId, INTERVENCION_OK).andExpect(status().isForbidden());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - ADMINISTRADOR → 403")
+        void registrarIntervencion_administrador_returns403() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Admin", establecimientoId, rodeoLoteId);
+                postIntervencion(adminToken, animalId, INTERVENCION_OK).andExpect(status().isForbidden());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Veterinario de otro establecimiento → 403")
+        @SuppressWarnings("null")
+        void registrarIntervencion_veterinarioAjeno_returns403() throws Exception {
+                Usuario otroVet = new Usuario();
+                otroVet.setEmail("otrovet@vigia.dev");
+                otroVet.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroVet.setNombre("Otro Vet");
+                otroVet.setRol(Rol.VETERINARIO);
+                otroVet.setActivo(true);
+                otroVet = usuarioRepository.save(otroVet);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Intv");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroVet));
+                establecimientoRepository.save(otroEst);
+
+                Long animalId = crearAnimal("Vaca Intv Ajena", establecimientoId, rodeoLoteId);
+                postIntervencion(getTokenFor("otrovet@vigia.dev", "otro123"), animalId, INTERVENCION_OK)
+                                .andExpect(status().isForbidden());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Animal inexistente → 404")
+        void registrarIntervencion_animalInexistente_returns404() throws Exception {
+                postIntervencion(veterinarioToken, 999999L, INTERVENCION_OK).andExpect(status().isNotFound());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Animal INACTIVO → 400")
+        @SuppressWarnings("null")
+        void registrarIntervencion_animalInactivo_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Inactiva", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                animal.setEstadoActual(EstadoAnimal.INACTIVO);
+                animalRepository.save(animal);
+
+                postIntervencion(veterinarioToken, animalId, INTERVENCION_OK).andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Sin tipo → 400")
+        void registrarIntervencion_sinTipo_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Sin Tipo", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId, "{\"descripcion\":\"Algo\"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - INSEMINACION → 400")
+        void registrarIntervencion_inseminacion_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Inseminacion", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId, "{\"tipo\":\"INSEMINACION\",\"descripcion\":\"IA\"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Descripción vacía → 400")
+        void registrarIntervencion_descripcionVacia_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Desc Vacia", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId, "{\"tipo\":\"OTRO\",\"descripcion\":\"   \"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Sin descripción → 400")
+        void registrarIntervencion_sinDescripcion_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Sin Desc", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId, "{\"tipo\":\"OTRO\"}").andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Descripción de más de 1000 caracteres → 400")
+        void registrarIntervencion_descripcionMuyLarga_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Desc Larga", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId,
+                                "{\"tipo\":\"OTRO\",\"descripcion\":\"" + "a".repeat(1001) + "\"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - fechaHora futura → 400")
+        void registrarIntervencion_fechaFutura_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Futura", establecimientoId, rodeoLoteId);
+                String manana = LocalDateTime.now().plusDays(1).withSecond(0).withNano(0).toString();
+                postIntervencion(veterinarioToken, animalId,
+                                "{\"tipo\":\"OTRO\",\"fechaHora\":\"" + manana + "\",\"descripcion\":\"Futuro\"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
         @DisplayName("POST /api/v1/animales/{id}/estado-salud - Éxito (Productor)")
         @SuppressWarnings("null")
         void registrarEstadoSalud_exito() throws Exception {

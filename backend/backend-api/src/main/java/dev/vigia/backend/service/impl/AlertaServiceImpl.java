@@ -18,6 +18,8 @@ import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.DetalleSanitarioResponse;
 import dev.vigia.backend.dto.DetalleGeoespacialResponse;
+import dev.vigia.backend.dto.DiagnosticoRequest;
+import dev.vigia.backend.dto.DiagnosticoResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
@@ -25,12 +27,14 @@ import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.Diagnostico;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.DiagnosticoRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
@@ -62,6 +66,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final IntervencionRepository intervencionRepository;
         private final EstadoReproductivoRepository estadoReproductivoRepository;
         private final EstadoSaludRepository estadoSaludRepository;
+        private final DiagnosticoRepository diagnosticoRepository;
         private final RabbitTemplate rabbitTemplate;
         private final ObjectMapper objectMapper;
 
@@ -718,6 +723,126 @@ public class AlertaServiceImpl implements AlertaService {
                 registrarEstadoDerivado(intervencion, request, usuario);
 
                 return this.toResponse(alerta);
+        }
+
+        /**
+         * Registra un diagnóstico veterinario sobre una alerta sanitaria confirmada
+         * de un establecimiento del usuario. Solo inserta en diagnosticos: no
+         * modifica la alerta ni publica eventos.
+         */
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public DiagnosticoResponse registrarDiagnostico(String emailUsuario, Long alertaId, DiagnosticoRequest request) {
+
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada"));
+
+                Usuario veterinario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+                Long establecimientoId = alerta.getAnimal().getEstablecimiento().getId();
+                boolean perteneceAlEstablecimiento = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario).stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException("No tiene permiso para diagnosticar esta alerta");
+                }
+
+                if (alerta.getDisparador() != DisparadorAlerta.SALUD) {
+                        throw new IllegalArgumentException(
+                                        "Solo se pueden registrar diagnósticos sobre alertas sanitarias.");
+                }
+
+                if (alerta.getEstado() != EstadoAlerta.CONFIRMADA) {
+                        throw new IllegalArgumentException(
+                                        "La alerta debe estar confirmada antes de registrar un diagnóstico.");
+                }
+
+                String texto = request.getDiagnostico() != null ? request.getDiagnostico().trim() : "";
+                String tratamiento = request.getTratamiento() != null ? request.getTratamiento().trim() : "";
+                if (texto.isEmpty()) {
+                        throw new IllegalArgumentException("El diagnóstico es obligatorio.");
+                }
+                if (texto.length() > 200) {
+                        throw new IllegalArgumentException("El diagnóstico no puede superar los 200 caracteres.");
+                }
+                if (tratamiento.length() > 500) {
+                        throw new IllegalArgumentException(
+                                        "La indicación o tratamiento no puede superar los 500 caracteres.");
+                }
+
+                Diagnostico diagnostico = new Diagnostico();
+                diagnostico.setAlerta(alerta);
+                diagnostico.setAnimal(alerta.getAnimal());
+                diagnostico.setVeterinario(veterinario);
+                diagnostico.setDiagnostico(texto);
+                diagnostico.setIndicaciones(tratamiento);
+                diagnostico.setFecha(LocalDateTime.now());
+
+                return toDiagnosticoResponse(diagnosticoRepository.save(diagnostico));
+        }
+
+        /**
+         * Lista los diagnósticos de los establecimientos activos del usuario,
+         * opcionalmente restringidos a un establecimiento y/o a un animal.
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public List<DiagnosticoResponse> listarDiagnosticos(String emailUsuario, Long animalId, Long establecimientoId) {
+
+                List<Long> ids = establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(emailUsuario)
+                                .stream().map(Establecimiento::getId).toList();
+
+                if (establecimientoId != null) {
+                        if (!ids.contains(establecimientoId)) {
+                                throw new AccessDeniedException(
+                                                "El usuario no pertenece al establecimiento indicado o no está activo.");
+                        }
+                        ids = List.of(establecimientoId);
+                }
+
+                if (ids.isEmpty()) {
+                        return List.of();
+                }
+
+                // ponytail: sin paginación, agregar Pageable cuando un veterinario tenga cientos de diagnósticos
+                return diagnosticoRepository.findVisibles(ids, animalId).stream()
+                                .map(this::toDiagnosticoResponse)
+                                .toList();
+        }
+
+        private DiagnosticoResponse toDiagnosticoResponse(Diagnostico d) {
+                Alerta alerta = d.getAlerta();
+                Animal animal = d.getAnimal();
+                Usuario vet = d.getVeterinario();
+
+                String veterinarioNombre = vet.getNombre();
+                if (vet.getApellido() != null && !vet.getApellido().isEmpty()) {
+                        veterinarioNombre += " " + vet.getApellido();
+                }
+                if (veterinarioNombre == null || veterinarioNombre.isBlank()) {
+                        veterinarioNombre = vet.getEmail();
+                }
+
+                DetalleSanitarioResponse detalleSanitario = alerta.getDisparador() == DisparadorAlerta.SALUD
+                                ? construirDetalleSanitario(alerta)
+                                : null;
+
+                return DiagnosticoResponse.builder()
+                                .id(d.getId())
+                                .alertaId(alerta.getId())
+                                .animalId(animal.getId())
+                                .animalAlias(animal.getAlias())
+                                .animalCaravanaOficial(animal.getIdCaravanaOficial())
+                                .establecimientoNombre(animal.getEstablecimiento().getNombre())
+                                .diagnostico(d.getDiagnostico())
+                                .tratamiento(d.getIndicaciones())
+                                .fechaRegistro(d.getFecha())
+                                .veterinarioNombre(veterinarioNombre)
+                                .disparador(alerta.getDisparador() != null ? alerta.getDisparador().name() : null)
+                                .datoOrigen(construirDescripcionDatoOrigen(alerta, detalleSanitario))
+                                .build();
         }
 
         @Override
