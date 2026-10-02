@@ -139,7 +139,7 @@ export default function ConfiguracionEstablecimientoPage() {
     );
   }
 
-  if (errorGlobal && !establecimiento) {
+  if (errorGlobal && !config) {
     return (
       <div className="cfg-page">
         <div className="cfg-error-state">
