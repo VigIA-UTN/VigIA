@@ -62,6 +62,9 @@ class ConfigAnestroControllerTest {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private EstablecimientoRepository establecimientoRepository;
     @Autowired private InvitacionRepository invitacionRepository;
+    @Autowired private dev.vigia.backend.repository.AnimalRepository animalRepository;
+    @Autowired private dev.vigia.backend.repository.RodeoLoteRepository rodeoLoteRepository;
+    @Autowired private dev.vigia.backend.repository.EstadoReproductivoRepository estadoReproductivoRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private AuthService authService;
 
@@ -82,6 +85,9 @@ class ConfigAnestroControllerTest {
     @SuppressWarnings("null")
     void setUp() throws Exception {
         // Limpieza ordenada para evitar FK violations
+        estadoReproductivoRepository.deleteAll();
+        animalRepository.deleteAll();
+        rodeoLoteRepository.deleteAll();
         invitacionRepository.deleteAll();
         establecimientoRepository.deleteAll();
         usuarioRepository.deleteAll();
