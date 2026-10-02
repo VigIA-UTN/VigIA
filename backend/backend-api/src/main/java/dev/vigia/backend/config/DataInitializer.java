@@ -17,8 +17,10 @@ import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
+import dev.vigia.backend.repository.DiagnosticoRepository;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.Diagnostico;
 import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.EstadoAlerta;
@@ -66,6 +68,7 @@ public class DataInitializer implements CommandLineRunner {
     private final EstadoSaludRepository estadoSaludRepository;
     private final AlertaRepository alertaRepository;
     private final IntervencionRepository intervencionRepository;
+    private final DiagnosticoRepository diagnosticoRepository;
     private final CaravanaRepository caravanaRepository;
     private final TelemetriaRepository telemetriaRepository;
     private final PasswordEncoder passwordEncoder;
@@ -82,6 +85,7 @@ public class DataInitializer implements CommandLineRunner {
         }
         telemetriaRepository.deleteAll();
         intervencionRepository.deleteAll();
+        diagnosticoRepository.deleteAll();
         alertaRepository.deleteAll();
         estadoReproductivoRepository.deleteAll();
         estadoSaludRepository.deleteAll();
@@ -238,10 +242,17 @@ public class DataInitializer implements CommandLineRunner {
 
         // 6b — ALTA, CONFIRMADA hace ~4 días: hiperactividad sostenida por
         // encima del perfil. Estado no accionable + el animal queda con 2 alertas.
-        crearAlertaSanitaria(demoConPerfil, SeveridadAlerta.ALTA, EstadoAlerta.CONFIRMADA, 0.88f,
+        Alerta saludConfirmada = crearAlertaSanitaria(demoConPerfil, SeveridadAlerta.ALTA, EstadoAlerta.CONFIRMADA, 0.88f,
                 "Problema severo postrante o complicación de parto",
                 ventanaSanitaria(demoConPerfil.getCaravana(), ahora.minusDays(4), 9, 0.00009),
                 perfilNormal, ahora.minusDays(9), ahora.minusDays(4).plusHours(2), vet);
+        // Diagnóstico inicial + control: historial clínico y página de Diagnósticos con datos.
+        sembrarDiagnostico(saludConfirmada, vet, "Cuadro febril compatible con neumonía",
+                "Oxitetraciclina LA 20 mg/kg IM, dosis única. Controlar temperatura en 48 h.",
+                ahora.minusDays(4).plusHours(3));
+        sembrarDiagnostico(saludConfirmada, vet, "Control a las 48 h: evolución favorable",
+                "Sin nueva medicación. Mantener en potrero cercano hasta el alta.",
+                ahora.minusDays(2).plusHours(3));
 
         // 7 — MEDIA, PENDIENTE (hace ~2 días), SIN perfil (animal recién
         // calibrado): el gráfico muestra solo el comportamiento actual + nota.
@@ -667,7 +678,19 @@ public class DataInitializer implements CommandLineRunner {
         return puntos;
     }
 
-    private void crearAlertaSanitaria(Animal animal, SeveridadAlerta severidad, EstadoAlerta estado,
+    private void sembrarDiagnostico(Alerta alerta, Usuario vet, String diagnostico, String indicaciones,
+                                    LocalDateTime fecha) {
+        Diagnostico d = new Diagnostico();
+        d.setAlerta(alerta);
+        d.setAnimal(alerta.getAnimal());
+        d.setVeterinario(vet);
+        d.setDiagnostico(diagnostico);
+        d.setIndicaciones(indicaciones);
+        d.setFecha(fecha);
+        diagnosticoRepository.save(d);
+    }
+
+    private Alerta crearAlertaSanitaria(Animal animal, SeveridadAlerta severidad, EstadoAlerta estado,
                                       float confianza, String posibleCausa, List<Telemetria> ventana,
                                       Map<String, Object> perfil, LocalDateTime perfilCalculadoEn,
                                       LocalDateTime tsConfirmacion, Usuario usuarioConfirmacion) {
@@ -703,6 +726,6 @@ public class DataInitializer implements CommandLineRunner {
             alerta.setTsConfirmacion(tsConfirmacion);
             alerta.setUsuarioConfirmacion(usuarioConfirmacion);
         }
-        alertaRepository.save(alerta);
+        return alertaRepository.save(alerta);
     }
 }

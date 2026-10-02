@@ -38,7 +38,7 @@ const fmtDia = (t: number) => { const d = new Date(t); return `${pad(d.getDate()
 const fmtFecha = (iso: string) => { const [d, t] = iso.split('T'); const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y} ${t} h`; };
 
 function TipoIcon({ ev, size = 40 }: { ev: HistorialEvento; size?: number }) {
-    const cls = ev.tipo === 'alerta' ? `hc-node hc-node-${ev.sev === 'CRITICO' ? 'critico' : 'borde'}`
+    const cls = ev.tipo === 'alerta' ? `hc-node hc-node-${ev.sev === 'ALTA' ? 'critico' : 'borde'}`
         : ev.tipo === 'diagnostico' ? 'hc-node hc-node-diag' : 'hc-node hc-node-intv';
     const icon = ev.tipo === 'alerta' ? 'bi-bell-fill' : ev.tipo === 'diagnostico' ? 'bi-clipboard2-pulse-fill' : (INTV_ICON[ev.sub ?? 'OTRO'] ?? INTV_ICON.OTRO);
     return <div className={cls} style={{ width: size, height: size }}><i className={`bi ${icon}`} /></div>;
@@ -52,6 +52,7 @@ interface Props {
 
 export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: Props) {
     const canEdit = rol === 'PRODUCTOR' || rol === 'VETERINARIO';
+    const canIntervenir = rol === 'VETERINARIO';
     const hoy = dayStart(new Date());
     const [eventos, setEventos] = useState<HistorialEvento[]>([]);
     const [loading, setLoading] = useState(true);
@@ -65,6 +66,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
     const [calKey, setCalKey] = useState(0); // recentra el calendario tras un preset
     const calRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState<Record<string, boolean>>({});
+    const [version, setVersion] = useState(0); // recarga el historial tras registrar un estado de salud o una intervención
 
     // Modal: registrar estado de salud (API real)
     const [showSalud, setShowSalud] = useState(false);
@@ -73,7 +75,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
     const [saludError, setSaludError] = useState<string | null>(null);
     const [saludOk, setSaludOk] = useState<string | null>(null);
 
-    // Modal: registrar intervención (submit simulado)
+    // Modal: registrar intervención (solo VETERINARIO)
     const [showIntv, setShowIntv] = useState(false);
     const [intvForm, setIntvForm] = useState<{ tipo: IntervencionManualRequest['tipo'] | ''; fechaHora: string; descripcion: string }>({ tipo: '', fechaHora: '', descripcion: '' });
     const [intvBusy, setIntvBusy] = useState(false);
@@ -99,6 +101,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
                 fecha: saludForm.fecha || null,
             });
             setSaludOk('Estado de salud registrado correctamente.');
+            setVersion(v => v + 1);
             try { onAnimalUpdated(await getAnimalById(animalId)); } catch { /* el éxito ya se mostró */ }
             setTimeout(() => { setShowSalud(false); setSaludOk(null); }, 1200);
         } catch (err) {
@@ -121,7 +124,8 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
         setIntvError(null); setIntvBusy(true);
         try {
             await registrarIntervencion(animalId, { tipo: intvForm.tipo, fechaHora: intvForm.fechaHora, descripcion: intvForm.descripcion.trim() });
-            setIntvOk('Intervención registrada (simulada: aún no hay endpoint).');
+            setIntvOk('Intervención registrada correctamente.');
+            setVersion(v => v + 1);
             setTimeout(() => { setShowIntv(false); setIntvOk(null); }, 1500);
         } catch (err) {
             setIntvError(errMsg(err, 'Error al registrar la intervención.'));
@@ -141,7 +145,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
             .catch(() => { if (!cancelled) setError(true); })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [animalId]);
+    }, [animalId, version]);
 
     useEffect(() => {
         if (!calOpen) return;
@@ -186,7 +190,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
             {canEdit && (
                 <div className="hc-actions">
                     <Button className="btn-vigia-success btn-sm px-3" onClick={openSalud}><i className="bi bi-plus-lg me-1" /> Registrar estado de salud</Button>
-                    <Button className="btn-vigia-success btn-sm px-3" onClick={openIntv}><i className="bi bi-plus-lg me-1" /> Registrar intervención</Button>
+                    {canIntervenir && <Button className="btn-vigia-success btn-sm px-3" onClick={openIntv}><i className="bi bi-plus-lg me-1" /> Registrar intervención</Button>}
                 </div>
             )}
             <div className="hc-card hc-filters">
@@ -270,7 +274,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
                                             onClick={() => setOpen(o => ({ ...o, [ev.id]: !o[ev.id] }))}>
                                             <div className="hc-event-main">
                                                 <div className="hc-event-title">
-                                                    {ev.tipo === 'alerta' && <span className={`hc-tag hc-tag-${ev.sev === 'CRITICO' ? 'critico' : 'borde'}`}>ALERTA · {ev.sev}</span>}
+                                                    {ev.tipo === 'alerta' && <span className={`hc-tag hc-tag-${ev.sev === 'ALTA' ? 'critico' : 'borde'}`}>ALERTA{ev.sev ? ` · ${ev.sev}` : ''}</span>}
                                                     {ev.tipo === 'diagnostico' && <span className="hc-tag hc-tag-diag">DIAGNÓSTICO</span>}
                                                     {ev.tipo === 'intervencion' && <span className="hc-tag hc-tag-intv">INTERVENCIÓN</span>}
                                                     <span className="hc-titulo">{ev.titulo}</span>

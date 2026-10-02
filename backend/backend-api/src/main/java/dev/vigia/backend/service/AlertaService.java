@@ -3,6 +3,8 @@ package dev.vigia.backend.service;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.DiagnosticoRequest;
+import dev.vigia.backend.dto.DiagnosticoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
@@ -32,6 +34,10 @@ public interface AlertaService {
                         Long alertaId);
 
         AlertaResponse intervenirAlerta(String emailUsuario, Long alertaId, IntervencionRequest request);
+
+        DiagnosticoResponse registrarDiagnostico(String emailUsuario, Long alertaId, DiagnosticoRequest request);
+
+        List<DiagnosticoResponse> listarDiagnosticos(String emailUsuario, Long animalId, Long establecimientoId);
 
         List<LineaTiempoEventoResponse> obtenerLineaTiempoAlertas(
                         String emailUsuario,

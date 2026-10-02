@@ -27,8 +27,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   const { rol } = useAuthStore();
-  const { selectedId, establecimientos } = useEstablecimientoStore();
-  const establecimientoNombre = establecimientos.find((e) => e.id === selectedId)?.nombre;
+  const { selectedId } = useEstablecimientoStore();
   const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR';
 
   // Ventana optima de inseminacion con countdown en tiempo real.
@@ -312,9 +311,6 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               <DiagnosticoSection
                 alertaId={alerta.id}
                 animalId={detalle?.animalId ?? alerta.animalId}
-                animalAlias={detalle?.animalAlias}
-                animalCaravanaOficial={detalle?.animalCaravanaOficial}
-                establecimientoNombre={establecimientoNombre}
                 showForm={rol === 'VETERINARIO' && estadoVisual === 'CONFIRMADA'}
               />
             )}

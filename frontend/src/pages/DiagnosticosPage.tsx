@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Form } from 'react-bootstrap';
-import { getDiagnosticos } from '../api/diagnosticoApi';
+import type { DiagnosticoResponse } from '../api/diagnosticoApi';
+import { filtrarDiagnosticos, getDiagnosticos } from '../api/diagnosticoApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
@@ -18,9 +19,32 @@ export default function DiagnosticosPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [establecimiento, setEstablecimiento] = useState('Todos los establecimientos');
 
+    const [diagnosticos, setDiagnosticos] = useState<DiagnosticoResponse[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchDiagnosticos = async () => {
+            try {
+                const data = await getDiagnosticos();
+                if (isMounted) setDiagnosticos(data);
+            } catch (err) {
+                console.error('Error cargando diagnósticos:', err);
+                if (isMounted) setError(true);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+        fetchDiagnosticos();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
     const rows = useMemo(
-        () => getDiagnosticos({ search: searchTerm, establecimiento }),
-        [searchTerm, establecimiento]
+        () => filtrarDiagnosticos(diagnosticos, { search: searchTerm, establecimiento }),
+        [diagnosticos, searchTerm, establecimiento]
     );
 
     return (
@@ -67,7 +91,19 @@ export default function DiagnosticosPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {rows.length === 0 ? (
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={7} className="text-center py-4 text-muted">
+                                        Cargando diagnósticos...
+                                    </td>
+                                </tr>
+                            ) : error ? (
+                                <tr>
+                                    <td colSpan={7} className="text-center py-4" style={{ color: '#D50000' }}>
+                                        No se pudieron cargar los diagnósticos. Intentá de nuevo más tarde.
+                                    </td>
+                                </tr>
+                            ) : rows.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="text-center py-4 text-muted">
                                         No hay diagnósticos que coincidan con la búsqueda. Probá con otro nombre o establecimiento.
@@ -79,13 +115,13 @@ export default function DiagnosticosPage() {
                                         <td>{formatFecha(r.fechaRegistro)}</td>
                                         <td>
                                             <div className="d-flex flex-column gap-1">
-                                                <span>{r.animalAlias}</span>
+                                                <span>{r.animalAlias || '—'}</span>
                                                 <span className="text-muted" style={{ fontSize: '0.85rem' }}>{r.animalCaravanaOficial}</span>
                                             </div>
                                         </td>
                                         <td className="col-mobile-hide">{r.establecimientoNombre || '—'}</td>
                                         <td className="text-truncate" style={{ maxWidth: '260px' }}>{r.diagnostico}</td>
-                                        <td className="col-mobile-hide text-truncate" style={{ maxWidth: '300px' }}>{r.tratamiento}</td>
+                                        <td className="col-mobile-hide text-truncate" style={{ maxWidth: '300px' }}>{r.tratamiento || '—'}</td>
                                         <td className="col-mobile-hide">{r.veterinarioNombre}</td>
                                         <td className="text-center">
                                             <a
