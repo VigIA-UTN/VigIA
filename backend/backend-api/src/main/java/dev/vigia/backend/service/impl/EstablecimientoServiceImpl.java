@@ -2,17 +2,19 @@ package dev.vigia.backend.service.impl;
 
 import dev.vigia.backend.service.EstablecimientoService;
 
+import dev.vigia.backend.dto.ConfigAnestroRequest;
+import dev.vigia.backend.dto.ConfigAnestroResponse;
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.dto.EstablecimientoResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +25,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class EstablecimientoServiceImpl implements EstablecimientoService {
+
+    private static final int DIAS_MIN = 1;
+    private static final int DIAS_MAX = 365;
 
     private final EstablecimientoRepository establecimientoRepository;
     private final IntervencionRepository intervencionRepository;
@@ -35,8 +40,12 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         est.setLongitud(request.getLongitud());
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-        est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
-        est.setSeveridadAnestro(SeveridadAlerta.valueOf(request.getSeveridadAnestro()));
+        if (request.getDiasDeteccionAnestro() != null) {
+            est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
+        }
+        if (request.getSeveridadAnestro() != null) {
+            est.setSeveridadAnestro(parseSeveridad(request.getSeveridadAnestro()));
+        }
 
         Establecimiento saved = establecimientoRepository.save(est);
         return mapToResponse(saved);
@@ -68,8 +77,12 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         est.setNombre(request.getNombre());
         est.setLatitud(request.getLatitud());
         est.setLongitud(request.getLongitud());
-        est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
-        est.setSeveridadAnestro(SeveridadAlerta.valueOf(request.getSeveridadAnestro()));
+        if (request.getDiasDeteccionAnestro() != null) {
+            est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
+        }
+        if (request.getSeveridadAnestro() != null) {
+            est.setSeveridadAnestro(parseSeveridad(request.getSeveridadAnestro()));
+        }
         return mapToResponse(establecimientoRepository.save(est));
     }
 
@@ -87,19 +100,6 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
         est.setActivo(true);
         return mapToResponse(establecimientoRepository.save(est));
-    }
-
-    private EstablecimientoResponse mapToResponse(Establecimiento est) {
-        return EstablecimientoResponse.builder()
-                .id(est.getId())
-                .nombre(est.getNombre())
-                .latitud(est.getLatitud())
-                .longitud(est.getLongitud())
-                .activo(est.isActivo())
-                .fechaAlta(est.getFechaAlta())
-                .diasDeteccionAnestro(est.getDiasDeteccionAnestro())
-                .severidadAnestro(est.getSeveridadAnestro())
-                .build();
     }
 
     @Override
@@ -124,7 +124,6 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         return intervenciones.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
-
     }
 
     private IntervencionResponse toResponse(Intervencion intervencion) {
@@ -136,6 +135,114 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 .descripcion(intervencion.getDescripcion())
                 .fechaHora(intervencion.getFechaHora())
                 .tipo(intervencion.getTipo())
+                .build();
+    }
+
+    // ── Configuración de anestro ──────────────────────────────────────────────
+
+    /**
+     * Consulta los parámetros de anestro del establecimiento.
+     * Solo PRODUCTOR o VETERINARIO activos del establecimiento pueden consultar.
+     */
+    @SuppressWarnings("null")
+    public ConfigAnestroResponse getConfigAnestro(Long establecimientoId, String emailUsuario) {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId)
+                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+
+        verificarPertenencia(est, emailUsuario);
+
+        return mapToConfigResponse(est);
+    }
+
+    /**
+     * Actualiza los parámetros de anestro del establecimiento.
+     * Solo PRODUCTOR o VETERINARIO activos del establecimiento pueden editar.
+     * Valida: dias 1–365, severidad dentro de {BAJA, MEDIA, ALTA}.
+     */
+    @SuppressWarnings("null")
+    public ConfigAnestroResponse updateConfigAnestro(Long establecimientoId,
+                                                     ConfigAnestroRequest request,
+                                                     String emailUsuario) {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId)
+                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+
+        verificarPertenencia(est, emailUsuario);
+        validarParametrosAnestro(request);
+
+        est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
+        est.setSeveridadAnestro(parseSeveridad(request.getSeveridadAnestro()));
+
+        return mapToConfigResponse(establecimientoRepository.save(est));
+    }
+
+    // ── Helpers privados ──────────────────────────────────────────────────────
+
+    /**
+     * Verifica que el usuario autenticado sea PRODUCTOR o VETERINARIO activo
+     * del establecimiento dado. Lanza AccessDeniedException si no cumple.
+     */
+    private void verificarPertenencia(Establecimiento est, String emailUsuario) {
+        boolean esMiembro = est.getEmpleados().stream()
+                .anyMatch(emp -> emp.isActivo()
+                        && emp.getUsuario().getEmail().equals(emailUsuario)
+                        && (emp.getUsuario().getRol() == Rol.PRODUCTOR
+                            || emp.getUsuario().getRol() == Rol.VETERINARIO));
+
+        if (!esMiembro) {
+            throw new AccessDeniedException(
+                    "Solo el Productor o el Veterinario del establecimiento pueden acceder a esta configuración.");
+        }
+    }
+
+    /**
+     * Valida que los parámetros de anestro estén dentro de los rangos permitidos.
+     */
+    private void validarParametrosAnestro(ConfigAnestroRequest request) {
+        if (request.getDiasDeteccionAnestro() == null) {
+            throw new IllegalArgumentException("El campo diasDeteccionAnestro es obligatorio.");
+        }
+        if (request.getDiasDeteccionAnestro() < DIAS_MIN || request.getDiasDeteccionAnestro() > DIAS_MAX) {
+            throw new IllegalArgumentException(
+                    String.format("diasDeteccionAnestro debe estar entre %d y %d.", DIAS_MIN, DIAS_MAX));
+        }
+        if (request.getSeveridadAnestro() == null || request.getSeveridadAnestro().isBlank()) {
+            throw new IllegalArgumentException("El campo severidadAnestro es obligatorio.");
+        }
+        parseSeveridad(request.getSeveridadAnestro()); // valida que sea un enum conocido
+    }
+
+    /**
+     * Convierte el String de severidad al enum correspondiente.
+     * Lanza IllegalArgumentException con mensaje legible si es inválido.
+     */
+    private SeveridadAlerta parseSeveridad(String valor) {
+        try {
+            return SeveridadAlerta.valueOf(valor.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "La severidad '" + valor + "' no es válida. Los valores permitidos son: BAJA, MEDIA, ALTA.");
+        }
+    }
+
+    private EstablecimientoResponse mapToResponse(Establecimiento est) {
+        return EstablecimientoResponse.builder()
+                .id(est.getId())
+                .nombre(est.getNombre())
+                .latitud(est.getLatitud())
+                .longitud(est.getLongitud())
+                .activo(est.isActivo())
+                .fechaAlta(est.getFechaAlta())
+                .diasDeteccionAnestro(est.getDiasDeteccionAnestro())
+                .severidadAnestro(est.getSeveridadAnestro())
+                .build();
+    }
+
+    private ConfigAnestroResponse mapToConfigResponse(Establecimiento est) {
+        return ConfigAnestroResponse.builder()
+                .establecimientoId(est.getId())
+                .nombreEstablecimiento(est.getNombre())
+                .diasDeteccionAnestro(est.getDiasDeteccionAnestro())
+                .severidadAnestro(est.getSeveridadAnestro())
                 .build();
     }
 }

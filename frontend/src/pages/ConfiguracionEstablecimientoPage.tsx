@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getEstablecimientos, updateEstablecimiento } from '../api/establecimientosApi';
-import type { EstablecimientoResponse } from '../api/establecimientosApi';
+import { getConfigAnestro, updateConfigAnestro } from '../api/establecimientosApi';
+import type { ConfigAnestroResponse } from '../api/establecimientosApi';
 import { useAuthStore } from '../store/authStore';
 import './ConfiguracionEstablecimientoPage.css';
 
@@ -35,7 +35,7 @@ export default function ConfiguracionEstablecimientoPage() {
   const navigate = useNavigate();
   const rol = useAuthStore((s) => s.rol);
 
-  const [establecimiento, setEstablecimiento] = useState<EstablecimientoResponse | null>(null);
+  const [config, setConfig] = useState<ConfigAnestroResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -61,16 +61,20 @@ export default function ConfiguracionEstablecimientoPage() {
 
     const fetchData = async () => {
       try {
-        const lista = await getEstablecimientos();
-        const found = lista.find((e) => e.id === numId);
-        if (!found) { setErrorGlobal('No se encontró el establecimiento.'); setLoading(false); return; }
-        setEstablecimiento(found);
+        // Usa el endpoint dedicado GET /establecimientos/{id}/anestro
+        const data = await getConfigAnestro(numId);
+        setConfig(data);
         reset({
-          diasDeteccionAnestro: found.diasDeteccionAnestro ?? DEFAULT_DIAS,
-          severidadAnestro: (found.severidadAnestro as 'BAJA' | 'MEDIA' | 'ALTA') ?? DEFAULT_SEVERIDAD,
+          diasDeteccionAnestro: data.diasDeteccionAnestro ?? DEFAULT_DIAS,
+          severidadAnestro: (data.severidadAnestro as 'BAJA' | 'MEDIA' | 'ALTA') ?? DEFAULT_SEVERIDAD,
         });
-      } catch {
-        setErrorGlobal('Error al cargar el establecimiento.');
+      } catch (err) {
+        const axiosError = err as { response?: { status?: number } };
+        if (axiosError.response?.status === 403) {
+          setErrorGlobal('No tenés permiso para ver la configuración de este establecimiento.');
+        } else {
+          setErrorGlobal('Error al cargar la configuración.');
+        }
       } finally {
         setLoading(false);
       }
@@ -79,18 +83,16 @@ export default function ConfiguracionEstablecimientoPage() {
   }, [id, navigate, reset]);
 
   const onSubmit = async (data: FormData) => {
-    if (!establecimiento) return;
+    if (!config) return;
     setSaving(true);
     setErrorGlobal(null);
     try {
-      const actualizado = await updateEstablecimiento(establecimiento.id, {
-        nombre: establecimiento.nombre,
-        latitud: establecimiento.latitud,
-        longitud: establecimiento.longitud,
+      // Usa el endpoint dedicado PUT /establecimientos/{id}/anestro
+      const actualizado = await updateConfigAnestro(config.establecimientoId, {
         diasDeteccionAnestro: data.diasDeteccionAnestro,
         severidadAnestro: data.severidadAnestro,
       });
-      setEstablecimiento(actualizado);
+      setConfig(actualizado);
       reset({
         diasDeteccionAnestro: actualizado.diasDeteccionAnestro,
         severidadAnestro: actualizado.severidadAnestro as 'BAJA' | 'MEDIA' | 'ALTA',
@@ -98,14 +100,18 @@ export default function ConfiguracionEstablecimientoPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      setErrorGlobal(axiosError.response?.data?.message || 'Error al guardar los cambios.');
+      const axiosError = err as { response?: { data?: { message?: string }; status?: number } };
+      if (axiosError.response?.status === 403) {
+        setErrorGlobal('No tenés permiso para editar la configuración de este establecimiento.');
+      } else {
+        setErrorGlobal(axiosError.response?.data?.message || 'Error al guardar los cambios.');
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Acceso restringido ────────────────────────────────────────────────────
+  // ── Acceso restringido (guard de UI — el backend también lo valida) ─────────
 
   if (rol !== 'PRODUCTOR' && rol !== 'VETERINARIO') {
     return (
@@ -158,7 +164,7 @@ export default function ConfiguracionEstablecimientoPage() {
           Establecimientos
         </button>
         <span className="cfg-breadcrumb-sep"><i className="bi bi-chevron-right" /></span>
-        <span className="cfg-breadcrumb-current">{establecimiento?.nombre}</span>
+        <span className="cfg-breadcrumb-current">{config?.nombreEstablecimiento}</span>
         <span className="cfg-breadcrumb-sep"><i className="bi bi-chevron-right" /></span>
         <span className="cfg-breadcrumb-current">Configuración de Anestro</span>
       </div>
@@ -170,7 +176,7 @@ export default function ConfiguracionEstablecimientoPage() {
           <h1 className="cfg-title">Configuración de Anestro</h1>
           <p className="cfg-subtitle">
             <i className="bi bi-building me-1" />
-            {establecimiento?.nombre}
+            {config?.nombreEstablecimiento}
           </p>
         </div>
       </div>

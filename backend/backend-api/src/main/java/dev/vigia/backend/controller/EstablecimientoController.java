@@ -1,5 +1,7 @@
 package dev.vigia.backend.controller;
 
+import dev.vigia.backend.dto.ConfigAnestroRequest;
+import dev.vigia.backend.dto.ConfigAnestroResponse;
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.dto.EstablecimientoResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
@@ -126,5 +128,49 @@ public class EstablecimientoController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error al obtener intervenciones: " + e.getMessage());
         }
+    }
+
+    // ── Configuración de anestro ──────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/establecimientos/{id}/anestro
+     * <p>
+     * Consulta los parámetros de detección de anestro de un establecimiento.
+     * Solo el PRODUCTOR o VETERINARIO activo del establecimiento puede consultarlos.
+     *
+     * @param id             ID del establecimiento
+     * @param authentication contexto de seguridad
+     * @return 200 con la configuración de anestro, 403 si no pertenece al establecimiento
+     */
+    @GetMapping("/{id}/anestro")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<ConfigAnestroResponse> getConfigAnestro(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                establecimientoService.getConfigAnestro(id, authentication.getName()));
+    }
+
+    /**
+     * PUT /api/v1/establecimientos/{id}/anestro
+     * <p>
+     * Actualiza los parámetros de detección de anestro de un establecimiento.
+     * Solo el PRODUCTOR o VETERINARIO activo del establecimiento puede editarlos.
+     * Valida rangos: días 1–365 y severidad dentro de {BAJA, MEDIA, ALTA}.
+     *
+     * @param id             ID del establecimiento
+     * @param request        nuevos parámetros (diasDeteccionAnestro, severidadAnestro)
+     * @param authentication contexto de seguridad
+     * @return 200 con la configuración actualizada, 400 si los valores son inválidos,
+     *         403 si no pertenece al establecimiento
+     */
+    @PutMapping("/{id}/anestro")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<ConfigAnestroResponse> updateConfigAnestro(
+            @PathVariable Long id,
+            @RequestBody ConfigAnestroRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                establecimientoService.updateConfigAnestro(id, request, authentication.getName()));
     }
 }
