@@ -112,48 +112,42 @@ def _indice_cohesion(distancia_m):
     """
     return UMBRAL_AISLAMIENTO_METROS / (UMBRAL_AISLAMIENTO_METROS + distancia_m)
 
-def _compute_isolation_times(historial_7d: List[CoordenadaGPS], max_gap_s: float = 3600.0) -> dict:
+def _compute_isolation_times(historial_7d: List[CoordenadaGPS], interval_s: float = 300.0) -> dict:
     """
     Returns a dict: animal_id -> total_isolation_time_in_seconds.
-    A point is isolated if distance to the centroid of OTHER animals' last known positions
-    (within max_gap_s) is > UMBRAL_AISLAMIENTO_METROS.
+    Positions are grouped into time intervals (default 5 minutes).
+    For each interval, if an animal is further than UMBRAL_AISLAMIENTO_METROS 
+    from the centroid of other animals' positions in that same interval,
+    it accumulates interval_s seconds of isolation.
     """
-    pts = sorted(historial_7d, key=lambda x: _ts(x))
-    last_pos = {}
     isolation_time = defaultdict(float)
-    last_iso_time = {} 
-    last_point_time = {} 
-    
-    for p in pts:
+    if not historial_7d:
+        return isolation_time
+
+    intervalos = defaultdict(lambda: defaultdict(list))
+    for p in historial_7d:
         t = _ts(p).timestamp()
+        interval_idx = int(t / interval_s)
+        intervalos[interval_idx][p.animal_id].append(p)
         
-        last_pos[p.animal_id] = p
-        
-        otros_lat = []
-        otros_lng = []
-        for a_id, op in last_pos.items():
-            if a_id != p.animal_id:
-                if t - _ts(op).timestamp() <= max_gap_s:
-                    otros_lat.append(op.lat)
-                    otros_lng.append(op.lng)
-                    
-        is_isolated = False
-        if otros_lat:
-            avg_lat = sum(otros_lat) / len(otros_lat)
-            avg_lng = sum(otros_lng) / len(otros_lng)
-            dist = _haversine(p.lat, p.lng, avg_lat, avg_lng)
-            if dist > UMBRAL_AISLAMIENTO_METROS:
-                is_isolated = True
-                
-        if p.animal_id in last_point_time:
-            dt = t - last_point_time[p.animal_id]
-            if dt <= max_gap_s:
-                if last_iso_time.get(p.animal_id, False):
-                    isolation_time[p.animal_id] += dt
-        
-        last_point_time[p.animal_id] = t
-        last_iso_time[p.animal_id] = is_isolated
-        
+    for interval_idx, animales_en_intervalo in intervalos.items():
+        pos_animal = {}
+        for a_id, puntos in animales_en_intervalo.items():
+            avg_lat = sum(p.lat for p in puntos) / len(puntos)
+            avg_lng = sum(p.lng for p in puntos) / len(puntos)
+            pos_animal[a_id] = (avg_lat, avg_lng)
+            
+        for a_id, (lat, lng) in pos_animal.items():
+            otros_lat = [o_lat for o_id, (o_lat, o_lng) in pos_animal.items() if o_id != a_id]
+            otros_lng = [o_lng for o_id, (o_lat, o_lng) in pos_animal.items() if o_id != a_id]
+            
+            if otros_lat:
+                avg_otros_lat = sum(otros_lat) / len(otros_lat)
+                avg_otros_lng = sum(otros_lng) / len(otros_lng)
+                dist = _haversine(lat, lng, avg_otros_lat, avg_otros_lng)
+                if dist > UMBRAL_AISLAMIENTO_METROS:
+                    isolation_time[a_id] += interval_s
+
     return isolation_time
 
 @app.get("/health")
