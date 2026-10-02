@@ -4,10 +4,16 @@ import dev.vigia.backend.service.EstablecimientoService;
 
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.dto.EstablecimientoResponse;
+import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.model.Establecimiento;
+import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.IntervencionRepository;
+import dev.vigia.backend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -19,6 +25,8 @@ import java.util.stream.Collectors;
 public class EstablecimientoServiceImpl implements EstablecimientoService {
 
     private final EstablecimientoRepository establecimientoRepository;
+    private final IntervencionRepository intervencionRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public EstablecimientoResponse createEstablecimiento(EstablecimientoRequest request) {
         Establecimiento est = new Establecimiento();
@@ -91,6 +99,43 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 .fechaAlta(est.getFechaAlta())
                 .diasDeteccionAnestro(est.getDiasDeteccionAnestro())
                 .severidadAnestro(est.getSeveridadAnestro())
+                .build();
+    }
+
+    @Override
+    public List<IntervencionResponse> obtenerIntervenciones(String emailUsuario, Long establecimientoId) {
+
+        usuarioRepository.findByEmail(emailUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+        List<Establecimiento> establecimientos = establecimientoRepository
+                .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
+
+        boolean perteneceAlEstablecimiento = establecimientos.stream()
+                .anyMatch(e -> e.getId().equals(establecimientoId));
+
+        if (!perteneceAlEstablecimiento) {
+            throw new AccessDeniedException(
+                    "El usuario no pertenece al establecimiento indicado o no está activo.");
+        }
+
+        List<Intervencion> intervenciones = intervencionRepository.findByEstablecimientoId(establecimientoId);
+
+        return intervenciones.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+
+    }
+
+    private IntervencionResponse toResponse(Intervencion intervencion) {
+        return IntervencionResponse.builder()
+                .id(intervencion.getId())
+                .animalId(intervencion.getAnimal().getId())
+                .alertaId(intervencion.getAlerta().getId())
+                .interventor(intervencion.getInterventor().getNombre())
+                .descripcion(intervencion.getDescripcion())
+                .fechaHora(intervencion.getFechaHora())
+                .tipo(intervencion.getTipo())
                 .build();
     }
 }

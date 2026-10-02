@@ -2,6 +2,7 @@ package dev.vigia.backend.controller;
 
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.dto.EstablecimientoResponse;
+import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.service.EstablecimientoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -113,5 +114,17 @@ public class EstablecimientoController {
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<EstablecimientoResponse> activarEstablecimiento(@PathVariable Long id) {
         return ResponseEntity.ok(establecimientoService.activarEstablecimiento(id));
+    }
+
+    @GetMapping("{id}/intervenciones")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> obtenerIntervenciones(@PathVariable Long id, Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<IntervencionResponse> response = establecimientoService.obtenerIntervenciones(email, id);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al obtener intervenciones: " + e.getMessage());
+        }
     }
 }
