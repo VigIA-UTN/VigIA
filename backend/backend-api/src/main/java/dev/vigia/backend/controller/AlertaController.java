@@ -270,7 +270,7 @@ public class AlertaController {
      *         denegado
      */
     @PutMapping("/estado/{id}")
-    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> actualizarEstadoAlerta(
             @PathVariable("id") Long alertaId,
             @RequestParam(name = "estado") EstadoAlerta nuevoEstado,

@@ -28,7 +28,6 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
   const { rol } = useAuthStore();
   const { selectedId } = useEstablecimientoStore();
-  const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR';
 
   // Ventana optima de inseminacion con countdown en tiempo real.
   // El backend puede devolver 'CELO', 'Celo Detectado' o 'reproductivo'
@@ -137,6 +136,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
   const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
   const isSanitaria = disparador.includes('SALUD') || disparador.includes('SANITARI');
+  // El campero actúa sobre alertas de celo y geoespaciales, pero no sobre las sanitarias.
+  const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR' || (rol === 'CAMPERO' && !isSanitaria);
   const detSan = detalle?.detalleSanitario ?? null;
   const sevHeader: SeveridadNivel | null =
     (isSanitaria ? detSan?.severidad : (alerta.severidad as SeveridadNivel | undefined)) ?? null;
@@ -637,7 +638,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
         )}
       </div>
 
-      {/* Acciones — solo visibles para Productor y Veterinario */}
+      {/* Acciones — Productor y Veterinario siempre; Campero salvo en alertas sanitarias */}
       {canActOnAlerts && !loadingDetail && !errorDetail && estadoVisual === 'PENDIENTE' && (
         <div className="p-4 bg-white border-top d-flex flex-column gap-2" style={{ zIndex: 10, borderRadius: '0 0 0 12px' }}>
           <div className="d-flex gap-3 justify-content-between">

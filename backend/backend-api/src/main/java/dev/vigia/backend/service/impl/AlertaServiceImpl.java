@@ -44,6 +44,7 @@ import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
@@ -484,6 +485,8 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
+                validarCamperoNoActuaSobreSalud(usuario, alerta);
+
                 EstadoAlerta estadoAnterior = alerta.getEstado();
 
                 if (estadoAnterior == EstadoAlerta.PENDIENTE &&
@@ -690,6 +693,8 @@ public class AlertaServiceImpl implements AlertaService {
                 if (!perteneceAlEstablecimiento) {
                         throw new AccessDeniedException("No tiene permiso para intervenir esta alerta");
                 }
+
+                validarCamperoNoActuaSobreSalud(usuario, alerta);
 
                 if (alerta.getEstado() != EstadoAlerta.CONFIRMADA) {
                         throw new IllegalArgumentException(
@@ -968,6 +973,12 @@ public class AlertaServiceImpl implements AlertaService {
                                                 ? intervencion.getAlerta().getId()
                                                 : null)
                                 .build();
+        }
+
+        private void validarCamperoNoActuaSobreSalud(Usuario usuario, Alerta alerta) {
+                if (usuario.getRol() == Rol.CAMPERO && alerta.getDisparador() == DisparadorAlerta.SALUD) {
+                        throw new AccessDeniedException("El campero no puede actuar sobre alertas sanitarias.");
+                }
         }
 
         private void registrarEstadoDerivado(Intervencion intervencion, IntervencionRequest request, Usuario usuario) {
