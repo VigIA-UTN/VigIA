@@ -65,6 +65,7 @@ class MapaCalorServiceImplTest {
     void setUp() {
         establecimiento = new Establecimiento();
         establecimiento.setId(ESTABLECIMIENTO_ID);
+        establecimiento.setUmbralAislamientoM(150.0);
     }
 
     private void usuarioProductor() {
@@ -73,6 +74,7 @@ class MapaCalorServiceImplTest {
         usuario.setRol(Rol.PRODUCTOR);
         when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(usuario));
         when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL)).thenReturn(List.of(establecimiento));
+        when(establecimientoRepository.findById(ESTABLECIMIENTO_ID)).thenReturn(Optional.of(establecimiento));
     }
 
     private Animal animal(Long id, Establecimiento est) {
@@ -219,5 +221,36 @@ class MapaCalorServiceImplTest {
         assertThatThrownBy(() -> service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, null, 5L))
                 .isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(telemetriaRepository, mlGeoClient, animalRepository);
+    }
+
+    @Test
+    @DisplayName("El umbral del establecimiento se envía a ml-geo en el request")
+    void umbralDelEstablecimientoEnRequest() {
+        usuarioProductor();
+        Animal a1 = animal(1L, establecimiento);
+        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
+                .thenReturn(List.of(telemetria(a1, -34.0, -59.0)));
+        when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
+
+        service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, null, null);
+
+        GeoAnalyzeRequestDTO request = requestEnviadoAMl();
+        assertThat(request.getUmbralAislamientoM()).isEqualTo(150.0);
+    }
+
+    @Test
+    @DisplayName("Con umbralAislamientoM null en el establecimiento, el campo queda null en el request (ml-geo usa su default)")
+    void umbralNullEnEstablecimientoPasaNullAMlGeo() {
+        usuarioProductor();
+        establecimiento.setUmbralAislamientoM(null);
+        Animal a1 = animal(1L, establecimiento);
+        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
+                .thenReturn(List.of(telemetria(a1, -34.0, -59.0)));
+        when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
+
+        service.obtenerMapaCalor(EMAIL, ESTABLECIMIENTO_ID, DESDE, HASTA, null, null);
+
+        GeoAnalyzeRequestDTO request = requestEnviadoAMl();
+        assertThat(request.getUmbralAislamientoM()).isNull();
     }
 }

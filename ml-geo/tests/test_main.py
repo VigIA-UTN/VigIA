@@ -266,8 +266,8 @@ class TestCohesionAislamiento:
 
     def test_indice_vale_medio_exactamente_en_el_umbral(self):
         """El 0.5 del indice es, por construccion, el umbral de aislamiento."""
-        assert main_app._indice_cohesion(0.0) == pytest.approx(1.0)
-        assert main_app._indice_cohesion(main_app.UMBRAL_AISLAMIENTO_METROS) == pytest.approx(0.5)
+        assert main_app._indice_cohesion(0.0, UMBRAL_AISLAMIENTO_METROS) == pytest.approx(1.0)
+        assert main_app._indice_cohesion(UMBRAL_AISLAMIENTO_METROS, UMBRAL_AISLAMIENTO_METROS) == pytest.approx(0.5)
 
     def test_alerta_equivale_a_indice_bajo_medio(self):
         """
@@ -308,7 +308,8 @@ class TestCohesionAislamiento:
     def test_umbral_de_aislamiento_sale_de_la_configuracion(self, monkeypatch):
         """
         Con el umbral por defecto (100 m) dos animales a ~55 m no alertan;
-        bajandolo a 25 m, la misma entrada pasa a alertar.
+        bajandolo a 25 m mediante el campo del request, la misma entrada pasa a alertar.
+        El campo del request tiene prioridad sobre el global.
         """
         # ~0.0005 deg de latitud ~= 55 m
         puntos = [
@@ -316,14 +317,40 @@ class TestCohesionAislamiento:
             make_punto("A2", -34.00050, -59.0),
         ]
 
+        # Sin umbral en el request => usa el global (100 m) => sin alerta
         sin_alerta = client.post(ENDPOINT, json={"historial_7d": puntos}).json()["alertas"]
         assert all(a["alerta_aislamiento"] is False for a in sin_alerta)
 
-        monkeypatch.setattr(main_app, "UMBRAL_AISLAMIENTO_METROS", 25.0)
-        con_alerta = client.post(ENDPOINT, json={"historial_7d": puntos}).json()["alertas"]
+        # Enviando umbral_aislamiento_m=25 en el request => alerta
+        con_alerta = client.post(
+            ENDPOINT, json={"umbral_aislamiento_m": 25.0, "historial_7d": puntos}
+        ).json()["alertas"]
         assert all(a["alerta_aislamiento"] is True for a in con_alerta)
         # El indice se recalibra con el umbral nuevo
         for alerta in con_alerta:
+            assert alerta["indice_cohesion"] == pytest.approx(
+                cohesion_esperada(alerta["distancia_centroide_m"], 25.0), rel=1e-6
+            )
+
+    def test_umbral_del_request_tiene_prioridad_sobre_el_global(self, monkeypatch):
+        """
+        El campo umbral_aislamiento_m del request tiene prioridad sobre el
+        global UMBRAL_AISLAMIENTO_METROS, aunque este se cambie con monkeypatch.
+        """
+        # ~0.0005 deg ~= 55 m
+        puntos = [
+            make_punto("A1", -34.00000, -59.0),
+            make_punto("A2", -34.00050, -59.0),
+        ]
+        # Global modificado a 200 m => sin alerta con ese umbral
+        monkeypatch.setattr(main_app, "UMBRAL_AISLAMIENTO_METROS", 200.0)
+
+        # Pero el request envia 25 m => debe alertar
+        resp = client.post(
+            ENDPOINT, json={"umbral_aislamiento_m": 25.0, "historial_7d": puntos}
+        ).json()["alertas"]
+        assert all(a["alerta_aislamiento"] is True for a in resp)
+        for alerta in resp:
             assert alerta["indice_cohesion"] == pytest.approx(
                 cohesion_esperada(alerta["distancia_centroide_m"], 25.0), rel=1e-6
             )

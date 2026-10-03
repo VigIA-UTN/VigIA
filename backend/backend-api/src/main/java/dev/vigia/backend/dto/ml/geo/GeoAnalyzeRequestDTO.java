@@ -22,4 +22,11 @@ public class GeoAnalyzeRequestDTO {
 
     @JsonProperty("historial_7d")
     private List<CoordenadaGPSDTO> historial7d;
+
+    /**
+     * Umbral de aislamiento en metros, específico del establecimiento.
+     * Si es null, ml-geo usa su valor por defecto (variable de entorno UMBRAL_AISLAMIENTO_METROS).
+     */
+    @JsonProperty("umbral_aislamiento_m")
+    private Double umbralAislamientoM;
 }
