@@ -419,13 +419,17 @@ export default function AnimalesPage() {
     });
 
     const openModal = async () => {
-        setForm({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO', pesoInicial: null });
+        setForm({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO', pesoInicial: null, caravanaId: null });
         setFormError(null);
         setFormSuccess(null);
-        try {
-            const lotes = await getRodeoLotes(selectedId || undefined);
-            setRodeoLotes(lotes.filter(l => l.activo));
-        } catch { setRodeoLotes([]); }
+        const [lotes, disponibles] = await Promise.all([
+            getRodeoLotes(selectedId || undefined).catch(() => [] as RodeoLoteResponse[]),
+            puedeGestionarCaravanas && selectedId
+                ? getCaravanasDisponibles(selectedId).catch(() => [] as CaravanaResponse[])
+                : Promise.resolve([] as CaravanaResponse[]),
+        ]);
+        setRodeoLotes(lotes.filter(l => l.activo));
+        setCaravanasDisponibles(disponibles);
         setShowModal(true);
     };
 
@@ -721,6 +725,33 @@ export default function AnimalesPage() {
                                     onChange={e => setForm(prev => ({ ...prev, pesoInicial: e.target.value ? parseFloat(e.target.value) : null }))}
                                 />
                             </Form.Group>
+                            {puedeGestionarCaravanas && (
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Caravana</Form.Label>
+                                    <Form.Select
+                                        name="caravanaId"
+                                        value={form.caravanaId ?? ''}
+                                        onChange={e => setForm(prev => ({ ...prev, caravanaId: e.target.value ? Number(e.target.value) : null }))}
+                                        disabled={caravanasDisponibles.length === 0}
+                                    >
+                                        <option value="">Sin caravana (vincular después)</option>
+                                        {caravanasDisponibles.map(c => {
+                                            const bateria = formatBateria(c.bateria);
+                                            const senial = formatUltimaSenial(c.ultimaSenial);
+                                            return (
+                                                <option key={c.id} value={c.id}>
+                                                    {c.alias || c.codigo || c.devEui} · {bateria.text} · {senial.text}
+                                                </option>
+                                            );
+                                        })}
+                                    </Form.Select>
+                                    {caravanasDisponibles.length === 0 && (
+                                        <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>
+                                            No hay caravanas disponibles en este establecimiento.
+                                        </div>
+                                    )}
+                                </Form.Group>
+                            )}
                         </Form>
                     </Modal.Body>
                     <Modal.Footer>
