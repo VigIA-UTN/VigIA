@@ -8,7 +8,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { getAnimales, ESTADO_REPRODUCTIVO_LABEL } from '../api/animalesApi';
 import type { AnimalResponse } from '../api/animalesApi';
-import { getAlertas, getVentanaInseminacion, esAnestro, tieneDatoDesactualizado } from '../api/alertaApi';
+import { getAlertas, getVentanaInseminacion, esAnestro, tieneDatoDesactualizado, textoAccionRecomendada } from '../api/alertaApi';
 import type { AlertaResponse, VentanaInseminacionResponse } from '../api/alertaApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
@@ -1711,7 +1711,9 @@ export default function DashboardPage() {
                                             >
                                                 <span className={`dash-sev-dot ${sevDotClass}`} />
                                                 <div className="dash-cola-nombre">{nombreAnimal(animal)}</div>
-                                                <div className="dash-cola-rec-bar" />
+                                                <div className="dash-cola-rec" title={textoAccionRecomendada(alerta)}>
+                                                    {textoAccionRecomendada(alerta)}
+                                                </div>
                                                 <span className={`dash-tipo-chip ${tipoClass}`}>
                                                     {tipoLabel}
                                                     {tieneDatoDesactualizado(alerta) && (

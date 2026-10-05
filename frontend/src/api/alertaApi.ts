@@ -34,6 +34,21 @@ export function tieneDatoDesactualizado(alerta: AlertaResponse): boolean {
 export const esAnestro = (a: { subtipo?: string | null; tipo?: string | null }) =>
   /anestro/i.test(a.subtipo ?? a.tipo ?? '');
 
+/** Acción recomendada de la alerta, con un texto genérico por tipo si el backend no la mandó. */
+export const textoAccionRecomendada = (alerta: AlertaResponse | null) => {
+  if (alerta?.accionRecomendada) {
+    return alerta.accionRecomendada;
+  } else if (alerta && esAnestro(alerta)) {
+    return 'Revisión veterinaria: el animal no registra celo en el período configurado.';
+  } else if (alerta && alerta.tipo === 'SALUD') {
+    return 'Revisar al animal y realizar seguimiento clínico.';
+  } else if (alerta && alerta.tipo === 'CELO') {
+    return 'Realizar inseminación artificial dentro de la ventana óptima.';
+  } else {
+    return 'Revisar al animal y realizar seguimiento.';
+  }
+}
+
 export async function getAlertas(
   establecimientoId: number,
   tipo?: string,

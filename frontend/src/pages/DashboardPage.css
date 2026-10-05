@@ -265,13 +265,14 @@
     text-overflow: ellipsis;
 }
 
-/* Línea de recomendación gris como en la foto */
-.dash-cola-rec-bar {
-    height: 6px;
-    background: #E2E8F0;
-    border-radius: 999px;
-    width: 100%;
-    max-width: 110px;
+/* Acción recomendada (texto completo en el tooltip) */
+.dash-cola-rec {
+    font-size: 0.85rem;
+    color: #64748B;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Tipo chip */
