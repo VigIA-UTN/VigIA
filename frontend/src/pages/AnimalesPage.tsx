@@ -8,6 +8,7 @@ import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { getCaravanasDisponibles } from '../api/caravanasApi';
 import type { CaravanaResponse } from '../api/caravanasApi';
 import { formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
+import { hoyIso } from '../utils/fechas';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
@@ -243,8 +244,20 @@ export default function AnimalesPage() {
             setFormError('No hay establecimiento seleccionado.');
             return;
         }
-        if (!form.idCaravanaOficial && !form.alias) {
-            setFormError('Ingresá al menos el identificador o el nombre del animal.');
+        if (!form.idCaravanaOficial?.trim()) {
+            setFormError('Ingresá el identificador del animal.');
+            return;
+        }
+        if (!form.fechaNacimiento) {
+            setFormError('Ingresá la fecha de nacimiento.');
+            return;
+        }
+        if (form.fechaNacimiento > hoyIso()) {
+            setFormError('La fecha de nacimiento no puede ser futura.');
+            return;
+        }
+        if (!form.rodeoLoteId) {
+            setFormError('Seleccioná un lote.');
             return;
         }
         setFormError(null);
@@ -311,6 +324,14 @@ export default function AnimalesPage() {
         } finally {
             setSubmittingUpload(false);
         }
+    };
+
+    const openUploadModal = async () => {
+        try {
+            const lotes = await getRodeoLotes(selectedId || undefined);
+            setRodeoLotes(lotes.filter(l => l.activo));
+        } catch { setRodeoLotes([]); }
+        setUploadModal(true);
     };
 
     const handleCloseUploadModal = () => {
@@ -432,7 +453,7 @@ export default function AnimalesPage() {
                             <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
                                 <i className="bi bi-upload" /> Cargar Estados
                             </Button>
-                            <Button className="btn-vigia-success" onClick={() => { setUploadModal(true) }}>
+                            <Button className="btn-vigia-success" onClick={openUploadModal}>
                                 <i className="bi bi-upload" /> Cargar Animales
                             </Button>
                             <Button className="btn-vigia-success" onClick={openModal}>
@@ -668,7 +689,7 @@ export default function AnimalesPage() {
                             </Form.Group>
                             <Form.Group className="mb-3">
                                 <Form.Label>Fecha de Nacimiento*</Form.Label>
-                                <Form.Control name="fechaNacimiento" type="date" value={form.fechaNacimiento ?? ''} onChange={handleChange} required />
+                                <Form.Control name="fechaNacimiento" type="date" max={hoyIso()} value={form.fechaNacimiento ?? ''} onChange={handleChange} required />
                             </Form.Group>
                             <Form.Group className="mb-3">
                                 <Form.Label>Raza</Form.Label>
@@ -680,6 +701,7 @@ export default function AnimalesPage() {
                                     name="rodeoLoteId"
                                     value={form.rodeoLoteId ?? ''}
                                     onChange={handleChange}
+                                    required
                                 >
                                     <option value="">Seleccioná una opción</option>
                                     {rodeoLotes.map(l => (
@@ -762,12 +784,23 @@ export default function AnimalesPage() {
                                 <div className="mb-3 text-white" style={{ fontSize: '0.9em' }}>
                                     <p className="mb-1">El archivo debe contener las siguientes columnas en este orden:</p>
                                     <ul>
-                                        <li><strong>IdCaravana</strong> (al menos IdCaravana o Alias debe estar presente)</li>
-                                        <li><strong>Alias</strong> (al menos IdCaravana o Alias debe estar presente)</li>
-                                        <li><strong>FechaNacimiento</strong> (opcional, formato YYYY-MM-DD)</li>
+                                        <li><strong>IdCaravana</strong> (obligatorio, no puede repetirse)</li>
+                                        <li><strong>Alias</strong> (opcional, no puede repetirse)</li>
+                                        <li><strong>FechaNacimiento</strong> (obligatoria, formato YYYY-MM-DD, no puede ser futura)</li>
                                         <li><strong>Raza</strong> (opcional)</li>
-                                        <li><strong>RodeoLote</strong> (opcional, nombre exacto del lote/rodeo, se creará si no existe)</li>
+                                        <li><strong>RodeoLote</strong> (obligatorio, nombre de un lote existente y activo del establecimiento)</li>
                                     </ul>
+                                    <Alert variant={rodeoLotes.length > 0 ? 'info' : 'warning'} className="py-2 mb-2">
+                                        <i className="bi bi-info-circle me-1" />
+                                        La carga <strong>no crea lotes nuevos</strong>: cada animal debe indicar un lote que ya exista y esté activo.
+                                        Si falta alguno, crealo antes con el botón <strong>+ Rodeo</strong>.
+                                        <div className="mt-1">
+                                            {rodeoLotes.length > 0
+                                                ? <>Lotes disponibles: <strong>{rodeoLotes.map(l => l.nombre).join(', ')}</strong></>
+                                                : <strong>Este establecimiento todavía no tiene lotes activos.</strong>}
+                                        </div>
+                                    </Alert>
+                                    <p className="mb-2">Las filas vacías se ignoran.</p>
                                     <div className="d-flex gap-3 mb-3">
                                         <a href="/template_animales.csv" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
                                             <i className="bi bi-filetype-csv me-1" /> Descargar template CSV

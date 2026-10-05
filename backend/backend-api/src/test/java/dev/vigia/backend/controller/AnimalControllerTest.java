@@ -425,6 +425,86 @@ class AnimalControllerTest {
                                 .andExpect(status().isBadRequest());
         }
 
+        private AnimalRequest animalRequestValido(String alias) {
+                AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial(UUID.randomUUID().toString());
+                req.setAlias(alias);
+                req.setFechaNacimiento(LocalDate.of(2022, 1, 1));
+                req.setRodeoLoteId(rodeoLoteId);
+                req.setEstablecimientoId(establecimientoId);
+                req.setEstadoActual(EstadoAnimal.ACTIVO);
+                return req;
+        }
+
+        @SuppressWarnings("null")
+        private void esperarBadRequest(AnimalRequest req) throws Exception {
+                mockMvc.perform(post("/api/v1/animales")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isBadRequest());
+                assertThat(animalRepository.findAll()).noneMatch(a -> req.getIdCaravanaOficial() != null
+                                && req.getIdCaravanaOficial().equals(a.getIdCaravanaOficial()));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Sin identificador retorna 400 aunque tenga alias")
+        void cargarAnimal_sinIdentificador_badRequest() throws Exception {
+                AnimalRequest req = animalRequestValido("Solo Alias");
+                req.setIdCaravanaOficial("  ");
+                esperarBadRequest(req);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Fecha de nacimiento futura retorna 400")
+        void cargarAnimal_fechaFutura_badRequest() throws Exception {
+                AnimalRequest req = animalRequestValido("Vaca Futura");
+                req.setFechaNacimiento(LocalDate.now().plusDays(1));
+                esperarBadRequest(req);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Rodeo de otro establecimiento retorna 400")
+        @SuppressWarnings("null")
+        void cargarAnimal_rodeoDeOtroEstablecimiento_badRequest() throws Exception {
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Rodeo");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst = establecimientoRepository.save(otroEst);
+                RodeoLote rodeoAjeno = new RodeoLote(otroEst);
+                rodeoAjeno.setNombre("Rodeo Ajeno");
+                rodeoAjeno = rodeoLoteRepository.save(rodeoAjeno);
+
+                AnimalRequest req = animalRequestValido("Vaca Rodeo Ajeno");
+                req.setRodeoLoteId(rodeoAjeno.getId());
+                esperarBadRequest(req);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Rodeo inactivo retorna 400")
+        @SuppressWarnings("null")
+        void cargarAnimal_rodeoInactivo_badRequest() throws Exception {
+                RodeoLote inactivo = new RodeoLote(establecimientoRepository.findById(establecimientoId).get());
+                inactivo.setNombre("Rodeo Inactivo");
+                inactivo.setActivo(false);
+                inactivo = rodeoLoteRepository.save(inactivo);
+
+                AnimalRequest req = animalRequestValido("Vaca Rodeo Inactivo");
+                req.setRodeoLoteId(inactivo.getId());
+                esperarBadRequest(req);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Alias duplicado en el establecimiento retorna 400")
+        void cargarAnimal_aliasDuplicado_badRequest() throws Exception {
+                crearAnimal("Lola", establecimientoId, rodeoLoteId);
+                esperarBadRequest(animalRequestValido("Lola"));
+        }
+
         // =========================================================================
         // GET /api/v1/animales — listarAnimales
         // =========================================================================
@@ -1123,9 +1203,9 @@ class AnimalControllerTest {
         @DisplayName("POST /api/v1/animales/csv - Carga Exitosa (Productor)")
         @SuppressWarnings("null")
         void cargarAnimalesExcel_asProductor_success() throws Exception {
-                String[] headers = { "IdCaravana", "Alias", "FechaNacimiento", "Raza", "Establecimiento", "Rodeo" };
+                String[] headers = { "IdCaravana", "Alias", "FechaNacimiento", "Raza", "RodeoLote" };
                 String[][] rows = {
-                                { "X-123", "Vaca Excel", "2020-01-01", "Angus", "Estancia Test", "Rodeo Base" }
+                                { "X-123", "Vaca Excel", "2020-01-01", "Angus", "Rodeo Base" }
                 };
 
                 MockMultipartFile file = generateExcel(headers, rows);
@@ -1138,7 +1218,38 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$.procesados").value(1))
                                 .andExpect(jsonPath("$.exitosos").value(1))
                                 .andExpect(jsonPath("$.fallidos").value(0))
-                                .andExpect(jsonPath("$.animales[0].alias").value("Vaca Excel"));
+                                .andExpect(jsonPath("$.animales[0].alias").value("Vaca Excel"))
+                                .andExpect(jsonPath("$.animales[0].rodeoLoteId").value(rodeoLoteId));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/csv - Fecha y rodeo obligatorios, rodeo inexistente no se crea")
+        @SuppressWarnings("null")
+        void cargarAnimalesExcel_validacionesAltaManual_noGuardaNada() throws Exception {
+                String[] headers = { "IdCaravana", "Alias", "FechaNacimiento", "Raza", "RodeoLote" };
+                String[][] rows = {
+                                { "X-1", "Vaca OK", "2020-01-01", "Angus", "Rodeo Base" },
+                                { "X-2", "Vaca Sin Fecha", null, "Angus", "Rodeo Base" },
+                                { "X-3", "Vaca Sin Rodeo", "2020-01-01", "Angus", null },
+                                { "X-4", "Vaca Rodeo Nuevo", "2020-01-01", "Angus", "Rodeo Inventado" }
+                };
+                MockMultipartFile file = generateExcel(headers, rows);
+
+                mockMvc.perform(multipart("/api/v1/animales/csv")
+                                .file(file)
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.procesados").value(4))
+                                .andExpect(jsonPath("$.exitosos").value(0))
+                                .andExpect(jsonPath("$.fallidos").value(3))
+                                .andExpect(jsonPath("$.errores[0]").value("Fila 3: La fecha de nacimiento es obligatoria."))
+                                .andExpect(jsonPath("$.errores[1]").value("Fila 4: El rodeo/lote es obligatorio."))
+                                .andExpect(jsonPath("$.errores[2]").value(
+                                                "Fila 5: El rodeo/lote 'Rodeo Inventado' no existe o no está activo en el establecimiento."));
+
+                assertThat(animalRepository.findAll()).isEmpty();
+                assertThat(rodeoLoteRepository.findByEstablecimientoId(establecimientoId)).hasSize(1);
         }
 
         @Test

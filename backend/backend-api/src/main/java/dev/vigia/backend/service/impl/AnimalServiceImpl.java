@@ -134,16 +134,23 @@ public class AnimalServiceImpl implements AnimalService {
                                         "El identificador ya se encuentra registrado en este establecimiento.");
                 }
 
-                if (request.getRodeoLoteId() != null) {
-                        rodeoLoteRepository.findById(request.getRodeoLoteId())
-                                        .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                if (request.getAlias() != null && !request.getAlias().isBlank()
+                                && animalRepository.existsByAliasAndEstablecimientoId(request.getAlias(),
+                                                request.getEstablecimientoId())) {
+                        throw new IllegalArgumentException(
+                                        "El nombre/alias ya se encuentra registrado en este establecimiento.");
                 }
 
-                Animal animal = new Animal(
-                                establecimiento,
-                                request.getRodeoLoteId() != null
-                                                ? rodeoLoteRepository.findById(request.getRodeoLoteId()).get()
-                                                : null);
+                RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
+                                .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                if (!lote.getEstablecimiento().getId().equals(establecimiento.getId())) {
+                        throw new IllegalArgumentException("El rodeo no pertenece al establecimiento.");
+                }
+                if (!lote.isActivo()) {
+                        throw new IllegalArgumentException("El rodeo/lote no está activo.");
+                }
+
+                Animal animal = new Animal(establecimiento, lote);
 
                 animal.setIdCaravanaOficial(request.getIdCaravanaOficial());
                 animal.setAlias(request.getAlias());
@@ -220,16 +227,26 @@ public class AnimalServiceImpl implements AnimalService {
                         }
                 }
 
-                if (request.getRodeoLoteId() != null) {
-                        RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
-                                        .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
-                        if (!lote.getEstablecimiento().getId().equals(nuevoEstablecimiento.getId())) {
-                                throw new IllegalArgumentException("El rodeo no pertenece al establecimiento destino.");
-                        }
-                        animal.setRodeoLote(lote);
-                } else {
-                        animal.setRodeoLote(null);
+                if (request.getAlias() != null && !request.getAlias().isBlank()
+                                && (!request.getAlias().equals(animal.getAlias())
+                                                || !request.getEstablecimientoId().equals(establecimientoActual.getId()))
+                                && animalRepository.existsByAliasAndEstablecimientoId(request.getAlias(),
+                                                request.getEstablecimientoId())) {
+                        throw new IllegalArgumentException(
+                                        "El nombre/alias ya se encuentra registrado en el establecimiento destino.");
                 }
+
+                RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
+                                .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                if (!lote.getEstablecimiento().getId().equals(nuevoEstablecimiento.getId())) {
+                        throw new IllegalArgumentException("El rodeo no pertenece al establecimiento destino.");
+                }
+                boolean cambioDeRodeo = animal.getRodeoLote() == null
+                                || !animal.getRodeoLote().getId().equals(lote.getId());
+                if (cambioDeRodeo && !lote.isActivo()) {
+                        throw new IllegalArgumentException("El rodeo/lote no está activo.");
+                }
+                animal.setRodeoLote(lote);
 
                 animal.setEstablecimiento(nuevoEstablecimiento);
                 animal.setIdCaravanaOficial(request.getIdCaravanaOficial());
