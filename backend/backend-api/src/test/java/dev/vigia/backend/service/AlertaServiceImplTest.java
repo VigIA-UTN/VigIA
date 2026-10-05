@@ -624,7 +624,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
-        void obtenerDetalleAlerta_CELO_collarSinTransmitirMasDe2h_marcaDesactualizado() {
+        void obtenerDetalleAlerta_CELO_caravanaSinTransmitirMasDe2h_marcaDesactualizado() {
                 LocalDateTime hace3h = LocalDateTime.now().minusHours(3);
 
                 AlertaDetalleResponse result = detalleConUltimaSenial(hace3h);
@@ -635,7 +635,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
-        void obtenerDetalleAlerta_CELO_collarTransmitiendo_noMarcaDesactualizado() {
+        void obtenerDetalleAlerta_CELO_caravanaTransmitiendo_noMarcaDesactualizado() {
                 AlertaDetalleResponse result = detalleConUltimaSenial(LocalDateTime.now().minusMinutes(30));
 
                 assertFalse(result.isDatoPosiblementeDesactualizado());
@@ -670,7 +670,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
-        void listarAlertasCelo_collarSinTransmitir_marcaDesactualizadoEnListado() {
+        void listarAlertasCelo_caravanaSinTransmitir_marcaDesactualizadoEnListado() {
                 dev.vigia.backend.model.Caravana caravana = new dev.vigia.backend.model.Caravana();
                 caravana.setUltimaSenial(LocalDateTime.now().minusHours(4));
                 mockAnimal.setCaravana(caravana);
@@ -688,7 +688,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
-        void listarAlertasCelo_resuelta_noCargaCollarNiMarca() {
+        void listarAlertasCelo_resuelta_noCargaCaravanaNiMarca() {
                 mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
                 dev.vigia.backend.model.Caravana caravana = new dev.vigia.backend.model.Caravana();
                 caravana.setUltimaSenial(LocalDateTime.now().minusHours(4));

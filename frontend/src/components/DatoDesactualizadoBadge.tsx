@@ -10,8 +10,8 @@ export default function DatoDesactualizadoBadge({ alerta }: { alerta: AlertaResp
 
   const texto = alerta.caravanaUltimaSenial
     ? `Sin señal ${formatUltimaSenial(alerta.caravanaUltimaSenial).text}`
-    : 'Sin transmisiones del collar';
-  const titulo = `Dato posiblemente desactualizado: el collar no transmite hace más de ${alerta.horasUmbralDatoDesactualizado ?? 2} h. Verificá el animal en campo antes de inseminar.`;
+    : 'Sin transmisiones de la caravana';
+  const titulo = `Dato posiblemente desactualizado: la caravana no transmite hace más de ${alerta.horasUmbralDatoDesactualizado ?? 2} h. Verificá el animal en campo antes de inseminar.`;
 
   return (
     <span

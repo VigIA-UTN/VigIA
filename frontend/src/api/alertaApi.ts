@@ -11,7 +11,7 @@ export interface AlertaResponse {
   severidad?: "ALTA" | "MEDIA" | "BAJA";
   gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';
   accionRecomendada: string;
-  /** H0008: última transmisión del collar (solo se envía en alertas de celo pendientes). */
+  /** H0008: última transmisión de la caravana (solo se envía en alertas de celo pendientes). */
   caravanaUltimaSenial?: string | null;
   datoPosiblementeDesactualizado?: boolean;
   horasUmbralDatoDesactualizado?: number;
@@ -20,7 +20,7 @@ export interface AlertaResponse {
 /**
  * H0008: el backend marca la alerta al momento de enviarla. Como las listas no se refrescan solas,
  * además se re-evalúa con la última señal conocida para que una tarjeta abierta pase a "sin señal"
- * si el collar deja de transmitir. Ante la duda advierte (puede adelantarse si el collar transmitió
+ * si la caravana deja de transmitir. Ante la duda advierte (puede adelantarse si la caravana transmitió
  * después; el detalle de la alerta siempre consulta el dato fresco).
  */
 export function tieneDatoDesactualizado(alerta: AlertaResponse): boolean {
@@ -172,9 +172,9 @@ export interface AlertaDetalleResponse {
   detalleSanitario?: DetalleSanitario | null;
   /** Presente solo para alertas geoespaciales (datoDisparador === 'FUERA_DE_PERIMETRO'). */
   detalleGeoespacial?: DetalleGeoespacial | null;
-  /** Última transmisión del collar (null si no tiene collar o nunca transmitió). */
+  /** Última transmisión de la caravana (null si no tiene caravana o nunca transmitió). */
   caravanaUltimaSenial?: string | null;
-  /** True en alertas de celo pendientes cuyo collar no transmite hace más de `horasUmbralDatoDesactualizado`. */
+  /** True en alertas de celo pendientes cuya caravana no transmite hace más de `horasUmbralDatoDesactualizado`. */
   datoPosiblementeDesactualizado?: boolean;
   horasUmbralDatoDesactualizado?: number;
 }

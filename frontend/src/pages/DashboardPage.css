@@ -386,7 +386,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   IDEA 4 — COBERTURA DE COLLARES
+   IDEA 4 — COBERTURA DE CARAVANAS
    ══════════════════════════════════════════════════════════════ */
 .dash-coverage-pct {
     font-size: 3.2rem;
@@ -421,7 +421,7 @@
 .dash-coverage-calibrando { background: #13D4FB; }
 .dash-coverage-silencio  { background: #D69E2E; }
 .dash-coverage-bateria   { background: #E53E3E; }
-.dash-coverage-sincollar { background: rgba(255,255,255,0.3); }
+.dash-coverage-sincaravana { background: rgba(255,255,255,0.3); }
 
 .dash-coverage-legend {
     display: flex;

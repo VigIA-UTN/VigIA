@@ -1302,7 +1302,7 @@ public class AnimalServiceImpl implements AnimalService {
                 if (telemetriaDesactualizada(telemetria)) {
                         return IndicadorResponse.builder()
                                         .nombre("Estado de movimiento")
-                                        .descripcion(descripcionSinDatosPorCollarDesactualizado())
+                                        .descripcion(descripcionSinDatosPorCaravanaDesactualizada())
                                         .valor(String.valueOf(telemetria.getMoveState()))
                                         .estado("SIN DATOS")
                                         .build();
@@ -1328,8 +1328,8 @@ public class AnimalServiceImpl implements AnimalService {
                 return antiguedad.compareTo(Duration.ofHours(HORAS_SIN_DATOS_MOVIMIENTO)) > 0;
         }
 
-        private String descripcionSinDatosPorCollarDesactualizado() {
-                return "El collar no transmitió datos en las últimas " + HORAS_SIN_DATOS_MOVIMIENTO
+        private String descripcionSinDatosPorCaravanaDesactualizada() {
+                return "La caravana no transmitió datos en las últimas " + HORAS_SIN_DATOS_MOVIMIENTO
                                 + " horas; no se puede calcular el estado de movimiento actual.";
         }
 

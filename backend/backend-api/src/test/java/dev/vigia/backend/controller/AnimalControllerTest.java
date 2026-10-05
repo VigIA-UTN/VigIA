@@ -1984,12 +1984,12 @@ class AnimalControllerTest {
         // =========================================================================
 
         @SuppressWarnings("null")
-        private void asignarCollarConMoveState(Long animalId, int moveState) {
-                asignarCollarConMoveState(animalId, moveState, LocalDateTime.now());
+        private void asignarCaravanaConMoveState(Long animalId, int moveState) {
+                asignarCaravanaConMoveState(animalId, moveState, LocalDateTime.now());
         }
 
         @SuppressWarnings("null")
-        private void asignarCollarConMoveState(Long animalId, int moveState, LocalDateTime fechaHoraTelemetria) {
+        private void asignarCaravanaConMoveState(Long animalId, int moveState, LocalDateTime fechaHoraTelemetria) {
                 Animal animal = animalRepository.findById(animalId).orElseThrow();
 
                 Caravana caravana = new Caravana();
@@ -2052,7 +2052,7 @@ class AnimalControllerTest {
         void getIndicadoresSalud_verde() throws Exception {
                 Long animalId = crearAnimal("Vaca Indicadores Verde", establecimientoId, rodeoLoteId);
 
-                asignarCollarConMoveState(animalId, 100); // igual a la media -> VERDE
+                asignarCaravanaConMoveState(animalId, 100); // igual a la media -> VERDE
                 asignarEstadoReproductivo(animalId, TipoReproductivo.GESTANTE);
                 asignarEstadoSalud(animalId, TipoEstadoSalud.SANO);
 
@@ -2083,10 +2083,10 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void getIndicadoresSalud_movimientoAmarilloYRojo() throws Exception {
                 Long animalAmarilloId = crearAnimal("Vaca Indicadores Amarillo", establecimientoId, rodeoLoteId);
-                asignarCollarConMoveState(animalAmarilloId, 115); // 1.5 std por encima de la media -> AMARILLO
+                asignarCaravanaConMoveState(animalAmarilloId, 115); // 1.5 std por encima de la media -> AMARILLO
 
                 Long animalRojoId = crearAnimal("Vaca Indicadores Rojo", establecimientoId, rodeoLoteId);
-                asignarCollarConMoveState(animalRojoId, 200); // muy por encima de la media -> ROJO
+                asignarCaravanaConMoveState(animalRojoId, 200); // muy por encima de la media -> ROJO
 
                 mockMvc.perform(get("/api/v1/animales/" + animalAmarilloId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -2128,7 +2128,7 @@ class AnimalControllerTest {
         @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Animal sin caravana, estado reproductivo ni estado de salud devuelve SIN DATOS (no 500)")
         @SuppressWarnings("null")
         void getIndicadoresSalud_sinDatos() throws Exception {
-                Long animalId = crearAnimal("Vaca Sin Collar", establecimientoId, rodeoLoteId);
+                Long animalId = crearAnimal("Vaca Sin Caravana", establecimientoId, rodeoLoteId);
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -2201,7 +2201,7 @@ class AnimalControllerTest {
                 Long animalId = crearAnimal("Vaca Telemetria Reciente", establecimientoId, rodeoLoteId);
                 // 5h59m de antigüedad: todavía dentro de la ventana de 6hs -> se calcula el
                 // color normalmente.
-                asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).plusMinutes(1));
+                asignarCaravanaConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).plusMinutes(1));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -2217,7 +2217,7 @@ class AnimalControllerTest {
                 Long animalId = crearAnimal("Vaca Telemetria Vieja", establecimientoId, rodeoLoteId);
                 // 6h01m de antigüedad: supera la ventana de 6hs -> SIN DATOS, aunque el
                 // moveState sea "normal" (VERDE).
-                asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).minusMinutes(1));
+                asignarCaravanaConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).minusMinutes(1));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -2233,7 +2233,7 @@ class AnimalControllerTest {
                 Long animalId = crearAnimal("Vaca Telemetria Vieja Rojo", establecimientoId, rodeoLoteId);
                 // moveState muy alejado de la media (daría ROJO), pero la telemetría es de hace
                 // más de 6hs.
-                asignarCollarConMoveState(animalId, 500, LocalDateTime.now().minusHours(7));
+                asignarCaravanaConMoveState(animalId, 500, LocalDateTime.now().minusHours(7));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -2310,7 +2310,7 @@ class AnimalControllerTest {
 
                 Caravana caravana = new Caravana();
                 caravana.setDevEui("TEST-DEV-EUI-01");
-                caravana.setAlias("Sensor Collar 01");
+                caravana.setAlias("Sensor Caravana 01");
                 caravana.setEstablecimiento(est);
                 caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
                 caravana.setActivo(false);
@@ -2327,7 +2327,7 @@ class AnimalControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.caravanaId").value(caravana.getId()))
                                 .andExpect(jsonPath("$.caravanaDevEui").value("TEST-DEV-EUI-01"))
-                                .andExpect(jsonPath("$.caravanaAlias").value("Sensor Collar 01"))
+                                .andExpect(jsonPath("$.caravanaAlias").value("Sensor Caravana 01"))
                                 .andExpect(jsonPath("$.caravanaEstado").value("VINCULADO"));
 
                 Caravana enDb = caravanaRepository.findById(caravana.getId()).orElseThrow();

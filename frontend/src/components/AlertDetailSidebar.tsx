@@ -277,7 +277,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           </div>
         ) : (
           <>
-            {/* H0008: el backend lo marca solo en alertas de celo pendientes con el collar sin transmitir */}
+            {/* H0008: el backend lo marca solo en alertas de celo pendientes con la caravana sin transmitir */}
             {detalle?.datoPosiblementeDesactualizado && (
               <div
                 className="d-flex align-items-start gap-2 rounded-4 px-3 py-2"
@@ -288,8 +288,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                 <div>
                   <div className="fw-bold">Dato posiblemente desactualizado</div>
                   {detalle.caravanaUltimaSenial
-                    ? <>El collar no transmite desde hace más de {detalle.horasUmbralDatoDesactualizado ?? 2} h (última señal {formatUltimaSenial(detalle.caravanaUltimaSenial).text}).</>
-                    : <>No hay transmisiones registradas del collar de este animal.</>}
+                    ? <>La caravana no transmite desde hace más de {detalle.horasUmbralDatoDesactualizado ?? 2} h (última señal {formatUltimaSenial(detalle.caravanaUltimaSenial).text}).</>
+                    : <>No hay transmisiones registradas de la caravana de este animal.</>}
                   {' '}Verificá el estado del animal en campo antes de inseminar.
                 </div>
               </div>

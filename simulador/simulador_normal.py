@@ -34,7 +34,7 @@ Notas técnicas heredadas de simulador_demo.py (se mantienen sin cambios):
 - INTERVALO_SEGUNDOS (cadencia real de envío) y TICK_MODELADO_SEGUNDOS (la
   magnitud de movimiento que "ve" el modelo por paquete, fija en 300s) están
   desacoplados a propósito: acá INTERVALO_SEGUNDOS default es 300 (5 min,
-  igual que un collar real) porque este script SÍ está pensado para correr
+  igual que una caravana real) porque este script SÍ está pensado para correr
   con cadencia real y no necesita ir rápido. Si en algún momento hace falta
   acelerarlo para pruebas, se puede bajar sin miedo a romper la calibración
   del modelo — la distancia por paquete no depende de este valor.
@@ -56,7 +56,7 @@ API_URL = os.getenv("API_URL", "http://localhost:8081/api/v1/ingesta/uplink")
 NUM_ANIMALES = int(os.getenv("NUM_ANIMALES", 5))
 
 # Cadencia real de envío. Este script está pensado para correr con el mismo
-# ritmo que un collar real (5 min) durante períodos largos; no participa del
+# ritmo que una caravana real (5 min) durante períodos largos; no participa del
 # cálculo de distancia por paquete (ver TICK_MODELADO_SEGUNDOS).
 INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 300))
 
@@ -71,7 +71,7 @@ LON_INICIAL = -59.225728
 SPEED_BASE_DEG_POR_TICK_5MIN = 0.000018
 TURN_STD_BASE = 0.35  # rad por tick, pastoreo normal (igual que generate_dataset.py)
 
-# moveState real del collar: 0-9
+# moveState real de la caravana: 0-9
 MOVESTATE_REPOSO = (0, 1)
 MOVESTATE_NORMAL = (2, 6)
 MOVESTATE_ALTA_ACTIVIDAD = (7, 9)

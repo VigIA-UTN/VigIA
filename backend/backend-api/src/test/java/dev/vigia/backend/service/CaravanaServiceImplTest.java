@@ -69,7 +69,7 @@ class CaravanaServiceImplTest {
     void crearCaravanaSinCodigoExitoso() {
         CaravanaRequest request = CaravanaRequest.builder()
                 .dev_eui("AA-BB-CC-DD")
-                .alias("Collar 1")
+                .alias("Caravana 1")
                 .establecimientoId(10L)
                 .build();
 
@@ -85,7 +85,7 @@ class CaravanaServiceImplTest {
 
         assertThat(response.getId()).isEqualTo(1L);
         assertThat(response.getDevEui()).isEqualTo("AA-BB-CC-DD");
-        assertThat(response.getAlias()).isEqualTo("Collar 1");
+        assertThat(response.getAlias()).isEqualTo("Caravana 1");
         assertThat(response.getCodigo()).isNull();
         assertThat(response.getFechaAsignacion()).isNull();
         assertThat(response.getEstadoSensor()).isEqualTo(EstadoSensor.DISPONIBLE);
@@ -316,7 +316,7 @@ class CaravanaServiceImplTest {
         when(caravanaRepository.findById(1L)).thenReturn(Optional.of(caravana));
         when(caravanaRepository.save(any(Caravana.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CaravanaResponse response = caravanaService.darDeBajaCaravana(1L, "Collar dañado", "admin@vigia.dev");
+        CaravanaResponse response = caravanaService.darDeBajaCaravana(1L, "Caravana dañada", "admin@vigia.dev");
 
         assertThat(response.getEstadoSensor()).isEqualTo(EstadoSensor.INACTIVO);
         assertThat(response.getActivo()).isFalse();

@@ -4,7 +4,7 @@ gps_noise_common.py
 Lógica compartida entre ml-training/celo/generate_dataset.py y
 ml-training/salud/generate_dataset.py para simular ruido de medición GPS
 y la granularidad real de moveState (ver investigación de causa raíz:
-un collar real, aunque esté físicamente quieto, produce un ruido de
+una caravana real, aunque esté físicamente quieta, produce un ruido de
 posición GNSS de ~15m de desvío estándar por eje entre fixes
 consecutivos, muy por encima del desplazamiento sintético que ambos
 generadores producían -- eso hacía que el modelo de celo interpretara
@@ -22,7 +22,7 @@ METERS_PER_DEGREE = 111_320.0  # aprox. WGS84 ecuatorial; ver nota en el
 # docstring de inject_gps_noise sobre por qué no se corrige por cos(lat).
 
 # Derivado empíricamente de una muestra real de 12 lecturas consecutivas
-# de un collar físicamente quieto: distancias entre fixes consecutivos
+# de una caravana físicamente quieta: distancias entre fixes consecutivos
 # (unidades "escaladas" = grados*100000, mismo criterio que
 # DIST_SCALE_FACTOR en ml-celo/app/main.py y ml-salud/app/features_salud.py)
 # = [37.4, 20.3, 4.27, 31.6, 15.19, 16.63, 24.8, 37.3, 33.4, 23.5, 27.6],

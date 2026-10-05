@@ -9,7 +9,7 @@ Al no existir un dataset público con acelerometría cruda + GPS ya etiquetado p
 - **Ciclo Estral Bovino:** Promedio de 21 ± 4 días.
 - **Duración del Estro (Celo):** Promedio de 15 ± 6 horas.
 - **Dinámica GPS / Proximidad:** Durante el celo y el periestro, la vaca aumenta significativamente su distancia recorrida y pierde linealidad en su trayectoria (movimientos erráticos).
-- **Edge Computing (Collar Lansitec):** El collar no envía acelerometría cruda por LoRaWAN para ahorrar batería. En su lugar, analiza los datos internamente y envía un estado de vibración (`vibstate` de 0 a 9) en cada Heartbeat.
+- **Edge Computing (Caravana Lansitec):** La caravana no envía acelerometría cruda por LoRaWAN para ahorrar batería. En su lugar, analiza los datos internamente y envía un estado de vibración (`vibstate` de 0 a 9) en cada Heartbeat.
   - `0`: Descanso / Rumia.
   - `1-6`: Caminata / Pastoreo normal.
   - `7-9`: Picos de alta actividad (celo, monta, arreo).
@@ -28,14 +28,14 @@ A diferencia de simuladores simplificados que generan "días" aislados, nuestro 
 
 ## 3. Ruido de GPS y granularidad de `moveState`
 
-Un collar real, aunque esté físicamente quieto, mide con ruido GNSS: la
-distancia entre dos fixes consecutivos de un collar estacionario ronda
+Una caravana real, aunque esté físicamente quieta, mide con ruido GNSS: la
+distancia entre dos fixes consecutivos de una caravana estacionaria ronda
 los ~15m de desvío estándar por eje (derivado empíricamente de una
 muestra real de 12 lecturas). Hasta que se agregó esto, `generate_dataset.py`
 generaba la posición "verdadera" del random walk como si fuera también
 la posición observada, sin ruido de medición — un desplazamiento
 sintético mucho más chico que el ruido GPS real, incluso durante el pico
-de celo. Esto hacía que un collar real quieto pareciera, para el modelo,
+de celo. Esto hacía que una caravana real quieta pareciera, para el modelo,
 más "activo" que el pico de celo sintético, generando falsos positivos
 de celo con confianza ~0.99 en dispositivos que no se estaban moviendo.
 

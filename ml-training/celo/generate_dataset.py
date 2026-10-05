@@ -24,7 +24,7 @@ from gps_noise_common import (  # noqa: E402
 SAMPLES_PER_DAY = 288  # 1 lectura cada 5 minutos (24 * 60 / 5)
 MINUTES_PER_SAMPLE = 5
 
-# moveState real del collar: 0 (reposo) a 9 (alta aceleración)
+# moveState real de la caravana: 0 (reposo) a 9 (alta aceleración)
 
 
 def build_dataset(n_animales: int, dias: int, seed: int,
@@ -139,8 +139,8 @@ def build_dataset(n_animales: int, dias: int, seed: int,
         lon[:, t] = lon[:, t - 1] + step_lon + pull_lon
 
     # Trayectoria "verdadera" (determina las labels is_celo/is_periestro,
-    # ya calculadas más arriba y ajenas a lat/lon) vs. observada: un collar
-    # real, aunque esté quieto, mide con ruido GNSS -- ver
+    # ya calculadas más arriba y ajenas a lat/lon) vs. observada: una caravana
+    # real, aunque esté quieta, mide con ruido GNSS -- ver
     # gps_noise_common.py para la derivación empírica de gps_noise_std_m.
     lat_true, lon_true = lat, lon
     lat, lon = inject_gps_noise(lat_true, lon_true, gps_noise_std_m, rng)

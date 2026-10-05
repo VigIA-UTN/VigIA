@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="VigIA - Microservicio de Detección de Celo", lifespan=lifespan)
 
 class PuntoTelemetria(BaseModel):
-    moveState: int  # 0-9, según protocolo real del collar Lansitec
+    moveState: int  # 0-9, según protocolo real de la caravana Lansitec
     latitud: float
     longitud: float
 
