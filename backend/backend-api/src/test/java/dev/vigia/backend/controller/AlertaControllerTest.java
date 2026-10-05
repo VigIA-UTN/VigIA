@@ -40,6 +40,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -446,9 +447,9 @@ class AlertaControllerTest {
     }
 
     @Test
-    @DisplayName("Confirmar alerta ya CONFIRMADA → 400 (transición inválida)")
+    @DisplayName("Confirmar alerta ya CONFIRMADA → 409 con quién la procesó")
     @SuppressWarnings("null")
-    void confirmarAlerta_yaConfirmada_returns400() throws Exception {
+    void confirmarAlerta_yaConfirmada_returns409() throws Exception {
         // Primera confirmación
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
@@ -459,13 +460,14 @@ class AlertaControllerTest {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
                 .param("estado", "CONFIRMADA"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Esta alerta ya fue confirmada por")));
     }
 
     @Test
-    @DisplayName("Confirmar alerta ya DESCARTADA → 400 (transición inválida)")
+    @DisplayName("Confirmar alerta ya DESCARTADA → 409 con quién la procesó")
     @SuppressWarnings("null")
-    void confirmarAlerta_yaDescartada_returns400() throws Exception {
+    void confirmarAlerta_yaDescartada_returns409() throws Exception {
         // Primero descartar
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
@@ -476,7 +478,8 @@ class AlertaControllerTest {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
                 .param("estado", "CONFIRMADA"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Esta alerta ya fue descartada por")));
     }
 
     @Test

@@ -27,6 +27,7 @@ import dev.vigia.backend.dto.BloqueComparativoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
+import dev.vigia.backend.exception.AlertaYaProcesadaException;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -721,7 +722,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_Success_Confirmada() {
                 // Arrange
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
@@ -743,7 +744,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_ConfirmarAnestro_RegistraEstadoAnestro() {
                 mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
@@ -765,7 +766,7 @@ public class AlertaServiceImplTest {
         @Test
         void actualizarEstadoAlerta_ConfirmarCelo_RegistraEstadoCelo() {
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
@@ -782,7 +783,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_Success_Descartada() {
                 // Arrange
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
@@ -819,7 +820,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaNotFound() {
                 // Arrange
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.empty());
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.empty());
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -834,7 +835,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_ThrowsAccessDeniedException_WhenUserNotBelongsToEstablecimiento() {
                 // Arrange
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(Collections.emptyList()); // sin pertenencia
 
@@ -847,39 +848,65 @@ public class AlertaServiceImplTest {
 
         @Test
         @SuppressWarnings("null")
-        void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaYaConfirmada() {
+        void actualizarEstadoAlerta_ThrowsAlertaYaProcesada_WhenAlertaYaConfirmada() {
                 // Arrange: la alerta ya está CONFIRMADA, se intenta confirmar de nuevo
                 mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                Usuario otro = new Usuario();
+                otro.setNombre("Juan");
+                otro.setApellido("Pérez");
+                mockAlerta.setUsuarioConfirmacion(otro);
+                mockAlerta.setTsConfirmacion(LocalDateTime.of(2026, 10, 5, 14, 32));
 
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
 
                 // Act & Assert
-                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                AlertaYaProcesadaException exception = assertThrows(AlertaYaProcesadaException.class,
                                 () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
                                                 "Notas"));
-                assertEquals("Estado inválido para la actualización.", exception.getMessage());
+                assertEquals("Esta alerta ya fue confirmada por Juan Pérez el 05/10/2026 a las 14:32.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
 
         @Test
         @SuppressWarnings("null")
-        void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaYaDescartada() {
+        void actualizarEstadoAlerta_ThrowsAlertaYaProcesada_WhenAlertaYaDescartada() {
                 // Arrange: alerta ya DESCARTADA, se intenta confirmar
                 mockAlerta.setEstado(EstadoAlerta.DESCARTADA);
+                Usuario otro = new Usuario();
+                otro.setNombre("Juan");
+                otro.setApellido("Pérez");
+                mockAlerta.setUsuarioConfirmacion(otro);
+                mockAlerta.setTsConfirmacion(LocalDateTime.of(2026, 10, 5, 14, 32));
 
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
 
                 // Act & Assert
-                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                AlertaYaProcesadaException exception = assertThrows(AlertaYaProcesadaException.class,
                                 () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
                                                 "Notas"));
-                assertEquals("Estado inválido para la actualización.", exception.getMessage());
+                assertEquals("Esta alerta ya fue descartada por Juan Pérez el 05/10/2026 a las 14:32.", exception.getMessage());
+                verify(alertaRepository, never()).save(any());
+        }
+
+        @Test
+        void actualizarEstadoAlerta_ThrowsAlertaYaProcesada_WhenAlertaArchivada() {
+                mockAlerta.setEstado(EstadoAlerta.ARCHIVADA);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+
+                AlertaYaProcesadaException exception = assertThrows(AlertaYaProcesadaException.class,
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.DESCARTADA,
+                                                null));
+                assertEquals("Esta alerta ya fue archivada porque venció la ventana de inseminación.",
+                                exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
 

@@ -22,6 +22,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const [isClosing, setIsClosing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [notas, setNotas] = useState('');
+  // H0010: error al confirmar/descartar; conflicto = otro usuario ya la procesó (409)
+  const [actionError, setActionError] = useState<{ mensaje: string; conflicto: boolean } | null>(null);
+  // Estado real tras un 409: se informa al padre al cerrar, para que el aviso no desaparezca antes de leerlo
+  const estadoPorSincronizar = useRef<'CONFIRMADA' | 'DESCARTADA' | null>(null);
 
   const [detalle, setDetalle] = useState<AlertaDetalleResponse | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
@@ -102,6 +106,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   }, [alerta.id, selectedId]);
 
   const handleClose = () => {
+    if (estadoPorSincronizar.current) {
+      onActionComplete(alerta.id, estadoPorSincronizar.current);
+      estadoPorSincronizar.current = null;
+    }
     setIsClosing(true);
     setTimeout(() => {
       onClose();
@@ -110,19 +118,38 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
   const handleAccion = async (nuevoEstado: 'CONFIRMADA' | 'DESCARTADA', triggerIntervencion: boolean = true, notaOverride?: string) => {
     setActionLoading(true);
+    setActionError(null);
     try {
-      // Si la alerta es un mock, el backend va a tirar 404/500, lo atajamos acá para que actualice igual visualmente.
-      await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride).catch(err => {
-        console.warn('Backend falló (probablemente es un mock alert), forzando update frontend:', err);
-      });
+      await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride);
 
       onActionComplete(alerta.id, nuevoEstado);
       if (nuevoEstado === 'CONFIRMADA' && triggerIntervencion) {
         onOpenIntervencion?.();
       }
       handleClose();
-    } catch (error) {
-      console.error('Error actualizando alerta:', error);
+    } catch (err) {
+      console.error('Error actualizando alerta:', err);
+      const e = err as { response?: { status?: number; data?: { message?: string } | string } };
+      const responseData = e?.response?.data;
+      const errorMessage = typeof responseData === 'string' ? responseData : responseData?.message;
+
+      if (e?.response?.status === 409) {
+        setActionError({ mensaje: errorMessage || 'Esta alerta ya fue procesada por otro usuario.', conflicto: true });
+        // Refrescamos el detalle para mostrar el estado real y ocultar los botones
+        if (selectedId) {
+          try {
+            const actualizado = await getAlertaDetalle(alerta.id, selectedId);
+            setDetalle(actualizado);
+            if (actualizado.estadoActual === 'CONFIRMADA' || actualizado.estadoActual === 'DESCARTADA') {
+              estadoPorSincronizar.current = actualizado.estadoActual;
+            }
+          } catch (refreshErr) {
+            console.error('Error refrescando alerta:', refreshErr);
+          }
+        }
+      } else {
+        setActionError({ mensaje: errorMessage || 'No se pudo actualizar la alerta. Intentá de nuevo.', conflicto: false });
+      }
       setActionLoading(false);
     }
   };
@@ -656,6 +683,23 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           </>
         )}
       </div>
+
+      {/* H0010: aviso de error al confirmar/descartar, fijo sobre el pie para que siempre se vea */}
+      {actionError && (
+        <div
+          className="d-flex align-items-start gap-2 px-4 py-3 border-top"
+          role="alert"
+          style={actionError.conflicto
+            ? { backgroundColor: '#E3F2FD', color: '#0D47A1', fontSize: '0.9rem' }
+            : { backgroundColor: '#FDECEA', color: '#B71C1C', fontSize: '0.9rem' }}
+        >
+          <i className={`bi ${actionError.conflicto ? 'bi-person-check' : 'bi-exclamation-triangle'} fs-5`} style={{ lineHeight: 1.2 }}></i>
+          <div>
+            {actionError.conflicto && <div className="fw-bold">Alerta ya procesada</div>}
+            {actionError.mensaje}
+          </div>
+        </div>
+      )}
 
       {/* Acciones — Productor y Veterinario siempre; Campero salvo en alertas sanitarias */}
       {canActOnAlerts && !loadingDetail && !errorDetail && estadoVisual === 'PENDIENTE' && (

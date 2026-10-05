@@ -3,6 +3,7 @@ package dev.vigia.backend.service.impl;
 import java.util.Comparator;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
+import dev.vigia.backend.exception.AlertaYaProcesadaException;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Diagnostico;
@@ -278,17 +280,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 })
                                 .collect(Collectors.toList());
 
-                String usuarioAccionStr = null;
-                if (alerta.getUsuarioConfirmacion() != null) {
-                        usuarioAccionStr = alerta.getUsuarioConfirmacion().getNombre();
-                        if (alerta.getUsuarioConfirmacion().getApellido() != null
-                                        && !alerta.getUsuarioConfirmacion().getApellido().isEmpty()) {
-                                usuarioAccionStr += " " + alerta.getUsuarioConfirmacion().getApellido();
-                        }
-                        if (usuarioAccionStr == null || usuarioAccionStr.isBlank()) {
-                                usuarioAccionStr = alerta.getUsuarioConfirmacion().getEmail();
-                        }
-                }
+                String usuarioAccionStr = nombreVisible(alerta.getUsuarioConfirmacion());
 
                 DetalleSanitarioResponse detalleSanitario = null;
                 if (alerta.getDisparador() == DisparadorAlerta.SALUD) {
@@ -493,7 +485,7 @@ public class AlertaServiceImpl implements AlertaService {
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                Alerta alerta = alertaRepository.findById(alertaId)
+                Alerta alerta = alertaRepository.findByIdForUpdate(alertaId)
                                 .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
 
                 Long establecimientoId = alerta.getAnimal().getEstablecimiento().getId();
@@ -511,6 +503,10 @@ public class AlertaServiceImpl implements AlertaService {
                 validarCamperoNoActuaSobreSalud(usuario, alerta);
 
                 EstadoAlerta estadoAnterior = alerta.getEstado();
+
+                if (estadoAnterior != EstadoAlerta.PENDIENTE) {
+                        throw new AlertaYaProcesadaException(mensajeAlertaYaProcesada(alerta));
+                }
 
                 if (estadoAnterior == EstadoAlerta.PENDIENTE &&
                                 (nuevoEstado == EstadoAlerta.CONFIRMADA || nuevoEstado == EstadoAlerta.DESCARTADA)) {
@@ -996,6 +992,45 @@ public class AlertaServiceImpl implements AlertaService {
                                                 ? intervencion.getAlerta().getId()
                                                 : null)
                                 .build();
+        }
+
+        private static final DateTimeFormatter FECHA_ACCION = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
+
+        private String mensajeAlertaYaProcesada(Alerta alerta) {
+                if (alerta.getEstado() == EstadoAlerta.ARCHIVADA) {
+                        return "Esta alerta ya fue archivada porque venció la ventana de inseminación.";
+                }
+                if (alerta.getEstado() == EstadoAlerta.VENCIDA) {
+                        return "Esta alerta ya venció y no admite cambios.";
+                }
+                String accion = switch (alerta.getEstado()) {
+                        case CONFIRMADA -> "confirmada";
+                        case DESCARTADA -> "descartada";
+                        default -> "procesada";
+                };
+                StringBuilder msg = new StringBuilder("Esta alerta ya fue ").append(accion);
+                String quien = nombreVisible(alerta.getUsuarioConfirmacion());
+                if (quien != null) {
+                        msg.append(" por ").append(quien);
+                }
+                if (alerta.getTsConfirmacion() != null) {
+                        msg.append(" el ").append(alerta.getTsConfirmacion().format(FECHA_ACCION));
+                }
+                return msg.append(".").toString();
+        }
+
+        private static String nombreVisible(Usuario usuario) {
+                if (usuario == null) {
+                        return null;
+                }
+                String nombre = usuario.getNombre();
+                if (usuario.getApellido() != null && !usuario.getApellido().isEmpty()) {
+                        nombre += " " + usuario.getApellido();
+                }
+                if (nombre == null || nombre.isBlank()) {
+                        nombre = usuario.getEmail();
+                }
+                return nombre;
         }
 
         private void validarCamperoNoActuaSobreSalud(Usuario usuario, Alerta alerta) {

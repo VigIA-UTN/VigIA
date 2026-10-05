@@ -34,7 +34,14 @@ public class GlobalExceptionHandler {
                 .body(errorBody(HttpStatus.FORBIDDEN, ex.getMessage()));
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
+    /**
+     * La alerta ya fue procesada por otro usuario → 409 Conflict.
+     */
+    @ExceptionHandler(AlertaYaProcesadaException.class)
+    public ResponseEntity<Map<String, Object>> handleAlertaYaProcesada(AlertaYaProcesadaException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(errorBody(HttpStatus.CONFLICT, ex.getMessage()));
+    }
 
     private Map<String, Object> errorBody(HttpStatus status, String message) {
         return Map.of(
