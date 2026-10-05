@@ -92,7 +92,10 @@ export default function InvitacionesPendientesPage() {
                     <h4>{inv.establecimiento}</h4>
                     <p><strong>Rol sugerido:</strong> {inv.rol}</p>
                     <p><strong>Enviado por:</strong> {inv.nombreCompleto}</p>
-                    <p><strong>Fecha:</strong> {new Date(inv.fechaCreacion || '').toLocaleDateString()}</p>
+                    <p><strong>Fecha de envío:</strong> {new Date(inv.fechaCreacion || '').toLocaleDateString()}</p>
+                    {inv.fechaExpiracion && (
+                      <p><strong>Vence el:</strong> {new Date(inv.fechaExpiracion).toLocaleDateString()}</p>
+                    )}
                   </div>
                   <div className="invitacion-actions">
                     <Button 
