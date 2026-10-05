@@ -1186,16 +1186,6 @@ export default function DashboardPage() {
                                         >
                                             <span className={`dash-sev-dot ${sevDot}`} />
                                             <span className="dash-salud-revisar-nombre">{nombreAnimal(animal)}</span>
-                                            <div className="dash-salud-sparkline">
-                                                {/* Placeholder de actividad (wireframe usa ~~ ) */}
-                                                <svg width="40" height="18" viewBox="0 0 40 18">
-                                                    <polyline
-                                                        points="0,9 8,5 16,12 24,4 32,10 40,7"
-                                                        fill="none" stroke="#94A3B8" strokeWidth="1.5"
-                                                        strokeLinejoin="round" strokeLinecap="round"
-                                                    />
-                                                </svg>
-                                            </div>
                                             <span className="dash-salud-revisar-tiempo">
                                                 {dias > 0 ? `${dias} d` : `${Math.floor(h)}h`}
                                             </span>

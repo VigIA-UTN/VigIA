@@ -1341,11 +1341,6 @@
 }
 
 /* ── Sparkline mini ────────────────────────────────────────────── */
-.dash-salud-sparkline {
-    opacity: 0.7;
-    flex-shrink: 0;
-}
-
 /* ── Partos esperados — bar chart ──────────────────────────────── */
 .dash-partos-chart {
     display: flex;

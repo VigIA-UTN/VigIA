@@ -38,6 +38,8 @@ export default function AnimalesPage() {
     const navigate = useNavigate();
     const rol = useAuthStore((s) => s.rol);
     const puedeGestionarCaravanas = rol !== 'VETERINARIO';
+    // Alta/baja de animales, rodeos y cargas masivas: el backend solo se las permite al productor.
+    const esProductor = rol === 'PRODUCTOR';
     const selectedId = useEstablecimientoStore((s) => s.selectedId);
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
     const [loading, setLoading] = useState(true);
@@ -450,20 +452,22 @@ export default function AnimalesPage() {
                                 <i className="bi bi-heart" /> Salud
                             </button>
                         </div>
-                        <div className="animales-action-btns d-flex align-items-center gap-2">
-                            <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
-                                <i className="bi bi-plus-lg" /> Rodeo
-                            </Button>
-                            <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
-                                <i className="bi bi-upload" /> Cargar Estados
-                            </Button>
-                            <Button className="btn-vigia-success" onClick={openUploadModal}>
-                                <i className="bi bi-upload" /> Cargar Animales
-                            </Button>
-                            <Button className="btn-vigia-success" onClick={openModal}>
-                                <i className="bi bi-plus-lg" /> Animal
-                            </Button>
-                        </div>
+                        {esProductor && (
+                            <div className="animales-action-btns d-flex align-items-center gap-2">
+                                <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
+                                    <i className="bi bi-plus-lg" /> Rodeo
+                                </Button>
+                                <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
+                                    <i className="bi bi-upload" /> Cargar Estados
+                                </Button>
+                                <Button className="btn-vigia-success" onClick={openUploadModal}>
+                                    <i className="bi bi-upload" /> Cargar Animales
+                                </Button>
+                                <Button className="btn-vigia-success" onClick={openModal}>
+                                    <i className="bi bi-plus-lg" /> Animal
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     <div className="mb-3 mt-3">
@@ -660,9 +664,11 @@ export default function AnimalesPage() {
                                                                         : <><i className="bi bi-bell-fill"></i> Alerta</>}
                                                                 </Button>
                                                             )}
-                                                            <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)}>
-                                                                <i className="bi bi-trash"></i>
-                                                            </Button>
+                                                            {esProductor && (
+                                                                <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)}>
+                                                                    <i className="bi bi-trash"></i>
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
