@@ -49,6 +49,7 @@ import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.service.AlertaService;
+import dev.vigia.backend.service.CeloDatoDesactualizadoEvaluator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import dev.vigia.backend.config.RabbitMQConfig;
@@ -70,6 +71,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final DiagnosticoRepository diagnosticoRepository;
         private final RabbitTemplate rabbitTemplate;
         private final ObjectMapper objectMapper;
+        private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
 
         @Override
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
@@ -99,7 +101,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 disparadorEnum = DisparadorAlerta.ABIGEATO;
                 }
 
-                dev.vigia.backend.model.SeveridadAlerta severidadEnum = null;
+                SeveridadAlerta severidadEnum = null;
                 if (severidad != null && !severidad.isBlank()) {
                         String s = severidad.trim().toUpperCase();
                         if (s.equals("ALTA"))
@@ -300,6 +302,8 @@ public class AlertaServiceImpl implements AlertaService {
 
                 String descripcionDatoOrigen = construirDescripcionDatoOrigen(alerta, detalleSanitario);
 
+                LocalDateTime ultimaSenial = ultimaSenialDe(alerta);
+
                 return AlertaDetalleResponse.builder()
                                 .id(alerta.getId())
                                 .animalId(alerta.getAnimal().getId())
@@ -322,7 +326,21 @@ public class AlertaServiceImpl implements AlertaService {
                                 .detalleSanitario(detalleSanitario)
                                 .detalleGeoespacial(detalleGeoespacial)
                                 .accionRecomendada(alerta.getAccionRecomendada())
+                                .caravanaUltimaSenial(ultimaSenial)
+                                .datoPosiblementeDesactualizado(esDatoDesactualizado(alerta, ultimaSenial))
+                                .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
                                 .build();
+        }
+
+        private static LocalDateTime ultimaSenialDe(Alerta alerta) {
+                return alerta.getAnimal() != null && alerta.getAnimal().getCaravana() != null
+                                ? alerta.getAnimal().getCaravana().getUltimaSenial()
+                                : null;
+        }
+
+        private boolean esDatoDesactualizado(Alerta alerta, LocalDateTime ultimaSenial) {
+                return datoDesactualizadoEvaluator.esDatoDesactualizado(alerta.getDisparador(), alerta.getTipo(),
+                                alerta.getEstado(), ultimaSenial);
         }
 
         private String construirDescripcionDatoOrigen(Alerta alerta, DetalleSanitarioResponse detalleSanitario) {
@@ -447,6 +465,8 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         private AlertaResponse toResponse(Alerta alerta) {
+                LocalDateTime ultimaSenial = datoDesactualizadoEvaluator.aplica(alerta.getDisparador(),
+                                alerta.getTipo(), alerta.getEstado()) ? ultimaSenialDe(alerta) : null;
                 return AlertaResponse.builder()
                                 .id(alerta.getId())
                                 .tipo(alerta.getDisparador() != null ? alerta.getDisparador().name() : alerta.getTipo())
@@ -458,6 +478,9 @@ public class AlertaServiceImpl implements AlertaService {
                                 .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
                                 .accionRecomendada(alerta.getAccionRecomendada())
+                                .caravanaUltimaSenial(ultimaSenial)
+                                .datoPosiblementeDesactualizado(esDatoDesactualizado(alerta, ultimaSenial))
+                                .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
                                 .build();
         }
 

@@ -78,6 +78,7 @@ import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.RegistroPesoRepository;
 import dev.vigia.backend.service.AnimalService;
 import dev.vigia.backend.service.CargaMasivaService;
+import dev.vigia.backend.service.CeloDatoDesactualizadoEvaluator;
 import dev.vigia.backend.service.EstadoReproductivoCsvService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -97,6 +98,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstadoSaludRepository estadoSaludRepository;
         private final RegistroPesoRepository registroPesoRepository;
         private final CaravanaRepository caravanaRepository;
+        private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
 
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
@@ -944,6 +946,12 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         private AlertaResponse alertaToAlertaResponse(Alerta alerta) {
+                boolean aplicaAviso = datoDesactualizadoEvaluator.aplica(alerta.getDisparador(), alerta.getTipo(),
+                                alerta.getEstado());
+                LocalDateTime ultimaSenial = aplicaAviso && alerta.getAnimal() != null
+                                && alerta.getAnimal().getCaravana() != null
+                                                ? alerta.getAnimal().getCaravana().getUltimaSenial()
+                                                : null;
                 return AlertaResponse.builder()
                                 .id(alerta.getId())
                                 .tipo(alerta.getTipo())
@@ -954,6 +962,11 @@ public class AnimalServiceImpl implements AnimalService {
                                 .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
                                 .severidad(alerta.getSeveridad().name())
+                                .caravanaUltimaSenial(ultimaSenial)
+                                .datoPosiblementeDesactualizado(datoDesactualizadoEvaluator.esDatoDesactualizado(
+                                                alerta.getDisparador(), alerta.getTipo(), alerta.getEstado(),
+                                                ultimaSenial))
+                                .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
                                 .build();
         }
 

@@ -81,6 +81,9 @@ public class AlertaServiceImplTest {
         @Spy
         private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
+        @org.mockito.Spy
+        private CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator = new CeloDatoDesactualizadoEvaluator();
+
         @InjectMocks
         private AlertaServiceImpl alertaService;
 
@@ -606,6 +609,109 @@ public class AlertaServiceImplTest {
                 AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
 
                 assertNull(result.getDetalleSanitario());
+        }
+
+
+        private AlertaDetalleResponse detalleConUltimaSenial(LocalDateTime ultimaSenial) {
+                dev.vigia.backend.model.Caravana caravana = new dev.vigia.backend.model.Caravana();
+                caravana.setUltimaSenial(ultimaSenial);
+                mockAnimal.setCaravana(caravana);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                return alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+        }
+
+        @Test
+        void obtenerDetalleAlerta_CELO_collarSinTransmitirMasDe2h_marcaDesactualizado() {
+                LocalDateTime hace3h = LocalDateTime.now().minusHours(3);
+
+                AlertaDetalleResponse result = detalleConUltimaSenial(hace3h);
+
+                assertTrue(result.isDatoPosiblementeDesactualizado());
+                assertEquals(hace3h, result.getCaravanaUltimaSenial());
+                assertEquals(2, result.getHorasUmbralDatoDesactualizado());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_CELO_collarTransmitiendo_noMarcaDesactualizado() {
+                AlertaDetalleResponse result = detalleConUltimaSenial(LocalDateTime.now().minusMinutes(30));
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_CELO_sinTransmisiones_marcaDesactualizado() {
+                AlertaDetalleResponse result = detalleConUltimaSenial(null);
+
+                assertTrue(result.isDatoPosiblementeDesactualizado());
+                assertNull(result.getCaravanaUltimaSenial());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_CELO_yaResuelta_noMarcaDesactualizado() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+
+                AlertaDetalleResponse result = detalleConUltimaSenial(LocalDateTime.now().minusHours(5));
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_Anestro_noMarcaDesactualizado() {
+                mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
+                mockAlerta.setValorDetectado(60.0);
+                mockAlerta.setValorUmbral(45.0);
+
+                AlertaDetalleResponse result = detalleConUltimaSenial(LocalDateTime.now().minusHours(5));
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
+        }
+
+        @Test
+        void listarAlertasCelo_collarSinTransmitir_marcaDesactualizadoEnListado() {
+                dev.vigia.backend.model.Caravana caravana = new dev.vigia.backend.model.Caravana();
+                caravana.setUltimaSenial(LocalDateTime.now().minusHours(4));
+                mockAnimal.setCaravana(caravana);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findCeloByEstablecimiento(ESTABLECIMIENTO_ID))
+                                .thenReturn(List.of(mockAlerta));
+
+                AlertaResponse result = alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null).get(0);
+
+                assertTrue(result.isDatoPosiblementeDesactualizado());
+                assertEquals(caravana.getUltimaSenial(), result.getCaravanaUltimaSenial());
+                assertEquals(2, result.getHorasUmbralDatoDesactualizado());
+        }
+
+        @Test
+        void listarAlertasCelo_resuelta_noCargaCollarNiMarca() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                dev.vigia.backend.model.Caravana caravana = new dev.vigia.backend.model.Caravana();
+                caravana.setUltimaSenial(LocalDateTime.now().minusHours(4));
+                mockAnimal.setCaravana(caravana);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findCeloByEstablecimiento(ESTABLECIMIENTO_ID))
+                                .thenReturn(List.of(mockAlerta));
+
+                AlertaResponse result = alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null).get(0);
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
+                assertNull(result.getCaravanaUltimaSenial());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_SALUD_noMarcaDesactualizado() {
+                mockAlerta.setDisparador(DisparadorAlerta.SALUD);
+
+                AlertaDetalleResponse result = detalleConUltimaSenial(LocalDateTime.now().minusHours(5));
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
         }
 
         // --- Tests para actualizarEstadoAlerta ---

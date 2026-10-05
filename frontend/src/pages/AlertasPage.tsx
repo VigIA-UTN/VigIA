@@ -4,6 +4,7 @@ import { getAlertas, esAnestro, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
+import DatoDesactualizadoBadge from '../components/DatoDesactualizadoBadge';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import './AnimalesPage.css'; // For common vigia styles
 import './AlertasPage.css';
@@ -288,7 +289,12 @@ export default function AlertasPage() {
                                             return (
                                                 <tr key={a.id}>
                                                     <td className="fw-medium">#{a.animalId}</td>
-                                                    <td><span className={`tipo-badge tipo-${tipoLower}`}>{esAnestro(a) ? 'ANESTRO' : a.tipo || 'CELO'}</span></td>
+                                                    <td>
+                                                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                                                            <span className={`tipo-badge tipo-${tipoLower}`}>{esAnestro(a) ? 'ANESTRO' : a.tipo || 'CELO'}</span>
+                                                            <DatoDesactualizadoBadge alerta={a} />
+                                                        </div>
+                                                    </td>
                                                     <td className="text-center">
                                                         <span className={`severidad-badge ${getSeveridadClass(sev)}`}>
                                                             {sev}

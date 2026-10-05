@@ -1,5 +1,6 @@
 import { esAnestro, type AlertaResponse } from '../api/alertaApi';
 import SidebarCard, { type Categoria, type Severidad } from './SidebarCard';
+import DatoDesactualizadoBadge from './DatoDesactualizadoBadge';
 
 interface AlertNotificationCardProps {
   alerta: AlertaResponse;
@@ -83,12 +84,15 @@ export default function AlertNotificationCard({
       </span>
     </div>
   ) : (
-    <div
-      title={textoAccionRecomendada(alerta)}
-      style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-    >
-      {textoAccionRecomendada(alerta)}
-    </div>
+    <>
+      <DatoDesactualizadoBadge alerta={alerta} />
+      <div
+        title={textoAccionRecomendada(alerta)}
+        style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+      >
+        {textoAccionRecomendada(alerta)}
+      </div>
+    </>
   );
 
   return (

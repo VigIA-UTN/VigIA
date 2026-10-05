@@ -6,6 +6,7 @@ import DiagnosticoSection from './DiagnosticoSection';
 import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useVentanaInseminacion, formatCountdown } from '../hooks/useVentanaInseminacion';
+import { formatUltimaSenial } from '../utils/caravanaTelemetria';
 
 interface AlertDetailSidebarProps {
   alerta: AlertaResponse;
@@ -276,6 +277,24 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           </div>
         ) : (
           <>
+            {/* H0008: el backend lo marca solo en alertas de celo pendientes con el collar sin transmitir */}
+            {detalle?.datoPosiblementeDesactualizado && (
+              <div
+                className="d-flex align-items-start gap-2 rounded-4 px-3 py-2"
+                role="alert"
+                style={{ backgroundColor: '#FFF8E1', border: '1px solid #F2C94C', color: '#7A5A00', fontSize: '0.9rem' }}
+              >
+                <i className="bi bi-wifi-off fs-5" style={{ lineHeight: 1.2 }}></i>
+                <div>
+                  <div className="fw-bold">Dato posiblemente desactualizado</div>
+                  {detalle.caravanaUltimaSenial
+                    ? <>El collar no transmite desde hace más de {detalle.horasUmbralDatoDesactualizado ?? 2} h (última señal {formatUltimaSenial(detalle.caravanaUltimaSenial).text}).</>
+                    : <>No hay transmisiones registradas del collar de este animal.</>}
+                  {' '}Verificá el estado del animal en campo antes de inseminar.
+                </div>
+              </div>
+            )}
+
             {/* Dato de origen — misma seccion para cualquier tipo de alerta */}
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>

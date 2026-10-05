@@ -8,7 +8,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { getAnimales, ESTADO_REPRODUCTIVO_LABEL } from '../api/animalesApi';
 import type { AnimalResponse } from '../api/animalesApi';
-import { getAlertas, getVentanaInseminacion, esAnestro } from '../api/alertaApi';
+import { getAlertas, getVentanaInseminacion, esAnestro, tieneDatoDesactualizado } from '../api/alertaApi';
 import type { AlertaResponse, VentanaInseminacionResponse } from '../api/alertaApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
@@ -1712,7 +1712,16 @@ export default function DashboardPage() {
                                                 <span className={`dash-sev-dot ${sevDotClass}`} />
                                                 <div className="dash-cola-nombre">{nombreAnimal(animal)}</div>
                                                 <div className="dash-cola-rec-bar" />
-                                                <span className={`dash-tipo-chip ${tipoClass}`}>{tipoLabel}</span>
+                                                <span className={`dash-tipo-chip ${tipoClass}`}>
+                                                    {tipoLabel}
+                                                    {tieneDatoDesactualizado(alerta) && (
+                                                        <i
+                                                            className="bi bi-wifi-off ms-1"
+                                                            style={{ color: '#B7791F' }}
+                                                            title={`Dato posiblemente desactualizado: el collar no transmite hace más de ${alerta.horasUmbralDatoDesactualizado ?? 2} h. Verificá el animal en campo antes de inseminar.`}
+                                                        />
+                                                    )}
+                                                </span>
                                                 <span className={tiempoClass}>{tiempoLabel}</span>
                                                 <button
                                                     className={`dash-atender-btn ${isUrgentAtender ? '' : 'dash-atender-btn-outline'}`}

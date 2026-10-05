@@ -11,6 +11,23 @@ export interface AlertaResponse {
   severidad?: "ALTA" | "MEDIA" | "BAJA";
   gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';
   accionRecomendada: string;
+  /** H0008: última transmisión del collar (solo se envía en alertas de celo pendientes). */
+  caravanaUltimaSenial?: string | null;
+  datoPosiblementeDesactualizado?: boolean;
+  horasUmbralDatoDesactualizado?: number;
+}
+
+/**
+ * H0008: el backend marca la alerta al momento de enviarla. Como las listas no se refrescan solas,
+ * además se re-evalúa con la última señal conocida para que una tarjeta abierta pase a "sin señal"
+ * si el collar deja de transmitir. Ante la duda advierte (puede adelantarse si el collar transmitió
+ * después; el detalle de la alerta siempre consulta el dato fresco).
+ */
+export function tieneDatoDesactualizado(alerta: AlertaResponse): boolean {
+  if (alerta.datoPosiblementeDesactualizado) return true;
+  if (!alerta.caravanaUltimaSenial || alerta.estado !== 'PENDIENTE') return false;
+  const umbralMs = (alerta.horasUmbralDatoDesactualizado ?? 2) * 60 * 60 * 1000;
+  return Date.now() - new Date(alerta.caravanaUltimaSenial).getTime() > umbralMs;
 }
 
 /** Alerta de anestro: disparador CELO, pero sin ventana de inseminación. Mira tipo por el mapper que manda el tipo crudo. */
@@ -155,6 +172,11 @@ export interface AlertaDetalleResponse {
   detalleSanitario?: DetalleSanitario | null;
   /** Presente solo para alertas geoespaciales (datoDisparador === 'FUERA_DE_PERIMETRO'). */
   detalleGeoespacial?: DetalleGeoespacial | null;
+  /** Última transmisión del collar (null si no tiene collar o nunca transmitió). */
+  caravanaUltimaSenial?: string | null;
+  /** True en alertas de celo pendientes cuyo collar no transmite hace más de `horasUmbralDatoDesactualizado`. */
+  datoPosiblementeDesactualizado?: boolean;
+  horasUmbralDatoDesactualizado?: number;
 }
 
 export async function getAlertaDetalle(alertaId: number, establecimientoId: number): Promise<AlertaDetalleResponse> {
