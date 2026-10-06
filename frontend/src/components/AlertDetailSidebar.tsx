@@ -17,9 +17,16 @@ interface AlertDetailSidebarProps {
   onOpenIntervencion?: () => void;
 }
 
+/** El backend responde texto plano o { message } según el endpoint. */
+function mensajeError(err: unknown, fallback: string): string {
+  const data = (err as { response?: { data?: { message?: string } | string } })?.response?.data;
+  return (typeof data === 'string' ? data : data?.message) || fallback;
+}
+
 export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, mode = 'absolute', onOpenIntervencion }: AlertDetailSidebarProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [notas, setNotas] = useState('');
 
   const [detalle, setDetalle] = useState<AlertaDetalleResponse | null>(null);
@@ -84,12 +91,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
         if (isMounted) setDetalle(data);
       } catch (err) {
         console.error("Error fetching alerta detalle:", err);
-        if (isMounted) {
-          const e = err as { response?: { data?: { message?: string } | string } };
-          const responseData = e?.response?.data;
-          const errorMessage = typeof responseData === 'string' ? responseData : responseData?.message;
-          setErrorDetail(errorMessage || "Ocurrió un error al cargar el detalle de la alerta.");
-        }
+        if (isMounted) setErrorDetail(mensajeError(err, "Ocurrió un error al cargar el detalle de la alerta."));
       } finally {
         if (isMounted) setLoadingDetail(false);
       }
@@ -110,6 +112,23 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
   const handleAccion = async (nuevoEstado: 'CONFIRMADA' | 'DESCARTADA', triggerIntervencion: boolean = true, notaOverride?: string) => {
     setActionLoading(true);
+    setActionError(null);
+
+    // Confirmar una alerta sanitaria deja el sidebar abierto para cargar el diagnóstico,
+    // así que acá el error del backend no se puede tapar: el diagnóstico fallaría después.
+    if (isSanitaria && nuevoEstado === 'CONFIRMADA') {
+      try {
+        await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride);
+        setDetalle(d => d && { ...d, estadoActual: nuevoEstado });
+        onActionComplete(alerta.id, nuevoEstado);
+      } catch (err) {
+        setActionError(mensajeError(err, 'No se pudo confirmar la alerta.'));
+      } finally {
+        setActionLoading(false);
+      }
+      return;
+    }
+
     try {
       // Si la alerta es un mock, el backend va a tirar 404/500, lo atajamos acá para que actualice igual visualmente.
       await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride).catch(err => {
@@ -668,6 +687,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               <i className="bi bi-clipboard-plus"></i> {actionLoading ? '...' : 'Confirmar celo e inseminación'}
             </button>
           )}
+          {actionError && <span role="alert" style={{ color: '#D50000', fontSize: '0.85rem' }}>{actionError}</span>}
         </div>
       )}
 
