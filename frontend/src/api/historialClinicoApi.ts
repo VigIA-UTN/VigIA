@@ -43,6 +43,7 @@ const FUENTE_ESTADO_SALUD: Record<HistorialOrigen, string> = {
 /** El backend manda LocalDateTime (con segundos y fracción); el historial usa YYYY-MM-DDTHH:mm. */
 const minuto = (iso: string) => iso.slice(0, 16);
 const fmtDiaIso = (d: string) => d.split('-').reverse().join('/');
+const fmtFechaHora = (iso: string) => `${fmtDiaIso(iso.slice(0, 10))} ${iso.slice(11, 16)} h`;
 const esOrigen = (o: string | null): o is HistorialOrigen => o === 'AUTOMATICO' || o === 'MANUAL' || o === 'CARGA_MASIVA';
 const esEstado = (e: string | null): e is NonNullable<HistorialEvento['estado']> =>
     e === 'SANO' || e === 'EN_OBSERVACION' || e === 'ENFERMO';
@@ -66,7 +67,12 @@ function alertaOIntervencion(ev: LineaTiempoEventoResponse): HistorialEvento {
         resumen: ev.descripcion ?? 'El sistema detectó un comportamiento que se aparta de lo habitual para este animal.',
         usuario: SIS, origen: 'AUTOMATICO', fuente: 'Detección automática del modelo sanitario',
         fechaRegistro: minuto(ev.fecha), alertaId: ev.id,
-        detalles: [['Estado de la alerta', RESOLUCION_LABEL[ev.estadoResolucion ?? ''] ?? '—'], ['Alerta', `#${ev.id}`]],
+        detalles: [
+            ['Estado de la alerta', RESOLUCION_LABEL[ev.estadoResolucion ?? ''] ?? '—'],
+            ...(ev.usuarioResolucion ? [['Resuelta por', ev.usuarioResolucion] as [string, string]] : []),
+            ...(ev.tsResolucion ? [['Fecha de resolución', fmtFechaHora(ev.tsResolucion)] as [string, string]] : []),
+            ['Alerta', `#${ev.id}`],
+        ],
     };
 }
 

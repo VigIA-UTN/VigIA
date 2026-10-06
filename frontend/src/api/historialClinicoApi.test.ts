@@ -35,6 +35,14 @@ describe('construirHistorial', () => {
         expect(ev.detalles).toContainEqual(['Estado de la alerta', 'Confirmada']);
     });
 
+    it('una alerta resuelta muestra quién y cuándo la resolvió; una pendiente no', () => {
+        const [resuelta] = construirHistorial([{ ...alerta, usuarioResolucion: 'Laura Vet', tsResolucion: '2026-09-27T10:15:00.5' }], [], []);
+        expect(resuelta.detalles).toContainEqual(['Resuelta por', 'Laura Vet']);
+        expect(resuelta.detalles).toContainEqual(['Fecha de resolución', '27/09/2026 10:15 h']);
+        const [pendiente] = construirHistorial([{ ...alerta, estadoResolucion: 'SIN_ATENDER' }], [], []);
+        expect(pendiente.detalles?.map(([k]) => k)).toEqual(['Estado de la alerta', 'Alerta']);
+    });
+
     it('mapea una intervención con su tipo, autor y alerta de origen', () => {
         const [ev] = construirHistorial([intervencion], [], []);
         expect(ev).toMatchObject({ id: 'i3', tipo: 'intervencion', sub: 'TRATAMIENTO', titulo: 'Tratamiento', usuario: 'Juan Sosa', resumen: 'Oxitetraciclina IM' });

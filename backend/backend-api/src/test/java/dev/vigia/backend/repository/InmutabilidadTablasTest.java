@@ -46,11 +46,11 @@ public class InmutabilidadTablasTest {
         try (Statement st = connection.createStatement()) {
             ResultSet rs = st.executeQuery(
                     "SELECT COUNT(*) FROM information_schema.tables " +
-                    "WHERE table_schema = 'public' AND table_name IN ('intervenciones', 'diagnosticos')");
+                    "WHERE table_schema = 'public' AND table_name IN ('intervenciones', 'diagnosticos', 'estados_salud')");
             rs.next();
             int tablesFound = rs.getInt(1);
-            assumeTrue(tablesFound == 2,
-                    "Las tablas 'intervenciones' y/o 'diagnosticos' no existen en la BD - " +
+            assumeTrue(tablesFound == 3,
+                    "Las tablas 'intervenciones', 'diagnosticos' y/o 'estados_salud' no existen en la BD - " +
                     "Ejecutar las migraciones Flyway antes de correr este test");
         }
 
@@ -93,6 +93,15 @@ public class InmutabilidadTablasTest {
                         DROP TRIGGER IF EXISTS trg_bloquear_modificacion_diagnosticos ON diagnosticos;
                         CREATE TRIGGER trg_bloquear_modificacion_diagnosticos
                             BEFORE UPDATE OR DELETE ON diagnosticos
+                            FOR EACH ROW
+                            EXECUTE FUNCTION trg_bloquear_modificacion_inmutable();
+                    """);
+
+            // Asegurar que la tabla estados_salud tiene el trigger activo
+            st.execute("""
+                        DROP TRIGGER IF EXISTS trg_bloquear_modificacion_estados_salud ON estados_salud;
+                        CREATE TRIGGER trg_bloquear_modificacion_estados_salud
+                            BEFORE UPDATE OR DELETE ON estados_salud
                             FOR EACH ROW
                             EXECUTE FUNCTION trg_bloquear_modificacion_inmutable();
                     """);
@@ -235,6 +244,40 @@ public class InmutabilidadTablasTest {
     }
 
     @Test
+    @DisplayName("Estados de salud: INSERT permitido, UPDATE bloqueado con mensaje de acción prohibida")
+    void testEstadosSaludBloqueoUpdate() throws SQLException {
+        long idGenerado = insertarEstadoSalud("Estado de salud de prueba test update");
+
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE estados_salud SET diagnostico_notas = 'Notas modificadas' WHERE estado_salud_id = ?")) {
+            ps.setLong(1, idGenerado);
+            assertThatThrownBy(ps::executeUpdate)
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("Acción prohibida")
+                    .hasMessageContaining("estados_salud");
+        }
+
+        limpiarRegistro("estados_salud", "estado_salud_id", idGenerado);
+    }
+
+    @Test
+    @DisplayName("Estados de salud: INSERT permitido, DELETE bloqueado con mensaje de acción prohibida")
+    void testEstadosSaludBloqueoDelete() throws SQLException {
+        long idGenerado = insertarEstadoSalud("Estado de salud de prueba test delete");
+
+        try (PreparedStatement ps = connection.prepareStatement(
+                "DELETE FROM estados_salud WHERE estado_salud_id = ?")) {
+            ps.setLong(1, idGenerado);
+            assertThatThrownBy(ps::executeUpdate)
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("Acción prohibida")
+                    .hasMessageContaining("estados_salud");
+        }
+
+        limpiarRegistro("estados_salud", "estado_salud_id", idGenerado);
+    }
+
+    @Test
     @DisplayName("Bypass opcional: permite UPDATE y DELETE cuando la variable de sesión está activa")
     void testBypassPermiteModificaciones() throws SQLException {
         Long animalId = obtenerAnimalValido();
@@ -301,10 +344,26 @@ public class InmutabilidadTablasTest {
         return 1L;
     }
 
+    private long insertarEstadoSalud(String notas) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO estados_salud (animal_id, estado, diagnostico_notas, origen, fecha_registro) " +
+                        "VALUES (?, 'SANO', ?, 'MANUAL', NOW()) RETURNING estado_salud_id")) {
+            ps.setLong(1, obtenerAnimalValido());
+            ps.setString(2, notas);
+            ResultSet rs = ps.executeQuery();
+            assertThat(rs.next()).isTrue();
+            return rs.getLong(1);
+        }
+    }
+
     private void limpiarRegistro(String tabla, long id) {
+        limpiarRegistro(tabla, "id", id);
+    }
+
+    private void limpiarRegistro(String tabla, String columnaId, long id) {
         try (Statement st = connection.createStatement()) {
             st.execute("SET vigia.bypass_immutable_triggers = 'true'");
-            st.execute("DELETE FROM " + tabla + " WHERE id = " + id);
+            st.execute("DELETE FROM " + tabla + " WHERE " + columnaId + " = " + id);
             st.execute("RESET vigia.bypass_immutable_triggers");
         } catch (SQLException ignored) {
         }

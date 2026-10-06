@@ -24,6 +24,9 @@ public class LineaTiempoEventoResponse {
     private String severidad;
 
     private String estadoResolucion;
+    // Quién confirmó o descartó la alerta y cuándo; null mientras está pendiente.
+    private String usuarioResolucion;
+    private LocalDateTime tsResolucion;
 
     private String tipoIntervencion;
     private String descripcion;

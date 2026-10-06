@@ -347,6 +347,9 @@ export interface LineaTiempoEventoResponse {
   subtipo?: string | null;
   severidad: 'ALTA' | 'MEDIA' | 'BAJA' | null;
   estadoResolucion: string | null;
+  /** Quién confirmó o descartó la alerta y cuándo; null mientras está pendiente. */
+  usuarioResolucion?: string | null;
+  tsResolucion?: string | null;
   tipoIntervencion: string | null;
   descripcion: string | null;
   interventor: string | null;
