@@ -35,6 +35,14 @@ describe('construirHistorial', () => {
         expect(ev.detalles).toContainEqual(['Estado de la alerta', 'Confirmada']);
     });
 
+    it('una alerta resuelta muestra quién y cuándo la resolvió; una pendiente no', () => {
+        const [resuelta] = construirHistorial([{ ...alerta, usuarioResolucion: 'Laura Vet', tsResolucion: '2026-09-27T10:15:00.5' }], [], []);
+        expect(resuelta.detalles).toContainEqual(['Resuelta por', 'Laura Vet']);
+        expect(resuelta.detalles).toContainEqual(['Fecha de resolución', '27/09/2026 10:15 h']);
+        const [pendiente] = construirHistorial([{ ...alerta, estadoResolucion: 'SIN_ATENDER' }], [], []);
+        expect(pendiente.detalles?.map(([k]) => k)).toEqual(['Estado de la alerta', 'Alerta']);
+    });
+
     it('mapea una intervención con su tipo, autor y alerta de origen', () => {
         const [ev] = construirHistorial([intervencion], [], []);
         expect(ev).toMatchObject({ id: 'i3', tipo: 'intervencion', sub: 'TRATAMIENTO', titulo: 'Tratamiento', usuario: 'Juan Sosa', resumen: 'Oxitetraciclina IM' });
@@ -58,6 +66,14 @@ describe('construirHistorial', () => {
         expect(ev.fuente).toContain('#5');
         expect(ev.detalles).toContainEqual(['Dato de origen de la alerta', 'Actividad 40% por debajo del perfil.']);
     });
+
+    it('enlaza alertas, intervenciones y diagnósticos con su alerta de origen; los estados de salud no', () => {
+        const porId = Object.fromEntries(construirHistorial([alerta, intervencion], [estadoSalud], [diagnostico]).map(e => [e.id, e.alertaId]));
+        expect(porId).toEqual({ a5: 5, i3: 5, d7: 5, s2: undefined });
+    });
+
+    it('una intervención manual no tiene alerta que abrir', () =>
+        expect(construirHistorial([{ ...intervencion, alertaAsociadaId: null }], [], [])[0].alertaId).toBeUndefined());
 
     it('ordena todas las fuentes de la más reciente a la más antigua', () =>
         expect(construirHistorial([alerta, intervencion], [estadoSalud], [diagnostico]).map(e => e.id))
