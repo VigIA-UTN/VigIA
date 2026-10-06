@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { Container, Row, Col, Button, Modal, Form, Spinner, Alert } from 'react-bootstrap';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -26,25 +27,9 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-// Schema para configuración de anestro en el modal de detalle
-const anestroSchema = z.object({
-  diasDeteccionAnestro: z
-    .number({ message: 'Debe ser un número entero' })
-    .int('Debe ser un número entero')
-    .min(1, 'Mínimo 1 día')
-    .max(365, 'Máximo 365 días'),
-  severidadAnestro: z.enum(['BAJA', 'MEDIA', 'ALTA']),
-});
-type AnestroFormData = z.infer<typeof anestroSchema>;
-
-const SEVERIDAD_CFG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  BAJA:  { label: 'Baja',  color: '#2B7295', bg: '#e8f4f8', icon: 'bi-bell' },
-  MEDIA: { label: 'Media', color: '#c47c0a', bg: '#fef3c7', icon: 'bi-bell-fill' },
-  ALTA:  { label: 'Alta',  color: '#c0392b', bg: '#fee2e2', icon: 'bi-bell-slash-fill' },
-};
-
 export default function EstablecimientosPage() {
   const rol = useAuthStore(state => state.rol);
+  const navigate = useNavigate();
   const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,11 +51,6 @@ export default function EstablecimientosPage() {
   const [creandoLote, setCreandoLote] = useState(false);
   const [errorLote, setErrorLote] = useState<string | null>(null);
 
-  // Estado para configuración de anestro en el modal de detalle
-  const [savingAnestro, setSavingAnestro] = useState(false);
-  const [anestroSaved, setAnestroSaved] = useState(false);
-  const [errorAnestro, setErrorAnestro] = useState<string | null>(null);
-
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
@@ -78,20 +58,6 @@ export default function EstablecimientosPage() {
   const { register: registerUpdate, handleSubmit: handleSubmitUpdate, reset: resetUpdate, formState: { errors: errorsUpdate } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
-
-  const {
-    register: registerAnestro,
-    handleSubmit: handleSubmitAnestro,
-    reset: resetAnestro,
-    control: controlAnestro,
-    setValue: setAnestroValue,
-    formState: { errors: errorsAnestro, isDirty: isAnestroD },
-  } = useForm<AnestroFormData>({
-    resolver: zodResolver(anestroSchema),
-    defaultValues: { diasDeteccionAnestro: 45, severidadAnestro: 'MEDIA' },
-  });
-
-  const sevActual = useWatch({ control: controlAnestro, name: 'severidadAnestro' });
 
   useEffect(() => {
     const fetchEstablecimientos = async () => {
@@ -139,31 +105,6 @@ export default function EstablecimientosPage() {
       setSubmittingUpdate(false);
     }
   }
-
-  const onSaveAnestro = async (data: AnestroFormData) => {
-    if (!establecimientoDetail) return;
-    setSavingAnestro(true);
-    setErrorAnestro(null);
-    try {
-      const actualizado = await updateEstablecimiento(establecimientoDetail.id, {
-        nombre: establecimientoDetail.nombre,
-        latitud: establecimientoDetail.latitud,
-        longitud: establecimientoDetail.longitud,
-        diasDeteccionAnestro: data.diasDeteccionAnestro,
-        severidadAnestro: data.severidadAnestro,
-      });
-      setEstablecimientoDetail(actualizado);
-      setEstablecimientos(prev => prev.map(e => e.id === actualizado.id ? actualizado : e));
-      resetAnestro({ diasDeteccionAnestro: actualizado.diasDeteccionAnestro, severidadAnestro: actualizado.severidadAnestro as 'BAJA' | 'MEDIA' | 'ALTA' });
-      setAnestroSaved(true);
-      setTimeout(() => setAnestroSaved(false), 2500);
-    } catch (err) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      setErrorAnestro(axiosError.response?.data?.message || 'Error al guardar');
-    } finally {
-      setSavingAnestro(false);
-    }
-  };
 
   const handleDesactivar = async (id: number) => {
     if (!window.confirm('¿Estás seguro de que deseas desactivar este establecimiento?')) return;
@@ -291,12 +232,6 @@ export default function EstablecimientosPage() {
                           onClick={async () => {
                             setEstablecimientoDetail(est);
                             setShowDetailModal(true);
-                            setErrorAnestro(null);
-                            setAnestroSaved(false);
-                            resetAnestro({
-                              diasDeteccionAnestro: est.diasDeteccionAnestro ?? 45,
-                              severidadAnestro: (est.severidadAnestro as 'BAJA' | 'MEDIA' | 'ALTA') ?? 'MEDIA',
-                            });
                             setLoadingLotes(true);
                             setErrorLote(null);
                             try {
@@ -485,82 +420,13 @@ export default function EstablecimientosPage() {
             </MapContainer>
 
             {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
-              <>
-                  <hr />
-                  <div className="d-flex align-items-center gap-2 mb-3">
-                    <i className="bi bi-gear-fill" style={{ color: '#1E3A5F' }} />
-                    <h5 className="mb-0" style={{ color: '#1E3A5F' }}>Configuración de Anestro</h5>
-                  </div>
-                  {errorAnestro && <Alert variant="danger" className="py-2">{errorAnestro}</Alert>}
-                  {anestroSaved && <Alert variant="success" className="py-2">✓ Guardado correctamente</Alert>}
-                  <form onSubmit={handleSubmitAnestro(onSaveAnestro)} noValidate>
-
-                    {/* Fila 1: input días + info box al lado */}
-                    <div className="d-flex gap-3 align-items-center mb-3">
-
-                      {/* Input días */}
-                      <div style={{ flexShrink: 0 }}>
-                        <label className="form-label fw-bold mb-1" style={{ fontSize: '0.95rem', color: '#1E3A5F' }}>Días sin ciclo</label>
-                        <div className="input-group input-group-sm" style={{ maxWidth: 170 }}>
-                          <input
-                            type="number"
-                            className={`form-control ${errorsAnestro.diasDeteccionAnestro ? 'is-invalid' : ''}`}
-                            min={1} max={365}
-                            placeholder="45"
-                            {...registerAnestro('diasDeteccionAnestro', { valueAsNumber: true })}
-                          />
-                          <span className="input-group-text">días</span>
-                        </div>
-                        {errorsAnestro.diasDeteccionAnestro && (
-                          <div className="text-danger mt-1" style={{ fontSize: '0.75rem' }}>{errorsAnestro.diasDeteccionAnestro.message}</div>
-                        )}
-                      </div>
-
-                      {/* Info box al lado, mismo alto que el input */}
-                      <div className="est-anestro-info" style={{ flex: 1 }}>
-                        <i className="bi bi-info-circle-fill" style={{ color: '#3B8D99', flexShrink: 0 }} />
-                        <p className="mb-0" style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.4 }}>
-                          Días sin ciclo reproductivo antes de generar una alerta. Defecto: <strong>45 días</strong>.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Fila 2: toggle severidad */}
-                    <div className="mb-3">
-                      <label className="form-label fw-bold mb-1" style={{ fontSize: '0.95rem', color: '#1E3A5F' }}>Prioridad de la alerta</label>
-                      <div className="est-anestro-toggle">
-                        {(['BAJA', 'MEDIA', 'ALTA'] as const).map(nivel => {
-                          const cfg = SEVERIDAD_CFG[nivel];
-                          const isActive = sevActual === nivel;
-                          return (
-                            <button
-                              key={nivel}
-                              type="button"
-                              className={`est-anestro-pill ${isActive ? 'est-anestro-pill--active' : ''}`}
-                              style={isActive ? { backgroundColor: cfg.bg, color: cfg.color, borderColor: cfg.color } : {}}
-                              onClick={() => setAnestroValue('severidadAnestro', nivel, { shouldDirty: true })}
-                            >
-                              <i className={`bi ${cfg.icon}`} style={isActive ? { color: cfg.color } : {}} />
-                              {cfg.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* 4. Guardar */}
-                    <div className="d-flex justify-content-end">
-                      <button
-                        type="submit"
-                        className="btn btn-sm"
-                        style={{ background: '#1E3A5F', color: '#fff', fontWeight: 600, borderRadius: 8, padding: '0.4rem 1.2rem' }}
-                        disabled={savingAnestro || !isAnestroD}
-                      >
-                        {savingAnestro ? <Spinner size="sm" animation="border" /> : 'Guardar Cambios'}
-                      </button>
-                    </div>
-                  </form>
-                </>
+              <Button
+                className="btn-vigia-secondary"
+                onClick={() => navigate(`/establecimientos/${establecimientoDetail.id}/configuracion`)}
+              >
+                <i className="bi bi-gear-fill me-2" />
+                Configurar anestro
+              </Button>
             )}
 
             <hr />

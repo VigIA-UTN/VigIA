@@ -7,6 +7,4 @@ public class EstablecimientoRequest {
     private String nombre;
     private Double latitud;
     private Double longitud;
-    private Integer diasDeteccionAnestro;
-    private String severidadAnestro;
 }

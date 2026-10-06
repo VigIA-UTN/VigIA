@@ -2,12 +2,13 @@ package dev.vigia.backend.service.impl;
 
 import dev.vigia.backend.service.EstablecimientoService;
 
+import dev.vigia.backend.dto.ConfiguracionAnestroRequest;
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.dto.EstablecimientoResponse;
 import dev.vigia.backend.model.Establecimiento;
-import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -27,8 +28,6 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         est.setLongitud(request.getLongitud());
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-        est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
-        est.setSeveridadAnestro(SeveridadAlerta.valueOf(request.getSeveridadAnestro()));
 
         Establecimiento saved = establecimientoRepository.save(est);
         return mapToResponse(saved);
@@ -54,15 +53,32 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
     }
 
     @SuppressWarnings("null")
-    public EstablecimientoResponse updateEstablecimiento(Long id, EstablecimientoRequest request) {
-        Establecimiento est = establecimientoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+    public EstablecimientoResponse updateEstablecimiento(Long id, EstablecimientoRequest request,
+            String emailUsuario, boolean esAdmin) {
+        Establecimiento est = esAdmin
+                ? establecimientoRepository.findById(id)
+                        .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"))
+                : findPerteneciente(id, emailUsuario);
         est.setNombre(request.getNombre());
         est.setLatitud(request.getLatitud());
         est.setLongitud(request.getLongitud());
-        est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
-        est.setSeveridadAnestro(SeveridadAlerta.valueOf(request.getSeveridadAnestro()));
         return mapToResponse(establecimientoRepository.save(est));
+    }
+
+    public EstablecimientoResponse actualizarConfiguracionAnestro(Long id, ConfiguracionAnestroRequest request,
+            String emailUsuario) {
+        Establecimiento est = findPerteneciente(id, emailUsuario);
+        est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
+        est.setSeveridadAnestro(request.getSeveridadAnestro());
+        return mapToResponse(establecimientoRepository.save(est));
+    }
+
+    private Establecimiento findPerteneciente(Long id, String emailUsuario) {
+        return establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(emailUsuario).stream()
+                .filter(e -> e.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new AccessDeniedException(
+                        "El usuario no pertenece al establecimiento indicado o no está activo."));
     }
 
     @SuppressWarnings("null")

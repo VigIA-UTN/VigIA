@@ -4,8 +4,6 @@ export interface EstablecimientoRequest {
   nombre: string;
   latitud: number;
   longitud: number;
-  diasDeteccionAnestro?: number;
-  severidadAnestro?: string;
 }
 
 export interface EstablecimientoResponse {
@@ -36,6 +34,16 @@ export async function desactivarEstablecimiento(id: number): Promise<Establecimi
 
 export async function activarEstablecimiento(id: number): Promise<EstablecimientoResponse> {
   const response = await axiosClient.put<EstablecimientoResponse>(`/establecimientos/activar/${id}`);
+  return response.data;
+}
+
+export interface ConfiguracionAnestroRequest {
+  diasDeteccionAnestro: number;
+  severidadAnestro: 'BAJA' | 'MEDIA' | 'ALTA';
+}
+
+export async function updateConfiguracionAnestro(id: number, data: ConfiguracionAnestroRequest): Promise<EstablecimientoResponse> {
+  const response = await axiosClient.patch<EstablecimientoResponse>(`/establecimientos/${id}/configuracion-anestro`, data);
   return response.data;
 }
 

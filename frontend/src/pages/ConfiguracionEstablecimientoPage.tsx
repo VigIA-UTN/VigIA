@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getEstablecimientos, updateEstablecimiento } from '../api/establecimientosApi';
+import { getEstablecimientos, updateConfiguracionAnestro } from '../api/establecimientosApi';
 import type { EstablecimientoResponse } from '../api/establecimientosApi';
 import { useAuthStore } from '../store/authStore';
 import './ConfiguracionEstablecimientoPage.css';
@@ -83,13 +83,7 @@ export default function ConfiguracionEstablecimientoPage() {
     setSaving(true);
     setErrorGlobal(null);
     try {
-      const actualizado = await updateEstablecimiento(establecimiento.id, {
-        nombre: establecimiento.nombre,
-        latitud: establecimiento.latitud,
-        longitud: establecimiento.longitud,
-        diasDeteccionAnestro: data.diasDeteccionAnestro,
-        severidadAnestro: data.severidadAnestro,
-      });
+      const actualizado = await updateConfiguracionAnestro(establecimiento.id, data);
       setEstablecimiento(actualizado);
       reset({
         diasDeteccionAnestro: actualizado.diasDeteccionAnestro,
@@ -98,8 +92,11 @@ export default function ConfiguracionEstablecimientoPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      setErrorGlobal(axiosError.response?.data?.message || 'Error al guardar los cambios.');
+      // El backend no devuelve { message }: el 403 trae texto plano y el 400 de validación el body default de Spring
+      const status = (err as { response?: { status?: number } }).response?.status;
+      setErrorGlobal(status === 403
+        ? 'No tenés permisos para modificar este establecimiento.'
+        : 'Error al guardar los cambios.');
     } finally {
       setSaving(false);
     }
