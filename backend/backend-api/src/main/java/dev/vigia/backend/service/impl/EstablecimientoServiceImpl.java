@@ -40,12 +40,6 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         est.setLongitud(request.getLongitud());
         est.setActivo(true);
         est.setFechaAlta(LocalDate.now());
-        if (request.getDiasDeteccionAnestro() != null) {
-            est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
-        }
-        if (request.getSeveridadAnestro() != null) {
-            est.setSeveridadAnestro(parseSeveridad(request.getSeveridadAnestro()));
-        }
 
         Establecimiento saved = establecimientoRepository.save(est);
         return mapToResponse(saved);
@@ -71,19 +65,24 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
     }
 
     @SuppressWarnings("null")
-    public EstablecimientoResponse updateEstablecimiento(Long id, EstablecimientoRequest request) {
-        Establecimiento est = establecimientoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+    public EstablecimientoResponse updateEstablecimiento(Long id, EstablecimientoRequest request,
+            String emailUsuario, boolean esAdmin) {
+        Establecimiento est = esAdmin
+                ? establecimientoRepository.findById(id)
+                        .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"))
+                : findPerteneciente(id, emailUsuario);
         est.setNombre(request.getNombre());
         est.setLatitud(request.getLatitud());
         est.setLongitud(request.getLongitud());
-        if (request.getDiasDeteccionAnestro() != null) {
-            est.setDiasDeteccionAnestro(request.getDiasDeteccionAnestro());
-        }
-        if (request.getSeveridadAnestro() != null) {
-            est.setSeveridadAnestro(parseSeveridad(request.getSeveridadAnestro()));
-        }
         return mapToResponse(establecimientoRepository.save(est));
+    }
+
+    private Establecimiento findPerteneciente(Long id, String emailUsuario) {
+        return establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(emailUsuario).stream()
+                .filter(e -> e.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new AccessDeniedException(
+                        "El usuario no pertenece al establecimiento indicado o no está activo."));
     }
 
     @SuppressWarnings("null")

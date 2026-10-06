@@ -31,6 +31,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -86,6 +87,9 @@ class EstablecimientoControllerTest {
 
     private String adminToken;
     private String userToken;
+    private String vetToken;
+    private String camperoToken;
+    private String otroProductorToken;
     private Long establecimientoId;
 
     @BeforeEach
@@ -120,9 +124,16 @@ class EstablecimientoControllerTest {
         productor.setActivo(true);
         usuarioRepository.save(productor);
 
+        Usuario veterinario = crearUsuario("vet@vigia.dev", Rol.VETERINARIO);
+        Usuario campero = crearUsuario("campero@vigia.dev", Rol.CAMPERO);
+        crearUsuario("otro@vigia.dev", Rol.PRODUCTOR); // no pertenece al establecimiento
+
         // 3. Get tokens
         adminToken = getTokenFor("admin@vigia.dev", "admin123");
         userToken = getTokenFor("productor@vigia.dev", "prod123");
+        vetToken = getTokenFor("vet@vigia.dev", "pass123");
+        camperoToken = getTokenFor("campero@vigia.dev", "pass123");
+        otroProductorToken = getTokenFor("otro@vigia.dev", "pass123");
 
         // 4. Create an initial establishment
         Establecimiento est = new Establecimiento();
@@ -134,8 +145,20 @@ class EstablecimientoControllerTest {
         est.setEmpleados(new ArrayList<>());
         Empleado vinculoProd = new Empleado(est, productor);
         est.getEmpleados().add(vinculoProd);
+        est.getEmpleados().add(new Empleado(est, veterinario));
+        est.getEmpleados().add(new Empleado(est, campero));
         est = establecimientoRepository.save(est);
         establecimientoId = est.getId();
+    }
+
+    private Usuario crearUsuario(String email, Rol rol) {
+        Usuario u = new Usuario();
+        u.setEmail(email);
+        u.setPasswordHash(passwordEncoder.encode("pass123"));
+        u.setNombre(email);
+        u.setRol(rol);
+        u.setActivo(true);
+        return usuarioRepository.save(u);
     }
 
     @SuppressWarnings("null")
@@ -151,15 +174,13 @@ class EstablecimientoControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/establecimientos - Admin crea establecimiento exitosamente")
+    @DisplayName("POST /api/v1/establecimientos - Admin crea establecimiento con la configuración de anestro por defecto")
     @SuppressWarnings("null")
     void createEstablecimiento_asAdmin_success() throws Exception {
         EstablecimientoRequest request = new EstablecimientoRequest();
         request.setNombre("Nuevo Est");
         request.setLatitud(-35.0);
         request.setLongitud(-59.0);
-        request.setDiasDeteccionAnestro(10);
-        request.setSeveridadAnestro(SeveridadAlerta.MEDIA.name());
 
         mockMvc.perform(post("/api/v1/establecimientos")
                 .header("Authorization", "Bearer " + adminToken)
@@ -167,7 +188,9 @@ class EstablecimientoControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.nombre").value("Nuevo Est"))
-                .andExpect(jsonPath("$.activo").value(true));
+                .andExpect(jsonPath("$.activo").value(true))
+                .andExpect(jsonPath("$.diasDeteccionAnestro").value(45))
+                .andExpect(jsonPath("$.severidadAnestro").value("MEDIA"));
     }
 
     @Test
@@ -218,6 +241,59 @@ class EstablecimientoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].nombre").value("Establecimiento Test"));
+    }
+
+    // ── PUT /{id}: chequeo de pertenencia ────────────────────────────────────
+
+    private ResultActions putEstablecimiento(String token, String nombre) throws Exception {
+        EstablecimientoRequest request = new EstablecimientoRequest();
+        request.setNombre(nombre);
+        request.setLatitud(-34.0);
+        request.setLongitud(-58.0);
+        return mockMvc.perform(put("/api/v1/establecimientos/" + establecimientoId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/establecimientos/{id} - Productor ajeno recibe 403 y no se modifica nada")
+    @SuppressWarnings("null")
+    void updateEstablecimiento_asProductorAjeno_forbidden() throws Exception {
+        putEstablecimiento(otroProductorToken, "Hackeado").andExpect(status().isForbidden());
+
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        assertThat(est.getNombre()).isEqualTo("Establecimiento Test");
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/establecimientos/{id} - Productor del establecimiento lo edita sin pisar la configuración de anestro")
+    void updateEstablecimiento_asProductorDueno_ok() throws Exception {
+        mockMvc.perform(put("/api/v1/establecimientos/" + establecimientoId + "/anestro")
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"diasDeteccionAnestro\":30,\"severidadAnestro\":\"ALTA\"}"))
+                .andExpect(status().isOk());
+
+        putEstablecimiento(userToken, "Renombrado")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nombre").value("Renombrado"))
+                .andExpect(jsonPath("$.diasDeteccionAnestro").value(30))
+                .andExpect(jsonPath("$.severidadAnestro").value("ALTA"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/establecimientos/{id} - Admin edita cualquier establecimiento")
+    void updateEstablecimiento_asAdmin_ok() throws Exception {
+        putEstablecimiento(adminToken, "Editado por admin")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nombre").value("Editado por admin"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/establecimientos/{id} - Veterinario sigue sin poder editar el establecimiento")
+    void updateEstablecimiento_asVeterinario_forbidden() throws Exception {
+        putEstablecimiento(vetToken, "No deberia").andExpect(status().isForbidden());
     }
 
     // ── Tests para GET /{id}/intervenciones ─────────────────────────────────────
@@ -345,19 +421,9 @@ class EstablecimientoControllerTest {
     @DisplayName("GET /{id}/intervenciones - Usuario que no pertenece al establecimiento recibe error")
     @SuppressWarnings("null")
     void obtenerIntervenciones_usuarioNoPerteneceAlEstablecimiento_retornaError() throws Exception {
-        // Crear un segundo productor que NO pertenece al establecimiento
-        Usuario otroProd = new Usuario();
-        otroProd.setEmail("otro@vigia.dev");
-        otroProd.setPasswordHash(passwordEncoder.encode("otro123"));
-        otroProd.setNombre("Otro Productor");
-        otroProd.setRol(Rol.PRODUCTOR);
-        otroProd.setActivo(true);
-        usuarioRepository.save(otroProd);
-
-        String otroToken = getTokenFor("otro@vigia.dev", "otro123");
-
+        // otro@vigia.dev (creado en setUp) NO pertenece al establecimiento
         mockMvc.perform(get("/api/v1/establecimientos/" + establecimientoId + "/intervenciones")
-                .header("Authorization", "Bearer " + otroToken))
+                .header("Authorization", "Bearer " + otroProductorToken))
                 .andExpect(status().isBadRequest());
     }
 

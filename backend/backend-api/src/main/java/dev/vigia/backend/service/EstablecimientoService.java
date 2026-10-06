@@ -16,9 +16,7 @@ public interface EstablecimientoService {
     List<EstablecimientoResponse> getEstablecimientosByUsuario(String email);
 
     EstablecimientoResponse getEstablecimientoById(Long id);
-
-    EstablecimientoResponse updateEstablecimiento(Long id, EstablecimientoRequest request);
-
+    EstablecimientoResponse updateEstablecimiento(Long id, EstablecimientoRequest request, String emailUsuario, boolean esAdmin);
     EstablecimientoResponse desactivarEstablecimiento(Long id);
 
     EstablecimientoResponse activarEstablecimiento(Long id);
