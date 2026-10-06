@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 
-import { Container, Row, Col, Button, Modal, Form, Spinner, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Button, Modal, Form, Spinner, Alert, OverlayTrigger, Popover, Toast, Dropdown } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,6 +30,9 @@ type FormData = z.infer<typeof schema>;
 
 export default function EstablecimientosPage() {
   const rol = useAuthStore(state => state.rol);
+  // Mismos roles que exige el backend para cada endpoint
+  const puedeEditar = rol === 'ADMINISTRADOR' || rol === 'PRODUCTOR';
+  const puedeConfigurar = rol === 'PRODUCTOR' || rol === 'VETERINARIO';
   const navigate = useNavigate();
   const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +54,9 @@ export default function EstablecimientosPage() {
   const [nuevoLoteNombre, setNuevoLoteNombre] = useState('');
   const [creandoLote, setCreandoLote] = useState(false);
   const [errorLote, setErrorLote] = useState<string | null>(null);
+
+  const [confirmDesactivarId, setConfirmDesactivarId] = useState<number | null>(null);
+  const [undoToast, setUndoToast] = useState<{ id: number; nombre: string } | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -106,11 +113,12 @@ export default function EstablecimientosPage() {
     }
   }
 
-  const handleDesactivar = async (id: number) => {
-    if (!window.confirm('¿Estás seguro de que deseas desactivar este establecimiento?')) return;
+  const handleDesactivar = async (est: EstablecimientoResponse) => {
+    setConfirmDesactivarId(null);
     try {
-      const actualizado = await desactivarEstablecimiento(id);
-      setEstablecimientos(establecimientos.map(e => e.id === id ? actualizado : e));
+      const actualizado = await desactivarEstablecimiento(est.id);
+      setEstablecimientos(prev => prev.map(e => e.id === est.id ? actualizado : e));
+      setUndoToast({ id: est.id, nombre: est.nombre });
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
       alert(axiosError.response?.data?.message || 'Error al desactivar establecimiento');
@@ -124,6 +132,18 @@ export default function EstablecimientosPage() {
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
       alert(axiosError.response?.data?.message || 'Error al activar el establecimiento');
+    }
+  };
+
+  const handleUndoDesactivar = async () => {
+    if (!undoToast) return;
+    const { id } = undoToast;
+    setUndoToast(null);
+    try {
+      const actualizado = await activarEstablecimiento(id);
+      setEstablecimientos(prev => prev.map(e => e.id === id ? actualizado : e));
+    } catch {
+      alert('No se pudo deshacer la acción.');
     }
   };
 
@@ -189,35 +209,55 @@ export default function EstablecimientosPage() {
                       />
                       {/* Overlay degradado para que el nombre se lea bien */}
                       <div className="est-card-map-overlay" />
-                      {/* Badge de estado sobre la imagen */}
-                      <span className={`est-status-badge ${est.activo ? 'est-status-badge--active' : 'est-status-badge--inactive'}`}>
-                        <span className="est-status-dot" />
-                        {est.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                      {/* Acciones de editar */}
-                      <div className="est-card-top-actions">
-                        <button
-                          className="est-icon-btn"
-                          title="Editar establecimiento"
-                          onClick={() => {
-                            setEstablecimientoEdit(est);
-                            resetUpdate({
-                              nombre: est.nombre,
-                              latitud: est.latitud,
-                              longitud: est.longitud,
-                            });
-                            setShowUpdateModal(true);
-                          }}
-                        >
-                          <i className="bi bi-pencil-fill" />
-                        </button>
-                      </div>
+                      {/* Menú de acciones */}
+                      {(puedeEditar || puedeConfigurar) && (
+                        <div className="est-card-top-actions">
+                          <Dropdown align="end">
+                            <Dropdown.Toggle as="button" bsPrefix="est-icon-btn" title="Más acciones">
+                              <i className="bi bi-three-dots-vertical" />
+                            </Dropdown.Toggle>
+                            {/* Portal: la card tiene overflow hidden y filter, recortaría el menú */}
+                            {createPortal(
+                              <Dropdown.Menu className="est-menu">
+                                {puedeEditar && (
+                                  <Dropdown.Item as="button" onClick={() => {
+                                    setEstablecimientoEdit(est);
+                                    resetUpdate({
+                                      nombre: est.nombre,
+                                      latitud: est.latitud,
+                                      longitud: est.longitud,
+                                    });
+                                    setShowUpdateModal(true);
+                                  }}>
+                                    Editar establecimiento
+                                    <i className="bi bi-pencil" />
+                                  </Dropdown.Item>
+                                )}
+                                {puedeConfigurar && (
+                                  <Dropdown.Item as="button" onClick={() => navigate(`/establecimientos/${est.id}/configuracion`)}>
+                                    Configurar anestro
+                                    <i className="bi bi-gear" />
+                                  </Dropdown.Item>
+                                )}
+                              </Dropdown.Menu>,
+                              document.body
+                            )}
+                          </Dropdown>
+                        </div>
+                      )}
                     </div>
 
                     {/* Info de la card */}
                     <div className="est-card-body">
                       <div className="est-card-info">
-                        <span className="est-card-id">#{est.id}</span>
+                        <div className="est-card-id-row">
+                          <span className="est-card-id">#{est.id}</span>
+                          <span className="est-status">{est.activo ? 'Activo' : 'Inactivo'}</span>
+                          <span
+                            className={`est-status-dot ${est.activo ? 'est-status-dot--active' : 'est-status-dot--inactive'}`}
+                            aria-hidden="true"
+                          />
+                        </div>
                         <h4 className="est-card-name">{est.nombre}</h4>
                         <p className="est-card-coords">
                           <i className="bi bi-geo-alt-fill me-1" />
@@ -246,15 +286,36 @@ export default function EstablecimientosPage() {
                         >
                           Ver detalle
                         </button>
-                        {est.activo ? (
-                          <button className="est-btn est-btn-danger" onClick={() => handleDesactivar(est.id)}>
-                            Desactivar
-                          </button>
+                        {rol === 'ADMINISTRADOR' && (est.activo ? (
+                          <OverlayTrigger
+                            trigger="click"
+                            placement="top"
+                            rootClose
+                            show={confirmDesactivarId === est.id}
+                            onToggle={(next) => setConfirmDesactivarId(next ? est.id : null)}
+                            overlay={
+                              <Popover id={`confirm-desactivar-${est.id}`}>
+                                <Popover.Body>
+                                  <p className="mb-2">¿Desactivar <strong>{est.nombre}</strong>?</p>
+                                  <div className="d-flex justify-content-center gap-2">
+                                    <button className="est-btn est-btn-cancel" onClick={() => setConfirmDesactivarId(null)}>
+                                      Cancelar
+                                    </button>
+                                    <button className="est-btn est-btn-danger" onClick={() => handleDesactivar(est)}>
+                                      Desactivar
+                                    </button>
+                                  </div>
+                                </Popover.Body>
+                              </Popover>
+                            }
+                          >
+                            <button className="est-btn est-btn-danger">Desactivar</button>
+                          </OverlayTrigger>
                         ) : (
                           <button className="est-btn est-btn-success" onClick={() => handleActivar(est.id)}>
                             Activar
                           </button>
-                        )}
+                        ))}
                       </div>
                     </div>
 
@@ -332,8 +393,8 @@ export default function EstablecimientosPage() {
 
       {/* Modal Editar */}
       {establecimientoEdit && (
-        <Modal show={showUpdateModal} onHide={handleCloseUpdateModal} centered>
-          <Modal.Header closeButton style={{ backgroundColor: '#1E3A5F', color: 'white' }}>
+        <Modal show={showUpdateModal} onHide={handleCloseUpdateModal} centered dialogClassName="modal-nuevo-animal">
+          <Modal.Header closeButton>
             <Modal.Title>Actualizar establecimiento</Modal.Title>
           </Modal.Header>
           <Form onSubmit={handleSubmitUpdate(onUpdate)}>
@@ -380,10 +441,7 @@ export default function EstablecimientosPage() {
               </Form.Group>
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="secondary" onClick={handleCloseUpdateModal}>
-                Cancelar
-              </Button>
-              <Button type="submit" className="btn-vigia-primary" disabled={submittingUpdate}>
+              <Button type="submit" className="btn-guardar-animal" disabled={submittingUpdate}>
                 {submittingUpdate ? <Spinner size="sm" animation="border" /> : 'Confirmar'}
               </Button>
             </Modal.Footer>
@@ -488,6 +546,24 @@ export default function EstablecimientosPage() {
           </Modal.Body>
         </Modal>
       )}
+
+      {/* Undo toast — disponible 5s tras desactivar */}
+      <div className="undo-toast-container">
+        <Toast
+          show={!!undoToast}
+          onClose={() => setUndoToast(null)}
+          delay={5000}
+          autohide
+          className="undo-toast"
+        >
+          <Toast.Body className="d-flex align-items-center justify-content-between gap-3">
+            <span>{undoToast?.nombre} desactivado</span>
+            <Button variant="link" className="undo-toast-btn p-0" onClick={handleUndoDesactivar}>
+              Deshacer
+            </Button>
+          </Toast.Body>
+        </Toast>
+      </div>
     </div>
   );
 }

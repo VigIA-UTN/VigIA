@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Alert, Form, InputGroup } from 'react-bootstrap';
+import { SEVERIDAD } from '../utils/severidadColores';
 import { getConfigAnestro, updateConfigAnestro } from '../api/establecimientosApi';
 import type { ConfigAnestroResponse } from '../api/establecimientosApi';
 import { useAuthStore } from '../store/authStore';
@@ -24,11 +26,12 @@ type FormData = z.infer<typeof schema>;
 const DEFAULT_DIAS = 45;
 const DEFAULT_SEVERIDAD = 'MEDIA';
 
-const SEVERIDAD_CONFIG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  BAJA:  { label: 'Baja',  color: '#2B7295', bg: '#e8f4f8', icon: 'bi-bell' },
-  MEDIA: { label: 'Media', color: '#c47c0a', bg: '#fef3c7', icon: 'bi-bell-fill' },
-  ALTA:  { label: 'Alta',  color: '#c0392b', bg: '#fee2e2', icon: 'bi-bell-slash-fill' },
-};
+// Texto sobre el color plano de la rampa: oscuro sobre verde/amarillo, blanco sobre rojo (contraste AA).
+const SEVERIDAD_OPCION = {
+  BAJA:  { label: 'Baja',  texto: '#111827' },
+  MEDIA: { label: 'Media', texto: '#111827' },
+  ALTA:  { label: 'Alta',  texto: '#ffffff' },
+} as const;
 
 export default function ConfiguracionEstablecimientoPage() {
   const { id } = useParams<{ id: string }>();
@@ -170,16 +173,7 @@ export default function ConfiguracionEstablecimientoPage() {
       </div>
 
       {/* Header */}
-      <div className="cfg-header">
-        <i className="bi bi-gear-fill cfg-header-gear" />
-        <div className="cfg-header-text">
-          <h1 className="cfg-title">Configuración de Anestro</h1>
-          <p className="cfg-subtitle">
-            <i className="bi bi-building me-1" />
-            {config?.nombreEstablecimiento}
-          </p>
-        </div>
-      </div>
+      <h1 className="cfg-title">Configuración de Anestro</h1>
 
       {/* Error global */}
       {errorGlobal && (
@@ -220,24 +214,21 @@ export default function ConfiguracionEstablecimientoPage() {
                 <label className="cfg-label" htmlFor="diasDeteccionAnestro">
                   Cantidad de días
                 </label>
-                <div className={`cfg-input-wrapper ${errors.diasDeteccionAnestro ? 'cfg-input-wrapper--error' : ''}`}>
-                  <input
+                <InputGroup hasValidation>
+                  <Form.Control
                     id="diasDeteccionAnestro"
                     type="number"
-                    className="cfg-input"
                     min={1}
                     max={365}
                     placeholder={String(DEFAULT_DIAS)}
                     {...register('diasDeteccionAnestro', { valueAsNumber: true })}
+                    isInvalid={!!errors.diasDeteccionAnestro}
                   />
-                  <span className="cfg-input-suffix">días</span>
-                </div>
-                {errors.diasDeteccionAnestro && (
-                  <span className="cfg-field-error">
-                    <i className="bi bi-exclamation-circle me-1" />
-                    {errors.diasDeteccionAnestro.message}
-                  </span>
-                )}
+                  <InputGroup.Text>días</InputGroup.Text>
+                  <Form.Control.Feedback type="invalid">
+                    {errors.diasDeteccionAnestro?.message}
+                  </Form.Control.Feedback>
+                </InputGroup>
               </div>
             </div>
 
@@ -264,21 +255,17 @@ export default function ConfiguracionEstablecimientoPage() {
                   render={({ field }) => (
                     <div className="cfg-toggle-group">
                       {(['BAJA', 'MEDIA', 'ALTA'] as const).map((nivel) => {
-                        const cfg = SEVERIDAD_CONFIG[nivel];
+                        const opcion = SEVERIDAD_OPCION[nivel];
                         const isActive = field.value === nivel;
                         return (
                           <button
                             key={nivel}
                             type="button"
                             className={`cfg-toggle-pill ${isActive ? 'cfg-toggle-pill--active' : ''}`}
-                            style={isActive ? { backgroundColor: cfg.bg, color: cfg.color, borderColor: cfg.color } : {}}
+                            style={isActive ? { backgroundColor: SEVERIDAD[nivel].bar, color: opcion.texto } : {}}
                             onClick={() => field.onChange(nivel)}
                           >
-                            <i
-                              className={`bi ${cfg.icon} cfg-toggle-icon`}
-                              style={isActive ? { color: cfg.color } : {}}
-                            />
-                            {cfg.label}
+                            {opcion.label}
                           </button>
                         );
                       })}
@@ -294,23 +281,20 @@ export default function ConfiguracionEstablecimientoPage() {
               </div>
             </div>
           </div>
-
-          {/* Fila inferior: caja de info a todo el ancho */}
-          <div className="cfg-card-footer">
-            <div className="cfg-help-box">
-              <i className="bi bi-info-circle-fill cfg-help-icon" />
-              <div>
-                <p className="cfg-help-title">¿Qué controla este parámetro?</p>
-                <p className="cfg-help-text">
-                  Define cuántos días consecutivos sin actividad de ciclo reproductivo
-                  deben transcurrir para que el sistema genere una alerta de anestro.
-                  El valor por defecto es <strong>{DEFAULT_DIAS} días</strong>.
-                </p>
-              </div>
-            </div>
-          </div>
-
         </div>
+
+        {/* Info: mismo estilo que el aviso de calibración de AnimalDetailPage */}
+        <Alert variant="info" className="d-flex align-items-center shadow-sm mb-4" style={{ borderLeft: '5px solid #0dcaf0' }}>
+          <i className="bi bi-info-circle-fill fs-4 me-3 text-info"></i>
+          <div>
+            <h5 className="alert-heading mb-1" style={{ fontSize: '0.95rem' }}>¿Qué controla este parámetro?</h5>
+            <p className="mb-0" style={{ fontSize: '0.85rem' }}>
+              Define cuántos días consecutivos sin actividad de ciclo reproductivo
+              deben transcurrir para que el sistema genere una alerta de anestro.
+              El valor por defecto es <strong>{DEFAULT_DIAS} días</strong>.
+            </p>
+          </div>
+        </Alert>
 
         {/* Acciones */}
         <div className="cfg-actions">
@@ -319,8 +303,7 @@ export default function ConfiguracionEstablecimientoPage() {
             className="cfg-btn cfg-btn-cancel"
             onClick={() => navigate('/establecimientos')}
           >
-            <i className="bi bi-arrow-left me-2" />
-            Cancelar
+            Volver
           </button>
           <button
             type="submit"
