@@ -12,18 +12,25 @@ import dev.vigia.backend.model.Intervencion;
 
 @Repository
 public interface IntervencionRepository extends JpaRepository<Intervencion, Long> {
-    List<Intervencion> findByAnimalIdOrderByFechaHoraDesc(Long animalId);
+       List<Intervencion> findByAnimalIdOrderByFechaHoraDesc(Long animalId);
 
-    boolean existsByAlertaId(Long alertaId);
+       boolean existsByAlertaId(Long alertaId);
 
-    @Query("SELECT i FROM Intervencion i " +
-           "WHERE i.animal.id = :animalId " +
-           "AND (cast(:desde as timestamp) IS NULL OR i.fechaHora >= :desde) " +
-           "AND (cast(:hasta as timestamp) IS NULL OR i.fechaHora <= :hasta) " +
-           "ORDER BY i.fechaHora ASC")
-    List<Intervencion> findByAnimalConRango(
-            @Param("animalId") Long animalId,
-            @Param("desde")    LocalDateTime desde,
-            @Param("hasta")    LocalDateTime hasta);
+       @Query("SELECT i FROM Intervencion i " +
+                     "WHERE i.animal.id = :animalId " +
+                     "AND (cast(:desde as timestamp) IS NULL OR i.fechaHora >= :desde) " +
+                     "AND (cast(:hasta as timestamp) IS NULL OR i.fechaHora <= :hasta) " +
+                     "ORDER BY i.fechaHora ASC")
+       List<Intervencion> findByAnimalConRango(
+                     @Param("animalId") Long animalId,
+                     @Param("desde") LocalDateTime desde,
+                     @Param("hasta") LocalDateTime hasta);
+
+       @Query("SELECT i FROM Intervencion i " +
+                     "JOIN FETCH i.animal a " +
+                     "JOIN a.establecimiento e " +
+                     "WHERE e.id = :establecimientoId " +
+                     "ORDER BY i.fechaHora DESC")
+       List<Intervencion> findByEstablecimientoId(
+                     @Param("establecimientoId") Long establecimientoId);
 }
-

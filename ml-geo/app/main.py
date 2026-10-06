@@ -31,6 +31,9 @@ class GeoAnalyzeRequest(BaseModel):
     # Animales a incluir en el mapa de calor (p. ej. los de un rodeo); None = todos. Las alertas usan siempre el historial completo.
     animal_ids: Optional[List[str]] = None
     historial_7d: List[CoordenadaGPS]
+    # Umbral de aislamiento en metros para este análisis. Si no se envía, se usa el valor
+    # por defecto configurado en la variable de entorno UMBRAL_AISLAMIENTO_METROS (100 m).
+    umbral_aislamiento_m: Optional[float] = None
 
 class AlertaAnimal(BaseModel):
     animal_id: str
@@ -103,57 +106,55 @@ def _haversine(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-def _indice_cohesion(distancia_m):
+def _indice_cohesion(distancia_m, umbral_m: float = None):
     """
     Cohesión con el rodeo en 0..1: 1.0 pegado al grupo, 0.5 exactamente sobre
-    UMBRAL_AISLAMIENTO_METROS, y tendiendo a 0 a medida que el animal se aleja.
-    Por construcción indice < 0.5 <=> distancia > UMBRAL_AISLAMIENTO_METROS, pero
-    la alerta se deriva de la distancia para no depender de la igualdad de floats.
-    """
-    return UMBRAL_AISLAMIENTO_METROS / (UMBRAL_AISLAMIENTO_METROS + distancia_m)
+    el umbral de aislamiento, y tendiendo a 0 a medida que el animal se aleja.
+    Por construcción indice < 0.5 <=> distancia > umbral, pero la alerta se
+    deriva de la distancia para no depender de la igualdad de floats.
 
-def _compute_isolation_times(historial_7d: List[CoordenadaGPS], max_gap_s: float = 3600.0) -> dict:
+    umbral_m: umbral efectivo para este análisis; si es None usa el global
+    UMBRAL_AISLAMIENTO_METROS (valor de la variable de entorno).
+    """
+    u = umbral_m if umbral_m is not None else UMBRAL_AISLAMIENTO_METROS
+    return u / (u + distancia_m)
+
+def _compute_isolation_times(historial_7d: List[CoordenadaGPS], umbral_m: float, interval_s: float = 300.0) -> dict:
     """
     Returns a dict: animal_id -> total_isolation_time_in_seconds.
-    A point is isolated if distance to the centroid of OTHER animals' last known positions
-    (within max_gap_s) is > UMBRAL_AISLAMIENTO_METROS.
+    Positions are grouped into time intervals (default 5 minutes).
+    For each interval, if an animal is further than umbral_m from the centroid
+    of other animals' positions in that same interval, it accumulates
+    interval_s seconds of isolation.
     """
-    pts = sorted(historial_7d, key=lambda x: _ts(x))
-    last_pos = {}
     isolation_time = defaultdict(float)
-    last_iso_time = {} 
-    last_point_time = {} 
-    
-    for p in pts:
+    if not historial_7d:
+        return isolation_time
+
+    intervalos = defaultdict(lambda: defaultdict(list))
+    for p in historial_7d:
         t = _ts(p).timestamp()
+        interval_idx = int(t / interval_s)
+        intervalos[interval_idx][p.animal_id].append(p)
         
-        last_pos[p.animal_id] = p
-        
-        otros_lat = []
-        otros_lng = []
-        for a_id, op in last_pos.items():
-            if a_id != p.animal_id:
-                if t - _ts(op).timestamp() <= max_gap_s:
-                    otros_lat.append(op.lat)
-                    otros_lng.append(op.lng)
-                    
-        is_isolated = False
-        if otros_lat:
-            avg_lat = sum(otros_lat) / len(otros_lat)
-            avg_lng = sum(otros_lng) / len(otros_lng)
-            dist = _haversine(p.lat, p.lng, avg_lat, avg_lng)
-            if dist > UMBRAL_AISLAMIENTO_METROS:
-                is_isolated = True
-                
-        if p.animal_id in last_point_time:
-            dt = t - last_point_time[p.animal_id]
-            if dt <= max_gap_s:
-                if last_iso_time.get(p.animal_id, False):
-                    isolation_time[p.animal_id] += dt
-        
-        last_point_time[p.animal_id] = t
-        last_iso_time[p.animal_id] = is_isolated
-        
+    for interval_idx, animales_en_intervalo in intervalos.items():
+        pos_animal = {}
+        for a_id, puntos in animales_en_intervalo.items():
+            avg_lat = sum(p.lat for p in puntos) / len(puntos)
+            avg_lng = sum(p.lng for p in puntos) / len(puntos)
+            pos_animal[a_id] = (avg_lat, avg_lng)
+            
+        for a_id, (lat, lng) in pos_animal.items():
+            otros_lat = [o_lat for o_id, (o_lat, o_lng) in pos_animal.items() if o_id != a_id]
+            otros_lng = [o_lng for o_id, (o_lat, o_lng) in pos_animal.items() if o_id != a_id]
+            
+            if otros_lat:
+                avg_otros_lat = sum(otros_lat) / len(otros_lat)
+                avg_otros_lng = sum(otros_lng) / len(otros_lng)
+                dist = _haversine(lat, lng, avg_otros_lat, avg_otros_lng)
+                if dist > umbral_m:
+                    isolation_time[a_id] += interval_s
+
     return isolation_time
 
 @app.get("/health")
@@ -163,11 +164,17 @@ def health():
 @app.post("/api/internal/ml/geo/analyze", response_model=GeoAnalyzeResponse)
 def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
     """
-    Request: historial de coordenadas GPS (lat/lng) del rodeo
-    en los últimos 7 días.
+    Request: historial de coordenadas GPS (lat/lng) del rodeo en los últimos 7 días.
+
+    El campo opcional ``umbral_aislamiento_m`` permite al backend enviar el umbral
+    configurado para el establecimiento. Si se omite, se usa el valor por defecto
+    de la variable de entorno UMBRAL_AISLAMIENTO_METROS (100 m).
     """
     correlation_id = request.headers.get("X-Correlation-ID", "unknown")
-    print(f"[{correlation_id}] Request recibida para análisis geoespacial con {len(payload.historial_7d)} puntos.")
+    # Umbral efectivo: el del request tiene prioridad; si no viene, se usa el global.
+    umbral_efectivo = payload.umbral_aislamiento_m if payload.umbral_aislamiento_m is not None else UMBRAL_AISLAMIENTO_METROS
+    print(f"[{correlation_id}] Request recibida para análisis geoespacial con {len(payload.historial_7d)} puntos "
+          f"(umbral={umbral_efectivo} m).")
     response.headers["X-Correlation-ID"] = correlation_id
 
     try:
@@ -203,13 +210,13 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
         animales = list(ultimas_posiciones.values())
         alertas = []
         
-        iso_times = _compute_isolation_times(payload.historial_7d)
+        iso_times = _compute_isolation_times(payload.historial_7d, umbral_efectivo)
 
         if len(animales) == 1:
             # Con un solo animal, no hay aislamiento posible respecto a un rodeo
             alertas.append(AlertaAnimal(
                 animal_id=animales[0].animal_id,
-                indice_cohesion=_indice_cohesion(0.0),
+                indice_cohesion=_indice_cohesion(0.0, umbral_efectivo),
                 distancia_centroide_m=0.0,
                 alerta_aislamiento=False,
                 tiempo_fuera_grupo_s=0.0
@@ -224,9 +231,9 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
 
                 alertas.append(AlertaAnimal(
                     animal_id=a.animal_id,
-                    indice_cohesion=_indice_cohesion(distancia_centroide),
+                    indice_cohesion=_indice_cohesion(distancia_centroide, umbral_efectivo),
                     distancia_centroide_m=distancia_centroide,
-                    alerta_aislamiento=distancia_centroide > UMBRAL_AISLAMIENTO_METROS,
+                    alerta_aislamiento=distancia_centroide > umbral_efectivo,
                     tiempo_fuera_grupo_s=iso_times.get(a.animal_id, 0.0)
                 ))
 

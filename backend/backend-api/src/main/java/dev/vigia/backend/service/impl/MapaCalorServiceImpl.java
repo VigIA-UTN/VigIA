@@ -60,6 +60,9 @@ public class MapaCalorServiceImpl implements MapaCalorService {
                         }
                 }
 
+                Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+
                 List<Telemetria> telemetriaList;
                 if (rodeoId != null) {
                         List<Long> animalIds = animalRepository.findByRodeoLoteId(rodeoId).stream()
@@ -110,6 +113,7 @@ public class MapaCalorServiceImpl implements MapaCalorService {
                 GeoAnalyzeRequestDTO request = GeoAnalyzeRequestDTO.builder()
                                 .animalId(animalId != null ? animalId.toString() : null)
                                 .historial7d(coordenadas)
+                                .umbralAislamientoM(establecimiento.getUmbralAislamientoM())
                                 .build();
 
                 return mlGeoClient.analyze(request);

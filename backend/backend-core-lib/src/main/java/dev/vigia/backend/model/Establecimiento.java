@@ -39,6 +39,13 @@ public class Establecimiento {
 
     private Integer diasDeteccionAnestro = 45;
 
+    /**
+     * Umbral de aislamiento para el análisis geoespacial de ml-geo, en metros.
+     * Por defecto 100 m, que coincide con el valor de la variable de entorno
+     * UMBRAL_AISLAMIENTO_METROS del servicio ml-geo.
+     */
+    private Double umbralAislamientoM = 100.0;
+
     @Enumerated(EnumType.STRING)
     private SeveridadAlerta severidadAnestro = SeveridadAlerta.MEDIA;
 }
