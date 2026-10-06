@@ -59,6 +59,14 @@ describe('construirHistorial', () => {
         expect(ev.detalles).toContainEqual(['Dato de origen de la alerta', 'Actividad 40% por debajo del perfil.']);
     });
 
+    it('enlaza alertas, intervenciones y diagnósticos con su alerta de origen; los estados de salud no', () => {
+        const porId = Object.fromEntries(construirHistorial([alerta, intervencion], [estadoSalud], [diagnostico]).map(e => [e.id, e.alertaId]));
+        expect(porId).toEqual({ a5: 5, i3: 5, d7: 5, s2: undefined });
+    });
+
+    it('una intervención manual no tiene alerta que abrir', () =>
+        expect(construirHistorial([{ ...intervencion, alertaAsociadaId: null }], [], [])[0].alertaId).toBeUndefined());
+
     it('ordena todas las fuentes de la más reciente a la más antigua', () =>
         expect(construirHistorial([alerta, intervencion], [estadoSalud], [diagnostico]).map(e => e.id))
             .toEqual(['d7', 's2', 'i3', 'a5']));

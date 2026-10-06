@@ -8,6 +8,9 @@ import {
     type AnimalResponse,
     type TipoEstadoSalud,
 } from '../api/animalesApi';
+import { getAlertaDetalle, type AlertaResponse } from '../api/alertaApi';
+import AlertDetailSidebar from '../components/AlertDetailSidebar';
+import { useEstablecimientoStore } from '../store/establecimientoStore';
 import DateRangeCalendar from '../components/heatmap/DateRangeCalendar';
 import { dayStart, lastDaysRange } from '../components/heatmap/heatmapFilters';
 import '../components/heatmap/heatmap.css';
@@ -67,6 +70,12 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
     const calRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState<Record<string, boolean>>({});
     const [version, setVersion] = useState(0); // recarga el historial tras registrar un estado de salud o una intervención
+
+    // Detalle de la alerta de origen de un evento
+    const { selectedId } = useEstablecimientoStore();
+    const [alertaAbierta, setAlertaAbierta] = useState<AlertaResponse | null>(null);
+    const [abriendoAlerta, setAbriendoAlerta] = useState<string | null>(null); // id del evento
+    const [alertaError, setAlertaError] = useState<{ evId: string; msg: string } | null>(null);
 
     // Modal: registrar estado de salud (API real)
     const [showSalud, setShowSalud] = useState(false);
@@ -140,7 +149,8 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
             .then(data => {
                 if (cancelled) return;
                 setEventos(data);
-                if (data.length) setOpen({ [data[0].id]: true });
+                // Al recargar se respeta lo que el usuario dejó expandido.
+                if (data.length) setOpen(o => Object.keys(o).length ? o : { [data[0].id]: true });
             })
             .catch(() => { if (!cancelled) setError(true); })
             .finally(() => { if (!cancelled) setLoading(false); });
@@ -153,6 +163,20 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
         document.addEventListener('mousedown', close);
         return () => document.removeEventListener('mousedown', close);
     }, [calOpen]);
+
+    const abrirAlerta = async (ev: HistorialEvento) => {
+        if (!ev.alertaId || !selectedId) return;
+        setAbriendoAlerta(ev.id); setAlertaError(null);
+        try {
+            // El evento no sabe el tipo de su alerta (una inseminación apunta a una de celo): lo da el detalle.
+            const d = await getAlertaDetalle(ev.alertaId, selectedId);
+            setAlertaAbierta({ id: d.id, tipo: d.datoDisparador, animalId: d.animalId, tsGeneracion: d.tsGeneracion, estado: d.estadoActual, accionRecomendada: d.accionRecomendada });
+        } catch (err) {
+            setAlertaError({ evId: ev.id, msg: errMsg(err, 'No se pudo abrir la alerta.') });
+        } finally {
+            setAbriendoAlerta(null);
+        }
+    };
 
     const selectPreset = (p: string) => {
         setPreset(p);
@@ -308,6 +332,13 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
                                                         Registrado el {fmtFecha(ev.fechaRegistro)} por {ev.usuario}
                                                         {ev.fechaRegistro !== ev.fecha && ` · el evento ocurrió el ${fmtFecha(ev.fecha)}`}
                                                     </div>
+                                                    {ev.alertaId && (
+                                                        <Button variant="link" size="sm" className="p-0 align-self-start" onClick={() => abrirAlerta(ev)} disabled={abriendoAlerta === ev.id || !selectedId}>
+                                                            <i className="bi bi-box-arrow-up-right me-1" />
+                                                            {abriendoAlerta === ev.id ? 'Abriendo alerta...' : `Ver alerta #${ev.alertaId}`}
+                                                        </Button>
+                                                    )}
+                                                    {alertaError?.evId === ev.id && <span role="alert" style={{ color: '#D50000', fontSize: '0.85rem' }}>{alertaError.msg}</span>}
                                                 </div>
                                             </div>
                                         )}
@@ -382,6 +413,16 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
                     </Button>
                 </Modal.Footer>
             </Modal>
+
+            {alertaAbierta && (
+                <AlertDetailSidebar
+                    alerta={alertaAbierta}
+                    mode="fixed"
+                    // Confirmar la alerta o cargarle un diagnóstico cambia el historial: se recarga al cerrar.
+                    onClose={() => { setAlertaAbierta(null); setVersion(v => v + 1); }}
+                    onActionComplete={() => setVersion(v => v + 1)}
+                />
+            )}
         </div>
     );
 }
