@@ -9,6 +9,7 @@ import dev.vigia.backend.service.EstablecimientoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -53,7 +54,7 @@ public class EstablecimientoController {
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<List<EstablecimientoResponse>> getAllEstablecimientos(Authentication authentication) {
-        if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"))) {
+        if (esAdmin(authentication)) {
             return ResponseEntity.ok(establecimientoService.getAllEstablecimientos());
         } else {
             return ResponseEntity.ok(establecimientoService.getEstablecimientosByUsuario(authentication.getName()));
@@ -77,17 +78,25 @@ public class EstablecimientoController {
     /**
      * PUT /api/v1/establecimientos/{id}
      * <p>
-     * Edita los datos de un establecimiento existente.
+     * Edita los datos de un establecimiento existente. Un ADMINISTRADOR puede
+     * editar cualquiera; un PRODUCTOR solo los establecimientos a los que pertenece.
      *
-     * @param id      ID del establecimiento a editar
-     * @param request nuevos datos del establecimiento
-     * @return 200 con el establecimiento actualizado
+     * @param id             ID del establecimiento a editar
+     * @param request        nuevos datos del establecimiento
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con el establecimiento actualizado, 403 si el usuario no
+     *         pertenece al establecimiento
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR')")
-    public ResponseEntity<EstablecimientoResponse> updateEstablecimiento(@PathVariable Long id,
-            @RequestBody EstablecimientoRequest request) {
-        return ResponseEntity.ok(establecimientoService.updateEstablecimiento(id, request));
+    public ResponseEntity<?> updateEstablecimiento(@PathVariable Long id,
+            @RequestBody EstablecimientoRequest request, Authentication authentication) {
+        try {
+            return ResponseEntity.ok(establecimientoService.updateEstablecimiento(
+                    id, request, authentication.getName(), esAdmin(authentication)));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        }
     }
 
     /**
@@ -116,6 +125,10 @@ public class EstablecimientoController {
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<EstablecimientoResponse> activarEstablecimiento(@PathVariable Long id) {
         return ResponseEntity.ok(establecimientoService.activarEstablecimiento(id));
+    }
+
+    private boolean esAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"));
     }
 
     @GetMapping("{id}/intervenciones")

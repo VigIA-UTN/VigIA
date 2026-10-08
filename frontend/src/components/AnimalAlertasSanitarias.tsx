@@ -46,7 +46,6 @@ export default function AnimalAlertasSanitarias({ animalId, establecimientoId, o
 
   const handleActionComplete = (alertaId: number, nuevoEstado: 'CONFIRMADA' | 'DESCARTADA') => {
     setAlertas((prev) => prev.map((a) => (a.id === alertaId ? { ...a, estado: nuevoEstado } : a)));
-    setSelected(null);
   };
 
   return (

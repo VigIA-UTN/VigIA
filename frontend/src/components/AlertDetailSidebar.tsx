@@ -18,6 +18,12 @@ interface AlertDetailSidebarProps {
   onOpenIntervencion?: () => void;
 }
 
+/** El backend responde texto plano o { message } según el endpoint. */
+function mensajeError(err: unknown, fallback: string): string {
+  const data = (err as { response?: { data?: { message?: string } | string } })?.response?.data;
+  return (typeof data === 'string' ? data : data?.message) || fallback;
+}
+
 export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, mode = 'absolute', onOpenIntervencion }: AlertDetailSidebarProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -88,12 +94,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
         if (isMounted) setDetalle(data);
       } catch (err) {
         console.error("Error fetching alerta detalle:", err);
-        if (isMounted) {
-          const e = err as { response?: { data?: { message?: string } | string } };
-          const responseData = e?.response?.data;
-          const errorMessage = typeof responseData === 'string' ? responseData : responseData?.message;
-          setErrorDetail(errorMessage || "Ocurrió un error al cargar el detalle de la alerta.");
-        }
+        if (isMounted) setErrorDetail(mensajeError(err, "Ocurrió un error al cargar el detalle de la alerta."));
       } finally {
         if (isMounted) setLoadingDetail(false);
       }
@@ -123,18 +124,22 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride);
 
       onActionComplete(alerta.id, nuevoEstado);
+      // Confirmar una alerta sanitaria deja el sidebar abierto para cargar el diagnóstico.
+      if (isSanitaria && nuevoEstado === 'CONFIRMADA') {
+        setDetalle(d => d && { ...d, estadoActual: nuevoEstado });
+        setActionLoading(false);
+        return;
+      }
       if (nuevoEstado === 'CONFIRMADA' && triggerIntervencion) {
         onOpenIntervencion?.();
       }
       handleClose();
     } catch (err) {
       console.error('Error actualizando alerta:', err);
-      const e = err as { response?: { status?: number; data?: { message?: string } | string } };
-      const responseData = e?.response?.data;
-      const errorMessage = typeof responseData === 'string' ? responseData : responseData?.message;
+      const status = (err as { response?: { status?: number } })?.response?.status;
 
-      if (e?.response?.status === 409) {
-        setActionError({ mensaje: errorMessage || 'Esta alerta ya fue procesada por otro usuario.', conflicto: true });
+      if (status === 409) {
+        setActionError({ mensaje: mensajeError(err, 'Esta alerta ya fue procesada por otro usuario.'), conflicto: true });
         // Refrescamos el detalle para mostrar el estado real y ocultar los botones
         if (selectedId) {
           try {
@@ -148,7 +153,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           }
         }
       } else {
-        setActionError({ mensaje: errorMessage || 'No se pudo actualizar la alerta. Intentá de nuevo.', conflicto: false });
+        setActionError({ mensaje: mensajeError(err, 'No se pudo actualizar la alerta. Intentá de nuevo.'), conflicto: false });
       }
       setActionLoading(false);
     }

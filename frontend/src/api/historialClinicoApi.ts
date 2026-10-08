@@ -20,6 +20,8 @@ export interface HistorialEvento {
     fuente: string;
     fechaRegistro: string;
     detalles?: [string, string][];
+    /** Alerta de origen, para abrir su detalle; los estados de salud no tienen. */
+    alertaId?: number;
 }
 
 const SIS = 'Sistema VigIA';
@@ -41,6 +43,7 @@ const FUENTE_ESTADO_SALUD: Record<HistorialOrigen, string> = {
 /** El backend manda LocalDateTime (con segundos y fracción); el historial usa YYYY-MM-DDTHH:mm. */
 const minuto = (iso: string) => iso.slice(0, 16);
 const fmtDiaIso = (d: string) => d.split('-').reverse().join('/');
+const fmtFechaHora = (iso: string) => `${fmtDiaIso(iso.slice(0, 10))} ${iso.slice(11, 16)} h`;
 const esOrigen = (o: string | null): o is HistorialOrigen => o === 'AUTOMATICO' || o === 'MANUAL' || o === 'CARGA_MASIVA';
 const esEstado = (e: string | null): e is NonNullable<HistorialEvento['estado']> =>
     e === 'SANO' || e === 'EN_OBSERVACION' || e === 'ENFERMO';
@@ -53,7 +56,7 @@ function alertaOIntervencion(ev: LineaTiempoEventoResponse): HistorialEvento {
             id: `i${ev.id}`, tipo: 'intervencion', sub: tipo as HistorialEvento['sub'], fecha: minuto(ev.fecha),
             titulo: label, resumen: ev.descripcion ?? '', usuario: ev.interventor ?? '—', origen: 'MANUAL',
             fuente: ev.alertaAsociadaId ? `Registrada desde la alerta #${ev.alertaAsociadaId}` : 'Registrada manualmente',
-            fechaRegistro: minuto(ev.fecha),
+            fechaRegistro: minuto(ev.fecha), alertaId: ev.alertaAsociadaId ?? undefined,
             detalles: [['Tipo', label], ['Intervención', `#${ev.id}`]],
         };
     }
@@ -63,8 +66,13 @@ function alertaOIntervencion(ev: LineaTiempoEventoResponse): HistorialEvento {
             : ev.severidad ? `Animal en estado ${ESTADO_ANIMAL[ev.severidad]}` : 'Alerta sanitaria',
         resumen: ev.descripcion ?? 'El sistema detectó un comportamiento que se aparta de lo habitual para este animal.',
         usuario: SIS, origen: 'AUTOMATICO', fuente: 'Detección automática del modelo sanitario',
-        fechaRegistro: minuto(ev.fecha),
-        detalles: [['Estado de la alerta', RESOLUCION_LABEL[ev.estadoResolucion ?? ''] ?? '—'], ['Alerta', `#${ev.id}`]],
+        fechaRegistro: minuto(ev.fecha), alertaId: ev.id,
+        detalles: [
+            ['Estado de la alerta', RESOLUCION_LABEL[ev.estadoResolucion ?? ''] ?? '—'],
+            ...(ev.usuarioResolucion ? [['Resuelta por', ev.usuarioResolucion] as [string, string]] : []),
+            ...(ev.tsResolucion ? [['Fecha de resolución', fmtFechaHora(ev.tsResolucion)] as [string, string]] : []),
+            ['Alerta', `#${ev.id}`],
+        ],
     };
 }
 
@@ -89,7 +97,7 @@ function diagnosticoAEvento(d: DiagnosticoResponse): HistorialEvento {
     return {
         id: `d${d.id}`, tipo: 'diagnostico', fecha: minuto(d.fechaRegistro), titulo: d.diagnostico,
         resumen: d.tratamiento || 'Sin indicación o tratamiento.', usuario: d.veterinarioNombre, rol: 'VETERINARIO',
-        origen: 'MANUAL', fuente: `Registrado desde la alerta #${d.alertaId}`, fechaRegistro: minuto(d.fechaRegistro),
+        origen: 'MANUAL', fuente: `Registrado desde la alerta #${d.alertaId}`, fechaRegistro: minuto(d.fechaRegistro), alertaId: d.alertaId,
         detalles: [['Dato de origen de la alerta', d.datoOrigen], ['Alerta', `#${d.alertaId}`]],
     };
 }

@@ -557,6 +557,52 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        void obtenerLineaTiempoAlertas_AlertaResuelta_ExponeQuienYCuandoLaResolvio() {
+                Usuario vet = new Usuario();
+                vet.setNombre("Laura");
+                vet.setApellido("Vet");
+                vet.setEmail("laura@vigia.dev");
+                LocalDateTime resuelta = LocalDateTime.of(2026, 9, 27, 10, 15);
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                mockAlerta.setUsuarioConfirmacion(vet);
+                mockAlerta.setTsConfirmacion(resuelta);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByAnimalConFiltros(10L, DisparadorAlerta.CELO, null, null))
+                                .thenReturn(List.of(mockAlerta));
+
+                LineaTiempoEventoResponse evento = alertaService
+                                .obtenerLineaTiempoAlertas(EMAIL, 10L, "celo", null, null).get(0);
+
+                assertEquals("Laura Vet", evento.getUsuarioResolucion());
+                assertEquals(resuelta, evento.getTsResolucion());
+
+                // Sin nombre cargado se muestra el email.
+                vet.setNombre(null);
+                vet.setApellido(null);
+                assertEquals("laura@vigia.dev", alertaService
+                                .obtenerLineaTiempoAlertas(EMAIL, 10L, "celo", null, null).get(0).getUsuarioResolucion());
+        }
+
+        @Test
+        void obtenerLineaTiempoAlertas_AlertaPendiente_SinResolucion() {
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByAnimalConFiltros(10L, DisparadorAlerta.CELO, null, null))
+                                .thenReturn(List.of(mockAlerta));
+
+                LineaTiempoEventoResponse evento = alertaService
+                                .obtenerLineaTiempoAlertas(EMAIL, 10L, "celo", null, null).get(0);
+
+                assertNull(evento.getUsuarioResolucion());
+                assertNull(evento.getTsResolucion());
+        }
+
+        @Test
         void obtenerLineaTiempoAlertas_Anestro_ExponeDiasSinCicloYEstadoArchivada() {
                 mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
                 mockAlerta.setEstado(EstadoAlerta.ARCHIVADA);

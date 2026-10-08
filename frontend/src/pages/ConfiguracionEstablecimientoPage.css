@@ -40,32 +40,11 @@
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
-.cfg-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-/* Ícono gear: solo el símbolo, sin fondo */
-.cfg-header-gear {
-  font-size: 2.2rem;
-  color: #1E3A5F;
-  flex-shrink: 0;
-  line-height: 1;
-}
-
 .cfg-title {
   font-size: 1.75rem;
   font-weight: 700;
   color: #1E3A5F;
-  margin: 0 0 0.1rem;
-}
-
-.cfg-subtitle {
-  color: #6b7280;
-  font-size: 0.9rem;
-  margin: 0;
+  margin: 0 0 2rem;
 }
 
 /* ── Toast de confirmación ──────────────────────────────────────────────── */
@@ -128,16 +107,6 @@
 }
 
 /* Footer de la card: ocupa todo el ancho */
-.cfg-card-footer {
-  border-top: 1px solid #e8ecf0;
-  padding: 0;
-}
-
-.cfg-card-footer .cfg-help-box {
-  border-radius: 0 0 16px 16px;
-  margin: 0;
-}
-
 /* Divisor vertical entre columnas */
 .cfg-divider {
   width: 1px;
@@ -207,52 +176,6 @@
   color: #374151;
 }
 
-.cfg-input-wrapper {
-  display: flex;
-  align-items: center;
-  border: 1.5px solid #d1d5db;
-  border-radius: 10px;
-  overflow: hidden;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  background: #fff;
-}
-
-.cfg-input-wrapper:focus-within {
-  border-color: #1E3A5F;
-  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
-}
-
-.cfg-input-wrapper--error {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-}
-
-.cfg-input {
-  border: none;
-  outline: none;
-  padding: 0.65rem 0.9rem;
-  font-size: 1rem;
-  flex: 1;
-  background: transparent;
-  color: #111827;
-  -moz-appearance: textfield;
-}
-
-.cfg-input::-webkit-outer-spin-button,
-.cfg-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-}
-
-.cfg-input-suffix {
-  padding: 0.65rem 0.9rem;
-  background: #f3f4f6;
-  color: #6b7280;
-  font-size: 0.85rem;
-  border-left: 1.5px solid #d1d5db;
-  white-space: nowrap;
-  user-select: none;
-}
-
 .cfg-field-error {
   font-size: 0.8rem;
   color: #ef4444;
@@ -270,33 +193,28 @@
 /* ── Toggle pill de severidad ───────────────────────────────────────────── */
 .cfg-toggle-group {
   display: flex;
-  gap: 0;
+  gap: 3px;
+  padding: 3px;
   border: 1.5px solid #d1d5db;
   border-radius: 10px;
-  overflow: hidden;
   background: #f9fafb;
 }
 
+/* radio = 10px del contenedor - 3px de padding, para que encaje sin recortarse */
 .cfg-toggle-pill {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  padding: 0.6rem 0.5rem;
+  padding: 0.5rem;
   border: none;
+  border-radius: 7px;
   background: transparent;
   font-size: 0.85rem;
   font-weight: 500;
   color: #6b7280;
   cursor: pointer;
   transition: background-color 0.2s, color 0.2s;
-  border-right: 1px solid #e5e7eb;
-  position: relative;
-}
-
-.cfg-toggle-pill:last-child {
-  border-right: none;
 }
 
 .cfg-toggle-pill:hover:not(.cfg-toggle-pill--active) {
@@ -306,12 +224,6 @@
 
 .cfg-toggle-pill--active {
   font-weight: 700;
-  box-shadow: inset 0 0 0 1.5px currentColor;
-}
-
-.cfg-toggle-icon {
-  font-size: 0.95rem;
-  transition: color 0.2s;
 }
 
 /* ── Preview de severidad activa ────────────────────────────────────────── */
@@ -328,36 +240,6 @@
 }
 
 /* ── Caja de ayuda ──────────────────────────────────────────────────────── */
-.cfg-help-box {
-  display: flex;
-  gap: 0.75rem;
-  background: #f0f7ff;
-  border-radius: 10px;
-  padding: 0.85rem 1rem;
-  margin-top: auto;
-}
-
-.cfg-help-icon {
-  color: #3B8D99;
-  font-size: 1rem;
-  flex-shrink: 0;
-  margin-top: 0.1rem;
-}
-
-.cfg-help-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #1E3A5F;
-  margin: 0 0 0.25rem;
-}
-
-.cfg-help-text {
-  font-size: 0.8rem;
-  color: #4b5563;
-  line-height: 1.55;
-  margin: 0;
-}
-
 /* ── Botones de acción ──────────────────────────────────────────────────── */
 .cfg-actions {
   display: flex;
@@ -374,7 +256,7 @@
   font-weight: 600;
   border: none;
   cursor: pointer;
-  transition: background-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition: background-color 0.15s, transform 0.1s;
 }
 
 .cfg-btn:active { transform: scale(0.97); }
@@ -386,19 +268,15 @@
 .cfg-btn-cancel:hover { background: #e5e7eb; }
 
 .cfg-btn-save {
-  background-color: #1E3A5F;
+  background-color: #8CC63F;
   color: #fff;
-  box-shadow: 0 3px 10px rgba(30, 58, 95, 0.25);
 }
 .cfg-btn-save:hover:not(:disabled) {
-  background-color: #132a47;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(30, 58, 95, 0.35);
+  background-color: #7ab332;
 }
 .cfg-btn-save:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 /* ── Spinners ───────────────────────────────────────────────────────────── */

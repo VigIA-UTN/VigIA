@@ -839,15 +839,6 @@ public class AlertaServiceImpl implements AlertaService {
         private DiagnosticoResponse toDiagnosticoResponse(Diagnostico d) {
                 Alerta alerta = d.getAlerta();
                 Animal animal = d.getAnimal();
-                Usuario vet = d.getVeterinario();
-
-                String veterinarioNombre = vet.getNombre();
-                if (vet.getApellido() != null && !vet.getApellido().isEmpty()) {
-                        veterinarioNombre += " " + vet.getApellido();
-                }
-                if (veterinarioNombre == null || veterinarioNombre.isBlank()) {
-                        veterinarioNombre = vet.getEmail();
-                }
 
                 DetalleSanitarioResponse detalleSanitario = alerta.getDisparador() == DisparadorAlerta.SALUD
                                 ? construirDetalleSanitario(alerta)
@@ -863,7 +854,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 .diagnostico(d.getDiagnostico())
                                 .tratamiento(d.getIndicaciones())
                                 .fechaRegistro(d.getFecha())
-                                .veterinarioNombre(veterinarioNombre)
+                                .veterinarioNombre(nombreVisible(d.getVeterinario()))
                                 .disparador(alerta.getDisparador() != null ? alerta.getDisparador().name() : null)
                                 .datoOrigen(construirDescripcionDatoOrigen(alerta, detalleSanitario))
                                 .build();
@@ -962,23 +953,23 @@ public class AlertaServiceImpl implements AlertaService {
                                                 ? alerta.getSeveridad().name()
                                                 : null)
                                 .estadoResolucion(resolverEstadoResolucion(alerta.getEstado()))
+                                .usuarioResolucion(nombreVisible(alerta.getUsuarioConfirmacion()))
+                                .tsResolucion(alerta.getTsConfirmacion())
                                 .descripcion(alerta.getAccionRecomendada())
                                 .build();
         }
 
-        private LineaTiempoEventoResponse intervencionToLineaTiempo(Intervencion intervencion) {
-                String interventorNombre = null;
-                if (intervencion.getInterventor() != null) {
-                        interventorNombre = intervencion.getInterventor().getNombre();
-                        if (intervencion.getInterventor().getApellido() != null
-                                        && !intervencion.getInterventor().getApellido().isBlank()) {
-                                interventorNombre += " " + intervencion.getInterventor().getApellido();
-                        }
-                        if (interventorNombre == null || interventorNombre.isBlank()) {
-                                interventorNombre = intervencion.getInterventor().getEmail();
-                        }
+        /** "Nombre Apellido", o el email si el usuario no cargó nombre; null si no hay usuario. */
+        private static String nombreVisible(Usuario u) {
+                if (u == null) {
+                        return null;
                 }
+                String nombre = ((u.getNombre() != null ? u.getNombre() : "") + " "
+                                + (u.getApellido() != null ? u.getApellido() : "")).trim();
+                return nombre.isEmpty() ? u.getEmail() : nombre;
+        }
 
+        private LineaTiempoEventoResponse intervencionToLineaTiempo(Intervencion intervencion) {
                 return LineaTiempoEventoResponse.builder()
                                 .tipoEvento("INTERVENCION")
                                 .id(intervencion.getId())
@@ -987,7 +978,7 @@ public class AlertaServiceImpl implements AlertaService {
                                                 ? intervencion.getTipo().name()
                                                 : null)
                                 .descripcion(intervencion.getDescripcion())
-                                .interventor(interventorNombre)
+                                .interventor(nombreVisible(intervencion.getInterventor()))
                                 .alertaAsociadaId(intervencion.getAlerta() != null
                                                 ? intervencion.getAlerta().getId()
                                                 : null)
@@ -1017,20 +1008,6 @@ public class AlertaServiceImpl implements AlertaService {
                         msg.append(" el ").append(alerta.getTsConfirmacion().format(FECHA_ACCION));
                 }
                 return msg.append(".").toString();
-        }
-
-        private static String nombreVisible(Usuario usuario) {
-                if (usuario == null) {
-                        return null;
-                }
-                String nombre = usuario.getNombre();
-                if (usuario.getApellido() != null && !usuario.getApellido().isEmpty()) {
-                        nombre += " " + usuario.getApellido();
-                }
-                if (nombre == null || nombre.isBlank()) {
-                        nombre = usuario.getEmail();
-                }
-                return nombre;
         }
 
         private void validarCamperoNoActuaSobreSalud(Usuario usuario, Alerta alerta) {

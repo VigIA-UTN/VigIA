@@ -19,12 +19,6 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.establecimiento-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.13);
 }
 
 .establecimiento-card--inactivo {
@@ -46,11 +40,6 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.4s ease;
-}
-
-.establecimiento-card:hover .est-card-map-img {
-  transform: scale(1.04);
 }
 
 /* Degradado inferior para legibilidad */
@@ -61,50 +50,39 @@
   pointer-events: none;
 }
 
-/* ── Badge de estado ────────────────────────────────────────────────────── */
-.est-status-badge {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  display: inline-flex;
+/* ── Punto de estado (a la altura del #id) ──────────────────────────────── */
+.est-card-id-row {
+  display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  backdrop-filter: blur(6px);
+  gap: 6px;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: #9ca3af;
+  letter-spacing: 0.05em;
   user-select: none;
 }
 
-.est-status-badge--active {
-  background: rgba(34, 197, 94, 0.22);
-  color: #dcfce7;
-  border: 1px solid rgba(34, 197, 94, 0.45);
-}
-
-.est-status-badge--inactive {
-  background: rgba(239, 68, 68, 0.22);
-  color: #fee2e2;
-  border: 1px solid rgba(239, 68, 68, 0.45);
+.est-status {
+  margin-left: auto;
+  font-weight: 500;
+  text-transform: uppercase;
 }
 
 .est-status-dot {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.est-status-badge--active .est-status-dot {
-  background: #4ade80;
-  box-shadow: 0 0 4px #4ade80;
+.est-status-dot--active {
+  background: #22c55e;
+  box-shadow: 0 0 4px #22c55e;
 }
 
-.est-status-badge--inactive .est-status-dot {
-  background: #f87171;
-  box-shadow: 0 0 4px #f87171;
+.est-status-dot--inactive {
+  background: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
 }
 
 /* ── Botón editar (arriba a la derecha sobre la imagen) ─────────────────── */
@@ -119,22 +97,54 @@
 .est-icon-btn {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0;
+  background: none;
+  border: none;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 1.3rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); /* legible sobre la imagen satelital */
   cursor: pointer;
-  transition: background 0.15s, transform 0.15s;
+  transition: opacity 0.15s;
 }
 
 .est-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.35);
-  transform: scale(1.1);
+  opacity: 0.75;
+}
+
+/* ── Menú de acciones (estilo iOS) ──────────────────────────────────────── */
+.est-menu {
+  min-width: 220px;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+}
+
+.est-menu .dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.7rem 1rem;
+  font-size: 0.95rem;
+  color: #1c1c1e;
+}
+
+.est-menu .dropdown-item + .dropdown-item {
+  border-top: 0.5px solid rgba(60, 60, 67, 0.2);
+}
+
+.est-menu .dropdown-item:hover,
+.est-menu .dropdown-item:focus,
+.est-menu .dropdown-item:active {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1c1c1e;
 }
 
 /* ── Body de la card (info + botones) ───────────────────────────────────── */
@@ -153,11 +163,7 @@
 }
 
 .est-card-id {
-  font-size: 0.75rem;
-  color: #9ca3af;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  user-select: none;
 }
 
 .est-card-name {
@@ -197,7 +203,7 @@
   font-size: 0.83rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition: background-color 0.15s, transform 0.1s;
   white-space: nowrap;
 }
 
@@ -223,32 +229,40 @@
   flex: 1;
   background: #1E3A5F;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(30, 58, 95, 0.2);
 }
 
 .est-btn-detail:hover {
   background: #152b47;
-  box-shadow: 0 4px 12px rgba(30, 58, 95, 0.3);
 }
 
 /* Desactivar */
 .est-btn-danger {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #F44336;
+  color: #fff;
 }
 
 .est-btn-danger:hover {
-  background: #fecaca;
+  background: #d32f2f;
+}
+
+/* Cancelar (popover de confirmación) */
+.est-btn-cancel {
+  background: #f0f4f8;
+  color: #1E3A5F;
+}
+
+.est-btn-cancel:hover {
+  background: #dce6f0;
 }
 
 /* Activar */
 .est-btn-success {
-  background: #dcfce7;
-  color: #166534;
+  background: #8CC63F;
+  color: #fff;
 }
 
 .est-btn-success:hover {
-  background: #bbf7d0;
+  background: #7ab332;
 }
 
 /* ── Estilos legacy (usados en modales) ─────────────────────────────────── */
@@ -307,49 +321,4 @@
 .establishment-map {
   height: 400px;
   width: 100%;
-}
-
-/* ── Toggle de anestro (dentro del modal de detalle) ────────────────────── */
-.est-anestro-toggle {
-  display: flex;
-  border: 1.5px solid #d1d5db;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #f9fafb;
-}
-
-.est-anestro-pill {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding: 0.45rem 0.4rem;
-  border: none;
-  background: transparent;
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: #6b7280;
-  cursor: pointer;
-  transition: background-color 0.18s, color 0.18s;
-  border-right: 1px solid #e5e7eb;
-}
-
-.est-anestro-pill:last-child { border-right: none; }
-
-.est-anestro-pill:hover:not(.est-anestro-pill--active) {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.est-anestro-pill--active { font-weight: 700; }
-
-/* Caja de info en modal de detalle */
-.est-anestro-info {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  background: #f0f7ff;
-  border-radius: 8px;
-  padding: 0.6rem 0.9rem;
 }

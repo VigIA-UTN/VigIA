@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 
-import { Container, Row, Col, Button, Modal, Form, Spinner, Alert } from 'react-bootstrap';
-import { useForm, useWatch } from 'react-hook-form';
+import { Container, Row, Col, Button, Modal, Form, Spinner, Alert, OverlayTrigger, Popover, Toast, Dropdown } from 'react-bootstrap';
+import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -26,25 +28,12 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-// Schema para configuración de anestro en el modal de detalle
-const anestroSchema = z.object({
-  diasDeteccionAnestro: z
-    .number({ message: 'Debe ser un número entero' })
-    .int('Debe ser un número entero')
-    .min(1, 'Mínimo 1 día')
-    .max(365, 'Máximo 365 días'),
-  severidadAnestro: z.enum(['BAJA', 'MEDIA', 'ALTA']),
-});
-type AnestroFormData = z.infer<typeof anestroSchema>;
-
-const SEVERIDAD_CFG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  BAJA:  { label: 'Baja',  color: '#2B7295', bg: '#e8f4f8', icon: 'bi-bell' },
-  MEDIA: { label: 'Media', color: '#c47c0a', bg: '#fef3c7', icon: 'bi-bell-fill' },
-  ALTA:  { label: 'Alta',  color: '#c0392b', bg: '#fee2e2', icon: 'bi-bell-slash-fill' },
-};
-
 export default function EstablecimientosPage() {
   const rol = useAuthStore(state => state.rol);
+  // Mismos roles que exige el backend para cada endpoint
+  const puedeEditar = rol === 'ADMINISTRADOR' || rol === 'PRODUCTOR';
+  const puedeConfigurar = rol === 'PRODUCTOR' || rol === 'VETERINARIO';
+  const navigate = useNavigate();
   const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,10 +55,8 @@ export default function EstablecimientosPage() {
   const [creandoLote, setCreandoLote] = useState(false);
   const [errorLote, setErrorLote] = useState<string | null>(null);
 
-  // Estado para configuración de anestro en el modal de detalle
-  const [savingAnestro, setSavingAnestro] = useState(false);
-  const [anestroSaved, setAnestroSaved] = useState(false);
-  const [errorAnestro, setErrorAnestro] = useState<string | null>(null);
+  const [confirmDesactivarId, setConfirmDesactivarId] = useState<number | null>(null);
+  const [undoToast, setUndoToast] = useState<{ id: number; nombre: string } | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -78,20 +65,6 @@ export default function EstablecimientosPage() {
   const { register: registerUpdate, handleSubmit: handleSubmitUpdate, reset: resetUpdate, formState: { errors: errorsUpdate } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
-
-  const {
-    register: registerAnestro,
-    handleSubmit: handleSubmitAnestro,
-    reset: resetAnestro,
-    control: controlAnestro,
-    setValue: setAnestroValue,
-    formState: { errors: errorsAnestro, isDirty: isAnestroD },
-  } = useForm<AnestroFormData>({
-    resolver: zodResolver(anestroSchema),
-    defaultValues: { diasDeteccionAnestro: 45, severidadAnestro: 'MEDIA' },
-  });
-
-  const sevActual = useWatch({ control: controlAnestro, name: 'severidadAnestro' });
 
   useEffect(() => {
     const fetchEstablecimientos = async () => {
@@ -140,36 +113,12 @@ export default function EstablecimientosPage() {
     }
   }
 
-  const onSaveAnestro = async (data: AnestroFormData) => {
-    if (!establecimientoDetail) return;
-    setSavingAnestro(true);
-    setErrorAnestro(null);
+  const handleDesactivar = async (est: EstablecimientoResponse) => {
+    setConfirmDesactivarId(null);
     try {
-      const actualizado = await updateEstablecimiento(establecimientoDetail.id, {
-        nombre: establecimientoDetail.nombre,
-        latitud: establecimientoDetail.latitud,
-        longitud: establecimientoDetail.longitud,
-        diasDeteccionAnestro: data.diasDeteccionAnestro,
-        severidadAnestro: data.severidadAnestro,
-      });
-      setEstablecimientoDetail(actualizado);
-      setEstablecimientos(prev => prev.map(e => e.id === actualizado.id ? actualizado : e));
-      resetAnestro({ diasDeteccionAnestro: actualizado.diasDeteccionAnestro, severidadAnestro: actualizado.severidadAnestro as 'BAJA' | 'MEDIA' | 'ALTA' });
-      setAnestroSaved(true);
-      setTimeout(() => setAnestroSaved(false), 2500);
-    } catch (err) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      setErrorAnestro(axiosError.response?.data?.message || 'Error al guardar');
-    } finally {
-      setSavingAnestro(false);
-    }
-  };
-
-  const handleDesactivar = async (id: number) => {
-    if (!window.confirm('¿Estás seguro de que deseas desactivar este establecimiento?')) return;
-    try {
-      const actualizado = await desactivarEstablecimiento(id);
-      setEstablecimientos(establecimientos.map(e => e.id === id ? actualizado : e));
+      const actualizado = await desactivarEstablecimiento(est.id);
+      setEstablecimientos(prev => prev.map(e => e.id === est.id ? actualizado : e));
+      setUndoToast({ id: est.id, nombre: est.nombre });
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
       alert(axiosError.response?.data?.message || 'Error al desactivar establecimiento');
@@ -183,6 +132,18 @@ export default function EstablecimientosPage() {
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
       alert(axiosError.response?.data?.message || 'Error al activar el establecimiento');
+    }
+  };
+
+  const handleUndoDesactivar = async () => {
+    if (!undoToast) return;
+    const { id } = undoToast;
+    setUndoToast(null);
+    try {
+      const actualizado = await activarEstablecimiento(id);
+      setEstablecimientos(prev => prev.map(e => e.id === id ? actualizado : e));
+    } catch {
+      alert('No se pudo deshacer la acción.');
     }
   };
 
@@ -248,35 +209,55 @@ export default function EstablecimientosPage() {
                       />
                       {/* Overlay degradado para que el nombre se lea bien */}
                       <div className="est-card-map-overlay" />
-                      {/* Badge de estado sobre la imagen */}
-                      <span className={`est-status-badge ${est.activo ? 'est-status-badge--active' : 'est-status-badge--inactive'}`}>
-                        <span className="est-status-dot" />
-                        {est.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                      {/* Acciones de editar */}
-                      <div className="est-card-top-actions">
-                        <button
-                          className="est-icon-btn"
-                          title="Editar establecimiento"
-                          onClick={() => {
-                            setEstablecimientoEdit(est);
-                            resetUpdate({
-                              nombre: est.nombre,
-                              latitud: est.latitud,
-                              longitud: est.longitud,
-                            });
-                            setShowUpdateModal(true);
-                          }}
-                        >
-                          <i className="bi bi-pencil-fill" />
-                        </button>
-                      </div>
+                      {/* Menú de acciones */}
+                      {(puedeEditar || puedeConfigurar) && (
+                        <div className="est-card-top-actions">
+                          <Dropdown align="end">
+                            <Dropdown.Toggle as="button" bsPrefix="est-icon-btn" title="Más acciones">
+                              <i className="bi bi-three-dots-vertical" />
+                            </Dropdown.Toggle>
+                            {/* Portal: la card tiene overflow hidden y filter, recortaría el menú */}
+                            {createPortal(
+                              <Dropdown.Menu className="est-menu">
+                                {puedeEditar && (
+                                  <Dropdown.Item as="button" onClick={() => {
+                                    setEstablecimientoEdit(est);
+                                    resetUpdate({
+                                      nombre: est.nombre,
+                                      latitud: est.latitud,
+                                      longitud: est.longitud,
+                                    });
+                                    setShowUpdateModal(true);
+                                  }}>
+                                    Editar establecimiento
+                                    <i className="bi bi-pencil" />
+                                  </Dropdown.Item>
+                                )}
+                                {puedeConfigurar && (
+                                  <Dropdown.Item as="button" onClick={() => navigate(`/establecimientos/${est.id}/configuracion`)}>
+                                    Configurar anestro
+                                    <i className="bi bi-gear" />
+                                  </Dropdown.Item>
+                                )}
+                              </Dropdown.Menu>,
+                              document.body
+                            )}
+                          </Dropdown>
+                        </div>
+                      )}
                     </div>
 
                     {/* Info de la card */}
                     <div className="est-card-body">
                       <div className="est-card-info">
-                        <span className="est-card-id">#{est.id}</span>
+                        <div className="est-card-id-row">
+                          <span className="est-card-id">#{est.id}</span>
+                          <span className="est-status">{est.activo ? 'Activo' : 'Inactivo'}</span>
+                          <span
+                            className={`est-status-dot ${est.activo ? 'est-status-dot--active' : 'est-status-dot--inactive'}`}
+                            aria-hidden="true"
+                          />
+                        </div>
                         <h4 className="est-card-name">{est.nombre}</h4>
                         <p className="est-card-coords">
                           <i className="bi bi-geo-alt-fill me-1" />
@@ -291,12 +272,6 @@ export default function EstablecimientosPage() {
                           onClick={async () => {
                             setEstablecimientoDetail(est);
                             setShowDetailModal(true);
-                            setErrorAnestro(null);
-                            setAnestroSaved(false);
-                            resetAnestro({
-                              diasDeteccionAnestro: est.diasDeteccionAnestro ?? 45,
-                              severidadAnestro: (est.severidadAnestro as 'BAJA' | 'MEDIA' | 'ALTA') ?? 'MEDIA',
-                            });
                             setLoadingLotes(true);
                             setErrorLote(null);
                             try {
@@ -311,15 +286,36 @@ export default function EstablecimientosPage() {
                         >
                           Ver detalle
                         </button>
-                        {est.activo ? (
-                          <button className="est-btn est-btn-danger" onClick={() => handleDesactivar(est.id)}>
-                            Desactivar
-                          </button>
+                        {rol === 'ADMINISTRADOR' && (est.activo ? (
+                          <OverlayTrigger
+                            trigger="click"
+                            placement="top"
+                            rootClose
+                            show={confirmDesactivarId === est.id}
+                            onToggle={(next) => setConfirmDesactivarId(next ? est.id : null)}
+                            overlay={
+                              <Popover id={`confirm-desactivar-${est.id}`}>
+                                <Popover.Body>
+                                  <p className="mb-2">¿Desactivar <strong>{est.nombre}</strong>?</p>
+                                  <div className="d-flex justify-content-center gap-2">
+                                    <button className="est-btn est-btn-cancel" onClick={() => setConfirmDesactivarId(null)}>
+                                      Cancelar
+                                    </button>
+                                    <button className="est-btn est-btn-danger" onClick={() => handleDesactivar(est)}>
+                                      Desactivar
+                                    </button>
+                                  </div>
+                                </Popover.Body>
+                              </Popover>
+                            }
+                          >
+                            <button className="est-btn est-btn-danger">Desactivar</button>
+                          </OverlayTrigger>
                         ) : (
                           <button className="est-btn est-btn-success" onClick={() => handleActivar(est.id)}>
                             Activar
                           </button>
-                        )}
+                        ))}
                       </div>
                     </div>
 
@@ -397,8 +393,8 @@ export default function EstablecimientosPage() {
 
       {/* Modal Editar */}
       {establecimientoEdit && (
-        <Modal show={showUpdateModal} onHide={handleCloseUpdateModal} centered>
-          <Modal.Header closeButton style={{ backgroundColor: '#1E3A5F', color: 'white' }}>
+        <Modal show={showUpdateModal} onHide={handleCloseUpdateModal} centered dialogClassName="modal-nuevo-animal">
+          <Modal.Header closeButton>
             <Modal.Title>Actualizar establecimiento</Modal.Title>
           </Modal.Header>
           <Form onSubmit={handleSubmitUpdate(onUpdate)}>
@@ -445,10 +441,7 @@ export default function EstablecimientosPage() {
               </Form.Group>
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="secondary" onClick={handleCloseUpdateModal}>
-                Cancelar
-              </Button>
-              <Button type="submit" className="btn-vigia-primary" disabled={submittingUpdate}>
+              <Button type="submit" className="btn-guardar-animal" disabled={submittingUpdate}>
                 {submittingUpdate ? <Spinner size="sm" animation="border" /> : 'Confirmar'}
               </Button>
             </Modal.Footer>
@@ -485,82 +478,13 @@ export default function EstablecimientosPage() {
             </MapContainer>
 
             {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
-              <>
-                  <hr />
-                  <div className="d-flex align-items-center gap-2 mb-3">
-                    <i className="bi bi-gear-fill" style={{ color: '#1E3A5F' }} />
-                    <h5 className="mb-0" style={{ color: '#1E3A5F' }}>Configuración de Anestro</h5>
-                  </div>
-                  {errorAnestro && <Alert variant="danger" className="py-2">{errorAnestro}</Alert>}
-                  {anestroSaved && <Alert variant="success" className="py-2">✓ Guardado correctamente</Alert>}
-                  <form onSubmit={handleSubmitAnestro(onSaveAnestro)} noValidate>
-
-                    {/* Fila 1: input días + info box al lado */}
-                    <div className="d-flex gap-3 align-items-center mb-3">
-
-                      {/* Input días */}
-                      <div style={{ flexShrink: 0 }}>
-                        <label className="form-label fw-bold mb-1" style={{ fontSize: '0.95rem', color: '#1E3A5F' }}>Días sin ciclo</label>
-                        <div className="input-group input-group-sm" style={{ maxWidth: 170 }}>
-                          <input
-                            type="number"
-                            className={`form-control ${errorsAnestro.diasDeteccionAnestro ? 'is-invalid' : ''}`}
-                            min={1} max={365}
-                            placeholder="45"
-                            {...registerAnestro('diasDeteccionAnestro', { valueAsNumber: true })}
-                          />
-                          <span className="input-group-text">días</span>
-                        </div>
-                        {errorsAnestro.diasDeteccionAnestro && (
-                          <div className="text-danger mt-1" style={{ fontSize: '0.75rem' }}>{errorsAnestro.diasDeteccionAnestro.message}</div>
-                        )}
-                      </div>
-
-                      {/* Info box al lado, mismo alto que el input */}
-                      <div className="est-anestro-info" style={{ flex: 1 }}>
-                        <i className="bi bi-info-circle-fill" style={{ color: '#3B8D99', flexShrink: 0 }} />
-                        <p className="mb-0" style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.4 }}>
-                          Días sin ciclo reproductivo antes de generar una alerta. Defecto: <strong>45 días</strong>.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Fila 2: toggle severidad */}
-                    <div className="mb-3">
-                      <label className="form-label fw-bold mb-1" style={{ fontSize: '0.95rem', color: '#1E3A5F' }}>Prioridad de la alerta</label>
-                      <div className="est-anestro-toggle">
-                        {(['BAJA', 'MEDIA', 'ALTA'] as const).map(nivel => {
-                          const cfg = SEVERIDAD_CFG[nivel];
-                          const isActive = sevActual === nivel;
-                          return (
-                            <button
-                              key={nivel}
-                              type="button"
-                              className={`est-anestro-pill ${isActive ? 'est-anestro-pill--active' : ''}`}
-                              style={isActive ? { backgroundColor: cfg.bg, color: cfg.color, borderColor: cfg.color } : {}}
-                              onClick={() => setAnestroValue('severidadAnestro', nivel, { shouldDirty: true })}
-                            >
-                              <i className={`bi ${cfg.icon}`} style={isActive ? { color: cfg.color } : {}} />
-                              {cfg.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* 4. Guardar */}
-                    <div className="d-flex justify-content-end">
-                      <button
-                        type="submit"
-                        className="btn btn-sm"
-                        style={{ background: '#1E3A5F', color: '#fff', fontWeight: 600, borderRadius: 8, padding: '0.4rem 1.2rem' }}
-                        disabled={savingAnestro || !isAnestroD}
-                      >
-                        {savingAnestro ? <Spinner size="sm" animation="border" /> : 'Guardar Cambios'}
-                      </button>
-                    </div>
-                  </form>
-                </>
+              <Button
+                className="btn-vigia-secondary"
+                onClick={() => navigate(`/establecimientos/${establecimientoDetail.id}/configuracion`)}
+              >
+                <i className="bi bi-gear-fill me-2" />
+                Configurar anestro
+              </Button>
             )}
 
             <hr />
@@ -622,6 +546,24 @@ export default function EstablecimientosPage() {
           </Modal.Body>
         </Modal>
       )}
+
+      {/* Undo toast — disponible 5s tras desactivar */}
+      <div className="undo-toast-container">
+        <Toast
+          show={!!undoToast}
+          onClose={() => setUndoToast(null)}
+          delay={5000}
+          autohide
+          className="undo-toast"
+        >
+          <Toast.Body className="d-flex align-items-center justify-content-between gap-3">
+            <span>{undoToast?.nombre} desactivado</span>
+            <Button variant="link" className="undo-toast-btn p-0" onClick={handleUndoDesactivar}>
+              Deshacer
+            </Button>
+          </Toast.Body>
+        </Toast>
+      </div>
     </div>
   );
 }
