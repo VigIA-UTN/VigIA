@@ -28,3 +28,19 @@ export function formatUltimaSenial(iso: string | null): { text: string; amber: b
 
   return { text, amber: diffDias > UMBRAL_SENIAL_SILENCIOSA_DIAS, title: iso };
 }
+
+/** Texto de una caravana en un <option>: omite los datos de telemetría que no tiene. */
+export function labelCaravanaOpcion(c: {
+  alias: string | null;
+  codigo: string | null;
+  devEui: string;
+  bateria: number | null;
+  ultimaSenial: string | null;
+}): string {
+  const nombre = c.alias || c.codigo || c.devEui;
+  if (c.bateria === null && !c.ultimaSenial) return `${nombre} · sin transmisiones`;
+  const partes = [nombre];
+  if (c.bateria !== null) partes.push(`batería ${formatBateria(c.bateria).text}`);
+  if (c.ultimaSenial) partes.push(`señal ${formatUltimaSenial(c.ultimaSenial).text}`);
+  return partes.join(' · ');
+}

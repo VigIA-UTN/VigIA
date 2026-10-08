@@ -7,7 +7,7 @@ import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { getCaravanasDisponibles } from '../api/caravanasApi';
 import type { CaravanaResponse } from '../api/caravanasApi';
-import { formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
+import { formatBateria, formatUltimaSenial, labelCaravanaOpcion } from '../utils/caravanaTelemetria';
 import { hoyIso } from '../utils/fechas';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
@@ -741,15 +741,9 @@ export default function AnimalesPage() {
                                         disabled={caravanasDisponibles.length === 0}
                                     >
                                         <option value="">Sin caravana (vincular después)</option>
-                                        {caravanasDisponibles.map(c => {
-                                            const bateria = formatBateria(c.bateria);
-                                            const senial = formatUltimaSenial(c.ultimaSenial);
-                                            return (
-                                                <option key={c.id} value={c.id}>
-                                                    {c.alias || c.codigo || c.devEui} · {bateria.text} · {senial.text}
-                                                </option>
-                                            );
-                                        })}
+                                        {caravanasDisponibles.map(c => (
+                                            <option key={c.id} value={c.id}>{labelCaravanaOpcion(c)}</option>
+                                        ))}
                                     </Form.Select>
                                     {caravanasDisponibles.length === 0 && (
                                         <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>
@@ -945,15 +939,9 @@ export default function AnimalesPage() {
                                     onChange={(e) => setSelectedCaravanaId(e.target.value ? Number(e.target.value) : null)}
                                 >
                                     <option value="">Seleccioná una opción</option>
-                                    {caravanasDisponibles.map(c => {
-                                        const bateria = formatBateria(c.bateria);
-                                        const senial = formatUltimaSenial(c.ultimaSenial);
-                                        return (
-                                            <option key={c.id} value={c.id}>
-                                                {c.alias || c.codigo || c.devEui} · {bateria.text} · {senial.text}
-                                            </option>
-                                        );
-                                    })}
+                                    {caravanasDisponibles.map(c => (
+                                        <option key={c.id} value={c.id}>{labelCaravanaOpcion(c)}</option>
+                                    ))}
                                 </Form.Select>
                                 {caravanasDisponibles.length === 0 && (
                                     <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>
