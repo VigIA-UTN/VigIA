@@ -8,7 +8,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { getAnimales, ESTADO_REPRODUCTIVO_LABEL } from '../api/animalesApi';
 import type { AnimalResponse } from '../api/animalesApi';
-import { getAlertas, getVentanaInseminacion, esAnestro } from '../api/alertaApi';
+import { getAlertas, getVentanaInseminacion, esAnestro, tieneDatoDesactualizado, textoAccionRecomendada } from '../api/alertaApi';
 import type { AlertaResponse, VentanaInseminacionResponse } from '../api/alertaApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
@@ -28,7 +28,7 @@ L.Icon.Default.mergeOptions({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const SILENCIO_THRESHOLD_H = 6;     // collar sin señal > 6h = silencioso
+const SILENCIO_THRESHOLD_H = 6;     // caravana sin señal > 6h = silenciosa
 const BATERIA_BAJA_PCT = 20;        // batería ≤ 20% = crítica
 const DIAS_ABIERTOS_URGENTE = 90;   // días abiertos para mostrar en embudo
 const INSEMINADA_DIAS_DIAG = 35;    // inseminada > 35d sin confirmación
@@ -230,21 +230,21 @@ export default function DashboardPage() {
             ventana: ventanas.get(a.id),
         }));
 
-        // Detectar collares silenciosos (no collar o sin señal > 6h)
-        const activosSinCollar = animalesFiltrados.filter(
+        // Detectar caravanas silenciosas (sin caravana o sin señal > 6h)
+        const activosSinCaravana = animalesFiltrados.filter(
             a => a.estadoActual !== 'INACTIVO' && (
                 !a.caravanaId ||
                 (a.caravanaUltimaSenial && horasTranscurridas(a.caravanaUltimaSenial) > SILENCIO_THRESHOLD_H)
             )
         );
-        // Los collares silenciosos como "alertas sintéticas" — sólo si no tienen ya una alerta
+        // Las caravanas silenciosas como "alertas sintéticas" — sólo si no tienen ya una alerta
         const alertaIds = new Set(alertasFiltradas.map(a => a.animalId));
-        activosSinCollar.filter(a => !alertaIds.has(a.id)).forEach(a => {
+        activosSinCaravana.filter(a => !alertaIds.has(a.id)).forEach(a => {
             items.push({
                 alerta: {
                     id: -a.id, // ID sintético negativo
                     animalId: a.id,
-                    tipo: 'COLLAR',
+                    tipo: 'CARAVANA',
                     estado: 'PENDIENTE',
                     tsGeneracion: a.caravanaUltimaSenial ?? a.fechaAlta,
                 } as AlertaResponse,
@@ -293,22 +293,22 @@ export default function DashboardPage() {
             });
     }, [animalesFiltrados]);
 
-    // ── Idea 4: Cobertura de collares ─────────────────────────────────────────
+    // ── Idea 4: Cobertura de caravanas ─────────────────────────────────────────
     const cobertura = useMemo(() => {
         const elegibles = animalesFiltrados.filter(a => a.estadoActual !== 'INACTIVO');
         const total = elegibles.length;
-        if (total === 0) return { pct: 0, ok: 0, calibrando: 0, silencio: 0, bateriaBaja: 0, sinCollar: 0, total: 0 };
+        if (total === 0) return { pct: 0, ok: 0, calibrando: 0, silencio: 0, bateriaBaja: 0, sinCaravana: 0, total: 0 };
 
-        let ok = 0, calibrando = 0, silencio = 0, bateriaBaja = 0, sinCollar = 0;
+        let ok = 0, calibrando = 0, silencio = 0, bateriaBaja = 0, sinCaravana = 0;
         elegibles.forEach(a => {
-            if (!a.caravanaId) { sinCollar++; return; }
+            if (!a.caravanaId) { sinCaravana++; return; }
             if (a.enCalibracion) { calibrando++; return; }
             const hs = a.caravanaUltimaSenial ? horasTranscurridas(a.caravanaUltimaSenial) : Infinity;
             if (hs > SILENCIO_THRESHOLD_H) { silencio++; return; }
             if (a.caravanaBateria !== null && a.caravanaBateria <= BATERIA_BAJA_PCT) { bateriaBaja++; return; }
             ok++;
         });
-        return { pct: Math.round((ok / total) * 100), ok, calibrando, silencio, bateriaBaja, sinCollar, total };
+        return { pct: Math.round((ok / total) * 100), ok, calibrando, silencio, bateriaBaja, sinCaravana, total };
     }, [animalesFiltrados]);
 
     // ── Idea 6: Embudo reproductivo ───────────────────────────────────────────
@@ -1186,16 +1186,6 @@ export default function DashboardPage() {
                                         >
                                             <span className={`dash-sev-dot ${sevDot}`} />
                                             <span className="dash-salud-revisar-nombre">{nombreAnimal(animal)}</span>
-                                            <div className="dash-salud-sparkline">
-                                                {/* Placeholder de actividad (wireframe usa ~~ ) */}
-                                                <svg width="40" height="18" viewBox="0 0 40 18">
-                                                    <polyline
-                                                        points="0,9 8,5 16,12 24,4 32,10 40,7"
-                                                        fill="none" stroke="#94A3B8" strokeWidth="1.5"
-                                                        strokeLinejoin="round" strokeLinecap="round"
-                                                    />
-                                                </svg>
-                                            </div>
                                             <span className="dash-salud-revisar-tiempo">
                                                 {dias > 0 ? `${dias} d` : `${Math.floor(h)}h`}
                                             </span>
@@ -1618,14 +1608,14 @@ export default function DashboardPage() {
                 {/* Cobertura */}
                 <div className="dash-kpi-chip">
                     <div className="dash-kpi-chip-label">
-                        Cobertura de collares
+                        Cobertura de caravanas
                     </div>
                     {loading ? <Spinner animation="border" size="sm" /> : (
                         <div className="dash-kpi-chip-val">{kpiCobertura}%</div>
                     )}
                     <div className="dash-kpi-chip-sub">
                         {cobertura.silencio > 0 ? `${cobertura.silencio} sin señal · ` : ''}
-                        {cobertura.bateriaBaja > 0 ? `${cobertura.bateriaBaja} batería baja` : 'collares ok'}
+                        {cobertura.bateriaBaja > 0 ? `${cobertura.bateriaBaja} batería baja` : 'caravanas ok'}
                     </div>
                 </div>
             </div>
@@ -1694,13 +1684,13 @@ export default function DashboardPage() {
                                     const tipoClass = alerta.tipo === 'CELO' ? 'dash-tipo-celo'
                                         : alerta.tipo === 'SALUD' ? 'dash-tipo-salud'
                                             : alerta.tipo === 'FUERA_DE_PERIMETRO' ? 'dash-tipo-perimetro'
-                                                : 'dash-tipo-collar';
+                                                : 'dash-tipo-caravana';
 
                                     const tipoLabel = esAnestro(alerta) ? 'ANESTRO'
                                         : alerta.tipo === 'CELO' ? 'CELO'
                                         : alerta.tipo === 'SALUD' ? 'SALUD'
                                             : alerta.tipo === 'FUERA_DE_PERIMETRO' ? 'PERÍMETRO'
-                                                : 'COLLAR';
+                                                : 'CARAVANA';
 
                                     return (
                                         <div key={`${alerta.id}-${i}`}>
@@ -1711,8 +1701,19 @@ export default function DashboardPage() {
                                             >
                                                 <span className={`dash-sev-dot ${sevDotClass}`} />
                                                 <div className="dash-cola-nombre">{nombreAnimal(animal)}</div>
-                                                <div className="dash-cola-rec-bar" />
-                                                <span className={`dash-tipo-chip ${tipoClass}`}>{tipoLabel}</span>
+                                                <div className="dash-cola-rec" title={textoAccionRecomendada(alerta)}>
+                                                    {textoAccionRecomendada(alerta)}
+                                                </div>
+                                                <span className={`dash-tipo-chip ${tipoClass}`}>
+                                                    {tipoLabel}
+                                                    {tieneDatoDesactualizado(alerta) && (
+                                                        <i
+                                                            className="bi bi-wifi-off ms-1"
+                                                            style={{ color: '#B7791F' }}
+                                                            title={`Dato posiblemente desactualizado: la caravana no transmite hace más de ${alerta.horasUmbralDatoDesactualizado ?? 2} h. Verificá el animal en campo antes de inseminar.`}
+                                                        />
+                                                    )}
+                                                </span>
                                                 <span className={tiempoClass}>{tiempoLabel}</span>
                                                 <button
                                                     className={`dash-atender-btn ${isUrgentAtender ? '' : 'dash-atender-btn-outline'}`}
@@ -1796,7 +1797,7 @@ export default function DashboardPage() {
                 {/* ── COLUMNA DERECHA ───────────────────────────────────── */}
                 <div className="dash-right-col">
 
-                    {/* ── Idea 4: Cobertura de collares ─────────────────── */}
+                    {/* ── Idea 4: Cobertura de caravanas ─────────────────── */}
                     <div className="dash-card dash-card-dark">
                         <div className="dash-card-header">
                             <p className="dash-card-title">
@@ -1831,9 +1832,9 @@ export default function DashboardPage() {
                                         <div className="dash-coverage-seg dash-coverage-silencio"
                                             style={{ flex: cobertura.silencio }} title={`Sin señal: ${cobertura.silencio}`} />
                                     )}
-                                    {cobertura.sinCollar > 0 && (
-                                        <div className="dash-coverage-seg dash-coverage-sincollar"
-                                            style={{ flex: cobertura.sinCollar }} title={`Sin collar: ${cobertura.sinCollar}`} />
+                                    {cobertura.sinCaravana > 0 && (
+                                        <div className="dash-coverage-seg dash-coverage-sincaravana"
+                                            style={{ flex: cobertura.sinCaravana }} title={`Sin caravana: ${cobertura.sinCaravana}`} />
                                     )}
                                 </div>
 
@@ -1843,7 +1844,7 @@ export default function DashboardPage() {
                                         { label: 'En calibración', count: cobertura.calibrando, cls: 'dash-coverage-calibrando' },
                                         { label: 'Sin señal > 6h', count: cobertura.silencio, cls: 'dash-coverage-silencio' },
                                         { label: `Batería ≤ ${BATERIA_BAJA_PCT}%`, count: cobertura.bateriaBaja, cls: 'dash-coverage-bateria' },
-                                        { label: 'Sin collar', count: cobertura.sinCollar, cls: 'dash-coverage-sincollar' },
+                                        { label: 'Sin caravana', count: cobertura.sinCaravana, cls: 'dash-coverage-sincaravana' },
                                     ].filter(r => r.count > 0).map(row => (
                                         <div key={row.label} className="dash-coverage-leg-row">
                                             <div className="dash-coverage-leg-left">

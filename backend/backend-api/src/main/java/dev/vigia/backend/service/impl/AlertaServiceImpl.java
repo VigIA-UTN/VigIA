@@ -3,6 +3,7 @@ package dev.vigia.backend.service.impl;
 import java.util.Comparator;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
+import dev.vigia.backend.exception.AlertaYaProcesadaException;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Diagnostico;
@@ -44,10 +46,12 @@ import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.service.AlertaService;
+import dev.vigia.backend.service.CeloDatoDesactualizadoEvaluator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import dev.vigia.backend.config.RabbitMQConfig;
@@ -69,6 +73,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final DiagnosticoRepository diagnosticoRepository;
         private final RabbitTemplate rabbitTemplate;
         private final ObjectMapper objectMapper;
+        private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
 
         @Override
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
@@ -98,7 +103,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 disparadorEnum = DisparadorAlerta.ABIGEATO;
                 }
 
-                dev.vigia.backend.model.SeveridadAlerta severidadEnum = null;
+                SeveridadAlerta severidadEnum = null;
                 if (severidad != null && !severidad.isBlank()) {
                         String s = severidad.trim().toUpperCase();
                         if (s.equals("ALTA"))
@@ -275,17 +280,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 })
                                 .collect(Collectors.toList());
 
-                String usuarioAccionStr = null;
-                if (alerta.getUsuarioConfirmacion() != null) {
-                        usuarioAccionStr = alerta.getUsuarioConfirmacion().getNombre();
-                        if (alerta.getUsuarioConfirmacion().getApellido() != null
-                                        && !alerta.getUsuarioConfirmacion().getApellido().isEmpty()) {
-                                usuarioAccionStr += " " + alerta.getUsuarioConfirmacion().getApellido();
-                        }
-                        if (usuarioAccionStr == null || usuarioAccionStr.isBlank()) {
-                                usuarioAccionStr = alerta.getUsuarioConfirmacion().getEmail();
-                        }
-                }
+                String usuarioAccionStr = nombreVisible(alerta.getUsuarioConfirmacion());
 
                 DetalleSanitarioResponse detalleSanitario = null;
                 if (alerta.getDisparador() == DisparadorAlerta.SALUD) {
@@ -298,6 +293,8 @@ public class AlertaServiceImpl implements AlertaService {
                 }
 
                 String descripcionDatoOrigen = construirDescripcionDatoOrigen(alerta, detalleSanitario);
+
+                LocalDateTime ultimaSenial = ultimaSenialDe(alerta);
 
                 return AlertaDetalleResponse.builder()
                                 .id(alerta.getId())
@@ -321,7 +318,21 @@ public class AlertaServiceImpl implements AlertaService {
                                 .detalleSanitario(detalleSanitario)
                                 .detalleGeoespacial(detalleGeoespacial)
                                 .accionRecomendada(alerta.getAccionRecomendada())
+                                .caravanaUltimaSenial(ultimaSenial)
+                                .datoPosiblementeDesactualizado(esDatoDesactualizado(alerta, ultimaSenial))
+                                .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
                                 .build();
+        }
+
+        private static LocalDateTime ultimaSenialDe(Alerta alerta) {
+                return alerta.getAnimal() != null && alerta.getAnimal().getCaravana() != null
+                                ? alerta.getAnimal().getCaravana().getUltimaSenial()
+                                : null;
+        }
+
+        private boolean esDatoDesactualizado(Alerta alerta, LocalDateTime ultimaSenial) {
+                return datoDesactualizadoEvaluator.esDatoDesactualizado(alerta.getDisparador(), alerta.getTipo(),
+                                alerta.getEstado(), ultimaSenial);
         }
 
         private String construirDescripcionDatoOrigen(Alerta alerta, DetalleSanitarioResponse detalleSanitario) {
@@ -446,6 +457,8 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         private AlertaResponse toResponse(Alerta alerta) {
+                LocalDateTime ultimaSenial = datoDesactualizadoEvaluator.aplica(alerta.getDisparador(),
+                                alerta.getTipo(), alerta.getEstado()) ? ultimaSenialDe(alerta) : null;
                 return AlertaResponse.builder()
                                 .id(alerta.getId())
                                 .tipo(alerta.getDisparador() != null ? alerta.getDisparador().name() : alerta.getTipo())
@@ -457,6 +470,9 @@ public class AlertaServiceImpl implements AlertaService {
                                 .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
                                 .accionRecomendada(alerta.getAccionRecomendada())
+                                .caravanaUltimaSenial(ultimaSenial)
+                                .datoPosiblementeDesactualizado(esDatoDesactualizado(alerta, ultimaSenial))
+                                .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
                                 .build();
         }
 
@@ -469,7 +485,7 @@ public class AlertaServiceImpl implements AlertaService {
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                Alerta alerta = alertaRepository.findById(alertaId)
+                Alerta alerta = alertaRepository.findByIdForUpdate(alertaId)
                                 .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
 
                 Long establecimientoId = alerta.getAnimal().getEstablecimiento().getId();
@@ -484,7 +500,13 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
+                validarCamperoNoActuaSobreSalud(usuario, alerta);
+
                 EstadoAlerta estadoAnterior = alerta.getEstado();
+
+                if (estadoAnterior != EstadoAlerta.PENDIENTE) {
+                        throw new AlertaYaProcesadaException(mensajeAlertaYaProcesada(alerta));
+                }
 
                 if (estadoAnterior == EstadoAlerta.PENDIENTE &&
                                 (nuevoEstado == EstadoAlerta.CONFIRMADA || nuevoEstado == EstadoAlerta.DESCARTADA)) {
@@ -690,6 +712,8 @@ public class AlertaServiceImpl implements AlertaService {
                 if (!perteneceAlEstablecimiento) {
                         throw new AccessDeniedException("No tiene permiso para intervenir esta alerta");
                 }
+
+                validarCamperoNoActuaSobreSalud(usuario, alerta);
 
                 if (alerta.getEstado() != EstadoAlerta.CONFIRMADA) {
                         throw new IllegalArgumentException(
@@ -959,6 +983,37 @@ public class AlertaServiceImpl implements AlertaService {
                                                 ? intervencion.getAlerta().getId()
                                                 : null)
                                 .build();
+        }
+
+        private static final DateTimeFormatter FECHA_ACCION = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
+
+        private String mensajeAlertaYaProcesada(Alerta alerta) {
+                if (alerta.getEstado() == EstadoAlerta.ARCHIVADA) {
+                        return "Esta alerta ya fue archivada porque venció la ventana de inseminación.";
+                }
+                if (alerta.getEstado() == EstadoAlerta.VENCIDA) {
+                        return "Esta alerta ya venció y no admite cambios.";
+                }
+                String accion = switch (alerta.getEstado()) {
+                        case CONFIRMADA -> "confirmada";
+                        case DESCARTADA -> "descartada";
+                        default -> "procesada";
+                };
+                StringBuilder msg = new StringBuilder("Esta alerta ya fue ").append(accion);
+                String quien = nombreVisible(alerta.getUsuarioConfirmacion());
+                if (quien != null) {
+                        msg.append(" por ").append(quien);
+                }
+                if (alerta.getTsConfirmacion() != null) {
+                        msg.append(" el ").append(alerta.getTsConfirmacion().format(FECHA_ACCION));
+                }
+                return msg.append(".").toString();
+        }
+
+        private void validarCamperoNoActuaSobreSalud(Usuario usuario, Alerta alerta) {
+                if (usuario.getRol() == Rol.CAMPERO && alerta.getDisparador() == DisparadorAlerta.SALUD) {
+                        throw new AccessDeniedException("El campero no puede actuar sobre alertas sanitarias.");
+                }
         }
 
         private void registrarEstadoDerivado(Intervencion intervencion, IntervencionRequest request, Usuario usuario) {

@@ -26,7 +26,7 @@ NUM_ANIMALES = int(os.getenv("NUM_ANIMALES", 5)) # 5 vacas como solicitaste
 # entrenado (ml-celo/app/models/): con INTERVALO_SEGUNDOS=5 la confianza queda
 # ~0.02, con INTERVALO_SEGUNDOS=300 (5 min, igual que entrenamiento) sube a
 # ~0.8-0.97. Por eso el default pasa a ser 300s.
-INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 300))  # 5 minutos, igual que el collar real / dataset de entrenamiento
+INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 300))  # 5 minutos, igual que la caravana real / dataset de entrenamiento
 
 # Coordenadas iniciales: Establecimiento de Prueba (del DataInitializer), usadas
 # solo como fallback si el backend todavía no tiene ninguna fila para un
@@ -88,7 +88,7 @@ SPEED_MULT_SALUD_ENFERMO = 0.1
 TURN_STD_SALUD_ENFERMO = 0.15  # casi no gira: se queda quieta, no da vueltas
 PROB_REPOSO_ENFERMO = 0.95     # ver justificación arriba
 
-# moveState real del collar: 0-9 (ver generate_dataset.py)
+# moveState real de la caravana: 0-9 (ver generate_dataset.py)
 #   0-1 = reposo/rumia, 2-6 = pastoreo/caminata normal, 7-9 = alta actividad
 MOVESTATE_REPOSO = (0, 1)
 MOVESTATE_NORMAL = (2, 6)
@@ -189,7 +189,7 @@ def generar_payload(device_id, estado, f_cnt):
     # Consumo de batería leve
     estado["bateria"] -= random.uniform(0.01, 0.05)
     if estado["bateria"] < 0:
-        estado["bateria"] = 100.0 # Se cambió el collar/batería
+        estado["bateria"] = 100.0 # Se cambió la caravana/batería
 
     speed_mult = 1.0
     turn_std = TURN_STD_BASE

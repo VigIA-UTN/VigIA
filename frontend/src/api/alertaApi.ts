@@ -11,11 +11,43 @@ export interface AlertaResponse {
   severidad?: "ALTA" | "MEDIA" | "BAJA";
   gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';
   accionRecomendada: string;
+  /** H0008: última transmisión de la caravana (solo se envía en alertas de celo pendientes). */
+  caravanaUltimaSenial?: string | null;
+  datoPosiblementeDesactualizado?: boolean;
+  horasUmbralDatoDesactualizado?: number;
+}
+
+/**
+ * H0008: el backend marca la alerta al momento de enviarla. Como las listas no se refrescan solas,
+ * además se re-evalúa con la última señal conocida para que una tarjeta abierta pase a "sin señal"
+ * si la caravana deja de transmitir. Ante la duda advierte (puede adelantarse si la caravana transmitió
+ * después; el detalle de la alerta siempre consulta el dato fresco).
+ */
+export function tieneDatoDesactualizado(alerta: AlertaResponse): boolean {
+  if (alerta.datoPosiblementeDesactualizado) return true;
+  if (!alerta.caravanaUltimaSenial || alerta.estado !== 'PENDIENTE') return false;
+  const umbralMs = (alerta.horasUmbralDatoDesactualizado ?? 2) * 60 * 60 * 1000;
+  return Date.now() - new Date(alerta.caravanaUltimaSenial).getTime() > umbralMs;
 }
 
 /** Alerta de anestro: disparador CELO, pero sin ventana de inseminación. Mira tipo por el mapper que manda el tipo crudo. */
 export const esAnestro = (a: { subtipo?: string | null; tipo?: string | null }) =>
   /anestro/i.test(a.subtipo ?? a.tipo ?? '');
+
+/** Acción recomendada de la alerta, con un texto genérico por tipo si el backend no la mandó. */
+export const textoAccionRecomendada = (alerta: AlertaResponse | null) => {
+  if (alerta?.accionRecomendada) {
+    return alerta.accionRecomendada;
+  } else if (alerta && esAnestro(alerta)) {
+    return 'Revisión veterinaria: el animal no registra celo en el período configurado.';
+  } else if (alerta && alerta.tipo === 'SALUD') {
+    return 'Revisar al animal y realizar seguimiento clínico.';
+  } else if (alerta && alerta.tipo === 'CELO') {
+    return 'Realizar inseminación artificial dentro de la ventana óptima.';
+  } else {
+    return 'Revisar al animal y realizar seguimiento.';
+  }
+}
 
 export async function getAlertas(
   establecimientoId: number,
@@ -155,6 +187,11 @@ export interface AlertaDetalleResponse {
   detalleSanitario?: DetalleSanitario | null;
   /** Presente solo para alertas geoespaciales (datoDisparador === 'FUERA_DE_PERIMETRO'). */
   detalleGeoespacial?: DetalleGeoespacial | null;
+  /** Última transmisión de la caravana (null si no tiene caravana o nunca transmitió). */
+  caravanaUltimaSenial?: string | null;
+  /** True en alertas de celo pendientes cuya caravana no transmite hace más de `horasUmbralDatoDesactualizado`. */
+  datoPosiblementeDesactualizado?: boolean;
+  horasUmbralDatoDesactualizado?: number;
 }
 
 export async function getAlertaDetalle(alertaId: number, establecimientoId: number): Promise<AlertaDetalleResponse> {

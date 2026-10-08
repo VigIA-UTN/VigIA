@@ -7,7 +7,8 @@ import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { getCaravanasDisponibles } from '../api/caravanasApi';
 import type { CaravanaResponse } from '../api/caravanasApi';
-import { formatBateria, formatUltimaSenial } from '../utils/caravanaTelemetria';
+import { formatBateria, formatUltimaSenial, labelCaravanaOpcion } from '../utils/caravanaTelemetria';
+import { hoyIso } from '../utils/fechas';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
@@ -37,6 +38,8 @@ export default function AnimalesPage() {
     const navigate = useNavigate();
     const rol = useAuthStore((s) => s.rol);
     const puedeGestionarCaravanas = rol !== 'VETERINARIO';
+    // Alta/baja de animales, rodeos y cargas masivas: el backend solo se las permite al productor.
+    const esProductor = rol === 'PRODUCTOR';
     const selectedId = useEstablecimientoStore((s) => s.selectedId);
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
     const [loading, setLoading] = useState(true);
@@ -243,8 +246,20 @@ export default function AnimalesPage() {
             setFormError('No hay establecimiento seleccionado.');
             return;
         }
-        if (!form.idCaravanaOficial && !form.alias) {
-            setFormError('Ingresá al menos el identificador o el nombre del animal.');
+        if (!form.idCaravanaOficial?.trim()) {
+            setFormError('Ingresá el identificador del animal.');
+            return;
+        }
+        if (!form.fechaNacimiento) {
+            setFormError('Ingresá la fecha de nacimiento.');
+            return;
+        }
+        if (form.fechaNacimiento > hoyIso()) {
+            setFormError('La fecha de nacimiento no puede ser futura.');
+            return;
+        }
+        if (!form.rodeoLoteId) {
+            setFormError('Seleccioná un lote.');
             return;
         }
         setFormError(null);
@@ -311,6 +326,14 @@ export default function AnimalesPage() {
         } finally {
             setSubmittingUpload(false);
         }
+    };
+
+    const openUploadModal = async () => {
+        try {
+            const lotes = await getRodeoLotes(selectedId || undefined);
+            setRodeoLotes(lotes.filter(l => l.activo));
+        } catch { setRodeoLotes([]); }
+        setUploadModal(true);
     };
 
     const handleCloseUploadModal = () => {
@@ -398,13 +421,17 @@ export default function AnimalesPage() {
     });
 
     const openModal = async () => {
-        setForm({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO', pesoInicial: null });
+        setForm({ idCaravanaOficial: '', alias: '', fechaNacimiento: '', raza: '', rodeoLoteId: null, estadoActual: 'ACTIVO', pesoInicial: null, caravanaId: null });
         setFormError(null);
         setFormSuccess(null);
-        try {
-            const lotes = await getRodeoLotes(selectedId || undefined);
-            setRodeoLotes(lotes.filter(l => l.activo));
-        } catch { setRodeoLotes([]); }
+        const [lotes, disponibles] = await Promise.all([
+            getRodeoLotes(selectedId || undefined).catch(() => [] as RodeoLoteResponse[]),
+            puedeGestionarCaravanas && selectedId
+                ? getCaravanasDisponibles(selectedId).catch(() => [] as CaravanaResponse[])
+                : Promise.resolve([] as CaravanaResponse[]),
+        ]);
+        setRodeoLotes(lotes.filter(l => l.activo));
+        setCaravanasDisponibles(disponibles);
         setShowModal(true);
     };
 
@@ -425,20 +452,22 @@ export default function AnimalesPage() {
                                 <i className="bi bi-heart" /> Salud
                             </button>
                         </div>
-                        <div className="animales-action-btns d-flex align-items-center gap-2">
-                            <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
-                                <i className="bi bi-plus-lg" /> Rodeo
-                            </Button>
-                            <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
-                                <i className="bi bi-upload" /> Cargar Estados
-                            </Button>
-                            <Button className="btn-vigia-success" onClick={() => { setUploadModal(true) }}>
-                                <i className="bi bi-upload" /> Cargar Animales
-                            </Button>
-                            <Button className="btn-vigia-success" onClick={openModal}>
-                                <i className="bi bi-plus-lg" /> Animal
-                            </Button>
-                        </div>
+                        {esProductor && (
+                            <div className="animales-action-btns d-flex align-items-center gap-2">
+                                <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
+                                    <i className="bi bi-plus-lg" /> Rodeo
+                                </Button>
+                                <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
+                                    <i className="bi bi-upload" /> Cargar Estados
+                                </Button>
+                                <Button className="btn-vigia-success" onClick={openUploadModal}>
+                                    <i className="bi bi-upload" /> Cargar Animales
+                                </Button>
+                                <Button className="btn-vigia-success" onClick={openModal}>
+                                    <i className="bi bi-plus-lg" /> Animal
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     <div className="mb-3 mt-3">
@@ -635,9 +664,11 @@ export default function AnimalesPage() {
                                                                         : <><i className="bi bi-bell-fill"></i> Alerta</>}
                                                                 </Button>
                                                             )}
-                                                            <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)}>
-                                                                <i className="bi bi-trash"></i>
-                                                            </Button>
+                                                            {esProductor && (
+                                                                <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)}>
+                                                                    <i className="bi bi-trash"></i>
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -668,7 +699,7 @@ export default function AnimalesPage() {
                             </Form.Group>
                             <Form.Group className="mb-3">
                                 <Form.Label>Fecha de Nacimiento*</Form.Label>
-                                <Form.Control name="fechaNacimiento" type="date" value={form.fechaNacimiento ?? ''} onChange={handleChange} required />
+                                <Form.Control name="fechaNacimiento" type="date" max={hoyIso()} value={form.fechaNacimiento ?? ''} onChange={handleChange} required />
                             </Form.Group>
                             <Form.Group className="mb-3">
                                 <Form.Label>Raza</Form.Label>
@@ -680,6 +711,7 @@ export default function AnimalesPage() {
                                     name="rodeoLoteId"
                                     value={form.rodeoLoteId ?? ''}
                                     onChange={handleChange}
+                                    required
                                 >
                                     <option value="">Seleccioná una opción</option>
                                     {rodeoLotes.map(l => (
@@ -699,6 +731,27 @@ export default function AnimalesPage() {
                                     onChange={e => setForm(prev => ({ ...prev, pesoInicial: e.target.value ? parseFloat(e.target.value) : null }))}
                                 />
                             </Form.Group>
+                            {puedeGestionarCaravanas && (
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Caravana</Form.Label>
+                                    <Form.Select
+                                        name="caravanaId"
+                                        value={form.caravanaId ?? ''}
+                                        onChange={e => setForm(prev => ({ ...prev, caravanaId: e.target.value ? Number(e.target.value) : null }))}
+                                        disabled={caravanasDisponibles.length === 0}
+                                    >
+                                        <option value="">Sin caravana (vincular después)</option>
+                                        {caravanasDisponibles.map(c => (
+                                            <option key={c.id} value={c.id}>{labelCaravanaOpcion(c)}</option>
+                                        ))}
+                                    </Form.Select>
+                                    {caravanasDisponibles.length === 0 && (
+                                        <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>
+                                            No hay caravanas disponibles en este establecimiento.
+                                        </div>
+                                    )}
+                                </Form.Group>
+                            )}
                         </Form>
                     </Modal.Body>
                     <Modal.Footer>
@@ -762,12 +815,23 @@ export default function AnimalesPage() {
                                 <div className="mb-3 text-white" style={{ fontSize: '0.9em' }}>
                                     <p className="mb-1">El archivo debe contener las siguientes columnas en este orden:</p>
                                     <ul>
-                                        <li><strong>IdCaravana</strong> (al menos IdCaravana o Alias debe estar presente)</li>
-                                        <li><strong>Alias</strong> (al menos IdCaravana o Alias debe estar presente)</li>
-                                        <li><strong>FechaNacimiento</strong> (opcional, formato YYYY-MM-DD)</li>
+                                        <li><strong>IdCaravana</strong> (obligatorio, no puede repetirse)</li>
+                                        <li><strong>Alias</strong> (opcional, no puede repetirse)</li>
+                                        <li><strong>FechaNacimiento</strong> (obligatoria, formato YYYY-MM-DD, no puede ser futura)</li>
                                         <li><strong>Raza</strong> (opcional)</li>
-                                        <li><strong>RodeoLote</strong> (opcional, nombre exacto del lote/rodeo, se creará si no existe)</li>
+                                        <li><strong>RodeoLote</strong> (obligatorio, nombre de un lote existente y activo del establecimiento)</li>
                                     </ul>
+                                    <Alert variant={rodeoLotes.length > 0 ? 'info' : 'warning'} className="py-2 mb-2">
+                                        <i className="bi bi-info-circle me-1" />
+                                        La carga <strong>no crea lotes nuevos</strong>: cada animal debe indicar un lote que ya exista y esté activo.
+                                        Si falta alguno, crealo antes con el botón <strong>+ Rodeo</strong>.
+                                        <div className="mt-1">
+                                            {rodeoLotes.length > 0
+                                                ? <>Lotes disponibles: <strong>{rodeoLotes.map(l => l.nombre).join(', ')}</strong></>
+                                                : <strong>Este establecimiento todavía no tiene lotes activos.</strong>}
+                                        </div>
+                                    </Alert>
+                                    <p className="mb-2">Las filas vacías se ignoran.</p>
                                     <div className="d-flex gap-3 mb-3">
                                         <a href="/template_animales.csv" download className="d-inline-block" style={{ color: '#8CC63F', fontWeight: '600' }}>
                                             <i className="bi bi-filetype-csv me-1" /> Descargar template CSV
@@ -875,15 +939,9 @@ export default function AnimalesPage() {
                                     onChange={(e) => setSelectedCaravanaId(e.target.value ? Number(e.target.value) : null)}
                                 >
                                     <option value="">Seleccioná una opción</option>
-                                    {caravanasDisponibles.map(c => {
-                                        const bateria = formatBateria(c.bateria);
-                                        const senial = formatUltimaSenial(c.ultimaSenial);
-                                        return (
-                                            <option key={c.id} value={c.id}>
-                                                {c.alias || c.codigo || c.devEui} · {bateria.text} · {senial.text}
-                                            </option>
-                                        );
-                                    })}
+                                    {caravanasDisponibles.map(c => (
+                                        <option key={c.id} value={c.id}>{labelCaravanaOpcion(c)}</option>
+                                    ))}
                                 </Form.Select>
                                 {caravanasDisponibles.length === 0 && (
                                     <div className="mt-2" style={{ color: '#cde', fontSize: '0.85rem' }}>

@@ -186,8 +186,8 @@ def build_dataset(n_animales: int, dias_evaluacion: int, seed: int,
         lon[:, t] = lon[:, t - 1] + step_lon + pull_lon
 
     # Trayectoria "verdadera" (determina severidad/tipo_alto, ya calculados
-    # más arriba y ajenos a lat/lon) vs. observada: un collar real, aunque
-    # esté quieto, mide con ruido GNSS -- ver gps_noise_common.py para la
+    # más arriba y ajenos a lat/lon) vs. observada: una caravana real, aunque
+    # esté quieta, mide con ruido GNSS -- ver gps_noise_common.py para la
     # derivación empírica de gps_noise_std_m.
     lat_true, lon_true = lat, lon
     lat, lon = inject_gps_noise(lat_true, lon_true, gps_noise_std_m, rng)

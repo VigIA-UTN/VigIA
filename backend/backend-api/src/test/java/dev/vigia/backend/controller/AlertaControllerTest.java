@@ -40,6 +40,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -339,13 +340,67 @@ class AlertaControllerTest {
     // =========================================================================
 
     @Test
-    @DisplayName("Campero intenta actualizar alerta → 403 Forbidden")
+    @DisplayName("Campero confirma alerta de CELO PENDIENTE → 200 con estado CONFIRMADA")
     @SuppressWarnings("null")
-    void actualizarAlerta_comoCampero_returns403() throws Exception {
+    void confirmarAlertaCelo_comoCampero_returns200() throws Exception {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + camperoToken)
                 .param("estado", "CONFIRMADA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(alertaId))
+                .andExpect(jsonPath("$.estado").value("CONFIRMADA"));
+    }
+
+    @Test
+    @DisplayName("Campero descarta alerta geoespacial PENDIENTE → 200 con estado DESCARTADA")
+    @SuppressWarnings("null")
+    void descartarAlertaGeoespacial_comoCampero_returns200() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.FUERA_DE_PERIMETRO, EstadoAlerta.PENDIENTE);
+
+        mockMvc.perform(put("/api/v1/alertas/estado/{id}", id)
+                .header("Authorization", "Bearer " + camperoToken)
+                .param("estado", "DESCARTADA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.estado").value("DESCARTADA"));
+    }
+
+    @Test
+    @DisplayName("Campero intenta confirmar o descartar alerta SALUD → 403 y la alerta sigue PENDIENTE")
+    @SuppressWarnings("null")
+    void actualizarAlertaSalud_comoCampero_returns403() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.PENDIENTE);
+
+        mockMvc.perform(put("/api/v1/alertas/estado/{id}", id)
+                .header("Authorization", "Bearer " + camperoToken)
+                .param("estado", "CONFIRMADA"))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/alertas/estado/{id}", id)
+                .header("Authorization", "Bearer " + camperoToken)
+                .param("estado", "DESCARTADA"))
+                .andExpect(status().isForbidden());
+
+        Alerta despues = alertaRepository.findById(id).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(EstadoAlerta.PENDIENTE, despues.getEstado());
+        org.junit.jupiter.api.Assertions.assertNull(despues.getUsuarioConfirmacion());
+    }
+
+    @Test
+    @DisplayName("Campero registra intervención sobre alerta de CELO confirmada → 200")
+    void intervenirAlertaCelo_comoCampero_returns200() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.CELO, EstadoAlerta.CONFIRMADA);
+
+        postIntervencion(camperoToken, id, INTERVENCION_OK)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id));
+    }
+
+    @Test
+    @DisplayName("Campero intenta registrar intervención sobre alerta SALUD confirmada → 403")
+    void intervenirAlertaSalud_comoCampero_returns403() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+
+        postIntervencion(camperoToken, id, INTERVENCION_OK).andExpect(status().isForbidden());
     }
 
     @Test
@@ -392,9 +447,9 @@ class AlertaControllerTest {
     }
 
     @Test
-    @DisplayName("Confirmar alerta ya CONFIRMADA → 400 (transición inválida)")
+    @DisplayName("Confirmar alerta ya CONFIRMADA → 409 con quién la procesó")
     @SuppressWarnings("null")
-    void confirmarAlerta_yaConfirmada_returns400() throws Exception {
+    void confirmarAlerta_yaConfirmada_returns409() throws Exception {
         // Primera confirmación
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
@@ -405,13 +460,14 @@ class AlertaControllerTest {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
                 .param("estado", "CONFIRMADA"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Esta alerta ya fue confirmada por")));
     }
 
     @Test
-    @DisplayName("Confirmar alerta ya DESCARTADA → 400 (transición inválida)")
+    @DisplayName("Confirmar alerta ya DESCARTADA → 409 con quién la procesó")
     @SuppressWarnings("null")
-    void confirmarAlerta_yaDescartada_returns400() throws Exception {
+    void confirmarAlerta_yaDescartada_returns409() throws Exception {
         // Primero descartar
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
@@ -422,7 +478,8 @@ class AlertaControllerTest {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
                 .param("estado", "CONFIRMADA"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Esta alerta ya fue descartada por")));
     }
 
     @Test
@@ -971,6 +1028,17 @@ class AlertaControllerTest {
     private org.springframework.test.web.servlet.ResultActions postDiagnostico(String token, Long alertaId, String body)
             throws Exception {
         return mockMvc.perform(post("/api/v1/alertas/{id}/diagnosticos", alertaId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body));
+    }
+
+    private static final String INTERVENCION_OK = "{\"tipo\":\"INSEMINACION\",\"descripcion\":\"Inseminación artificial\"}";
+
+    @SuppressWarnings("null")
+    private org.springframework.test.web.servlet.ResultActions postIntervencion(String token, Long alertaId, String body)
+            throws Exception {
+        return mockMvc.perform(post("/api/v1/alertas/intervenir/{id}", alertaId)
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body));

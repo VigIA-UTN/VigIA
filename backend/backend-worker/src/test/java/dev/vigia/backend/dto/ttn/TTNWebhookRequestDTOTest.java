@@ -18,7 +18,7 @@ class TTNWebhookRequestDTOTest {
     private static final String UPLINK_REAL_TTN = """
             {
               "end_device_ids": {
-                "device_id": "collar-01",
+                "device_id": "caravana-01",
                 "application_ids": {
                   "application_id": "vigia-app"
                 },

@@ -78,6 +78,7 @@ import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.RegistroPesoRepository;
 import dev.vigia.backend.service.AnimalService;
 import dev.vigia.backend.service.CargaMasivaService;
+import dev.vigia.backend.service.CeloDatoDesactualizadoEvaluator;
 import dev.vigia.backend.service.EstadoReproductivoCsvService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -97,6 +98,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstadoSaludRepository estadoSaludRepository;
         private final RegistroPesoRepository registroPesoRepository;
         private final CaravanaRepository caravanaRepository;
+        private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
 
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
@@ -134,16 +136,23 @@ public class AnimalServiceImpl implements AnimalService {
                                         "El identificador ya se encuentra registrado en este establecimiento.");
                 }
 
-                if (request.getRodeoLoteId() != null) {
-                        rodeoLoteRepository.findById(request.getRodeoLoteId())
-                                        .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                if (request.getAlias() != null && !request.getAlias().isBlank()
+                                && animalRepository.existsByAliasAndEstablecimientoId(request.getAlias(),
+                                                request.getEstablecimientoId())) {
+                        throw new IllegalArgumentException(
+                                        "El nombre/alias ya se encuentra registrado en este establecimiento.");
                 }
 
-                Animal animal = new Animal(
-                                establecimiento,
-                                request.getRodeoLoteId() != null
-                                                ? rodeoLoteRepository.findById(request.getRodeoLoteId()).get()
-                                                : null);
+                RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
+                                .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                if (!lote.getEstablecimiento().getId().equals(establecimiento.getId())) {
+                        throw new IllegalArgumentException("El rodeo no pertenece al establecimiento.");
+                }
+                if (!lote.isActivo()) {
+                        throw new IllegalArgumentException("El rodeo/lote no está activo.");
+                }
+
+                Animal animal = new Animal(establecimiento, lote);
 
                 animal.setIdCaravanaOficial(request.getIdCaravanaOficial());
                 animal.setAlias(request.getAlias());
@@ -220,16 +229,26 @@ public class AnimalServiceImpl implements AnimalService {
                         }
                 }
 
-                if (request.getRodeoLoteId() != null) {
-                        RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
-                                        .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
-                        if (!lote.getEstablecimiento().getId().equals(nuevoEstablecimiento.getId())) {
-                                throw new IllegalArgumentException("El rodeo no pertenece al establecimiento destino.");
-                        }
-                        animal.setRodeoLote(lote);
-                } else {
-                        animal.setRodeoLote(null);
+                if (request.getAlias() != null && !request.getAlias().isBlank()
+                                && (!request.getAlias().equals(animal.getAlias())
+                                                || !request.getEstablecimientoId().equals(establecimientoActual.getId()))
+                                && animalRepository.existsByAliasAndEstablecimientoId(request.getAlias(),
+                                                request.getEstablecimientoId())) {
+                        throw new IllegalArgumentException(
+                                        "El nombre/alias ya se encuentra registrado en el establecimiento destino.");
                 }
+
+                RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
+                                .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                if (!lote.getEstablecimiento().getId().equals(nuevoEstablecimiento.getId())) {
+                        throw new IllegalArgumentException("El rodeo no pertenece al establecimiento destino.");
+                }
+                boolean cambioDeRodeo = animal.getRodeoLote() == null
+                                || !animal.getRodeoLote().getId().equals(lote.getId());
+                if (cambioDeRodeo && !lote.isActivo()) {
+                        throw new IllegalArgumentException("El rodeo/lote no está activo.");
+                }
+                animal.setRodeoLote(lote);
 
                 animal.setEstablecimiento(nuevoEstablecimiento);
                 animal.setIdCaravanaOficial(request.getIdCaravanaOficial());
@@ -927,6 +946,12 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         private AlertaResponse alertaToAlertaResponse(Alerta alerta) {
+                boolean aplicaAviso = datoDesactualizadoEvaluator.aplica(alerta.getDisparador(), alerta.getTipo(),
+                                alerta.getEstado());
+                LocalDateTime ultimaSenial = aplicaAviso && alerta.getAnimal() != null
+                                && alerta.getAnimal().getCaravana() != null
+                                                ? alerta.getAnimal().getCaravana().getUltimaSenial()
+                                                : null;
                 return AlertaResponse.builder()
                                 .id(alerta.getId())
                                 .tipo(alerta.getTipo())
@@ -937,6 +962,11 @@ public class AnimalServiceImpl implements AnimalService {
                                 .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
                                 .severidad(alerta.getSeveridad().name())
+                                .caravanaUltimaSenial(ultimaSenial)
+                                .datoPosiblementeDesactualizado(datoDesactualizadoEvaluator.esDatoDesactualizado(
+                                                alerta.getDisparador(), alerta.getTipo(), alerta.getEstado(),
+                                                ultimaSenial))
+                                .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
                                 .build();
         }
 
@@ -1272,7 +1302,7 @@ public class AnimalServiceImpl implements AnimalService {
                 if (telemetriaDesactualizada(telemetria)) {
                         return IndicadorResponse.builder()
                                         .nombre("Estado de movimiento")
-                                        .descripcion(descripcionSinDatosPorCollarDesactualizado())
+                                        .descripcion(descripcionSinDatosPorCaravanaDesactualizada())
                                         .valor(String.valueOf(telemetria.getMoveState()))
                                         .estado("SIN DATOS")
                                         .build();
@@ -1298,8 +1328,8 @@ public class AnimalServiceImpl implements AnimalService {
                 return antiguedad.compareTo(Duration.ofHours(HORAS_SIN_DATOS_MOVIMIENTO)) > 0;
         }
 
-        private String descripcionSinDatosPorCollarDesactualizado() {
-                return "El collar no transmitió datos en las últimas " + HORAS_SIN_DATOS_MOVIMIENTO
+        private String descripcionSinDatosPorCaravanaDesactualizada() {
+                return "La caravana no transmitió datos en las últimas " + HORAS_SIN_DATOS_MOVIMIENTO
                                 + " horas; no se puede calcular el estado de movimiento actual.";
         }
 

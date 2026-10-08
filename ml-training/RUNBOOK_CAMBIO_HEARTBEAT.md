@@ -2,7 +2,7 @@
 
 Este documento está pensado para pegarse como prompt en una sesión futura
 de Claude Code (o para seguirlo a mano) cuando cambie la frecuencia real
-con la que los collares envían Heartbeat (el mensaje que trae `moveState`).
+con la que las caravanas envían Heartbeat (el mensaje que trae `moveState`).
 
 ## 1. Cuándo usar este runbook
 
@@ -90,7 +90,7 @@ python train_model.py --dataset-dir dataset --models-dir models --split-seed 42 
 2. `pytest ml-training/tests/ -v` en verde.
 3. Antes/después con la muestra real de GPS quieto: cargar el modelo
    viejo y el nuevo directamente (sin pasar por la API) sobre un payload
-   sintético que replique el ruido real de un collar quieto y `moveState`
+   sintético que replique el ruido real de una caravana quieta y `moveState`
    bajo, cuantizado con el nuevo `<N>`; confirmar que ninguno de los dos
    dispara un falso positivo de celo, y que un input de alta actividad
    real sigue superando el umbral.

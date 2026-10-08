@@ -24,6 +24,7 @@ import dev.vigia.backend.dto.DiagnosticoRequest;
 import dev.vigia.backend.dto.DiagnosticoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
+import dev.vigia.backend.exception.AlertaYaProcesadaException;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.service.AlertaService;
 import dev.vigia.backend.service.SseAlertaPublisher;
@@ -267,10 +268,10 @@ public class AlertaController {
      * @param notas          (opcional) notas asociadas al cambio de estado
      * @param authentication contexto de seguridad inyectado por Spring Security
      * @return 200 con la alerta actualizada, 400 si hay error, 403 si acceso
-     *         denegado
+     *         denegado, 409 si otro usuario ya la procesó
      */
     @PutMapping("/estado/{id}")
-    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> actualizarEstadoAlerta(
             @PathVariable("id") Long alertaId,
             @RequestParam(name = "estado") EstadoAlerta nuevoEstado,
@@ -282,6 +283,8 @@ public class AlertaController {
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
+        } catch (AlertaYaProcesadaException e) {
+            return ResponseEntity.status(409).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

@@ -34,4 +34,8 @@ public class AlertaDetalleResponse {
     private DetalleSanitarioResponse detalleSanitario;
     private DetalleGeoespacialResponse detalleGeoespacial;
     private String accionRecomendada;
+
+    private LocalDateTime caravanaUltimaSenial;
+    private boolean datoPosiblementeDesactualizado;
+    private long horasUmbralDatoDesactualizado;
 }

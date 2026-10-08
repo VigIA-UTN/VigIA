@@ -6,6 +6,7 @@ import DiagnosticoSection from './DiagnosticoSection';
 import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useVentanaInseminacion, formatCountdown } from '../hooks/useVentanaInseminacion';
+import { formatUltimaSenial } from '../utils/caravanaTelemetria';
 
 interface AlertDetailSidebarProps {
   alerta: AlertaResponse;
@@ -26,8 +27,11 @@ function mensajeError(err: unknown, fallback: string): string {
 export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, mode = 'absolute', onOpenIntervencion }: AlertDetailSidebarProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [notas, setNotas] = useState('');
+  // H0010: error al confirmar/descartar; conflicto = otro usuario ya la procesó (409)
+  const [actionError, setActionError] = useState<{ mensaje: string; conflicto: boolean } | null>(null);
+  // Estado real tras un 409: se informa al padre al cerrar, para que el aviso no desaparezca antes de leerlo
+  const estadoPorSincronizar = useRef<'CONFIRMADA' | 'DESCARTADA' | null>(null);
 
   const [detalle, setDetalle] = useState<AlertaDetalleResponse | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
@@ -35,7 +39,6 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
   const { rol } = useAuthStore();
   const { selectedId } = useEstablecimientoStore();
-  const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR';
 
   // Ventana optima de inseminacion con countdown en tiempo real.
   // El backend puede devolver 'CELO', 'Celo Detectado' o 'reproductivo'
@@ -104,6 +107,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   }, [alerta.id, selectedId]);
 
   const handleClose = () => {
+    if (estadoPorSincronizar.current) {
+      onActionComplete(alerta.id, estadoPorSincronizar.current);
+      estadoPorSincronizar.current = null;
+    }
     setIsClosing(true);
     setTimeout(() => {
       onClose();
@@ -113,35 +120,41 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const handleAccion = async (nuevoEstado: 'CONFIRMADA' | 'DESCARTADA', triggerIntervencion: boolean = true, notaOverride?: string) => {
     setActionLoading(true);
     setActionError(null);
-
-    // Confirmar una alerta sanitaria deja el sidebar abierto para cargar el diagnóstico,
-    // así que acá el error del backend no se puede tapar: el diagnóstico fallaría después.
-    if (isSanitaria && nuevoEstado === 'CONFIRMADA') {
-      try {
-        await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride);
-        setDetalle(d => d && { ...d, estadoActual: nuevoEstado });
-        onActionComplete(alerta.id, nuevoEstado);
-      } catch (err) {
-        setActionError(mensajeError(err, 'No se pudo confirmar la alerta.'));
-      } finally {
-        setActionLoading(false);
-      }
-      return;
-    }
-
     try {
-      // Si la alerta es un mock, el backend va a tirar 404/500, lo atajamos acá para que actualice igual visualmente.
-      await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride).catch(err => {
-        console.warn('Backend falló (probablemente es un mock alert), forzando update frontend:', err);
-      });
+      await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride);
 
       onActionComplete(alerta.id, nuevoEstado);
+      // Confirmar una alerta sanitaria deja el sidebar abierto para cargar el diagnóstico.
+      if (isSanitaria && nuevoEstado === 'CONFIRMADA') {
+        setDetalle(d => d && { ...d, estadoActual: nuevoEstado });
+        setActionLoading(false);
+        return;
+      }
       if (nuevoEstado === 'CONFIRMADA' && triggerIntervencion) {
         onOpenIntervencion?.();
       }
       handleClose();
-    } catch (error) {
-      console.error('Error actualizando alerta:', error);
+    } catch (err) {
+      console.error('Error actualizando alerta:', err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+
+      if (status === 409) {
+        setActionError({ mensaje: mensajeError(err, 'Esta alerta ya fue procesada por otro usuario.'), conflicto: true });
+        // Refrescamos el detalle para mostrar el estado real y ocultar los botones
+        if (selectedId) {
+          try {
+            const actualizado = await getAlertaDetalle(alerta.id, selectedId);
+            setDetalle(actualizado);
+            if (actualizado.estadoActual === 'CONFIRMADA' || actualizado.estadoActual === 'DESCARTADA') {
+              estadoPorSincronizar.current = actualizado.estadoActual;
+            }
+          } catch (refreshErr) {
+            console.error('Error refrescando alerta:', refreshErr);
+          }
+        }
+      } else {
+        setActionError({ mensaje: mensajeError(err, 'No se pudo actualizar la alerta. Intentá de nuevo.'), conflicto: false });
+      }
       setActionLoading(false);
     }
   };
@@ -156,6 +169,8 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
   const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
   const isSanitaria = disparador.includes('SALUD') || disparador.includes('SANITARI');
+  // El campero actúa sobre alertas de celo y geoespaciales, pero no sobre las sanitarias.
+  const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR' || (rol === 'CAMPERO' && !isSanitaria);
   const detSan = detalle?.detalleSanitario ?? null;
   const sevHeader: SeveridadNivel | null =
     (isSanitaria ? detSan?.severidad : (alerta.severidad as SeveridadNivel | undefined)) ?? null;
@@ -294,6 +309,24 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           </div>
         ) : (
           <>
+            {/* H0008: el backend lo marca solo en alertas de celo pendientes con la caravana sin transmitir */}
+            {detalle?.datoPosiblementeDesactualizado && (
+              <div
+                className="d-flex align-items-start gap-2 rounded-4 px-3 py-2"
+                role="alert"
+                style={{ backgroundColor: '#FFF8E1', border: '1px solid #F2C94C', color: '#7A5A00', fontSize: '0.9rem' }}
+              >
+                <i className="bi bi-wifi-off fs-5" style={{ lineHeight: 1.2 }}></i>
+                <div>
+                  <div className="fw-bold">Dato posiblemente desactualizado</div>
+                  {detalle.caravanaUltimaSenial
+                    ? <>La caravana no transmite desde hace más de {detalle.horasUmbralDatoDesactualizado ?? 2} h (última señal {formatUltimaSenial(detalle.caravanaUltimaSenial).text}).</>
+                    : <>No hay transmisiones registradas de la caravana de este animal.</>}
+                  {' '}Verificá el estado del animal en campo antes de inseminar.
+                </div>
+              </div>
+            )}
+
             {/* Dato de origen — misma seccion para cualquier tipo de alerta */}
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
@@ -656,7 +689,24 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
         )}
       </div>
 
-      {/* Acciones — solo visibles para Productor y Veterinario */}
+      {/* H0010: aviso de error al confirmar/descartar, fijo sobre el pie para que siempre se vea */}
+      {actionError && (
+        <div
+          className="d-flex align-items-start gap-2 px-4 py-3 border-top"
+          role="alert"
+          style={actionError.conflicto
+            ? { backgroundColor: '#E3F2FD', color: '#0D47A1', fontSize: '0.9rem' }
+            : { backgroundColor: '#FDECEA', color: '#B71C1C', fontSize: '0.9rem' }}
+        >
+          <i className={`bi ${actionError.conflicto ? 'bi-person-check' : 'bi-exclamation-triangle'} fs-5`} style={{ lineHeight: 1.2 }}></i>
+          <div>
+            {actionError.conflicto && <div className="fw-bold">Alerta ya procesada</div>}
+            {actionError.mensaje}
+          </div>
+        </div>
+      )}
+
+      {/* Acciones — Productor y Veterinario siempre; Campero salvo en alertas sanitarias */}
       {canActOnAlerts && !loadingDetail && !errorDetail && estadoVisual === 'PENDIENTE' && (
         <div className="p-4 bg-white border-top d-flex flex-column gap-2" style={{ zIndex: 10, borderRadius: '0 0 0 12px' }}>
           <div className="d-flex gap-3 justify-content-between">
@@ -687,7 +737,6 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               <i className="bi bi-clipboard-plus"></i> {actionLoading ? '...' : 'Confirmar celo e inseminación'}
             </button>
           )}
-          {actionError && <span role="alert" style={{ color: '#D50000', fontSize: '0.85rem' }}>{actionError}</span>}
         </div>
       )}
 

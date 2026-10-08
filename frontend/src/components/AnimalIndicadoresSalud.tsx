@@ -48,7 +48,7 @@ interface Props {
 /**
  * Sección "Indicadores de salud" de la ficha del animal: consume
  * GET /animales/{id}/indicadores-salud y hace polling para reflejar
- * nuevos datos de collar sin recargar la página.
+ * nuevos datos de caravana sin recargar la página.
  */
 export default function AnimalIndicadoresSalud({ animalId }: Props) {
   const [indicadores, setIndicadores] = useState<IndicadorSaludResponse[]>([]);

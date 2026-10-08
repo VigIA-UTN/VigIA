@@ -1,5 +1,6 @@
-import { esAnestro, type AlertaResponse } from '../api/alertaApi';
+import { esAnestro, textoAccionRecomendada, type AlertaResponse } from '../api/alertaApi';
 import SidebarCard, { type Categoria, type Severidad } from './SidebarCard';
+import DatoDesactualizadoBadge from './DatoDesactualizadoBadge';
 
 interface AlertNotificationCardProps {
   alerta: AlertaResponse;
@@ -43,20 +44,6 @@ function tiempoFueraBadge(ts: string) {
   return `Fuera hace ${h}h ${m}m`;
 }
 
-const textoAccionRecomendada = (alerta: AlertaResponse | null) => {
-  if (alerta?.accionRecomendada) {
-    return alerta.accionRecomendada;
-  } else if (alerta && esAnestro(alerta)) {
-    return 'Revisión veterinaria: el animal no registra celo en el período configurado.';
-  } else if (alerta && alerta.tipo === 'SALUD') {
-    return 'Revisar al animal y realizar seguimiento clínico.';
-  } else if (alerta && alerta.tipo === 'CELO') {
-    return 'Realizar inseminación artificial dentro de la ventana óptima.';
-  } else {
-    return 'Revisar al animal y realizar seguimiento.';
-  }
-}
-
 export default function AlertNotificationCard({
   alerta,
   onClick,
@@ -83,12 +70,15 @@ export default function AlertNotificationCard({
       </span>
     </div>
   ) : (
-    <div
-      title={textoAccionRecomendada(alerta)}
-      style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-    >
-      {textoAccionRecomendada(alerta)}
-    </div>
+    <>
+      <DatoDesactualizadoBadge alerta={alerta} />
+      <div
+        title={textoAccionRecomendada(alerta)}
+        style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+      >
+        {textoAccionRecomendada(alerta)}
+      </div>
+    </>
   );
 
   return (

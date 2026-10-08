@@ -265,13 +265,14 @@
     text-overflow: ellipsis;
 }
 
-/* Línea de recomendación gris como en la foto */
-.dash-cola-rec-bar {
-    height: 6px;
-    background: #E2E8F0;
-    border-radius: 999px;
-    width: 100%;
-    max-width: 110px;
+/* Acción recomendada (texto completo en el tooltip) */
+.dash-cola-rec {
+    font-size: 0.85rem;
+    color: #64748B;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Tipo chip */
@@ -386,7 +387,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   IDEA 4 — COBERTURA DE COLLARES
+   IDEA 4 — COBERTURA DE CARAVANAS
    ══════════════════════════════════════════════════════════════ */
 .dash-coverage-pct {
     font-size: 3.2rem;
@@ -421,7 +422,7 @@
 .dash-coverage-calibrando { background: #13D4FB; }
 .dash-coverage-silencio  { background: #D69E2E; }
 .dash-coverage-bateria   { background: #E53E3E; }
-.dash-coverage-sincollar { background: rgba(255,255,255,0.3); }
+.dash-coverage-sincaravana { background: rgba(255,255,255,0.3); }
 
 .dash-coverage-legend {
     display: flex;
@@ -1340,11 +1341,6 @@
 }
 
 /* ── Sparkline mini ────────────────────────────────────────────── */
-.dash-salud-sparkline {
-    opacity: 0.7;
-    flex-shrink: 0;
-}
-
 /* ── Partos esperados — bar chart ──────────────────────────────── */
 .dash-partos-chart {
     display: flex;

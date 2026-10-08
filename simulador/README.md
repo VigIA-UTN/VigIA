@@ -1,6 +1,6 @@
 # VigIA - Simulador de IoT Ganadero
 
-Script en Python que emula el comportamiento de cientos de collares IoT transmitiendo datos de telemetría en tiempo real hacia el backend. 
+Script en Python que emula el comportamiento de cientos de caravanas IoT transmitiendo datos de telemetría en tiempo real hacia el backend. 
 
 ## Funcionalidades
 - **Random Walk:** Simula el pastoreo normal de los animales en el campo.
@@ -8,14 +8,14 @@ Script en Python que emula el comportamiento de cientos de collares IoT transmit
 - **Anomalías forzadas**, para poder demostrar de punta a punta cada tipo de alerta sin depender del azar:
   - **Celo** (`VIGIA-ARG-001` por defecto): el historial de 24hs con patrón de alta actividad sostenida y errática ya lo persiste el backend al arrancar (`DataInitializer.java`, método `sembrarHistorialCelo`) — ningún script lo inyecta. Cada script que simula esta vaca solo manda, en su loop en vivo, los puntos nuevos con ese mismo patrón; basta que lleguen unos pocos para que el próximo ciclo del job de celo (cada 60s) evalúe la ventana completa y dispare la alerta.
   - **Salud** (`VIGIA-ARG-002` por defecto): `simulador.py` sigue inyectando 8 días de historial (7+ de calibración "sana" + 1 día de cuadro de enfermedad con inmovilidad) al arrancar, y sigue mandando ese patrón de inmovilidad en el loop en vivo — esto todavía no se movió al backend. Ver el comentario grande en `simulador.py` sobre por qué esto **requiere** que `fecha_alta` del animal ya tenga >= `vigia.salud.calibracion-dias` (7 por defecto) de antigüedad real — si no, el backend bloquea toda predicción de salud por RF03 sin importar la telemetría enviada. `VIGIA-ARG-002` viene backdateada en `DataInitializer.java` justamente para poder demostrar esto el mismo día. Todavía no hay un `simulador_salud.py` separado (queda pendiente para cuando se muestre ese flujo).
-- **Consumo de Batería:** Emula el desgaste progresivo de la batería de los collares.
+- **Consumo de Batería:** Emula el desgaste progresivo de la batería de las caravanas.
 
 ## Configuración
 
 Las variables de entorno principales son:
 - `API_URL`: URL del webhook del backend (por defecto apunta al contenedor del `backend-worker`).
-- `NUM_ANIMALES`: Cantidad de collares a simular (default 200).
-- `INTERVALO_SEGUNDOS`: Frecuencia de envío de datos. Por defecto **300 segundos** (5 min, igual que el collar real / dataset de entrenamiento) en `simulador.py` y en `simulador_normal.py` — no bajarlo ahí sin necesidad, aunque en estos dos scripts la distancia por paquete queda fija a esa escala así que bajarlo no rompe la calibración del modelo, solo acelera el ritmo. En `simulador_celo.py` el default es **5 segundos**, pensado para activarse puntualmente en una demo.
+- `NUM_ANIMALES`: Cantidad de caravanas a simular (default 200).
+- `INTERVALO_SEGUNDOS`: Frecuencia de envío de datos. Por defecto **300 segundos** (5 min, igual que la caravana real / dataset de entrenamiento) en `simulador.py` y en `simulador_normal.py` — no bajarlo ahí sin necesidad, aunque en estos dos scripts la distancia por paquete queda fija a esa escala así que bajarlo no rompe la calibración del modelo, solo acelera el ritmo. En `simulador_celo.py` el default es **5 segundos**, pensado para activarse puntualmente en una demo.
 - `FORZAR_CELO_DEVICE_ID`: device_id que siempre se simula en celo (default `VIGIA-ARG-001`).
 - `FORZAR_SALUD_DEVICE_ID`: device_id que siempre se simula con un desvío sanitario (default `VIGIA-ARG-002`, solo usado por `simulador.py`).
 

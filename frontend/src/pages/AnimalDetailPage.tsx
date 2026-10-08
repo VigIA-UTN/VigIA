@@ -20,7 +20,7 @@ import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
 import AnimalIndicadoresSalud from '../components/AnimalIndicadoresSalud';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import type { AlertaResponse } from '../api/alertaApi';
-import { formatFechaLocal } from '../utils/fechas';
+import { formatFechaLocal, hoyIso } from '../utils/fechas';
 
 function estadoSaludBadge(estado: string | null | undefined) {
     if (!estado) return <span className="badge bg-secondary">—</span>;
@@ -125,7 +125,8 @@ export default function AnimalDetailPage() {
 
                 if (rol === 'PRODUCTOR') {
                     const lotes = await getRodeoLotes(data.establecimientoId);
-                    setRodeoLotes(lotes.filter(l => l.activo));
+                    // El lote actual se mantiene seleccionable aunque esté inactivo
+                    setRodeoLotes(lotes.filter(l => l.activo || l.id === data.rodeoLoteId));
                 }
 
             } catch (err) {
@@ -143,7 +144,23 @@ export default function AnimalDetailPage() {
     };
 
     const handleSave = async () => {
-        if (!id || !form.establecimientoId || !form.fechaNacimiento || !form.estadoActual) return;
+        if (!id || !form.establecimientoId || !form.estadoActual) return;
+        if (!form.idCaravanaOficial?.trim()) {
+            setFormError('Ingresá el identificador del animal.');
+            return;
+        }
+        if (!form.fechaNacimiento) {
+            setFormError('Ingresá la fecha de nacimiento.');
+            return;
+        }
+        if (form.fechaNacimiento > hoyIso()) {
+            setFormError('La fecha de nacimiento no puede ser futura.');
+            return;
+        }
+        if (!form.rodeoLoteId) {
+            setFormError('Seleccioná un lote.');
+            return;
+        }
         setSubmitting(true);
         setFormError(null);
         try {
@@ -318,16 +335,16 @@ export default function AnimalDetailPage() {
                                     <Row className="g-4">
                                         <Col md={6}>
                                             <Form.Group className="mb-3">
-                                                <Form.Label className="fw-bold">Identificador Oficial</Form.Label>
-                                                <Form.Control name="idCaravanaOficial" value={form.idCaravanaOficial ?? ''} onChange={handleChange} />
+                                                <Form.Label className="fw-bold">Identificador Oficial*</Form.Label>
+                                                <Form.Control name="idCaravanaOficial" value={form.idCaravanaOficial ?? ''} onChange={handleChange} required />
                                             </Form.Group>
                                             <Form.Group className="mb-3">
                                                 <Form.Label className="fw-bold">Nombre/Alias</Form.Label>
                                                 <Form.Control name="alias" value={form.alias ?? ''} onChange={handleChange} />
                                             </Form.Group>
                                             <Form.Group className="mb-3">
-                                                <Form.Label className="fw-bold">Fecha de Nacimiento</Form.Label>
-                                                <Form.Control type="date" name="fechaNacimiento" value={form.fechaNacimiento ?? ''} onChange={handleChange} />
+                                                <Form.Label className="fw-bold">Fecha de Nacimiento*</Form.Label>
+                                                <Form.Control type="date" name="fechaNacimiento" max={hoyIso()} value={form.fechaNacimiento ?? ''} onChange={handleChange} required />
                                             </Form.Group>
                                             <Form.Group className="mb-3">
                                                 <Form.Label className="fw-bold">Raza</Form.Label>
@@ -340,9 +357,9 @@ export default function AnimalDetailPage() {
                                                 <Form.Control plaintext readOnly value={`#${animal.establecimientoId}`} />
                                             </Form.Group>
                                             <Form.Group className="mb-3">
-                                                <Form.Label className="fw-bold">Rodeo/Lote</Form.Label>
-                                                <Form.Select name="rodeoLoteId" value={form.rodeoLoteId ?? ''} onChange={handleChange}>
-                                                    <option value="">Sin rodeo</option>
+                                                <Form.Label className="fw-bold">Rodeo/Lote*</Form.Label>
+                                                <Form.Select name="rodeoLoteId" value={form.rodeoLoteId ?? ''} onChange={handleChange} required>
+                                                    <option value="">Seleccioná una opción</option>
                                                     {rodeoLotes.filter(l => l.establecimientoId === animal.establecimientoId).map(l => (
                                                         <option key={l.id} value={l.id}>{l.nombre}</option>
                                                     ))}

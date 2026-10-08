@@ -27,6 +27,7 @@ import dev.vigia.backend.dto.BloqueComparativoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
+import dev.vigia.backend.exception.AlertaYaProcesadaException;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -80,6 +81,9 @@ public class AlertaServiceImplTest {
 
         @Spy
         private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+
+        @org.mockito.Spy
+        private CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator = new CeloDatoDesactualizadoEvaluator();
 
         @InjectMocks
         private AlertaServiceImpl alertaService;
@@ -654,6 +658,109 @@ public class AlertaServiceImplTest {
                 assertNull(result.getDetalleSanitario());
         }
 
+
+        private AlertaDetalleResponse detalleConUltimaSenial(LocalDateTime ultimaSenial) {
+                dev.vigia.backend.model.Caravana caravana = new dev.vigia.backend.model.Caravana();
+                caravana.setUltimaSenial(ultimaSenial);
+                mockAnimal.setCaravana(caravana);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                return alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+        }
+
+        @Test
+        void obtenerDetalleAlerta_CELO_caravanaSinTransmitirMasDe2h_marcaDesactualizado() {
+                LocalDateTime hace3h = LocalDateTime.now().minusHours(3);
+
+                AlertaDetalleResponse result = detalleConUltimaSenial(hace3h);
+
+                assertTrue(result.isDatoPosiblementeDesactualizado());
+                assertEquals(hace3h, result.getCaravanaUltimaSenial());
+                assertEquals(2, result.getHorasUmbralDatoDesactualizado());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_CELO_caravanaTransmitiendo_noMarcaDesactualizado() {
+                AlertaDetalleResponse result = detalleConUltimaSenial(LocalDateTime.now().minusMinutes(30));
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_CELO_sinTransmisiones_marcaDesactualizado() {
+                AlertaDetalleResponse result = detalleConUltimaSenial(null);
+
+                assertTrue(result.isDatoPosiblementeDesactualizado());
+                assertNull(result.getCaravanaUltimaSenial());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_CELO_yaResuelta_noMarcaDesactualizado() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+
+                AlertaDetalleResponse result = detalleConUltimaSenial(LocalDateTime.now().minusHours(5));
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_Anestro_noMarcaDesactualizado() {
+                mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
+                mockAlerta.setValorDetectado(60.0);
+                mockAlerta.setValorUmbral(45.0);
+
+                AlertaDetalleResponse result = detalleConUltimaSenial(LocalDateTime.now().minusHours(5));
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
+        }
+
+        @Test
+        void listarAlertasCelo_caravanaSinTransmitir_marcaDesactualizadoEnListado() {
+                dev.vigia.backend.model.Caravana caravana = new dev.vigia.backend.model.Caravana();
+                caravana.setUltimaSenial(LocalDateTime.now().minusHours(4));
+                mockAnimal.setCaravana(caravana);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findCeloByEstablecimiento(ESTABLECIMIENTO_ID))
+                                .thenReturn(List.of(mockAlerta));
+
+                AlertaResponse result = alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null).get(0);
+
+                assertTrue(result.isDatoPosiblementeDesactualizado());
+                assertEquals(caravana.getUltimaSenial(), result.getCaravanaUltimaSenial());
+                assertEquals(2, result.getHorasUmbralDatoDesactualizado());
+        }
+
+        @Test
+        void listarAlertasCelo_resuelta_noCargaCaravanaNiMarca() {
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                dev.vigia.backend.model.Caravana caravana = new dev.vigia.backend.model.Caravana();
+                caravana.setUltimaSenial(LocalDateTime.now().minusHours(4));
+                mockAnimal.setCaravana(caravana);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findCeloByEstablecimiento(ESTABLECIMIENTO_ID))
+                                .thenReturn(List.of(mockAlerta));
+
+                AlertaResponse result = alertaService.listarAlertasCelo(EMAIL, ESTABLECIMIENTO_ID, null).get(0);
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
+                assertNull(result.getCaravanaUltimaSenial());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_SALUD_noMarcaDesactualizado() {
+                mockAlerta.setDisparador(DisparadorAlerta.SALUD);
+
+                AlertaDetalleResponse result = detalleConUltimaSenial(LocalDateTime.now().minusHours(5));
+
+                assertFalse(result.isDatoPosiblementeDesactualizado());
+        }
+
         // --- Tests para actualizarEstadoAlerta ---
 
         @Test
@@ -661,7 +768,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_Success_Confirmada() {
                 // Arrange
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
@@ -683,7 +790,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_ConfirmarAnestro_RegistraEstadoAnestro() {
                 mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
@@ -705,7 +812,7 @@ public class AlertaServiceImplTest {
         @Test
         void actualizarEstadoAlerta_ConfirmarCelo_RegistraEstadoCelo() {
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
@@ -722,7 +829,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_Success_Descartada() {
                 // Arrange
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
@@ -759,7 +866,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaNotFound() {
                 // Arrange
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.empty());
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.empty());
 
                 // Act & Assert
                 IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -774,7 +881,7 @@ public class AlertaServiceImplTest {
         void actualizarEstadoAlerta_ThrowsAccessDeniedException_WhenUserNotBelongsToEstablecimiento() {
                 // Arrange
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(Collections.emptyList()); // sin pertenencia
 
@@ -787,39 +894,65 @@ public class AlertaServiceImplTest {
 
         @Test
         @SuppressWarnings("null")
-        void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaYaConfirmada() {
+        void actualizarEstadoAlerta_ThrowsAlertaYaProcesada_WhenAlertaYaConfirmada() {
                 // Arrange: la alerta ya está CONFIRMADA, se intenta confirmar de nuevo
                 mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                Usuario otro = new Usuario();
+                otro.setNombre("Juan");
+                otro.setApellido("Pérez");
+                mockAlerta.setUsuarioConfirmacion(otro);
+                mockAlerta.setTsConfirmacion(LocalDateTime.of(2026, 10, 5, 14, 32));
 
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
 
                 // Act & Assert
-                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                AlertaYaProcesadaException exception = assertThrows(AlertaYaProcesadaException.class,
                                 () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
                                                 "Notas"));
-                assertEquals("Estado inválido para la actualización.", exception.getMessage());
+                assertEquals("Esta alerta ya fue confirmada por Juan Pérez el 05/10/2026 a las 14:32.", exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
 
         @Test
         @SuppressWarnings("null")
-        void actualizarEstadoAlerta_ThrowsIllegalArgumentException_WhenAlertaYaDescartada() {
+        void actualizarEstadoAlerta_ThrowsAlertaYaProcesada_WhenAlertaYaDescartada() {
                 // Arrange: alerta ya DESCARTADA, se intenta confirmar
                 mockAlerta.setEstado(EstadoAlerta.DESCARTADA);
+                Usuario otro = new Usuario();
+                otro.setNombre("Juan");
+                otro.setApellido("Pérez");
+                mockAlerta.setUsuarioConfirmacion(otro);
+                mockAlerta.setTsConfirmacion(LocalDateTime.of(2026, 10, 5, 14, 32));
 
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
 
                 // Act & Assert
-                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                AlertaYaProcesadaException exception = assertThrows(AlertaYaProcesadaException.class,
                                 () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.CONFIRMADA,
                                                 "Notas"));
-                assertEquals("Estado inválido para la actualización.", exception.getMessage());
+                assertEquals("Esta alerta ya fue descartada por Juan Pérez el 05/10/2026 a las 14:32.", exception.getMessage());
+                verify(alertaRepository, never()).save(any());
+        }
+
+        @Test
+        void actualizarEstadoAlerta_ThrowsAlertaYaProcesada_WhenAlertaArchivada() {
+                mockAlerta.setEstado(EstadoAlerta.ARCHIVADA);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+
+                AlertaYaProcesadaException exception = assertThrows(AlertaYaProcesadaException.class,
+                                () -> alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.DESCARTADA,
+                                                null));
+                assertEquals("Esta alerta ya fue archivada porque venció la ventana de inseminación.",
+                                exception.getMessage());
                 verify(alertaRepository, never()).save(any());
         }
 
