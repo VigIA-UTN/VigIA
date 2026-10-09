@@ -45,6 +45,7 @@ vigia:
     geo-url: ${ML_GEO_URL}
   batch:
     salud-rate: ${VIGIA_BATCH_SALUD_RATE:60000}
+    geo-rate: ${VIGIA_BATCH_GEO_RATE:60000}
   salud:
     calibracion-dias: ${VIGIA_SALUD_CALIBRACION_DIAS:7}
     recalibracion-dias: ${VIGIA_SALUD_RECALIBRACION_DIAS:30}
@@ -68,12 +69,20 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+      geoML:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
   retry:
     instances:
       celoML:
         maxAttempts: 2
         waitDuration: 500ms
       saludML:
+        maxAttempts: 2
+        waitDuration: 500ms
+      geoML:
         maxAttempts: 2
         waitDuration: 500ms
   timelimiter:
@@ -85,4 +94,7 @@ resilience4j:
       # le da más margen que a celoML (que siempre hace una sola).
       saludML:
         timeoutDuration: 4000ms
+      geoML:
+        timeoutDuration: 4000ms
+
 
