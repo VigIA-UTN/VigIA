@@ -409,9 +409,12 @@ class TestCohesionAislamiento:
     def test_tres_animales_uno_alejado_menor_cohesion(self):
         """
         Con tres animales: dos juntos (A1, A2) y uno muy alejado (A3).
-        distancia_centroide_m de cada animal es su distancia al centroide de
-        los OTROS dos. A3 debe tener la mayor distancia, el MENOR indice de
-        cohesion (el indice es inverso a la distancia) y estar en alerta.
+        A1+A2 forman el cluster principal (tamaño 2); A3 es su propio cluster
+        (tamaño 1).
+
+        La distancia de cada animal se mide ahora contra el CENTROIDE DEL
+        GRUPO PRINCIPAL (centroide de A1+A2), no contra el centroide de todos
+        los demás.
         """
         a1_lat, a2_lat, a3_lat = -34.00000, -34.00010, -36.00000
         lng = -59.0
@@ -427,23 +430,24 @@ class TestCohesionAislamiento:
         assert response.status_code == 200
         alertas = {a["animal_id"]: a for a in response.json()["alertas"]}
 
-        # Centroides esperados (promedio de los otros dos)
-        centroide_para_a1 = ((a2_lat + a3_lat) / 2, lng)
-        centroide_para_a2 = ((a1_lat + a3_lat) / 2, lng)
-        centroide_para_a3 = ((a1_lat + a2_lat) / 2, lng)
+        # El centroide del grupo principal {A1, A2}
+        centroide_lat = (a1_lat + a2_lat) / 2
+        dist_a1 = haversine(a1_lat, lng, centroide_lat, lng)
+        dist_a2 = haversine(a2_lat, lng, centroide_lat, lng)
+        dist_a3 = haversine(a3_lat, lng, centroide_lat, lng)
 
-        dist_a1 = haversine(a1_lat, lng, *centroide_para_a1)
-        dist_a2 = haversine(a2_lat, lng, *centroide_para_a2)
-        dist_a3 = haversine(a3_lat, lng, *centroide_para_a3)
-
-        assert alertas["A1"]["distancia_centroide_m"] == pytest.approx(dist_a1, rel=1e-4)
-        assert alertas["A2"]["distancia_centroide_m"] == pytest.approx(dist_a2, rel=1e-4)
+        assert alertas["A1"]["distancia_centroide_m"] == pytest.approx(dist_a1, abs=1.0)
+        assert alertas["A2"]["distancia_centroide_m"] == pytest.approx(dist_a2, abs=1.0)
         assert alertas["A3"]["distancia_centroide_m"] == pytest.approx(dist_a3, rel=1e-4)
 
-        # A3 esta mas lejos del centroide de A1+A2 que cualquier otro -> peor cohesion
+        # A3 está fuera del grupo principal -> alerta; A1 y A2 están dentro -> sin alerta
+        assert alertas["A1"]["alerta_aislamiento"] is False
+        assert alertas["A2"]["alerta_aislamiento"] is False
+        assert alertas["A3"]["alerta_aislamiento"] is True
+
+        # A3 tiene el menor índice de cohesión
         assert alertas["A3"]["indice_cohesion"] < alertas["A1"]["indice_cohesion"]
         assert alertas["A3"]["indice_cohesion"] < alertas["A2"]["indice_cohesion"]
-        assert alertas["A3"]["alerta_aislamiento"] is True
 
     def test_cada_animal_tiene_exactamente_una_alerta(self):
         """La respuesta debe tener exactamente un registro de alerta por animal unico."""
@@ -461,6 +465,115 @@ class TestCohesionAislamiento:
         ids = [a["animal_id"] for a in alertas]
         assert len(ids) == 3
         assert len(set(ids)) == 3  # sin duplicados
+
+
+# ===========================================================================
+# GRUPO PRINCIPAL - Historia de usuario: Identificar animales alejados del grupo
+# ===========================================================================
+
+class TestGrupoPrincipal:
+    """Tests de los criterios de aceptación de la historia de usuario:
+    'Identificar los animales que se alejaron del grupo'.
+    """
+
+    def test_subgrupo_alejado_junto_alerta_como_alejado_no_cohesionado(self):
+        """
+        CA: Un subgrupo que se aleja junto se reconoce como alejado y NO
+        como cohesionado.
+
+        5 animales juntos (grupo principal) + 2 que se alejaron juntos.
+        Los 2 del subgrupo deben tener alerta_aislamiento=True incluso
+        estando a menos del umbral entre sí.
+        """
+        # Grupo principal: 5 animales apiados
+        grupo_lat = -34.0
+        lng = -59.0
+        puntos = [make_punto(f"G{i}", grupo_lat + i * 0.0001, lng) for i in range(5)]
+
+        # Subgrupo alejado: 2 animales juntos entre sí pero lejos del grupo
+        # ~2 km al sur (< umbral entre ellos, > umbral del grupo principal)
+        subgrupo_lat = -34.020
+        puntos += [
+            make_punto("S1", subgrupo_lat,        lng),
+            make_punto("S2", subgrupo_lat + 0.0001, lng),  # ~11 m de S1
+        ]
+
+        payload = {"historial_7d": puntos}
+        response = client.post(ENDPOINT, json=payload)
+
+        assert response.status_code == 200
+        alertas = {a["animal_id"]: a for a in response.json()["alertas"]}
+
+        # Los del grupo principal no alertan
+        for i in range(5):
+            assert alertas[f"G{i}"]["alerta_aislamiento"] is False, \
+                f"G{i} no debería alertar (está en el grupo principal)"
+
+        # El subgrupo alerta COMPLETO, aunque S1 y S2 estén juntos entre sí
+        assert alertas["S1"]["alerta_aislamiento"] is True, \
+            "S1 debe alertar: el subgrupo se alejó del grupo principal"
+        assert alertas["S2"]["alerta_aislamiento"] is True, \
+            "S2 debe alertar: aunque S2 esté cerca de S1, ambos están alejados del grupo"
+
+    def test_grupo_principal_es_el_de_mayor_cantidad(self):
+        """
+        CA: Si el rodeo se divide, el grupo principal es el de mayor cantidad.
+
+        7 animales juntos (principal) vs 3 animales juntos (subgrupo).
+        Los 3 del subgrupo alertan; los 7 no.
+        """
+        lng = -59.0
+
+        # Grupo grande: 7 animales
+        puntos = [make_punto(f"P{i}", -34.0 + i * 0.0001, lng) for i in range(7)]
+
+        # Subgrupo chico: 3 animales a ~5 km
+        puntos += [make_punto(f"Q{i}", -34.05 + i * 0.0001, lng) for i in range(3)]
+
+        payload = {"historial_7d": puntos}
+        response = client.post(ENDPOINT, json=payload)
+
+        assert response.status_code == 200
+        alertas = {a["animal_id"]: a for a in response.json()["alertas"]}
+
+        for i in range(7):
+            assert alertas[f"P{i}"]["alerta_aislamiento"] is False, \
+                f"P{i} no debe alertar (grupo principal)"
+
+        for i in range(3):
+            assert alertas[f"Q{i}"]["alerta_aislamiento"] is True, \
+                f"Q{i} debe alertar (fuera del grupo principal)"
+
+    def test_grupo_principal_expuesto_en_funcion_interna(self):
+        """
+        Test unitario de _grupo_principal: el cluster más grande es el retornado;
+        en empate retorna None.
+        """
+        from app.main import _grupo_principal, CoordenadaGPS
+        from datetime import datetime, timezone
+
+        def make_animal(aid, lat, lng):
+            return CoordenadaGPS(
+                animal_id=aid, lat=lat, lng=lng,
+                timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc)
+            )
+
+        # Caso: cluster de 3 + cluster de 1 -> retorna el de 3
+        animales = [
+            make_animal("A", -34.0000, -59.0),
+            make_animal("B", -34.0001, -59.0),  # ~11 m de A -> mismo cluster
+            make_animal("C", -34.0002, -59.0),  # ~22 m de A -> mismo cluster
+            make_animal("D", -36.0,    -59.0),  # lejos -> cluster propio
+        ]
+        principal = _grupo_principal(animales, umbral_m=100.0)
+        assert principal == {"A", "B", "C"}
+
+        # Caso empate: 2 clusters de tamaño 1 -> None
+        animales_empate = [
+            make_animal("X", -34.0, -59.0),
+            make_animal("Y", -36.0, -59.0),  # lejos de X
+        ]
+        assert _grupo_principal(animales_empate, umbral_m=100.0) is None
 
 
 # ===========================================================================

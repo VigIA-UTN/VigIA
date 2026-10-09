@@ -115,7 +115,7 @@ class MapaCalorControllerTest {
     }
 
     @Test
-    @DisplayName("200: devuelve el análisis de ml-geo tal como llega")
+    @DisplayName("200: devuelve el análisis de ml-geo tal como llega, con animales_alejados enriquecidos")
     void devuelveElAnalisis() throws Exception {
         when(mlGeoClient.analyze(any())).thenReturn(respuestaDeMlGeo());
 
@@ -126,7 +126,8 @@ class MapaCalorControllerTest {
                 .andExpect(jsonPath("$.mapa_calor[0].intensidad").value(0.75))
                 .andExpect(jsonPath("$.alertas[0].indice_cohesion").value(0.25))
                 .andExpect(jsonPath("$.alertas[0].distancia_centroide_m").value(300.0))
-                .andExpect(jsonPath("$.alertas[0].alerta_aislamiento").value(true));
+                .andExpect(jsonPath("$.alertas[0].alerta_aislamiento").value(true))
+                .andExpect(jsonPath("$.animales_alejados").isArray());
     }
 
     @Test
@@ -139,7 +140,8 @@ class MapaCalorControllerTest {
                 .header("Authorization", "Bearer " + productorToken))
                 .andExpect(status().isPartialContent())
                 .andExpect(jsonPath("$.mapa_calor").isEmpty())
-                .andExpect(jsonPath("$.alertas").isEmpty());
+                .andExpect(jsonPath("$.alertas").isEmpty())
+                .andExpect(jsonPath("$.animales_alejados").isEmpty());
     }
 
     @Test
@@ -267,6 +269,52 @@ class MapaCalorControllerTest {
         ArgumentCaptor<GeoAnalyzeRequestDTO> captor = ArgumentCaptor.forClass(GeoAnalyzeRequestDTO.class);
         verify(mlGeoClient).analyze(captor.capture());
         return captor.getValue().getHistorial7d();
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    @DisplayName("animales_alejados: el backend resuelve IDs a caravana y alias")
+    void animalesAlejadosEnriquecidos() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+
+        // Animal con caravana oficial y alias
+        Animal conDatos = crearAnimalConTelemetria(est, null, "DEV-CON");
+        conDatos.setIdCaravanaOficial("AR-001");
+        conDatos.setAlias("Manchita");
+        conDatos = animalRepository.save(conDatos);
+
+        // Animal sin caravana oficial ni alias
+        Animal sinDatos = crearAnimalConTelemetria(est, null, "DEV-SIN");
+
+        // ml-geo marca a ambos como alejados
+        GeoAnalyzeResponseDTO mlGeoResp = GeoAnalyzeResponseDTO.builder()
+                .mapaCalor(new ArrayList<>())
+                .alertas(List.of(
+                        AlertaAnimalDTO.builder().animalId(conDatos.getId().toString())
+                                .alertaAislamiento(true).indiceCohesion(0.05).distanciaCentroideM(500.0).build(),
+                        AlertaAnimalDTO.builder().animalId(sinDatos.getId().toString())
+                                .alertaAislamiento(true).indiceCohesion(0.03).distanciaCentroideM(600.0).build()
+                ))
+                .build();
+        when(mlGeoClient.analyze(any())).thenReturn(mlGeoResp);
+
+        Long conId  = conDatos.getId();
+        Long sinId  = sinDatos.getId();
+
+        mockMvc.perform(get(ENDPOINT)
+                .param("establecimientoId", establecimientoId.toString())
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.animales_alejados").isArray())
+                .andExpect(jsonPath("$.animales_alejados.length()").value(2))
+                // animal con datos
+                .andExpect(jsonPath("$.animales_alejados[?(@.animal_id == " + conId + ")].caravana")
+                        .value("AR-001"))
+                .andExpect(jsonPath("$.animales_alejados[?(@.animal_id == " + conId + ")].alias")
+                        .value("Manchita"))
+                // animal sin datos: caravana y alias son null
+                .andExpect(jsonPath("$.animales_alejados[1].caravana").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.animales_alejados[1].alias").value(org.hamcrest.Matchers.nullValue()));
     }
 
     private GeoAnalyzeResponseDTO respuestaDeMlGeo() {

@@ -19,7 +19,8 @@ class GeoDtoJsonTest {
     void respuestaIdaYVuelta() throws Exception {
         String mlGeo = """
                 {"mapa_calor":[{"lat":-34.0,"lng":-59.0,"intensidad":0.5}],
-                 "alertas":[{"animal_id":"1","indice_cohesion":0.25,"distancia_centroide_m":300.0,"alerta_aislamiento":true}]}
+                 "alertas":[{"animal_id":"1","indice_cohesion":0.25,"distancia_centroide_m":300.0,"alerta_aislamiento":true}],
+                 "animales_alejados":[{"animal_id":1,"caravana":"AR-001","alias":"Manchita"}]}
                 """;
 
         GeoAnalyzeResponseDTO dto = mapper.readValue(mlGeo, GeoAnalyzeResponseDTO.class);
@@ -27,10 +28,13 @@ class GeoDtoJsonTest {
         assertThat(dto.getMapaCalor()).hasSize(1);
         assertThat(dto.getAlertas().get(0).getIndiceCohesion()).isEqualTo(0.25);
         assertThat(dto.getAlertas().get(0).getDistanciaCentroideM()).isEqualTo(300.0);
+        assertThat(dto.getAnimalesAlejados()).hasSize(1);
+        assertThat(dto.getAnimalesAlejados().get(0).getCaravana()).isEqualTo("AR-001");
 
         JsonNode out = mapper.readTree(mapper.writeValueAsString(dto));
         assertThat(out.at("/mapa_calor/0/intensidad").asDouble()).isEqualTo(0.5);
         assertThat(out.at("/alertas/0/distancia_centroide_m").asDouble()).isEqualTo(300.0);
+        assertThat(out.at("/animales_alejados/0/caravana").asText()).isEqualTo("AR-001");
         assertThat(out.at("/mapa_calor/0").has("subutilizada")).isFalse();
     }
 

@@ -57,6 +57,7 @@ public class MapaCalorController {
             GeoAnalyzeResponseDTO emptyResponse = GeoAnalyzeResponseDTO.builder()
                     .mapaCalor(new ArrayList<>())
                     .alertas(new ArrayList<>())
+                    .animalesAlejados(new ArrayList<>())
                     .build();
             return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT).body(emptyResponse);
         }

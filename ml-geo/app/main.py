@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 from typing import List, Optional
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 import math
 import os
@@ -157,6 +157,57 @@ def _compute_isolation_times(historial_7d: List[CoordenadaGPS], umbral_m: float,
 
     return isolation_time
 
+def _grupo_principal(animales: list, umbral_m: float):
+    """
+    Identifica el grupo principal del rodeo mediante BFS sobre el grafo de
+    proximidad: dos animales están conectados si su distancia ≤ umbral_m.
+
+    El grupo principal es el cluster más grande (mayor cantidad de animales).
+    Si hay dos o más clusters del mismo tamaño máximo (empate), retorna None
+    para indicar que no existe un grupo principal definido.
+
+    Esta lógica cubre el criterio de aceptación:
+    - Un subgrupo que se aleja junto queda FUERA del cluster principal y se
+      lista como alejado (no como cohesionado).
+    - Si el rodeo se divide, el grupo de mayor cantidad es el principal.
+    """
+    n = len(animales)
+    if n == 0:
+        return set()
+
+    visited = [False] * n
+    components = []
+
+    for start in range(n):
+        if visited[start]:
+            continue
+        component = []
+        queue = deque([start])
+        visited[start] = True
+        while queue:
+            curr = queue.popleft()
+            component.append(curr)
+            for other in range(n):
+                if not visited[other]:
+                    dist = _haversine(
+                        animales[curr].lat, animales[curr].lng,
+                        animales[other].lat, animales[other].lng,
+                    )
+                    if dist <= umbral_m:
+                        visited[other] = True
+                        queue.append(other)
+        components.append(component)
+
+    max_size = max(len(c) for c in components)
+    largest = [c for c in components if len(c) == max_size]
+
+    if len(largest) > 1:
+        # Empate: sin grupo principal definido (p. ej. dos animales aislados
+        # entre sí, o una división perfectamente pareja del rodeo).
+        return None
+
+    return {animales[i].animal_id for i in largest[0]}
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "ml-geo"}
@@ -222,20 +273,41 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
                 tiempo_fuera_grupo_s=0.0
             ))
         elif len(animales) > 1:
-            for a in animales:
-                otros = [o for o in animales if o.animal_id != a.animal_id]
-                avg_lat = sum(o.lat for o in otros) / len(otros)
-                avg_lng = sum(o.lng for o in otros) / len(otros)
+            ids_grupo_principal = _grupo_principal(animales, umbral_efectivo)
 
-                distancia_centroide = _haversine(a.lat, a.lng, avg_lat, avg_lng)
+            if ids_grupo_principal is None:
+                # Sin grupo principal definido (empate de clusters):
+                # cada animal se compara contra el centroide de los demás,
+                # preservando el comportamiento anterior en casos ambiguos.
+                for a in animales:
+                    otros = [o for o in animales if o.animal_id != a.animal_id]
+                    avg_lat = sum(o.lat for o in otros) / len(otros)
+                    avg_lng = sum(o.lng for o in otros) / len(otros)
+                    distancia_centroide = _haversine(a.lat, a.lng, avg_lat, avg_lng)
+                    alertas.append(AlertaAnimal(
+                        animal_id=a.animal_id,
+                        indice_cohesion=_indice_cohesion(distancia_centroide, umbral_efectivo),
+                        distancia_centroide_m=distancia_centroide,
+                        alerta_aislamiento=distancia_centroide > umbral_efectivo,
+                        tiempo_fuera_grupo_s=iso_times.get(a.animal_id, 0.0)
+                    ))
+            else:
+                # Hay un grupo principal claro: centroide de ese cluster.
+                # Los animales fuera de él se marcan como alejados,
+                # incluyendo subgrupos que se alejaron juntos.
+                principales = [a for a in animales if a.animal_id in ids_grupo_principal]
+                centroide_lat = sum(a.lat for a in principales) / len(principales)
+                centroide_lng = sum(a.lng for a in principales) / len(principales)
 
-                alertas.append(AlertaAnimal(
-                    animal_id=a.animal_id,
-                    indice_cohesion=_indice_cohesion(distancia_centroide, umbral_efectivo),
-                    distancia_centroide_m=distancia_centroide,
-                    alerta_aislamiento=distancia_centroide > umbral_efectivo,
-                    tiempo_fuera_grupo_s=iso_times.get(a.animal_id, 0.0)
-                ))
+                for a in animales:
+                    distancia_centroide = _haversine(a.lat, a.lng, centroide_lat, centroide_lng)
+                    alertas.append(AlertaAnimal(
+                        animal_id=a.animal_id,
+                        indice_cohesion=_indice_cohesion(distancia_centroide, umbral_efectivo),
+                        distancia_centroide_m=distancia_centroide,
+                        alerta_aislamiento=a.animal_id not in ids_grupo_principal,
+                        tiempo_fuera_grupo_s=iso_times.get(a.animal_id, 0.0)
+                    ))
 
         aisladas = sum(1 for a in alertas if a.alerta_aislamiento)
         print(f"[{correlation_id}] Análisis exitoso: {len(mapa_calor)} celdas, "
