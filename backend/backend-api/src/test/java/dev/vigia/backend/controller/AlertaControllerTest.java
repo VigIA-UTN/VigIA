@@ -908,6 +908,48 @@ class AlertaControllerTest {
     }
 
     @Test
+    @DisplayName("Modificar o borrar diagnósticos vía API (PUT/PATCH/DELETE) → 405 y el diagnóstico queda intacto")
+    @SuppressWarnings("null")
+    void modificarOBorrarDiagnostico_noExisteEnLaApi_returns405() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/alertas/{id}/diagnosticos", id)
+                .header("Authorization", "Bearer " + veterinarioToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"diagnostico\":\"Diagnóstico alterado\"}"))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/v1/alertas/{id}/diagnosticos", id)
+                .header("Authorization", "Bearer " + veterinarioToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"diagnostico\":\"Diagnóstico alterado\"}"))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/v1/alertas/{id}/diagnosticos", id)
+                .header("Authorization", "Bearer " + veterinarioToken))
+                .andExpect(status().isMethodNotAllowed());
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, diagnosticoRepository.count());
+        org.junit.jupiter.api.Assertions.assertEquals("Neumonía leve",
+                diagnosticoRepository.findAll().get(0).getDiagnostico());
+    }
+
+    @Test
+    @DisplayName("Borrar o modificar intervenciones vía API (PUT/DELETE) → 405")
+    @SuppressWarnings("null")
+    void modificarOBorrarIntervencion_noExisteEnLaApi_returns405() throws Exception {
+        Long animalId = animalPropio().getId();
+
+        mockMvc.perform(put("/api/v1/animales/{id}/intervenciones", animalId)
+                .header("Authorization", "Bearer " + veterinarioToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"descripcion\":\"alterada\"}"))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/v1/animales/{id}/intervenciones", animalId)
+                .header("Authorization", "Bearer " + veterinarioToken))
+                .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
     @DisplayName("Listar diagnósticos de un animal → más reciente primero, mismo formato que el POST")
     void listarDiagnosticos_porAnimal_masRecientePrimero() throws Exception {
         Animal animal = animalPropio();

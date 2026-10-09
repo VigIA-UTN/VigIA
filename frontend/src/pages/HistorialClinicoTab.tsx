@@ -19,7 +19,13 @@ import './AnimalDetailPage.css';
 import './AnimalesPage.css';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-const TIPOS: [HistorialTipo, string][] = [['alerta', 'Alertas'], ['diagnostico', 'Diagnósticos'], ['intervencion', 'Intervenciones']];
+const TIPOS: [HistorialTipo, string][] = [
+    ['alerta', 'Alertas'], ['diagnostico', 'Diagnósticos'], ['estado_salud', 'Estados de salud'], ['intervencion', 'Intervenciones'],
+];
+const TODOS_LOS_TIPOS: Record<HistorialTipo, boolean> = { alerta: true, diagnostico: true, estado_salud: true, intervencion: true };
+const TIPO_ICON: Record<HistorialTipo, string> = {
+    alerta: 'bi-bell-fill', diagnostico: 'bi-clipboard2-pulse-fill', estado_salud: 'bi-heart-pulse-fill', intervencion: 'bi-capsule',
+};
 const PRESETS: [string, string][] = [['30', '30 días'], ['90', '90 días'], ['365', '12 meses'], ['todo', 'Todo']];
 const ESTADO = { SANO: ['SANO', '#00BA4A'], EN_OBSERVACION: ['EN OBSERVACIÓN', '#FFC700'], ENFERMO: ['ENFERMO', '#D50000'] } as const;
 const ORIGEN = { AUTOMATICO: ['Automático', 'bi-cpu'], MANUAL: ['Manual', 'bi-person-fill'], CARGA_MASIVA: ['Carga masiva', 'bi-upload'] } as const;
@@ -29,8 +35,9 @@ const TIPOS_ESTADO_SALUD: TipoEstadoSalud[] = ['SANO', 'EN_OBSERVACION', 'ENFERM
 const TIPOS_INTERVENCION: [IntervencionManualRequest['tipo'], string][] = [
     ['TRATAMIENTO', 'Tratamiento'], ['VACUNACION', 'Vacunación'], ['REVISION_VETERINARIA', 'Revisión veterinaria'], ['OTRO', 'Otro'],
 ];
-const hoyIso = () => new Date().toISOString().split('T')[0];
+// Fecha y hora locales: toISOString() da UTC y de noche ya es el día siguiente.
 const ahoraLocal = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+const hoyIso = () => ahoraLocal().slice(0, 10);
 const errMsg = (err: unknown, fallback: string) => {
     const e = err as { response?: { data?: { message?: string } | string } };
     return typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || fallback;
@@ -42,8 +49,9 @@ const fmtFecha = (iso: string) => { const [d, t] = iso.split('T'); const [y, m, 
 
 function TipoIcon({ ev, size = 40 }: { ev: HistorialEvento; size?: number }) {
     const cls = ev.tipo === 'alerta' ? `hc-node hc-node-${ev.sev === 'ALTA' ? 'critico' : 'borde'}`
-        : ev.tipo === 'diagnostico' ? 'hc-node hc-node-diag' : 'hc-node hc-node-intv';
-    const icon = ev.tipo === 'alerta' ? 'bi-bell-fill' : ev.tipo === 'diagnostico' ? 'bi-clipboard2-pulse-fill' : (INTV_ICON[ev.sub ?? 'OTRO'] ?? INTV_ICON.OTRO);
+        : ev.tipo === 'diagnostico' ? 'hc-node hc-node-diag'
+        : ev.tipo === 'estado_salud' ? 'hc-node hc-node-salud' : 'hc-node hc-node-intv';
+    const icon = ev.tipo === 'intervencion' ? (INTV_ICON[ev.sub ?? 'OTRO'] ?? INTV_ICON.OTRO) : TIPO_ICON[ev.tipo];
     return <div className={cls} style={{ width: size, height: size }}><i className={`bi ${icon}`} /></div>;
 }
 
@@ -61,7 +69,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const [tipos, setTipos] = useState<Record<HistorialTipo, boolean>>({ alerta: true, diagnostico: true, intervencion: true });
+    const [tipos, setTipos] = useState<Record<HistorialTipo, boolean>>(TODOS_LOS_TIPOS);
     const [preset, setPreset] = useState('todo');
     const [desde, setDesde] = useState<number | null>(null); // null = sin límite inferior
     const [hasta, setHasta] = useState(hoy);
@@ -204,7 +212,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
     const allOpen = visibles.length > 0 && visibles.every(e => open[e.id]);
     const hayFiltros = !Object.values(tipos).every(Boolean) || preset !== 'todo' || hasta !== hoy;
 
-    const limpiar = () => { setTipos({ alerta: true, diagnostico: true, intervencion: true }); selectPreset('todo'); };
+    const limpiar = () => { setTipos(TODOS_LOS_TIPOS); selectPreset('todo'); };
 
     if (loading) return <div className="text-center py-5"><Spinner animation="border" style={{ color: '#1E3A5F' }} /></div>;
     if (error) return <p className="text-muted text-center py-5">No se pudo cargar el historial clínico.</p>;
@@ -226,7 +234,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
                                 <button key={k} type="button" aria-pressed={tipos[k]} className={`hc-chip${tipos[k] ? ' on' : ''}`}
                                     onClick={() => setTipos(t => ({ ...t, [k]: !t[k] }))}>
                                     <span className={`hc-chip-icon hc-chip-${k}`}>
-                                        <i className={`bi ${k === 'alerta' ? 'bi-bell-fill' : k === 'diagnostico' ? 'bi-clipboard2-pulse-fill' : 'bi-capsule'}`} />
+                                        <i className={`bi ${TIPO_ICON[k]}`} />
                                     </span>
                                     <span>{l}</span>
                                     <span className="hc-chip-count">{porFecha.filter(e => e.tipo === k).length}</span>
@@ -300,9 +308,11 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
                                                 <div className="hc-event-title">
                                                     {ev.tipo === 'alerta' && <span className={`hc-tag hc-tag-${ev.sev === 'ALTA' ? 'critico' : 'borde'}`}>ALERTA{ev.sev ? ` · ${ev.sev}` : ''}</span>}
                                                     {ev.tipo === 'diagnostico' && <span className="hc-tag hc-tag-diag">DIAGNÓSTICO</span>}
+                                                    {ev.tipo === 'estado_salud' && <span className="hc-tag hc-tag-salud">ESTADO DE SALUD</span>}
                                                     {ev.tipo === 'intervencion' && <span className="hc-tag hc-tag-intv">INTERVENCIÓN</span>}
+                                                    {/* El título ya nombra el estado: solo se agrega el punto de color. */}
+                                                    {est && <span className="hc-estado" aria-hidden="true"><span style={{ background: est[1] }} /></span>}
                                                     <span className="hc-titulo">{ev.titulo}</span>
-                                                    {est && <span className="hc-estado"><span style={{ background: est[1] }} />{est[0]}</span>}
                                                 </div>
                                                 <div className="hc-meta">
                                                     <span><i className="bi bi-clock" />{fmtFecha(ev.fecha)}</span>

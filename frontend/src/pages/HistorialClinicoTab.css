@@ -17,6 +17,7 @@
 .hc-chip.on .hc-chip-icon { opacity: 1; }
 .hc-chip-alerta { border-radius: 50%; background: #D50000; }
 .hc-chip-diagnostico { border-radius: 6px; background: var(--hc-navy); }
+.hc-chip-estado_salud { border-radius: 6px; background: #fff; box-shadow: inset 0 0 0 2px var(--hc-navy); color: var(--hc-navy); }
 .hc-chip-intervencion { border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 2px #388E3C; color: #388E3C; }
 .hc-chip-count { font-size: 12px; font-weight: 500; color: var(--hc-muted); }
 .hc-period { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -51,6 +52,7 @@
 .hc-node-critico { background: #D50000; }
 .hc-node-borde { background: #FFC700; color: var(--hc-navy); }
 .hc-node-diag { background: var(--hc-navy); border-radius: 10px; }
+.hc-node-salud { background: #fff; color: var(--hc-navy); border-radius: 10px; box-shadow: inset 0 0 0 2px var(--hc-navy), 0 0 0 4px var(--hc-bg); }
 .hc-node-intv { background: #fff; color: #388E3C; box-shadow: inset 0 0 0 2px #388E3C, 0 0 0 4px var(--hc-bg); }
 .hc-body { padding-bottom: 12px; min-width: 0; }
 .hc-event { overflow: hidden; }
@@ -63,6 +65,7 @@
 .hc-tag-critico { background: #D50000; color: #fff; }
 .hc-tag-borde { background: #FFC700; color: var(--hc-navy); }
 .hc-tag-diag { background: var(--hc-navy); color: #fff; }
+.hc-tag-salud { background: #fff; box-shadow: inset 0 0 0 1.5px var(--hc-navy); color: var(--hc-navy); }
 .hc-tag-intv { background: #fff; box-shadow: inset 0 0 0 1.5px #388E3C; color: #2E7D32; }
 .hc-estado { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
 .hc-estado span { width: 10px; height: 10px; border-radius: 50%; }

@@ -5,7 +5,7 @@ import { crearDiagnostico, getDiagnosticos, mensajeErrorDiagnostico } from '../a
 interface DiagnosticoSectionProps {
   alertaId: number;
   animalId: number;
-  /** Mostrar el formulario de carga (solo rol VETERINARIO). El historial siempre se muestra. */
+  /** Mostrar el formulario de carga (solo rol VETERINARIO). Los diagnósticos de la alerta siempre se muestran. */
   showForm: boolean;
 }
 
@@ -33,7 +33,7 @@ export default function DiagnosticoSection({ alertaId, animalId, showForm }: Dia
       setErrorHistorial(false);
       try {
         const data = await getDiagnosticos({ animalId });
-        if (isMounted) setHistorial(data);
+        if (isMounted) setHistorial(data.filter((d) => d.alertaId === alertaId));
       } catch (err) {
         console.error('Error cargando historial clínico:', err);
         if (isMounted) setErrorHistorial(true);
@@ -45,7 +45,7 @@ export default function DiagnosticoSection({ alertaId, animalId, showForm }: Dia
     return () => {
       isMounted = false;
     };
-  }, [animalId]);
+  }, [animalId, alertaId]);
 
   const handleSubmit = async () => {
     if (!diag.trim()) {
@@ -119,7 +119,7 @@ export default function DiagnosticoSection({ alertaId, animalId, showForm }: Dia
       <div>
         <div className="d-flex justify-content-between align-items-baseline mb-3">
           <h6 className="fw-bold m-0 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-            Historial clínico
+            Diagnósticos de esta alerta
           </h6>
         </div>
         {loadingHistorial ? (
@@ -139,7 +139,7 @@ export default function DiagnosticoSection({ alertaId, animalId, showForm }: Dia
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body">
               <p className="m-0" style={{ fontSize: '0.95rem', color: '#5A6670' }}>
-                Todavía no hay diagnósticos registrados para este animal.
+                Todavía no hay diagnósticos para esta alerta.
               </p>
             </div>
           </div>

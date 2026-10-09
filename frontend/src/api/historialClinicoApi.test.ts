@@ -49,9 +49,9 @@ describe('construirHistorial', () => {
         expect(ev.fuente).toContain('#5');
     });
 
-    it('mapea un estado de salud como diagnóstico con su estado', () => {
+    it('mapea un estado de salud como evento propio, separado de los diagnósticos', () => {
         const [ev] = construirHistorial([], [estadoSalud], []);
-        expect(ev).toMatchObject({ id: 's2', tipo: 'diagnostico', estado: 'ENFERMO', origen: 'MANUAL', usuario: 'Laura Vet', fecha: '2026-09-27T10:05', fechaRegistro: '2026-09-27T10:05' });
+        expect(ev).toMatchObject({ id: 's2', tipo: 'estado_salud', estado: 'ENFERMO', titulo: 'Enfermo', origen: 'MANUAL', usuario: 'Laura Vet', fecha: '2026-09-27T10:05', fechaRegistro: '2026-09-27T10:05' });
         expect(ev.detalles).toContainEqual(['Tratamiento indicado', '—']);
     });
 

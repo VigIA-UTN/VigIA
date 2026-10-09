@@ -2,7 +2,8 @@ import axiosClient from './axiosClient';
 import { getHistorialSalud, getLineaTiempoAlertas, type EstadoSaludResponse, type IntervencionResponse, type LineaTiempoEventoResponse } from './animalesApi';
 import { getDiagnosticos, type DiagnosticoResponse } from './diagnosticoApi';
 
-export type HistorialTipo = 'alerta' | 'diagnostico' | 'intervencion';
+/** `diagnostico` es solo el diagnóstico formal, ligado a su alerta; `estado_salud` es el estado cargado en la ficha. */
+export type HistorialTipo = 'alerta' | 'diagnostico' | 'estado_salud' | 'intervencion';
 export type HistorialOrigen = 'AUTOMATICO' | 'MANUAL' | 'CARGA_MASIVA';
 
 export interface HistorialEvento {
@@ -33,6 +34,9 @@ const INTERVENCION_LABEL: Record<string, string> = {
 const ESTADO_ANIMAL: Record<'ALTA' | 'MEDIA' | 'BAJA', string> = { BAJA: 'NORMAL', MEDIA: 'BORDE', ALTA: 'CRITICO' };
 const RESOLUCION_LABEL: Record<string, string> = {
     SIN_ATENDER: 'Pendiente', CONFIRMADA: 'Confirmada', DESCARTADA: 'Descartada', ARCHIVADA: 'Archivada',
+};
+const ESTADO_SALUD_LABEL: Record<NonNullable<HistorialEvento['estado']>, string> = {
+    SANO: 'Sano', EN_OBSERVACION: 'En observación', ENFERMO: 'Enfermo',
 };
 const FUENTE_ESTADO_SALUD: Record<HistorialOrigen, string> = {
     MANUAL: 'Cargado en Ficha › Estado de salud',
@@ -81,9 +85,10 @@ function estadoSaludAEvento(es: EstadoSaludResponse): HistorialEvento {
     const registro = minuto(es.fechaRegistro);
     // La revisión solo tiene día: si se cargó ese mismo día se usa la hora de carga, si no 00:00.
     const fecha = !es.fechaRevision || registro.startsWith(es.fechaRevision) ? registro : `${es.fechaRevision}T00:00`;
+    const estado = esEstado(es.estado) ? es.estado : undefined;
     return {
-        id: `s${es.id}`, tipo: 'diagnostico', estado: esEstado(es.estado) ? es.estado : undefined, fecha,
-        titulo: 'Estado de salud actualizado', resumen: es.diagnosticoNotas || 'Sin notas.',
+        id: `s${es.id}`, tipo: 'estado_salud', estado, fecha,
+        titulo: estado ? ESTADO_SALUD_LABEL[estado] : 'Estado de salud', resumen: es.diagnosticoNotas || 'Sin notas.',
         usuario: es.registradoPor ?? SIS, origen, fuente: FUENTE_ESTADO_SALUD[origen], fechaRegistro: registro,
         detalles: [
             ['Diagnóstico / notas', es.diagnosticoNotas || '—'],

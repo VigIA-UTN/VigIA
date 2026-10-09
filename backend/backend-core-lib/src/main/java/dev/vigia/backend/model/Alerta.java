@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -29,7 +28,6 @@ import lombok.Setter;
 @NoArgsConstructor
 public class Alerta {
 
-    /** Tipo de las alertas de AnestroDetectorService (disparador CELO, sin ventana de inseminación). */
     public static final String TIPO_ANESTRO = "Anestro Detectado";
 
     @Id
@@ -102,7 +100,7 @@ public class Alerta {
     @Column(name = "serie_comparativa_json", columnDefinition = "TEXT")
     private String serieComparativaJson;
 
-    @OneToMany(mappedBy = "alerta", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "alerta", fetch = FetchType.LAZY)
     @OrderBy("fecha DESC")
     private List<Diagnostico> diagnosticos = new ArrayList<>();
 }

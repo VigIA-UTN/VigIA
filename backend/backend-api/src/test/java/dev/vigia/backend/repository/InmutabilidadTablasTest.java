@@ -12,6 +12,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,57 +56,22 @@ public class InmutabilidadTablasTest {
                     "Ejecutar las migraciones Flyway antes de correr este test");
         }
 
+        // Los triggers tienen que venir de las migraciones Flyway (V12, V15 y V16): el test no los crea,
+        // así falla si una migración no los instaló.
         try (Statement st = connection.createStatement()) {
-            // Asegurar que la función del trigger existe
-            st.execute(
-                    """
-                                CREATE OR REPLACE FUNCTION trg_bloquear_modificacion_inmutable()
-                                RETURNS TRIGGER AS $$
-                                BEGIN
-                                    IF current_setting('vigia.bypass_immutable_triggers', true) = 'true' THEN
-                                        IF TG_OP = 'DELETE' THEN
-                                            RETURN OLD;
-                                        ELSE
-                                            RETURN NEW;
-                                        END IF;
-                                    END IF;
-
-                                    IF TG_OP = 'UPDATE' THEN
-                                        RAISE EXCEPTION 'Acción prohibida: no se permite modificar registros en la tabla %', TG_TABLE_NAME;
-                                    ELSIF TG_OP = 'DELETE' THEN
-                                        RAISE EXCEPTION 'Acción prohibida: no se permite eliminar registros en la tabla %', TG_TABLE_NAME;
-                                    END IF;
-                                    RETURN NULL;
-                                END;
-                                $$ LANGUAGE plpgsql;
-                            """);
-
-            // Asegurar que la tabla intervenciones tiene el trigger activo
-            st.execute("""
-                        DROP TRIGGER IF EXISTS trg_bloquear_modificacion_intervenciones ON intervenciones;
-                        CREATE TRIGGER trg_bloquear_modificacion_intervenciones
-                            BEFORE UPDATE OR DELETE ON intervenciones
-                            FOR EACH ROW
-                            EXECUTE FUNCTION trg_bloquear_modificacion_inmutable();
-                    """);
-
-            // Asegurar que la tabla diagnosticos tiene el trigger activo
-            st.execute("""
-                        DROP TRIGGER IF EXISTS trg_bloquear_modificacion_diagnosticos ON diagnosticos;
-                        CREATE TRIGGER trg_bloquear_modificacion_diagnosticos
-                            BEFORE UPDATE OR DELETE ON diagnosticos
-                            FOR EACH ROW
-                            EXECUTE FUNCTION trg_bloquear_modificacion_inmutable();
-                    """);
-
-            // Asegurar que la tabla estados_salud tiene el trigger activo
-            st.execute("""
-                        DROP TRIGGER IF EXISTS trg_bloquear_modificacion_estados_salud ON estados_salud;
-                        CREATE TRIGGER trg_bloquear_modificacion_estados_salud
-                            BEFORE UPDATE OR DELETE ON estados_salud
-                            FOR EACH ROW
-                            EXECUTE FUNCTION trg_bloquear_modificacion_inmutable();
-                    """);
+            ResultSet rs = st.executeQuery(
+                    "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname IN (" +
+                    "'trg_bloquear_modificacion_intervenciones', 'trg_bloquear_modificacion_diagnosticos', " +
+                    "'trg_bloquear_modificacion_estados_salud', 'trg_bloquear_cambio_resolucion_alertas')");
+            Set<String> triggers = new HashSet<>();
+            while (rs.next()) {
+                triggers.add(rs.getString(1));
+            }
+            assertThat(triggers).containsExactlyInAnyOrder(
+                    "trg_bloquear_modificacion_intervenciones",
+                    "trg_bloquear_modificacion_diagnosticos",
+                    "trg_bloquear_modificacion_estados_salud",
+                    "trg_bloquear_cambio_resolucion_alertas");
         }
     }
 
@@ -317,6 +284,68 @@ public class InmutabilidadTablasTest {
         }
     }
 
+    @Test
+    @DisplayName("Alertas: una alerta confirmada no puede cambiar su resolución")
+    void testAlertaConfirmadaBloqueaCambioDeResolucion() throws SQLException {
+        long alertaId = insertarAlerta("CONFIRMADA");
+
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE alertas SET estado = 'PENDIENTE' WHERE id = ?")) {
+            ps.setLong(1, alertaId);
+            assertThatThrownBy(ps::executeUpdate)
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("Acción prohibida")
+                    .hasMessageContaining("resolución de la alerta");
+        }
+
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE alertas SET usuario_confirmacion_id = NULL, ts_confirmacion = NOW() WHERE id = ?")) {
+            ps.setLong(1, alertaId);
+            assertThatThrownBy(ps::executeUpdate)
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("Acción prohibida");
+        }
+
+        limpiarAlerta(alertaId);
+    }
+
+    @Test
+    @DisplayName("Alertas: una alerta descartada no puede cambiar el dato sensorial de origen")
+    void testAlertaDescartadaBloqueaCambioDeDatoOrigen() throws SQLException {
+        long alertaId = insertarAlerta("DESCARTADA");
+
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE alertas SET confianza_modelo = 0.1, serie_comparativa_json = '{}' WHERE id = ?")) {
+            ps.setLong(1, alertaId);
+            assertThatThrownBy(ps::executeUpdate)
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("Acción prohibida");
+        }
+
+        limpiarAlerta(alertaId);
+    }
+
+    @Test
+    @DisplayName("Alertas: una alerta pendiente se puede resolver y las columnas no protegidas siguen editables")
+    void testAlertaPendientePermiteResolver() throws SQLException {
+        long alertaId = insertarAlerta("PENDIENTE");
+
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE alertas SET estado = 'CONFIRMADA', ts_confirmacion = NOW() WHERE id = ?")) {
+            ps.setLong(1, alertaId);
+            assertThat(ps.executeUpdate()).isEqualTo(1);
+        }
+
+        // Ya confirmada: la acción recomendada no forma parte de la resolución y se puede actualizar.
+        try (PreparedStatement ps = connection.prepareStatement(
+                "UPDATE alertas SET accion_recomendada = 'Revisar' WHERE id = ?")) {
+            ps.setLong(1, alertaId);
+            assertThat(ps.executeUpdate()).isEqualTo(1);
+        }
+
+        limpiarAlerta(alertaId);
+    }
+
     private Long obtenerAnimalValido() throws SQLException {
         try (Statement st = connection.createStatement();
                 ResultSet rs = st.executeQuery("SELECT id FROM animales LIMIT 1")) {
@@ -353,6 +382,27 @@ public class InmutabilidadTablasTest {
             ResultSet rs = ps.executeQuery();
             assertThat(rs.next()).isTrue();
             return rs.getLong(1);
+        }
+    }
+
+    private long insertarAlerta(String estado) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO alertas (animal_id, tipo, ts_generacion, disparador, valor_umbral, estado, " +
+                        "confianza_modelo, serie_comparativa_json) " +
+                        "VALUES (?, 'SALUD', NOW(), 'SALUD', 0.5, ?, 0.9, '{\"serie\":[]}') RETURNING id")) {
+            ps.setLong(1, obtenerAnimalValido());
+            ps.setString(2, estado);
+            ResultSet rs = ps.executeQuery();
+            assertThat(rs.next()).isTrue();
+            return rs.getLong(1);
+        }
+    }
+
+    private void limpiarAlerta(long id) {
+        // El trigger de alertas solo bloquea UPDATE: el DELETE no necesita bypass.
+        try (Statement st = connection.createStatement()) {
+            st.execute("DELETE FROM alertas WHERE id = " + id);
+        } catch (SQLException ignored) {
         }
     }
 
