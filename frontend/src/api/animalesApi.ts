@@ -232,6 +232,12 @@ export async function getIntervenciones(animalId: number): Promise<IntervencionR
   return response.data;
 }
 
+/** Todas las intervenciones del establecimiento, de la más reciente a la más antigua. */
+export async function getIntervencionesEstablecimiento(establecimientoId: number): Promise<IntervencionResponse[]> {
+  const response = await axiosClient.get<IntervencionResponse[]>(`/establecimientos/${establecimientoId}/intervenciones`);
+  return response.data;
+}
+
 export interface AnimalMetricaResponse {
   fecha: string;
   actividadMotora: number | null;

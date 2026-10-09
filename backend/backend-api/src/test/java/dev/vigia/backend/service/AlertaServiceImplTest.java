@@ -346,6 +346,29 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        void listarAlertas_TipoCelo_FiltraPorDisparadorYExponeTsConfirmacion() {
+                // Arrange
+                LocalDateTime tsConfirmacion = LocalDateTime.now().minusHours(2);
+                mockAlerta.setDisparador(DisparadorAlerta.CELO);
+                mockAlerta.setEstado(EstadoAlerta.CONFIRMADA);
+                mockAlerta.setTsConfirmacion(tsConfirmacion);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, EstadoAlerta.CONFIRMADA,
+                                DisparadorAlerta.CELO, null))
+                                .thenReturn(List.of(mockAlerta));
+
+                // Act
+                List<AlertaResponse> result = alertaService.listarAlertas(EMAIL, ESTABLECIMIENTO_ID, "CELO", null,
+                                EstadoAlerta.CONFIRMADA);
+
+                // Assert
+                assertEquals(1, result.size());
+                assertEquals(tsConfirmacion, result.get(0).getTsConfirmacion());
+        }
+
+        @Test
         @SuppressWarnings("null")
         void obtenerDetalleAlerta_ThrowsAccessDeniedException_WhenAlertNotBelongsToEstablecimiento() {
                 // Arrange

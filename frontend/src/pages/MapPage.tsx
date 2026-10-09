@@ -29,6 +29,7 @@ import PerimetroRodeoLayer from '../components/heatmap/PerimetroRodeoLayer';
 import { useHeatPoints } from '../components/heatmap/useHeatPoints';
 import { defaultHeatFilter, perimetrosDeRodeo } from '../components/heatmap/heatmapFilters';
 import type { HeatAnimal, HeatFilter } from '../components/heatmap/types';
+import { determinarIcono } from '../utils/animalPins';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -69,25 +70,6 @@ function MapEditorEvents({
   return null;
 }
 
-const pinUrls = import.meta.glob('../assets/pins/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-
-// 1x + 2x (Leaflet elige el 2x en pantallas retina). Punta del pin = centro inferior.
-const makePin = (estado: string, selected: boolean) => {
-  const [w, h] = selected ? [60, 78] : [40, 52];
-  const base = `../assets/pins/pin-${estado}${selected ? '-sel' : ''}`;
-  return new L.Icon({
-    iconUrl: pinUrls[`${base}-1x.png`],
-    iconRetinaUrl: pinUrls[`${base}-2x.png`],
-    iconSize: [w, h],
-    iconAnchor: [w / 2, h],
-    popupAnchor: [0, -h],
-  });
-};
-
-const PIN_ICONS = Object.fromEntries(
-  ['normal', 'borde', 'critico', 'sindatos'].map(e => [e, [makePin(e, false), makePin(e, true)]])
-) as Record<string, [L.Icon, L.Icon]>;
-
 const CENTRO_CAMPO: [number, number] = [-34.6037, -58.3816];
 
 function MapUpdater({ center, trigger }: { center: [number, number], trigger: { lat: number, lng: number, t: number } | null }) {
@@ -104,15 +86,6 @@ function MapUpdater({ center, trigger }: { center: [number, number], trigger: { 
   }, [trigger, map]);
 
   return null;
-}
-
-function determinarIcono(animal: AnimalMapa, selected: boolean) {
-  const severidades = animal.alertasAnimal.map(a => a.severidad);
-  const estado = animal.sinDatosRecientes ? 'sindatos'
-    : severidades.includes('ALTA') ? 'critico'
-      : severidades.includes('MEDIA') || severidades.includes('BAJA') ? 'borde'
-        : 'normal';
-  return PIN_ICONS[estado][selected ? 1 : 0];
 }
 
 export default function MapPage() {

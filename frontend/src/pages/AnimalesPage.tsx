@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Container, Spinner, Alert, Modal, Form, Button, Toast } from 'react-bootstrap';
 import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, vincularCaravana, desvincularCaravana, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
@@ -45,8 +45,15 @@ export default function AnimalesPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const [activeTab, setActiveTab] = useState<'general' | 'celo' | 'salud'>('general');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState<'general' | 'celo' | 'salud'>(
+        searchParams.get('tab') === 'salud' ? 'salud' : 'general'
+    );
     const [searchTerm, setSearchTerm] = useState('');
+    // Filtros que llegan desde el dashboard: ?rodeo=<id> (resumen ejecutivo) e ?ids=1,2,3 (listas de excepciones).
+    const rodeoFiltro = Number(searchParams.get('rodeo')) || null;
+    const idsParam = searchParams.get('ids');
+    const idsFiltro = idsParam ? new Set(idsParam.split(',').map(Number).filter(Boolean)) : null;
 
     const [showModal, setShowModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -394,6 +401,8 @@ export default function AnimalesPage() {
         // Filter by selected establecimiento
         if (selectedId && a.establecimientoId !== selectedId) return false;
         if (activeTab === 'salud' && a.estadoSalud !== 'EN_OBSERVACION' && a.estadoSalud !== 'ENFERMO') return false;
+        if (rodeoFiltro && a.rodeoLoteId !== rodeoFiltro) return false;
+        if (idsFiltro && !idsFiltro.has(a.id)) return false;
         if (!searchTerm) return true;
         const q = searchTerm.toLowerCase();
         const matchEstado = (v: string | null | undefined, labels: Record<string, string>) =>
@@ -470,7 +479,7 @@ export default function AnimalesPage() {
                         )}
                     </div>
 
-                    <div className="mb-3 mt-3">
+                    <div className="mb-3 mt-3 d-flex align-items-center gap-2 flex-wrap">
                         <Form.Control
                             type="text"
                             placeholder="Buscar por identificador, nombre o lote..."
@@ -478,6 +487,28 @@ export default function AnimalesPage() {
                             onChange={e => setSearchTerm(e.target.value)}
                             style={{ maxWidth: '400px' }}
                         />
+                        {idsFiltro && (
+                            <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => setSearchParams({})}
+                                title="Quitar filtro"
+                            >
+                                Lista del dashboard ({idsFiltro.size})
+                                <i className="bi bi-x-lg ms-1" />
+                            </Button>
+                        )}
+                        {rodeoFiltro && (
+                            <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => setSearchParams({})}
+                                title="Quitar filtro de rodeo"
+                            >
+                                Rodeo: {rodeoLotes.find(l => l.id === rodeoFiltro)?.nombre ?? `#${rodeoFiltro}`}
+                                <i className="bi bi-x-lg ms-1" />
+                            </Button>
+                        )}
                     </div>
 
                     {error && <Alert variant="danger" className="mt-3">{error}</Alert>}

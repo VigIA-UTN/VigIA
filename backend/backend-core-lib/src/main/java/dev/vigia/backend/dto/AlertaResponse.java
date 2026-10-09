@@ -16,6 +16,7 @@ public class AlertaResponse {
     private EstadoAlerta estado;
     private Long animalId;
     private LocalDateTime tsGeneracion;
+    private LocalDateTime tsConfirmacion;
     private Double latitud;
     private Double longitud;
     private String detalle;

@@ -92,16 +92,7 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                DisparadorAlerta disparadorEnum = null;
-                if (tipo != null && !tipo.isBlank()) {
-                        String t = tipo.trim().toLowerCase();
-                        if (t.equals("reproductivo"))
-                                disparadorEnum = DisparadorAlerta.CELO;
-                        else if (t.equals("sanitario"))
-                                disparadorEnum = DisparadorAlerta.SALUD;
-                        else if (t.equals("geoespacial"))
-                                disparadorEnum = DisparadorAlerta.ABIGEATO;
-                }
+                DisparadorAlerta disparadorEnum = resolverDisparador(tipo);
 
                 SeveridadAlerta severidadEnum = null;
                 if (severidad != null && !severidad.isBlank()) {
@@ -466,6 +457,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 .severidad(alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null)
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
+                                .tsConfirmacion(alerta.getTsConfirmacion())
                                 .latitud(alerta.getLatitud())
                                 .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())

@@ -129,7 +129,7 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         return IntervencionResponse.builder()
                 .id(intervencion.getId())
                 .animalId(intervencion.getAnimal().getId())
-                .alertaId(intervencion.getAlerta().getId())
+                .alertaId(intervencion.getAlerta() != null ? intervencion.getAlerta().getId() : null)
                 .interventor(intervencion.getInterventor().getNombre())
                 .descripcion(intervencion.getDescripcion())
                 .fechaHora(intervencion.getFechaHora())

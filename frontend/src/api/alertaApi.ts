@@ -7,6 +7,8 @@ export interface AlertaResponse {
   subtipo?: string | null;
   animalId: number;
   tsGeneracion: string;
+  /** Momento en que se confirmó, descartó o archivó la alerta. */
+  tsConfirmacion?: string | null;
   estado: string;
   severidad?: "ALTA" | "MEDIA" | "BAJA";
   gravedad?: 'GRAVE' | 'MEDIA' | 'LEVE';

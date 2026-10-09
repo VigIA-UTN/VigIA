@@ -356,6 +356,36 @@ class EstablecimientoControllerTest {
     }
 
     @Test
+    @DisplayName("GET /{id}/intervenciones - Intervención manual (sin alerta) se retorna con alertaId nulo")
+    @SuppressWarnings("null")
+    void obtenerIntervenciones_intervencionManual_retornaAlertaIdNulo() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        RodeoLote rodeo = new RodeoLote(est);
+        rodeo.setNombre("Rodeo Manual");
+        rodeo = rodeoLoteRepository.save(rodeo);
+
+        Animal animal = new Animal(est, rodeo);
+        animal.setAlias("Vaca Manual");
+        animal = animalRepository.save(animal);
+
+        Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
+        Intervencion intervencion = new Intervencion();
+        intervencion.setAnimal(animal);
+        intervencion.setInterventor(productor);
+        intervencion.setDescripcion("Vacunación anual");
+        intervencion.setFechaHora(LocalDateTime.now());
+        intervencion.setTipo(TipoIntervencion.VACUNACION);
+        intervencionRepository.save(intervencion);
+
+        mockMvc.perform(get("/api/v1/establecimientos/" + establecimientoId + "/intervenciones")
+                .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].tipo").value("VACUNACION"))
+                .andExpect(jsonPath("$[0].alertaId").doesNotExist());
+    }
+
+    @Test
     @DisplayName("GET /{id}/intervenciones - Múltiples intervenciones se retornan correctamente")
     @SuppressWarnings("null")
     void obtenerIntervenciones_multiplesIntervenciones_retornaTodas() throws Exception {

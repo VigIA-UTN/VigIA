@@ -156,6 +156,9 @@ function NavScroll() {
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/mapa')}>
                                 <i className="bi bi-map me-2" />Mapa
                             </button>
+                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/alertas')}>
+                                <i className="bi bi-bell me-2" />Alertas
+                            </button>
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/animales')}>
                                 <i className="bi bi-heart-pulse me-2" />Animales
                             </button>
@@ -174,7 +177,7 @@ function NavScroll() {
                                     </button>
                                 </>
                             )}
-                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/alertas')}>
+                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/invitaciones')}>
                                 <i className="bi bi-envelope me-2" />Invitaciones
                             </button>
                         </>

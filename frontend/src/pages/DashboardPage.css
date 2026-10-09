@@ -29,28 +29,6 @@
     letter-spacing: -0.01em;
 }
 
-.dash-header-meta {
-    font-size: 0.8rem;
-    color: #64748B;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.dash-live-dot {
-    width: 7px;
-    height: 7px;
-    background: #8CC63F;
-    border-radius: 50%;
-    display: inline-block;
-    animation: pulse-green 2s infinite;
-}
-
-@keyframes pulse-green {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%       { opacity: 0.5; transform: scale(0.8); }
-}
-
 /* ── Filtro de lote ──────────────────────────────────────────────────── */
 .dash-lote-filter {
     display: flex;
@@ -739,26 +717,12 @@
 /* ══════════════════════════════════════════════════════════════
    RESUMEN EJECUTIVO — layout general
    ══════════════════════════════════════════════════════════════ */
-.dash-exec-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    max-width: 1280px;
-    margin: 0 auto 6px;
-}
-
 .dash-exec-title {
     font-size: 1.55rem;
     font-weight: 500;
     color: #1A3558;
     letter-spacing: -0.01em;
     margin: 0;
-}
-
-.dash-exec-period {
-    font-size: 0.82rem;
-    color: #64748B;
-    font-weight: 500;
 }
 
 /* ── Hero card: tabla por rodeo ──────────────────────────────── */
@@ -888,14 +852,6 @@
     background: rgba(140, 198, 63, 0.1);
 }
 
-/* Footer note */
-.dash-exec-table-note {
-    font-size: 0.72rem;
-    color: #94A3B8;
-    padding: 10px 12px 2px;
-    display: block;
-}
-
 /* ── Grid inferior: tendencias + equipo ──────────────────────── */
 .dash-exec-bottom-grid {
     display: grid;
@@ -975,6 +931,12 @@
     letter-spacing: -0.02em;
 }
 
+.dash-team-kpi-sub {
+    font-size: 0.66rem;
+    color: #94A3B8;
+    line-height: 1.2;
+}
+
 .dash-team-hist-label {
     font-size: 0.72rem;
     color: #94A3B8;
@@ -1007,6 +969,12 @@
 
 .dash-team-hist-bar:hover {
     background: #8CC63F;
+}
+
+.dash-team-hist-count {
+    font-size: 0.66rem;
+    color: #64748B;
+    font-weight: 500;
 }
 
 .dash-team-hist-bar-label {
@@ -1062,16 +1030,6 @@
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Header interno de la tab ──────────────────────────────────── */
-.dash-salud-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    max-width: 1280px;
-    margin: 0 auto 20px;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
 .dash-salud-title {
     font-size: 1.55rem;
     font-weight: 500;
@@ -1084,19 +1042,6 @@
     font-size: 0.78rem;
     color: #94A3B8;
     display: block;
-}
-
-.dash-salud-filters {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.dash-salud-period {
-    font-size: 0.82rem;
-    color: #64748B;
-    cursor: pointer;
-    font-weight: 500;
 }
 
 /* ── Strip de 4 KPIs ───────────────────────────────────────────── */
@@ -1162,29 +1107,6 @@
 }
 
 /* ── Separador "debajo del pliegue" ────────────────────────────── */
-.dash-salud-fold-label {
-    max-width: 1280px;
-    margin: 20px auto 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.dash-salud-fold-label span {
-    font-size: 0.72rem;
-    color: #CBD5E1;
-    letter-spacing: 0.06em;
-    font-weight: 500;
-}
-
-.dash-salud-fold-label::before,
-.dash-salud-fold-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: #E2E8F0;
-}
-
 /* ── Grid inferior (3 cols) ────────────────────────────────────── */
 .dash-salud-bottom-grid {
     display: grid;
@@ -1513,6 +1435,20 @@
 }
 
 /* ── Última intervención ───────────────────────────────────────── */
+.dash-salud-interv-ultima {
+    font-size: 0.8rem;
+    color: #1A3558;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    background: #F8FAFC;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.dash-salud-interv-ultima-tipo {
+    font-weight: 600;
+}
+
 .dash-salud-interv-note {
     font-size: 0.68rem;
     color: #CBD5E1;
