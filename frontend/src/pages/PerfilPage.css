@@ -109,18 +109,9 @@
     box-shadow: 0 4px 6px rgba(30, 58, 95, 0.2);
 }
 
-.btn-vigia-outline {
-    border-color: #1E3A5F;
-    color: #1E3A5F;
-    border-radius: 8px;
+/* El estilo base de .btn-vigia-outline está en index.css; acá solo el tamaño, igual al de .btn-vigia-primary */
+.perfil-page .btn-vigia-outline {
     padding: 0.6rem 1.25rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.btn-vigia-outline:hover {
-    background-color: #1E3A5F;
-    color: white;
 }
 
 .text-sm {

@@ -944,6 +944,8 @@ public class AlertaServiceImpl implements AlertaService {
                                 .severidad(alerta.getSeveridad() != null
                                                 ? alerta.getSeveridad().name()
                                                 : null)
+                                .valorDetectado(alerta.getValorDetectado())
+                                .valorUmbral(alerta.getValorUmbral())
                                 .estadoResolucion(resolverEstadoResolucion(alerta.getEstado()))
                                 .usuarioResolucion(nombreVisible(alerta.getUsuarioConfirmacion()))
                                 .tsResolucion(alerta.getTsConfirmacion())

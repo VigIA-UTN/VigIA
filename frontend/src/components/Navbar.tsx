@@ -167,6 +167,11 @@ function NavScroll() {
                                     <i className="bi bi-clipboard2-pulse me-2" />Diagnósticos
                                 </button>
                             )}
+                            {isVeterinario && selectedId && (
+                                <button className="mobile-drawer-link" onClick={() => handleNavLink(`/establecimientos/${selectedId}/configuracion`)}>
+                                    <i className="bi bi-gear me-2" />Configuración
+                                </button>
+                            )}
                             {isProductor && (
                                 <>
                                     <button className="mobile-drawer-link" onClick={() => handleNavLink('/empleados')}>
@@ -191,7 +196,7 @@ function NavScroll() {
                     </div>
                     <div className="mt-3">
                         <button
-                            className="btn btn-outline-primary btn-sm w-100 mb-2"
+                            className="btn btn-vigia-outline btn-sm w-100 mb-2"
                             onClick={() => { setDrawerOpen(false); navigate('/perfil'); }}
                         >
                             Mi Perfil
@@ -229,6 +234,23 @@ function NavScroll() {
                     {/* Selector (Desktop) posicionado absoluto a la izquierda */}
                     <div className="d-none d-lg-flex align-items-center gap-2 position-absolute start-0 ps-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
                         {establecimientoSelector}
+                        {/* El veterinario no ve /establecimientos: configura el establecimiento activo desde acá */}
+                        {isVeterinario && selectedId && (
+                            <Link
+                                to={`/establecimientos/${selectedId}/configuracion`}
+                                className="btn btn-sm d-flex align-items-center"
+                                title="Configuración del establecimiento"
+                                aria-label="Configuración del establecimiento"
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.12)',
+                                    color: '#fff',
+                                    border: '1px solid rgba(255,255,255,0.25)',
+                                    borderRadius: '8px',
+                                }}
+                            >
+                                <i className="bi bi-gear" />
+                            </Link>
+                        )}
                     </div>
 
                     {/* Opciones de usuario (Desktop) posicionadas absoluto a la derecha */}

@@ -190,7 +190,7 @@ export default function ReproduccionTab({ animal, rol, onAnimalUpdated }: Props)
 
     return (
         <>
-            <LineaTiempoAlertas animalId={animalId} estados={historial} />
+            <LineaTiempoAlertas animalId={animalId} estados={historial} onAlertaResuelta={fetchHistorial} />
 
             {/* ── Sección Historial Reproductivo ── */}
             <Card className="shadow-sm border-0 animal-card">
@@ -240,7 +240,7 @@ export default function ReproduccionTab({ animal, rol, onAnimalUpdated }: Props)
                                                 {canEdit && (
                                                     <td className="text-center">
                                                         {idx === 0 && editable && (
-                                                            <Button variant="outline-primary" size="sm" onClick={() => openEditarEstadoModal(h)}>
+                                                            <Button variant="vigia-outline" size="sm" onClick={() => openEditarEstadoModal(h)}>
                                                                 <i className="bi bi-pencil" /> Editar
                                                             </Button>
                                                         )}

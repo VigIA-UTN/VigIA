@@ -130,6 +130,29 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    void noDispara_SiElModeloDetectoUnCeloReciente() {
+        // El celo detectado por el ML (POSIBLE_CELO) también cuenta como actividad de ciclo
+        historial(estado(TipoReproductivo.POSIBLE_CELO, 10, 200, null));
+
+        service.detectarAnestro();
+
+        verify(alertaRepository, never()).save(any());
+    }
+
+    @Test
+    void archivaLaPendiente_SiElModeloDetectoUnCeloDespues() {
+        historial(estado(TipoReproductivo.POSIBLE_CELO, 5, 200, null));
+        ultimaAlertaAnestro(EstadoAlerta.PENDIENTE, 0);
+
+        service.detectarAnestro();
+
+        ArgumentCaptor<Alerta> captor = ArgumentCaptor.forClass(Alerta.class);
+        verify(alertaRepository).save(captor.capture());
+        assertEquals(EstadoAlerta.ARCHIVADA, captor.getValue().getEstado());
+        assertEquals("ciclo_registrado", captor.getValue().getMotivoDescarte());
+    }
+
+    @Test
     void noDispara_SiHuboInseminacionReciente_AunqueElUltimoEstadoSeaVacia() {
         historial(
                 estado(TipoReproductivo.VACIA, 0, 200, null),

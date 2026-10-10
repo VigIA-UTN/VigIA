@@ -37,6 +37,9 @@ export default function ConfiguracionEstablecimientoPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const rol = useAuthStore((s) => s.rol);
+  // El veterinario no tiene acceso a /establecimientos (llega desde el Navbar): vuelve a la página anterior.
+  const veListado = rol === 'PRODUCTOR';
+  const volver = () => (veListado ? navigate('/establecimientos') : navigate(-1));
 
   const [config, setConfig] = useState<ConfigAnestroResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,9 +166,13 @@ export default function ConfiguracionEstablecimientoPage() {
 
       {/* Breadcrumb */}
       <div className="cfg-breadcrumb">
-        <button className="cfg-breadcrumb-link" onClick={() => navigate('/establecimientos')}>
-          Establecimientos
-        </button>
+        {veListado ? (
+          <button className="cfg-breadcrumb-link" onClick={volver}>
+            Establecimientos
+          </button>
+        ) : (
+          <span className="cfg-breadcrumb-current">Establecimientos</span>
+        )}
         <span className="cfg-breadcrumb-sep"><i className="bi bi-chevron-right" /></span>
         <span className="cfg-breadcrumb-current">{config?.nombreEstablecimiento}</span>
         <span className="cfg-breadcrumb-sep"><i className="bi bi-chevron-right" /></span>
@@ -301,7 +308,7 @@ export default function ConfiguracionEstablecimientoPage() {
           <button
             type="button"
             className="cfg-btn cfg-btn-cancel"
-            onClick={() => navigate('/establecimientos')}
+            onClick={volver}
           >
             Volver
           </button>

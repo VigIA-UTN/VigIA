@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { AnimalMapa } from '../api/animalesApi';
 import { getAnimalById, type AnimalResponse } from '../api/animalesApi';
 import type { AlertaResponse } from '../api/alertaApi';
 import AlertNotificationCard from './AlertNotificationCard';
+import { useAuthStore } from '../store/authStore';
 
 interface AnimalDetailSidebarProps {
   animalMapa: AnimalMapa;
@@ -16,6 +18,10 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
   const [animalDetail, setAnimalDetail] = useState<AnimalResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  // Mismos roles que la ruta /animales/:id
+  const rol = useAuthStore((s) => s.rol);
+  const puedeVerFicha = rol === 'PRODUCTOR' || rol === 'VETERINARIO' || rol === 'CAMPERO';
 
   useEffect(() => {
     let isMounted = true;
@@ -106,9 +112,20 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
           <div>
             <h2 className="m-0 fw-bold" style={{ color: '#1E3A5F' }}>{animalName}</h2>
             <p className="m-0 text-muted fs-6">#{animalMapa.id}</p>
+            {puedeVerFicha && (
+              // Mismo estilo que los links de acción de las otras barras laterales ("Ver en mapa")
+              <button
+                type="button"
+                className="btn btn-link p-0 mt-1 fw-semibold text-primary text-decoration-none d-flex align-items-center gap-1"
+                onClick={() => navigate(`/animales/${animalMapa.id}`)}
+              >
+                Ver ficha completa <i className="bi bi-chevron-right"></i>
+              </button>
+            )}
           </div>
           <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: statusColor, border: '2px solid white', boxShadow: '0 0 0 1px #CBD5E0' }}></div>
         </div>
+
       </div>
 
       <div className="p-4 d-flex flex-column gap-3 flex-grow-1 custom-scrollbar" style={{ overflowY: 'auto' }}>
