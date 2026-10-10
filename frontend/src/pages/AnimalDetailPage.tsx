@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Container, Button, Spinner, Alert, Card, Row, Col, Form, Badge } from 'react-bootstrap';
 import {
     getAnimalById,
@@ -18,9 +18,13 @@ import ReproduccionTab from './ReproduccionTab';
 import HistorialClinicoTab from './HistorialClinicoTab';
 import AnimalAlertasSanitarias from '../components/AnimalAlertasSanitarias';
 import AnimalIndicadoresSalud from '../components/AnimalIndicadoresSalud';
+import CohesionIndiceCard from '../components/CohesionIndiceCard';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import type { AlertaResponse } from '../api/alertaApi';
 import { formatFechaLocal, hoyIso } from '../utils/fechas';
+
+type Tab = 'actividad' | 'ficha' | 'reproduccion' | 'historial';
+const TABS: Tab[] = ['actividad', 'ficha', 'reproduccion', 'historial'];
 
 function estadoSaludBadge(estado: string | null | undefined) {
     if (!estado) return <span className="badge bg-secondary">—</span>;
@@ -88,6 +92,7 @@ export default function AnimalDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const rol = useAuthStore(state => state.rol);
+    const [searchParams] = useSearchParams();
 
     const [animal, setAnimal] = useState<AnimalResponse | null>(null);
     const [loading, setLoading] = useState(true);
@@ -100,8 +105,11 @@ export default function AnimalDetailPage() {
     const [form, setForm] = useState<Partial<AnimalRequest>>({});
     const [rodeoLotes, setRodeoLotes] = useState<RodeoLoteResponse[]>([]);
 
-    // Tab state — 'actividad' is the default
-    const [activeTab, setActiveTab] = useState<'actividad' | 'ficha' | 'reproduccion' | 'historial'>('actividad');
+    // Tab state — 'actividad' is the default; ?tab= lets other screens deep-link a tab
+    const [activeTab, setActiveTab] = useState<Tab>(() => {
+        const t = searchParams.get('tab') as Tab | null;
+        return t && TABS.includes(t) ? t : 'actividad';
+    });
 
     // NUEVO: para manejar el modal de intervención desde la pestaña actividad
     const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
@@ -295,6 +303,7 @@ export default function AnimalDetailPage() {
                 {activeTab === 'actividad' && (
                     <div key="actividad" className="tab-content-animated">
                         <ActividadTab animalId={animal.id} establecimientoId={animal.establecimientoId} />
+                        <CohesionIndiceCard animalId={animal.id} enCalibracion={animal.enCalibracion} />
                         <AnimalAlertasSanitarias animalId={animal.id} establecimientoId={animal.establecimientoId} onOpenIntervencion={(alerta) => {
                             setIntervencionAlerta(alerta);
                             setIsIntervencionOpen(true);
