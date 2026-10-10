@@ -403,7 +403,7 @@ public class DataInitializer implements CommandLineRunner {
         alerta.setTsGeneracion(tsGeneracion);
         alerta.setValorUmbral((double) est.getDiasDeteccionAnestro());
         alerta.setValorDetectado((double) diasSinCiclo);
-        alerta.setAccionRecomendada("Se requiere revisión veterinaria inmediata. El animal lleva "
+        alerta.setAccionRecomendada("Se recomienda revisión veterinaria. El animal lleva "
                 + diasSinCiclo + " días sin ciclo registrado.");
         alerta.setPosibleCausa("Anestro prolongado (>" + est.getDiasDeteccionAnestro() + " días)");
         alerta.setTsConfirmacion(tsConfirmacion);

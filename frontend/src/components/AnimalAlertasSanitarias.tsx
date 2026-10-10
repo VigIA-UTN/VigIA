@@ -83,7 +83,7 @@ export default function AnimalAlertasSanitarias({ animalId, establecimientoId, o
                     <small className="text-muted">Estado: {a.estado}</small>
                   </div>
                 </div>
-                <Button variant="outline-primary" size="sm" className="flex-shrink-0 ms-auto" onClick={() => setSelected(a)}>
+                <Button variant="vigia-outline" size="sm" className="flex-shrink-0 ms-auto" onClick={() => setSelected(a)}>
                   <i className="bi bi-eye" /> Ver detalle
                 </Button>
               </div>

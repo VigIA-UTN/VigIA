@@ -32,3 +32,6 @@ Thumbs.db
 # Modelos entrenados (historial)
 ml-training/celo/models
 ml-training/salud/models
+
+# Logs
+*.log

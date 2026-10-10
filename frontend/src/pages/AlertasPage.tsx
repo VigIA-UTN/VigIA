@@ -284,7 +284,7 @@ export default function AlertasPage() {
                                         sortedAlertas.map((a) => {
                                             // Fallback gravedad to severidad mapping just in case backend still sends gravedad
                                             const sev = a.severidad ?? (a.gravedad as 'ALTA' | 'MEDIA' | 'BAJA') ?? (a.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
-                                            const tipoLower = (a.tipo || 'CELO').toLowerCase();
+                                            const tipoLower = esAnestro(a) ? 'anestro' : (a.tipo || 'CELO').toLowerCase();
                                             
                                             return (
                                                 <tr key={a.id}>
@@ -308,7 +308,7 @@ export default function AlertasPage() {
                                                     </td>
                                                     <td className="text-center">
                                                         <Button
-                                                            variant="outline-primary"
+                                                            variant="vigia-outline"
                                                             size="sm"
                                                             onClick={() => setSelectedAlerta(a)}
                                                         >

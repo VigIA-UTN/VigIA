@@ -352,6 +352,9 @@ export interface LineaTiempoEventoResponse {
   /** Tipo crudo de la alerta ('Anestro Detectado', ...); `tipo` lleva el disparador. */
   subtipo?: string | null;
   severidad: 'ALTA' | 'MEDIA' | 'BAJA' | null;
+  /** Valor medido y umbral del disparador (en el anestro: días sin ciclo y días configurados). */
+  valorDetectado?: number | null;
+  valorUmbral?: number | null;
   estadoResolucion: string | null;
   /** Quién confirmó o descartó la alerta y cuándo; null mientras está pendiente. */
   usuarioResolucion?: string | null;

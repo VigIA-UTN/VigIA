@@ -630,7 +630,7 @@ public class AlertaServiceImplTest {
                 mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
                 mockAlerta.setEstado(EstadoAlerta.ARCHIVADA);
                 mockAlerta.setAccionRecomendada(
-                                "Se requiere revisión veterinaria inmediata. El animal lleva 60 días sin ciclo registrado.");
+                                "Se recomienda revisión veterinaria. El animal lleva 60 días sin ciclo registrado.");
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
                 when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
@@ -641,7 +641,7 @@ public class AlertaServiceImplTest {
                 LineaTiempoEventoResponse evento = alertaService
                                 .obtenerLineaTiempoAlertas(EMAIL, 10L, "celo", null, null).get(0);
 
-                assertEquals("Se requiere revisión veterinaria inmediata. El animal lleva 60 días sin ciclo registrado.",
+                assertEquals("Se recomienda revisión veterinaria. El animal lleva 60 días sin ciclo registrado.",
                                 evento.getDescripcion());
                 assertEquals("ARCHIVADA", evento.getEstadoResolucion());
         }

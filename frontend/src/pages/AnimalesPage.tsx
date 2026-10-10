@@ -635,7 +635,7 @@ export default function AnimalesPage() {
                                                             <div className="d-flex align-items-center justify-content-between gap-2">
                                                                 <span className="text-muted">Sin vincular</span>
                                                                 {puedeGestionarCaravanas && (
-                                                                    <Button variant="outline-primary" size="sm" className="flex-shrink-0" onClick={() => openVincularModal(a)}>
+                                                                    <Button variant="vigia-outline" size="sm" className="flex-shrink-0" onClick={() => openVincularModal(a)}>
                                                                         Vincular
                                                                     </Button>
                                                                 )}
@@ -679,7 +679,7 @@ export default function AnimalesPage() {
                                                     )}
                                                     <td className="text-center">
                                                         <div className="d-flex justify-content-center gap-2">
-                                                            <Button variant="outline-primary" size="sm" onClick={() => navigate(`/animales/${a.id}`)}>
+                                                            <Button variant="vigia-outline" size="sm" onClick={() => navigate(`/animales/${a.id}`)}>
                                                                 <i className="bi bi-eye"></i> Ver
                                                             </Button>
                                                             {a.estadoActual === 'CON_ALERTA' && (

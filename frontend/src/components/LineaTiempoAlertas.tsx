@@ -7,7 +7,9 @@ import {
   type LineaTiempoEventoResponse,
   type LineaTiempoFiltros,
 } from '../api/animalesApi';
-import { esAnestro } from '../api/alertaApi';
+import { esAnestro, getAlertaDetalle, type AlertaResponse } from '../api/alertaApi';
+import { useEstablecimientoStore } from '../store/establecimientoStore';
+import AlertDetailSidebar from './AlertDetailSidebar';
 import DateRangeCalendar from './heatmap/DateRangeCalendar';
 import { dayStart, lastDaysRange } from './heatmap/heatmapFilters';
 import './heatmap/heatmap.css';
@@ -101,13 +103,20 @@ const claveAlerta = (e: TimelineEvento) => (esAnestro(e) ? 'ANESTRO' : (e.tipo ?
 
 // ── Popup card ────────────────────────────────────────────────────────────────
 
-interface PopupProps {
+/** Apertura del detalle de una alerta desde su popup. */
+interface VerAlertaProps {
+  onVerAlerta: (evento: TimelineEvento) => void;
+  abriendoAlertaId: number | null;
+  alertaError: { id: number; msg: string } | null;
+}
+
+interface PopupProps extends VerAlertaProps {
   evento: TimelineEvento;
   onClose: () => void;
   position: 'above' | 'below';
 }
 
-function EventoPopup({ evento, onClose, position }: PopupProps) {
+function EventoPopup({ evento, onClose, position, onVerAlerta, abriendoAlertaId, alertaError }: PopupProps) {
   const isAlerta = evento.tipoEvento === 'ALERTA';
   const isEstado = evento.tipoEvento === 'ESTADO';
   const ref = useRef<HTMLDivElement>(null);
@@ -181,18 +190,46 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
             )}
             {claveAlerta(evento) === 'ANESTRO' && (
               <>
-                <i className="bi bi-info-circle me-1" />
-                {/* descripcion = acción recomendada del detector, con los días sin ciclo */}
-                {evento.descripcion ?? 'El animal superó el umbral de días sin celo registrado. Se recomienda revisión veterinaria.'}
+                {evento.valorDetectado != null ? (
+                  // Los días ya vienen como dato: no se repite la descripción, que los incluye en el texto
+                  <>
+                    <strong>{Math.round(evento.valorDetectado)} días sin ciclo</strong>
+                    {evento.valorUmbral != null && ` (umbral: ${Math.round(evento.valorUmbral)} días)`}
+                    <br />
+                    <i className="bi bi-info-circle me-1" />
+                    Se recomienda revisión veterinaria.
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-info-circle me-1" />
+                    {/* descripcion = acción recomendada del detector, con los días sin ciclo */}
+                    {evento.descripcion ?? 'El animal superó el umbral de días sin celo registrado. Se recomienda revisión veterinaria.'}
+                  </>
+                )}
               </>
             )}
           </div>
 
-          {evento.estadoResolucion && (
-            <div className="lt-popup-interventor">
-              <i className="bi bi-check2-circle me-1" />
-              Estado: <strong>{ESTADO_ALERTA_LABEL[evento.estadoResolucion] ?? evento.estadoResolucion}</strong>
-            </div>
+          {/* Estado y acceso al detalle en una fila, para que el popup no crezca de alto */}
+          <div className="lt-popup-footer">
+            {evento.estadoResolucion && (
+              <span className="lt-popup-interventor mb-0">
+                <i className="bi bi-check2-circle me-1" />
+                Estado:&nbsp;<strong>{ESTADO_ALERTA_LABEL[evento.estadoResolucion] ?? evento.estadoResolucion}</strong>
+              </span>
+            )}
+            <button
+              type="button"
+              className="lt-popup-link"
+              onClick={() => onVerAlerta(evento)}
+              disabled={abriendoAlertaId === evento.id}
+            >
+              <i className="bi bi-box-arrow-up-right me-1" />
+              {abriendoAlertaId === evento.id ? 'Abriendo...' : `Ver alerta #${evento.id}`}
+            </button>
+          </div>
+          {alertaError?.id === evento.id && (
+            <div role="alert" style={{ color: '#D50000', fontSize: '0.8rem' }}>{alertaError.msg}</div>
           )}
         </>
       ) : (
@@ -242,13 +279,13 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
 
 // ── Nodo de la línea de tiempo ────────────────────────────────────────────────
 
-interface NodoProps {
+interface NodoProps extends VerAlertaProps {
   evento: TimelineEvento;
   position: 'above' | 'below';
   index: number;
 }
 
-function EventoNodo({ evento, position, index }: NodoProps) {
+function EventoNodo({ evento, position, index, ...verAlerta }: NodoProps) {
   const [open, setOpen] = useState(false);
   const isAlerta = evento.tipoEvento === 'ALERTA';
   const isEstado = evento.tipoEvento === 'ESTADO';
@@ -299,6 +336,7 @@ function EventoNodo({ evento, position, index }: NodoProps) {
           evento={evento}
           onClose={() => setOpen(false)}
           position={position}
+          {...verAlerta}
         />
       )}
     </div>
@@ -311,10 +349,19 @@ interface Props {
   animalId: number;
   /** Estados reproductivos del animal; se muestran como nodos propios (INSEMINADA se omite: ya figura como intervención). */
   estados?: EstadoReproductivoResponse[];
+  /** Se llama al confirmar o descartar una alerta desde su detalle (confirmar un anestro registra un estado). */
+  onAlertaResuelta?: () => void;
 }
 
-export default function LineaTiempoAlertas({ animalId, estados }: Props) {
+export default function LineaTiempoAlertas({ animalId, estados, onAlertaResuelta }: Props) {
   const [remotos, setRemotos] = useState<LineaTiempoEventoResponse[]>([]);
+  const { selectedId } = useEstablecimientoStore();
+
+  // Detalle de alerta abierto desde un popup; version fuerza la recarga al resolverla.
+  const [alertaAbierta, setAlertaAbierta] = useState<AlertaResponse | null>(null);
+  const [abriendoAlertaId, setAbriendoAlertaId] = useState<number | null>(null);
+  const [alertaError, setAlertaError] = useState<{ id: number; msg: string } | null>(null);
+  const [version, setVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [cargado, setCargado] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -356,7 +403,24 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
     if (hasta != null) f.hasta = diaToIso(hasta, true);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData(f);
-  }, [desde, hasta, fetchData]);
+  }, [desde, hasta, fetchData, version]);
+
+  const abrirAlerta = async (ev: TimelineEvento) => {
+    if (!selectedId) return;
+    setAbriendoAlertaId(ev.id); setAlertaError(null);
+    try {
+      const d = await getAlertaDetalle(ev.id, selectedId);
+      // El detalle solo trae el disparador (CELO): el subtipo del evento es el que marca el anestro
+      setAlertaAbierta({
+        id: d.id, tipo: d.datoDisparador, subtipo: ev.subtipo, animalId: d.animalId,
+        tsGeneracion: d.tsGeneracion, estado: d.estadoActual, accionRecomendada: d.accionRecomendada,
+      });
+    } catch {
+      setAlertaError({ id: ev.id, msg: 'No se pudo abrir la alerta.' });
+    } finally {
+      setAbriendoAlertaId(null);
+    }
+  };
 
   const eventos = useMemo<TimelineEvento[]>(() => {
     const deMs = desde ?? -Infinity;
@@ -451,6 +515,9 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
                 evento={ev}
                 position={i % 2 === 0 ? 'above' : 'below'}
                 index={i}
+                onVerAlerta={abrirAlerta}
+                abriendoAlertaId={abriendoAlertaId}
+                alertaError={alertaError}
               />
             ))}
 
@@ -463,6 +530,15 @@ export default function LineaTiempoAlertas({ animalId, estados }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {alertaAbierta && (
+        <AlertDetailSidebar
+          alerta={alertaAbierta}
+          mode="fixed"
+          onClose={() => setAlertaAbierta(null)}
+          onActionComplete={() => { setVersion(v => v + 1); onAlertaResuelta?.(); }}
+        />
       )}
     </section>
   );

@@ -41,13 +41,15 @@ public class AnestroDetectorService {
     private final RabbitTemplate rabbitTemplate;
 
     private static final Set<TipoReproductivo> ESTADOS_DE_CICLO = EnumSet.of(
-            TipoReproductivo.CELO, TipoReproductivo.INSEMINADA, TipoReproductivo.GESTANTE, TipoReproductivo.PARIDA);
+            TipoReproductivo.CELO, TipoReproductivo.POSIBLE_CELO, TipoReproductivo.INSEMINADA, TipoReproductivo.GESTANTE,
+            TipoReproductivo.PARIDA);
 
     // Días sin volver a alertar tras descartar un anestro.
     @Value("${vigia.batch.anestro-silencio-dias:21}")
     private int silencioDias;
 
-    @Scheduled(cron = "${vigia.batch.anestro-cron:0 0 2 * * *}") // Por defecto, corre a las 2 AM
+    // @Scheduled(cron = "${vigia.batch.anestro-cron:0 0 2 * * *}") // Por defecto, corre a las 2 AM
+    @Scheduled(cron = "${vigia.batch.anestro-cron:0 * * * * *}")
     @Transactional
     public void detectarAnestro() {
         log.info("Iniciando detección programada de Anestro");
@@ -94,7 +96,7 @@ public class AnestroDetectorService {
 
     /**
      * Última evidencia de que el animal cicla, en todo el historial: parto, inseminación o un estado
-     * CELO/INSEMINADA/GESTANTE/PARIDA. Sin evidencia, cae al último registro, nacimiento + 1 año o alta.
+     * CELO/POSIBLE_CELO/INSEMINADA/GESTANTE/PARIDA. Sin evidencia, cae al último registro, nacimiento + 1 año o alta.
      */
     private LocalDate fechaReferencia(Animal animal, List<EstadoReproductivo> estados) {
         LocalDate ref = null;
@@ -160,7 +162,7 @@ public class AnestroDetectorService {
         alerta.setValorDetectado((double) diasSinCiclo);
         alerta.setEstado(EstadoAlerta.PENDIENTE);
         
-        alerta.setAccionRecomendada("Se requiere revisión veterinaria inmediata. El animal lleva " + diasSinCiclo + " días sin ciclo registrado.");
+        alerta.setAccionRecomendada("Se recomienda revisión veterinaria. El animal lleva " + diasSinCiclo + " días sin ciclo registrado.");
         alerta.setPosibleCausa("Anestro prolongado (>" + est.getDiasDeteccionAnestro() + " días)");
 
         alerta = alertaRepository.save(alerta);
