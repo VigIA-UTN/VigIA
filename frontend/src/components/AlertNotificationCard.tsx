@@ -1,4 +1,5 @@
-import { esAnestro, textoAccionRecomendada, type AlertaResponse } from '../api/alertaApi';
+import { esAislamiento, esAnestro, textoAccionRecomendada, type AlertaResponse } from '../api/alertaApi';
+import { formatMinutos } from '../utils/fechas';
 import SidebarCard, { type Categoria, type Severidad } from './SidebarCard';
 import DatoDesactualizadoBadge from './DatoDesactualizadoBadge';
 
@@ -15,6 +16,7 @@ const ICONO: Record<string, string> = {
   SALUD: 'bi-heart-pulse',
   GEOESPACIAL: 'bi-globe-americas',
   ABIGEATO: 'bi-globe-americas',
+  AISLAMIENTO_SOCIAL: 'bi-people-fill',
 };
 // Colores alineados con las tarjetas de resumen de MapPage (Reproductivo/Sanitario/Geoespacial).
 const CATEGORIA: Record<string, Categoria> = {
@@ -22,6 +24,7 @@ const CATEGORIA: Record<string, Categoria> = {
   SALUD: { label: 'Sanitario', color: '#198754', icono: 'bi-heart-pulse' },
   GEOESPACIAL: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
   ABIGEATO: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
+  AISLAMIENTO_SOCIAL: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
 };
 
 function haceCuanto(ts: string) {
@@ -32,6 +35,8 @@ function haceCuanto(ts: string) {
   if (min < 1440) return `Hace ${Math.floor(min / 60)} h`;
   return `Hace ${Math.floor(min / 1440)} d`;
 }
+
+const minutosDesde = (ts: string) => Math.max(0, Math.floor((Date.now() - new Date(ts).getTime()) / 60000)) || 0;
 
 function tiempoFueraBadge(ts: string) {
   const min = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
@@ -58,8 +63,23 @@ export default function AlertNotificationCard({
   const clave = anestro ? 'CELO' : alerta.tipo;
   const tipoNorm = (alerta.tipo ?? '').toUpperCase();
   const isGeoespacial = tipoNorm.includes('FUERA') || tipoNorm.includes('PERIMETRO') || tipoNorm === 'GEOESPACIAL';
+  const aislamiento = esAislamiento(alerta);
+  const aislados = alerta.animalesAislados ?? [];
 
-  const cuerpoPrincipal = isGeoespacial ? (
+  let titulo = anestro ? `#${alerta.animalId} en anestro` : `#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`;
+  if (aislamiento) {
+    titulo = aislados.length > 1 ? `${aislados.length} animales aislados del rodeo` : `#${aislados[0]?.identificador ?? alerta.animalId} aislado del rodeo`;
+  }
+  const minutosAislado = aislados.length
+    ? Math.max(...aislados.map(a => a.minutosFuera))
+    : minutosDesde(alerta.tsGeneracion);
+
+  const cuerpoPrincipal = aislamiento ? (
+    // Reserva las 3 líneas que ocupa la acción recomendada en las demás cards, para igualar la altura.
+    <div style={{ minHeight: 'calc(3 * 1.35em)' }}>
+      Fuera del grupo hace {formatMinutos(minutosAislado)}
+    </div>
+  ) : isGeoespacial ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
       <i
         className="bi bi-geo-alt-fill"
@@ -87,7 +107,7 @@ export default function AlertNotificationCard({
         severidad={severidad}
         icono={anestro ? 'bi-hourglass-split' : ICONO[clave] ?? 'bi-exclamation-triangle-fill'}
         categoria={CATEGORIA[clave]}
-        titulo={anestro ? `#${alerta.animalId} en anestro` : `#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
+        titulo={titulo}
         cuerpo={cuerpoPrincipal}
         timestamp={haceCuanto(alerta.tsGeneracion)}
         acento={isUnread}

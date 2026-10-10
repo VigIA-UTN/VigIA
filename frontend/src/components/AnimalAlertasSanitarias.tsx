@@ -52,7 +52,7 @@ export default function AnimalAlertasSanitarias({ animalId, establecimientoId, o
     <>
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', padding: '1.5rem', marginBottom: '1.5rem' }}>
         <h5 className="d-flex align-items-center gap-2" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: '#1E3A5F' }}>
-          <i className="bi bi-heart-pulse" /> Alertas sanitarias
+          Alertas sanitarias
         </h5>
         <p style={{ margin: '2px 0 1rem', fontSize: '0.8rem', color: '#A0AEC0' }}>
           Desvíos de comportamiento detectados para este animal

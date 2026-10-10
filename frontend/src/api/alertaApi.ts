@@ -1,4 +1,8 @@
 import axiosClient from './axiosClient';
+import { MOCK_ALERTA_AISLAMIENTO, MOCK_DETALLE_AISLAMIENTO } from './aislamientoMock';
+
+// TODO backend: borrar junto con aislamientoMock.ts cuando exista AISLAMIENTO_SOCIAL en la API.
+const mockAislamiento = import.meta.env.DEV;
 
 export interface AlertaResponse {
   id: number;
@@ -17,7 +21,29 @@ export interface AlertaResponse {
   caravanaUltimaSenial?: string | null;
   datoPosiblementeDesactualizado?: boolean;
   horasUmbralDatoDesactualizado?: number;
+  /** Solo AISLAMIENTO_SOCIAL: animales que se alejaron del grupo. */
+  animalesAislados?: AnimalAislado[];
 }
+
+/** Un animal que se alejó del grupo (alerta AISLAMIENTO_SOCIAL). */
+export interface AnimalAislado {
+  animalId: number;
+  identificador: string;
+  alias: string | null;
+  minutosFuera: number;
+  distanciaGrupoM: number;
+  severidad: SeveridadNivel;
+}
+
+/** Bloque de aislamiento del detalle de alerta (solo AISLAMIENTO_SOCIAL). */
+export interface DetalleAislamiento {
+  animalesAislados: AnimalAislado[];
+  tsInicio: string;
+  nombreLote: string | null;
+}
+
+/** Alerta geoespacial de aislamiento social: uno o más animales lejos del rodeo. */
+export const esAislamiento = (a: { tipo?: string | null }) => /AISLAMIENTO/i.test(a.tipo ?? '');
 
 /**
  * H0008: el backend marca la alerta al momento de enviarla. Como las listas no se refrescan solas,
@@ -63,6 +89,9 @@ export async function getAlertas(
   if (severidad) params.append('severidad', severidad);
   if (estado) params.append('estado', estado);
   const response = await axiosClient.get<AlertaResponse[]>(`/alertas?${params.toString()}`);
+  if (mockAislamiento && (!tipo || esAislamiento({ tipo })) && (!estado || estado === MOCK_ALERTA_AISLAMIENTO.estado)) {
+    return [...response.data, MOCK_ALERTA_AISLAMIENTO];
+  }
   return response.data;
 }
 
@@ -103,6 +132,10 @@ export async function updateAlertaEstado(
   nuevoEstado: 'CONFIRMADA' | 'DESCARTADA',
   notas?: string
 ): Promise<AlertaResponse> {
+  if (mockAislamiento && alertaId === MOCK_ALERTA_AISLAMIENTO.id) {
+    MOCK_ALERTA_AISLAMIENTO.estado = nuevoEstado;
+    return MOCK_ALERTA_AISLAMIENTO;
+  }
   const url = notas
     ? `/alertas/estado/${alertaId}?estado=${nuevoEstado}&notas=${encodeURIComponent(notas)}`
     : `/alertas/estado/${alertaId}?estado=${nuevoEstado}`;
@@ -189,6 +222,8 @@ export interface AlertaDetalleResponse {
   detalleSanitario?: DetalleSanitario | null;
   /** Presente solo para alertas geoespaciales (datoDisparador === 'FUERA_DE_PERIMETRO'). */
   detalleGeoespacial?: DetalleGeoespacial | null;
+  /** Presente solo para alertas AISLAMIENTO_SOCIAL. */
+  detalleAislamiento?: DetalleAislamiento | null;
   /** Última transmisión de la caravana (null si no tiene caravana o nunca transmitió). */
   caravanaUltimaSenial?: string | null;
   /** True en alertas de celo pendientes cuya caravana no transmite hace más de `horasUmbralDatoDesactualizado`. */
@@ -197,6 +232,9 @@ export interface AlertaDetalleResponse {
 }
 
 export async function getAlertaDetalle(alertaId: number, establecimientoId: number): Promise<AlertaDetalleResponse> {
+  if (mockAislamiento && alertaId === MOCK_ALERTA_AISLAMIENTO.id) {
+    return { ...MOCK_DETALLE_AISLAMIENTO, estadoActual: MOCK_ALERTA_AISLAMIENTO.estado };
+  }
   const response = await axiosClient.get<AlertaDetalleResponse>(
     `/alertas/${alertaId}?establecimientoId=${establecimientoId}`
   );

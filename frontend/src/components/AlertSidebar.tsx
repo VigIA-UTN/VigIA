@@ -137,10 +137,10 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
   // Derived filtered alerts
   const alertasFiltradas = alertas.filter(a => {
     if (filtroTipo) {
-      // 'GEO' es el valor interno que agrupa ABIGEATO y FUERA_DE_PERIMETRO
+      // 'GEO' es el valor interno que agrupa ABIGEATO, FUERA_DE_PERIMETRO y AISLAMIENTO_SOCIAL
       if (filtroTipo === 'GEO') {
         const t = (a.tipo ?? '').toUpperCase();
-        if (!t.includes('FUERA') && !t.includes('PERIMETRO') && t !== 'ABIGEATO' && t !== 'GEOESPACIAL') return false;
+        if (!t.includes('FUERA') && !t.includes('PERIMETRO') && t !== 'ABIGEATO' && t !== 'GEOESPACIAL' && !t.includes('AISLAMIENTO')) return false;
       } else if (a.tipo !== filtroTipo) {
         return false;
       }
