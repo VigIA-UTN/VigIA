@@ -1,14 +1,17 @@
 package dev.vigia.backend.config;
 
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.model.RegistroCohesion;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
-import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -45,18 +48,23 @@ public class CohesionBatchConfig {
     private final EstablecimientoRepository establecimientoRepository;
     private final TelemetriaRepository telemetriaRepository;
     private final AlertaRepository alertaRepository;
+    private final RegistroCohesionRepository registroCohesionRepository;
+    private final AnimalRepository animalRepository;
     private final RabbitTemplate rabbitTemplate;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public CohesionBatchConfig(JobRepository jobRepository, PlatformTransactionManager transactionManager,
             EstablecimientoRepository establecimientoRepository, TelemetriaRepository telemetriaRepository,
-            AlertaRepository alertaRepository, RabbitTemplate rabbitTemplate) {
+            AlertaRepository alertaRepository, RabbitTemplate rabbitTemplate,
+            RegistroCohesionRepository registroCohesionRepository, AnimalRepository animalRepository) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.establecimientoRepository = establecimientoRepository;
         this.telemetriaRepository = telemetriaRepository;
         this.alertaRepository = alertaRepository;
         this.rabbitTemplate = rabbitTemplate;
+        this.registroCohesionRepository = registroCohesionRepository;
+        this.animalRepository = animalRepository;
     }
 
     @Bean
@@ -94,7 +102,8 @@ public class CohesionBatchConfig {
                     })
                     .collect(Collectors.toList());
 
-            double umbral = establecimiento.getUmbralAislamientoM() != null ? establecimiento.getUmbralAislamientoM() : 100.0;
+            double umbral = establecimiento.getUmbralAislamientoM() != null ? establecimiento.getUmbralAislamientoM()
+                    : 100.0;
             Map<String, Object> request = new java.util.HashMap<>();
             request.put("historial_7d", coordenadas);
             request.put("umbral_aislamiento_m", umbral);
@@ -109,13 +118,41 @@ public class CohesionBatchConfig {
                     List<GeoAlerta> alertas = resp.getBody().getAlertas();
                     if (alertas != null) {
                         for (GeoAlerta ga : alertas) {
+                            if (ga.getAnimalId() == null) {
+                                continue;
+                            }
+                            Long animalId = Long.parseLong(ga.getAnimalId());
+
+                            // Guardar registro histórico del índice de cohesión por animal
+                            if (ga.getIndiceCohesion() != null) {
+                                Animal animal = telemetriaList.stream()
+                                        .map(t -> t.getCaravana().getAnimal())
+                                        .filter(a -> a != null && animalId.equals(a.getId()))
+                                        .findFirst()
+                                        .orElseGet(() -> animalRepository.findById(animalId).orElse(null));
+
+                                if (animal != null) {
+                                    RegistroCohesion reg = RegistroCohesion.builder()
+                                            .animal(animal)
+                                            .establecimiento(establecimiento)
+                                            .fecha(LocalDateTime.now())
+                                            .indiceCohesion(ga.getIndiceCohesion())
+                                            .tiempoFueraGrupoS(ga.getTiempoFueraGrupoS() != null
+                                                    ? ga.getTiempoFueraGrupoS().longValue()
+                                                    : 0L)
+                                            .distanciaCentroideM(ga.getDistanciaCentroideM())
+                                            .build();
+                                    registroCohesionRepository.save(reg);
+                                }
+                            }
+
                             if (Boolean.TRUE.equals(ga.getAlertaAislamiento())) {
-                                Long animalId = Long.parseLong(ga.getAnimalId());
                                 Double distancia = ga.getDistanciaCentroideM();
-                                
+
                                 // Buscar última posición de este animal
                                 var ultimaTelemetria = telemetriaList.stream()
-                                        .filter(t -> t.getCaravana().getAnimal() != null && animalId.equals(t.getCaravana().getAnimal().getId()))
+                                        .filter(t -> t.getCaravana().getAnimal() != null
+                                                && animalId.equals(t.getCaravana().getAnimal().getId()))
                                         .reduce((first, second) -> second)
                                         .orElse(null);
 
@@ -135,10 +172,11 @@ public class CohesionBatchConfig {
         };
     }
 
-    private void generarAlertaSiNoExiste(Long animalId, Establecimiento est, Double distancia, double umbral, Double lat, Double lng) {
+    private void generarAlertaSiNoExiste(Long animalId, Establecimiento est, Double distancia, double umbral,
+            Double lat, Double lng) {
         boolean existe = alertaRepository.alertasAnimalActivas(animalId).stream()
                 .anyMatch(al -> al.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL);
-        
+
         if (!existe) {
             dev.vigia.backend.model.Animal a = new dev.vigia.backend.model.Animal();
             a.setId(animalId);
@@ -185,7 +223,8 @@ public class CohesionBatchConfig {
 
     @Bean
     public ItemWriter<Establecimiento> cohesionWriter() {
-        return items -> {};
+        return items -> {
+        };
     }
 
     @Bean
@@ -217,10 +256,16 @@ public class CohesionBatchConfig {
         @JsonProperty("animal_id")
         private String animalId;
 
+        @JsonProperty("indice_cohesion")
+        private Double indiceCohesion;
+
         @JsonProperty("alerta_aislamiento")
         private Boolean alertaAislamiento;
 
         @JsonProperty("distancia_centroide_m")
         private Double distanciaCentroideM;
+
+        @JsonProperty("tiempo_fuera_grupo_s")
+        private Double tiempoFueraGrupoS;
     }
 }
