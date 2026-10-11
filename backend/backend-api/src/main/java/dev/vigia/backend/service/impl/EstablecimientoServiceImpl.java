@@ -2,6 +2,8 @@ package dev.vigia.backend.service.impl;
 
 import dev.vigia.backend.service.EstablecimientoService;
 
+import dev.vigia.backend.dto.ConfigAislamientoRequest;
+import dev.vigia.backend.dto.ConfigAislamientoResponse;
 import dev.vigia.backend.dto.ConfigAnestroRequest;
 import dev.vigia.backend.dto.ConfigAnestroResponse;
 import dev.vigia.backend.dto.EstablecimientoRequest;
@@ -28,6 +30,10 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
 
     private static final int DIAS_MIN = 1;
     private static final int DIAS_MAX = 365;
+
+    private static final double UMBRAL_AISLAMIENTO_MIN = 10.0;
+    private static final double UMBRAL_AISLAMIENTO_MAX = 1000.0;
+    private static final double UMBRAL_AISLAMIENTO_DEFAULT = 100.0;
 
     private final EstablecimientoRepository establecimientoRepository;
     private final IntervencionRepository intervencionRepository;
@@ -174,6 +180,43 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
         return mapToConfigResponse(establecimientoRepository.save(est));
     }
 
+    // ── Configuración de aislamiento ──────────────────────────────────────────
+
+    /**
+     * Consulta el umbral de aislamiento en metros del establecimiento.
+     * Solo PRODUCTOR o VETERINARIO activos del establecimiento pueden consultar.
+     * Si no fue configurado previamente, devuelve el valor default (100.0 m).
+     */
+    @SuppressWarnings("null")
+    public ConfigAislamientoResponse getConfigAislamiento(Long establecimientoId, String emailUsuario) {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId)
+                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+
+        verificarPertenencia(est, emailUsuario);
+
+        return mapToConfigAislamientoResponse(est);
+    }
+
+    /**
+     * Actualiza el umbral de aislamiento en metros del establecimiento.
+     * Solo PRODUCTOR o VETERINARIO activos del establecimiento pueden editar.
+     * Valida que el valor se encuentre en el rango permitido (10.0 a 1000.0 m).
+     */
+    @SuppressWarnings("null")
+    public ConfigAislamientoResponse updateConfigAislamiento(Long establecimientoId,
+                                                             ConfigAislamientoRequest request,
+                                                             String emailUsuario) {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId)
+                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+
+        verificarPertenencia(est, emailUsuario);
+        validarParametrosAislamiento(request);
+
+        est.setUmbralAislamientoM(request.getUmbralAislamientoM());
+
+        return mapToConfigAislamientoResponse(establecimientoRepository.save(est));
+    }
+
     // ── Helpers privados ──────────────────────────────────────────────────────
 
     /**
@@ -233,6 +276,7 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 .fechaAlta(est.getFechaAlta())
                 .diasDeteccionAnestro(est.getDiasDeteccionAnestro())
                 .severidadAnestro(est.getSeveridadAnestro())
+                .umbralAislamientoM(est.getUmbralAislamientoM())
                 .build();
     }
 
@@ -242,6 +286,25 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 .nombreEstablecimiento(est.getNombre())
                 .diasDeteccionAnestro(est.getDiasDeteccionAnestro())
                 .severidadAnestro(est.getSeveridadAnestro())
+                .build();
+    }
+
+    private void validarParametrosAislamiento(ConfigAislamientoRequest request) {
+        if (request.getUmbralAislamientoM() == null) {
+            throw new IllegalArgumentException("El campo umbralAislamientoM es obligatorio.");
+        }
+        if (request.getUmbralAislamientoM() < UMBRAL_AISLAMIENTO_MIN || request.getUmbralAislamientoM() > UMBRAL_AISLAMIENTO_MAX) {
+            throw new IllegalArgumentException(
+                    String.format("umbralAislamientoM debe estar entre %.1f y %.1f metros.", UMBRAL_AISLAMIENTO_MIN, UMBRAL_AISLAMIENTO_MAX));
+        }
+    }
+
+    private ConfigAislamientoResponse mapToConfigAislamientoResponse(Establecimiento est) {
+        Double umbral = est.getUmbralAislamientoM() != null ? est.getUmbralAislamientoM() : UMBRAL_AISLAMIENTO_DEFAULT;
+        return ConfigAislamientoResponse.builder()
+                .establecimientoId(est.getId())
+                .nombreEstablecimiento(est.getNombre())
+                .umbralAislamientoM(umbral)
                 .build();
     }
 }

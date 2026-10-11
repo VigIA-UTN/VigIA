@@ -1,5 +1,7 @@
 package dev.vigia.backend.service;
 
+import dev.vigia.backend.dto.ConfigAislamientoRequest;
+import dev.vigia.backend.dto.ConfigAislamientoResponse;
 import dev.vigia.backend.dto.ConfigAnestroRequest;
 import dev.vigia.backend.dto.ConfigAnestroResponse;
 import dev.vigia.backend.dto.EstablecimientoRequest;
@@ -47,4 +49,30 @@ public interface EstablecimientoService {
      * @throws org.springframework.security.access.AccessDeniedException si el usuario no pertenece al establecimiento
      */
     ConfigAnestroResponse updateConfigAnestro(Long establecimientoId, ConfigAnestroRequest request, String emailUsuario);
+
+    /**
+     * Consulta el umbral de aislamiento de un establecimiento.
+     * Solo puede ser invocado por un PRODUCTOR o VETERINARIO activo del establecimiento.
+     * Si no fue configurado previamente, devuelve el valor por defecto (100.0 m).
+     *
+     * @param establecimientoId ID del establecimiento
+     * @param emailUsuario      email del usuario autenticado
+     * @return configuración de aislamiento vigente
+     * @throws org.springframework.security.access.AccessDeniedException si el usuario no pertenece al establecimiento
+     */
+    ConfigAislamientoResponse getConfigAislamiento(Long establecimientoId, String emailUsuario);
+
+    /**
+     * Actualiza el umbral de aislamiento de un establecimiento.
+     * Solo puede ser invocado por un PRODUCTOR o VETERINARIO activo del establecimiento.
+     * Valida que el valor se encuentre en el rango permitido (10.0 a 1000.0 metros).
+     *
+     * @param establecimientoId ID del establecimiento
+     * @param request           nuevo umbral
+     * @param emailUsuario      email del usuario autenticado
+     * @return configuración de aislamiento actualizada
+     * @throws IllegalArgumentException                                  si el valor está fuera de rango o es nulo
+     * @throws org.springframework.security.access.AccessDeniedException si el usuario no pertenece al establecimiento
+     */
+    ConfigAislamientoResponse updateConfigAislamiento(Long establecimientoId, ConfigAislamientoRequest request, String emailUsuario);
 }

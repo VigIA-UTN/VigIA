@@ -17,4 +17,5 @@ public class EstablecimientoResponse {
     private LocalDate fechaAlta;
     private Integer diasDeteccionAnestro;
     private SeveridadAlerta severidadAnestro;
+    private Double umbralAislamientoM;
 }

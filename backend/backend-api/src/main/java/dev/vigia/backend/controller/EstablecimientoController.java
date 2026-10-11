@@ -1,5 +1,7 @@
 package dev.vigia.backend.controller;
 
+import dev.vigia.backend.dto.ConfigAislamientoRequest;
+import dev.vigia.backend.dto.ConfigAislamientoResponse;
 import dev.vigia.backend.dto.ConfigAnestroRequest;
 import dev.vigia.backend.dto.ConfigAnestroResponse;
 import dev.vigia.backend.dto.EstablecimientoRequest;
@@ -185,5 +187,49 @@ public class EstablecimientoController {
             Authentication authentication) {
         return ResponseEntity.ok(
                 establecimientoService.updateConfigAnestro(id, request, authentication.getName()));
+    }
+
+    // ── Configuración de aislamiento ──────────────────────────────────────────
+
+    /**
+     * GET /api/v1/establecimientos/{id}/aislamiento
+     * <p>
+     * Consulta el umbral de aislamiento en metros de un establecimiento.
+     * Solo el PRODUCTOR o VETERINARIO activo del establecimiento puede consultarlo.
+     *
+     * @param id             ID del establecimiento
+     * @param authentication contexto de seguridad
+     * @return 200 con la configuración de aislamiento, 403 si no pertenece al establecimiento
+     */
+    @GetMapping("/{id}/aislamiento")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<ConfigAislamientoResponse> getConfigAislamiento(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                establecimientoService.getConfigAislamiento(id, authentication.getName()));
+    }
+
+    /**
+     * PUT /api/v1/establecimientos/{id}/aislamiento
+     * <p>
+     * Actualiza el umbral de aislamiento en metros de un establecimiento.
+     * Solo el PRODUCTOR o VETERINARIO activo del establecimiento puede editarlo.
+     * Valida que el umbral se encuentre en el rango permitido (10.0 a 1000.0 m).
+     *
+     * @param id             ID del establecimiento
+     * @param request        nuevo umbral (umbralAislamientoM)
+     * @param authentication contexto de seguridad
+     * @return 200 con la configuración actualizada, 400 si el valor es inválido o fuera de rango,
+     *         403 si no pertenece al establecimiento
+     */
+    @PutMapping("/{id}/aislamiento")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<ConfigAislamientoResponse> updateConfigAislamiento(
+            @PathVariable Long id,
+            @RequestBody ConfigAislamientoRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                establecimientoService.updateConfigAislamiento(id, request, authentication.getName()));
     }
 }
