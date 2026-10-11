@@ -364,6 +364,10 @@ public class AlertaServiceImpl implements AlertaService {
                         return "El sistema detectó que el animal salió del perímetro asignado.";
                 }
 
+                if (disparador == DisparadorAlerta.AISLAMIENTO_SOCIAL) {
+                        return "La posición de este animal se mantuvo lejos del grupo principal del rodeo durante más tiempo que lo habitual.";
+                }
+
                 if (confianzaPct != null) {
                         return String.format(
                                         "El sistema detectó un comportamiento que se aparta de lo habitual para este animal, "
@@ -917,6 +921,7 @@ public class AlertaServiceImpl implements AlertaService {
                         case "sanitario" -> DisparadorAlerta.SALUD;
                         case "geoespacial" -> DisparadorAlerta.ABIGEATO;
                         case "perimetro" -> DisparadorAlerta.FUERA_DE_PERIMETRO;
+                        case "aislamiento_social" -> DisparadorAlerta.AISLAMIENTO_SOCIAL;
                         default -> null;
                 };
         }

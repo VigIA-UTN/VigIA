@@ -17,6 +17,7 @@ public class BatchScheduler {
     private final JobLauncher jobLauncher;
     private final Job celoJob;
     private final Job saludJob;
+    private final Job cohesionJob;
 
     @Scheduled(fixedRateString = "${vigia.batch.celo-rate:60000}")
     @SuppressWarnings("null")
@@ -45,6 +46,20 @@ public class BatchScheduler {
             jobLauncher.run(saludJob, parameters);
         } catch (Exception e) {
             log.error("Error al ejecutar el Job de Salud: {}", e.getMessage(), e);
+        }
+    }
+
+    @Scheduled(fixedRateString = "${vigia.batch.cohesion-rate:60000}")
+    public void runCohesionJob() {
+        try {
+            log.info("Iniciando ejecución programada del Job de Cohesión");
+            JobParameters parameters = new JobParametersBuilder()
+                    .addLong("time", System.currentTimeMillis())
+                    .toJobParameters();
+            
+            jobLauncher.run(cohesionJob, parameters);
+        } catch (Exception e) {
+            log.error("Error al ejecutar el Job de Cohesión: {}", e.getMessage(), e);
         }
     }
 }

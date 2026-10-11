@@ -4,6 +4,7 @@ public enum DisparadorAlerta {
     CELO,
     SALUD,
     ABIGEATO,
-    FUERA_DE_PERIMETRO
+    FUERA_DE_PERIMETRO,
+    AISLAMIENTO_SOCIAL
 }
 

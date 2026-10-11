@@ -7,6 +7,7 @@ spring:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:vigia}
     username: ${DB_USER:vigia_user}
     password: ${DB_PASSWORD:vigia_dev_password}
+    driver-class-name: org.postgresql.Driver
   batch:
     job:
       enabled: false

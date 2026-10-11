@@ -1,8 +1,8 @@
 import axiosClient from './axiosClient';
 import { MOCK_ALERTA_AISLAMIENTO, MOCK_DETALLE_AISLAMIENTO } from './aislamientoMock';
 
-// TODO backend: borrar junto con aislamientoMock.ts cuando exista AISLAMIENTO_SOCIAL en la API.
-const mockAislamiento = import.meta.env.DEV;
+// El backend ya emite AISLAMIENTO_SOCIAL de forma nativa.
+const mockAislamiento = false;
 
 export interface AlertaResponse {
   id: number;
