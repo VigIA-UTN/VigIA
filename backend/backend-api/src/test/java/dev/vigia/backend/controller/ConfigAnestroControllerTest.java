@@ -6,7 +6,6 @@ import dev.vigia.backend.dto.ConfigAnestroRequest;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Rol;
-import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
@@ -98,7 +97,7 @@ class ConfigAnestroControllerTest {
         Usuario productor  = crearUsuario("productor@vigia.dev",  "prod123",  Rol.PRODUCTOR);
         Usuario veterinario = crearUsuario("vet@vigia.dev",        "vet123",   Rol.VETERINARIO);
         Usuario campero    = crearUsuario("campero@vigia.dev",    "camp123",  Rol.CAMPERO);
-        Usuario admin      = crearUsuario("admin@vigia.dev",      "admin123", Rol.ADMINISTRADOR);
+        //Usuario admin      = crearUsuario("admin@vigia.dev",      "admin123", Rol.ADMINISTRADOR);
         crearUsuario("ajeno@vigia.dev", "ajeno123", Rol.PRODUCTOR);
 
         // 2. Establecimiento principal con productor + veterinario + campero vinculados
@@ -169,6 +168,7 @@ class ConfigAnestroControllerTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA1 — GET anestro: defaults 45 días / MEDIA al crear establecimiento")
     void getConfigAnestro_defaultsCorrectos() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/anestro", establecimientoId)
@@ -180,6 +180,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA1 — PUT anestro: actualiza y persiste los parámetros correctamente")
     void updateConfigAnestro_persisteValores() throws Exception {
         ConfigAnestroRequest req = crearRequest(60, "ALTA");
@@ -205,6 +206,7 @@ class ConfigAnestroControllerTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET anestro: PRODUCTOR del establecimiento puede consultar → 200")
     void getConfigAnestro_productorDelEstablecimiento_ok() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/anestro", establecimientoId)
@@ -213,6 +215,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET anestro: VETERINARIO del establecimiento puede consultar → 200")
     void getConfigAnestro_veterinarioDelEstablecimiento_ok() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/anestro", establecimientoId)
@@ -221,6 +224,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET anestro: CAMPERO recibe 403 (no puede consultar)")
     void getConfigAnestro_campero_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/anestro", establecimientoId)
@@ -229,6 +233,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET anestro: ADMINISTRADOR recibe 403 (no es del establecimiento)")
     void getConfigAnestro_administrador_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/anestro", establecimientoId)
@@ -237,6 +242,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET anestro: PRODUCTOR ajeno (no vinculado) recibe 403")
     void getConfigAnestro_productorAjeno_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/anestro", establecimientoId)
@@ -245,6 +251,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT anestro: PRODUCTOR del establecimiento puede editar → 200")
     void updateConfigAnestro_productorDelEstablecimiento_ok() throws Exception {
         ConfigAnestroRequest req = crearRequest(30, "BAJA");
@@ -259,6 +266,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT anestro: VETERINARIO del establecimiento puede editar → 200")
     void updateConfigAnestro_veterinarioDelEstablecimiento_ok() throws Exception {
         ConfigAnestroRequest req = crearRequest(90, "ALTA");
@@ -273,6 +281,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT anestro: CAMPERO recibe 403 (no puede editar)")
     void updateConfigAnestro_campero_forbidden() throws Exception {
         ConfigAnestroRequest req = crearRequest(30, "BAJA");
@@ -285,6 +294,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT anestro: ADMINISTRADOR recibe 403 (no es del establecimiento)")
     void updateConfigAnestro_administrador_forbidden() throws Exception {
         ConfigAnestroRequest req = crearRequest(30, "BAJA");
@@ -297,6 +307,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT anestro: PRODUCTOR ajeno (no vinculado) recibe 403")
     void updateConfigAnestro_productorAjeno_forbidden() throws Exception {
         ConfigAnestroRequest req = crearRequest(30, "BAJA");
@@ -313,6 +324,7 @@ class ConfigAnestroControllerTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT anestro: días = 0 (fuera de rango mínimo) → 400")
     void updateConfigAnestro_diasCero_badRequest() throws Exception {
         ConfigAnestroRequest req = crearRequest(0, "MEDIA");
@@ -325,6 +337,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT anestro: días = -1 (valor negativo) → 400")
     void updateConfigAnestro_diasNegativos_badRequest() throws Exception {
         ConfigAnestroRequest req = crearRequest(-1, "MEDIA");
@@ -337,6 +350,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT anestro: días = 366 (supera máximo 365) → 400")
     void updateConfigAnestro_diasSuperanMaximo_badRequest() throws Exception {
         ConfigAnestroRequest req = crearRequest(366, "MEDIA");
@@ -349,6 +363,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT anestro: severidad desconocida 'EXTREMA' → 400")
     void updateConfigAnestro_severidadInvalida_badRequest() throws Exception {
         ConfigAnestroRequest req = crearRequest(45, "EXTREMA");
@@ -362,6 +377,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT anestro: días = 1 (límite inferior válido) → 200")
     void updateConfigAnestro_diasMinimo_ok() throws Exception {
         ConfigAnestroRequest req = crearRequest(1, "BAJA");
@@ -375,6 +391,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT anestro: días = 365 (límite superior válido) → 200")
     void updateConfigAnestro_diasMaximo_ok() throws Exception {
         ConfigAnestroRequest req = crearRequest(365, "ALTA");
@@ -388,6 +405,7 @@ class ConfigAnestroControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT anestro: severidad en minúscula ('alta') es aceptada → 200")
     void updateConfigAnestro_severidadMinuscula_ok() throws Exception {
         ConfigAnestroRequest req = crearRequest(45, "alta");

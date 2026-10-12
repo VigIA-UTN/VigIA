@@ -50,13 +50,14 @@ public class BatchScheduler {
     }
 
     @Scheduled(fixedRateString = "${vigia.batch.cohesion-rate:60000}")
+    @SuppressWarnings("null")
     public void runCohesionJob() {
         try {
             log.info("Iniciando ejecución programada del Job de Cohesión");
             JobParameters parameters = new JobParametersBuilder()
                     .addLong("time", System.currentTimeMillis())
                     .toJobParameters();
-            
+
             jobLauncher.run(cohesionJob, parameters);
         } catch (Exception e) {
             log.error("Error al ejecutar el Job de Cohesión: {}", e.getMessage(), e);

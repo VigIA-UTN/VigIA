@@ -163,6 +163,7 @@ class CargaMasivaServiceTest {
                 assertEquals(0, resultado.getAnimalesExitosos().size());
         }
 
+        @SuppressWarnings("null")
         private CargaMasivaResult procesarFilas(List<String[]> parsedRows) throws IOException {
                 when(establecimientoRepository.findById(1L))
                                 .thenReturn(Optional.of(establecimiento));
@@ -218,6 +219,7 @@ class CargaMasivaServiceTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         @DisplayName("Falla si el rodeo no existe (no se crea automáticamente)")
         void procesarCargaMasiva_rodeoInexistente() throws IOException {
                 assertFallaConError(

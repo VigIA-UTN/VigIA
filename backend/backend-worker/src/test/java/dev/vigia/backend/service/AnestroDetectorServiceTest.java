@@ -56,6 +56,7 @@ class AnestroDetectorServiceTest {
     private Animal animal;
 
     @BeforeEach
+    @SuppressWarnings("null")
     void setUp() {
         ReflectionTestUtils.setField(service, "silencioDias", 21);
 
@@ -76,6 +77,7 @@ class AnestroDetectorServiceTest {
     }
 
     /** Estado registrado hace {@code diasRegistro} días; parto/inseminación en días atrás o null. */
+    @SuppressWarnings("null")
     private static EstadoReproductivo estado(TipoReproductivo tipo, int diasRegistro, Integer diasParto,
             Integer diasInseminacion) {
         EstadoReproductivo e = new EstadoReproductivo();
@@ -91,6 +93,7 @@ class AnestroDetectorServiceTest {
         animal.setEstadosReproductivos(List.of(estados));
     }
 
+    @SuppressWarnings("null")
     private void ultimaAlertaAnestro(EstadoAlerta estado, int diasDesdeResolucion) {
         Alerta a = new Alerta();
         a.setAnimal(animal);
@@ -102,6 +105,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void dispara_CuandoSuperaElUmbralSinCiclo() {
         historial(estado(TipoReproductivo.VACIA, 100, 100, null));
 
@@ -120,6 +124,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void noDispara_SiSeRegistroCeloAunqueArrastreUnPartoViejo() {
         // Registrar un celo copia el parto anterior: la referencia tiene que ser el celo, no el parto.
         historial(estado(TipoReproductivo.CELO, 10, 200, null));
@@ -130,6 +135,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void noDispara_SiElModeloDetectoUnCeloReciente() {
         // El celo detectado por el ML (POSIBLE_CELO) también cuenta como actividad de ciclo
         historial(estado(TipoReproductivo.POSIBLE_CELO, 10, 200, null));
@@ -140,6 +146,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void archivaLaPendiente_SiElModeloDetectoUnCeloDespues() {
         historial(estado(TipoReproductivo.POSIBLE_CELO, 5, 200, null));
         ultimaAlertaAnestro(EstadoAlerta.PENDIENTE, 0);
@@ -153,6 +160,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void noDispara_SiHuboInseminacionReciente_AunqueElUltimoEstadoSeaVacia() {
         historial(
                 estado(TipoReproductivo.VACIA, 0, 200, null),
@@ -164,6 +172,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void noDispara_SiSeDescartoHaceMenosDelSilencio() {
         historial(estado(TipoReproductivo.VACIA, 100, 100, null));
         ultimaAlertaAnestro(EstadoAlerta.DESCARTADA, 10);
@@ -174,6 +183,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void dispara_SiSeDescartoHaceMasDelSilencio() {
         historial(estado(TipoReproductivo.VACIA, 100, 100, null));
         ultimaAlertaAnestro(EstadoAlerta.DESCARTADA, 30);
@@ -184,6 +194,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void archivaLaPendiente_SiSeRegistroUnCeloDespues() {
         historial(estado(TipoReproductivo.CELO, 5, 200, null));
         ultimaAlertaAnestro(EstadoAlerta.PENDIENTE, 0);
@@ -198,6 +209,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void dispara_SiLaAnteriorFueArchivada_ElArchivadoNoSilencia() {
         historial(estado(TipoReproductivo.VACIA, 100, 100, null));
         ultimaAlertaAnestro(EstadoAlerta.ARCHIVADA, 2);
@@ -208,6 +220,7 @@ class AnestroDetectorServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void noDispara_SiYaHayUnaAlertaPendiente() {
         historial(estado(TipoReproductivo.VACIA, 100, 100, null));
         ultimaAlertaAnestro(EstadoAlerta.PENDIENTE, 0);

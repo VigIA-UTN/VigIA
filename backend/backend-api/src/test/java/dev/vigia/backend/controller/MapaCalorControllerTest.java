@@ -299,6 +299,8 @@ class MapaCalorControllerTest {
         when(mlGeoClient.analyze(any())).thenReturn(mlGeoResp);
 
         Long conId  = conDatos.getId();
+        
+        @SuppressWarnings("unused")
         Long sinId  = sinDatos.getId();
 
         mockMvc.perform(get(ENDPOINT)

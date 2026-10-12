@@ -137,6 +137,7 @@ public class MapaCalorServiceImpl implements MapaCalorService {
          * <p>Se usa una única consulta por IDs (en lugar de N consultas) para evitar el
          * problema N+1. Los IDs que ml-geo no encuentre en la BD se ignoran silenciosamente.
          */
+        @SuppressWarnings("null")
         private List<AnimalAlejadoDTO> resolverAnimalesAlejados(GeoAnalyzeResponseDTO mlGeoResponse) {
                 if (mlGeoResponse == null || mlGeoResponse.getAlertas() == null) {
                         return new ArrayList<>();

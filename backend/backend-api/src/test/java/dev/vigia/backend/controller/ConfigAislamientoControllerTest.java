@@ -98,7 +98,7 @@ class ConfigAislamientoControllerTest {
         Usuario productor   = crearUsuario("productor@vigia.dev",   "prod123",  Rol.PRODUCTOR);
         Usuario veterinario = crearUsuario("vet@vigia.dev",         "vet123",   Rol.VETERINARIO);
         Usuario campero     = crearUsuario("campero@vigia.dev",     "camp123",  Rol.CAMPERO);
-        Usuario admin       = crearUsuario("admin@vigia.dev",       "admin123", Rol.ADMINISTRADOR);
+        //Usuario admin       = crearUsuario("admin@vigia.dev",       "admin123", Rol.ADMINISTRADOR);
         crearUsuario("ajeno@vigia.dev", "ajeno123", Rol.PRODUCTOR);
 
         // 2. Establecimiento principal con productor + veterinario + campero vinculados
@@ -166,6 +166,7 @@ class ConfigAislamientoControllerTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA1 — GET aislamiento: default 100.0 m al crear establecimiento")
     void getConfigAislamiento_defaultCorrecto_100m() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/aislamiento", establecimientoId)
@@ -177,6 +178,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA1 — GET aislamiento: si umbralAislamientoM es null en BD, devuelve 100.0 m por defecto")
     void getConfigAislamiento_cuandoNull_devuelveDefault100m() throws Exception {
         Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
@@ -190,6 +192,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA1 — PUT aislamiento: actualiza y persiste el umbral correctamente")
     void updateConfigAislamiento_persisteNuevoValor() throws Exception {
         ConfigAislamientoRequest req = crearRequest(150.0);
@@ -214,6 +217,7 @@ class ConfigAislamientoControllerTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET aislamiento: PRODUCTOR del establecimiento puede consultar → 200")
     void getConfigAislamiento_productorDelEstablecimiento_ok() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/aislamiento", establecimientoId)
@@ -222,6 +226,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET aislamiento: VETERINARIO del establecimiento puede consultar → 200")
     void getConfigAislamiento_veterinarioDelEstablecimiento_ok() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/aislamiento", establecimientoId)
@@ -230,6 +235,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET aislamiento: CAMPERO recibe 403 (no puede consultar)")
     void getConfigAislamiento_campero_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/aislamiento", establecimientoId)
@@ -238,6 +244,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET aislamiento: ADMINISTRADOR recibe 403 (no es del establecimiento)")
     void getConfigAislamiento_administrador_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/aislamiento", establecimientoId)
@@ -246,6 +253,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — GET aislamiento: PRODUCTOR ajeno recibe 403")
     void getConfigAislamiento_productorAjeno_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/{id}/aislamiento", establecimientoId)
@@ -254,6 +262,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT aislamiento: PRODUCTOR del establecimiento puede editar → 200")
     void updateConfigAislamiento_productorDelEstablecimiento_ok() throws Exception {
         ConfigAislamientoRequest req = crearRequest(120.0);
@@ -267,6 +276,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT aislamiento: VETERINARIO del establecimiento puede editar → 200")
     void updateConfigAislamiento_veterinarioDelEstablecimiento_ok() throws Exception {
         ConfigAislamientoRequest req = crearRequest(80.0);
@@ -280,6 +290,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT aislamiento: CAMPERO recibe 403 (no puede editar)")
     void updateConfigAislamiento_campero_forbidden() throws Exception {
         ConfigAislamientoRequest req = crearRequest(80.0);
@@ -292,6 +303,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT aislamiento: ADMINISTRADOR recibe 403 (no es del establecimiento)")
     void updateConfigAislamiento_administrador_forbidden() throws Exception {
         ConfigAislamientoRequest req = crearRequest(80.0);
@@ -304,6 +316,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA2 — PUT aislamiento: PRODUCTOR ajeno recibe 403")
     void updateConfigAislamiento_productorAjeno_forbidden() throws Exception {
         ConfigAislamientoRequest req = crearRequest(80.0);
@@ -320,6 +333,7 @@ class ConfigAislamientoControllerTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT aislamiento: valor null → 400 Bad Request")
     void updateConfigAislamiento_umbralNull_badRequest() throws Exception {
         ConfigAislamientoRequest req = new ConfigAislamientoRequest(null);
@@ -332,6 +346,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT aislamiento: valor menor al mínimo (< 10.0 m) → 400 Bad Request")
     void updateConfigAislamiento_umbralMenorAlMinimo_badRequest() throws Exception {
         ConfigAislamientoRequest req = crearRequest(9.9);
@@ -344,6 +359,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT aislamiento: valor 0.0 m → 400 Bad Request")
     void updateConfigAislamiento_umbralCero_badRequest() throws Exception {
         ConfigAislamientoRequest req = crearRequest(0.0);
@@ -356,6 +372,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT aislamiento: valor negativo → 400 Bad Request")
     void updateConfigAislamiento_umbralNegativo_badRequest() throws Exception {
         ConfigAislamientoRequest req = crearRequest(-50.0);
@@ -368,6 +385,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT aislamiento: valor mayor al máximo (> 1000.0 m) → 400 Bad Request")
     void updateConfigAislamiento_umbralSuperaMaximo_badRequest() throws Exception {
         ConfigAislamientoRequest req = crearRequest(1000.1);
@@ -380,6 +398,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT aislamiento: valor límite inferior 10.0 m → 200 OK")
     void updateConfigAislamiento_umbralMinimoValido_ok() throws Exception {
         ConfigAislamientoRequest req = crearRequest(10.0);
@@ -393,6 +412,7 @@ class ConfigAislamientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("CA3 — PUT aislamiento: valor límite superior 1000.0 m → 200 OK")
     void updateConfigAislamiento_umbralMaximoValido_ok() throws Exception {
         ConfigAislamientoRequest req = crearRequest(1000.0);

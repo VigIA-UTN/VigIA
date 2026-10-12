@@ -79,6 +79,7 @@ public class CohesionBatchConfig {
     }
 
     @Bean
+    @SuppressWarnings("null")
     public ItemProcessor<Establecimiento, Establecimiento> cohesionProcessor() {
         return establecimiento -> {
             LocalDateTime hace24h = LocalDateTime.now().minusHours(24);

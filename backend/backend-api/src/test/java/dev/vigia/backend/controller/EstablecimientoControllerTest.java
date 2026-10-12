@@ -88,8 +88,11 @@ class EstablecimientoControllerTest {
     private String adminToken;
     private String userToken;
     private String vetToken;
+    @SuppressWarnings("unused")
     private String camperoToken;
+    @SuppressWarnings("unused")
     private String otroProductorToken;
+    @SuppressWarnings("unused")
     private Long establecimientoId;
 
     @BeforeEach
@@ -234,6 +237,7 @@ class EstablecimientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("GET /api/v1/establecimientos - Productor lista solo sus establecimientos")
     void getAllEstablecimientos_asProductor_success() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos")
@@ -245,6 +249,7 @@ class EstablecimientoControllerTest {
 
     // ── PUT /{id}: chequeo de pertenencia ────────────────────────────────────
 
+    @SuppressWarnings("null")
     private ResultActions putEstablecimiento(String token, String nombre) throws Exception {
         EstablecimientoRequest request = new EstablecimientoRequest();
         request.setNombre(nombre);
@@ -267,6 +272,7 @@ class EstablecimientoControllerTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("PUT /api/v1/establecimientos/{id} - Productor del establecimiento lo edita sin pisar la configuración de anestro")
     void updateEstablecimiento_asProductorDueno_ok() throws Exception {
         mockMvc.perform(put("/api/v1/establecimientos/" + establecimientoId + "/anestro")

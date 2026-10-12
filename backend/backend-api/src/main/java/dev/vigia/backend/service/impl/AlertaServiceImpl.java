@@ -809,6 +809,7 @@ public class AlertaServiceImpl implements AlertaService {
          */
         @Override
         @Transactional(readOnly = true)
+        @SuppressWarnings("null")
         public List<DiagnosticoResponse> listarDiagnosticos(String emailUsuario, Long animalId, Long establecimientoId) {
 
                 List<Long> ids = establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(emailUsuario)

@@ -68,6 +68,7 @@ class MapaCalorServiceImplTest {
         establecimiento.setUmbralAislamientoM(150.0);
     }
 
+    @SuppressWarnings("null")
     private void usuarioProductor() {
         Usuario usuario = new Usuario();
         usuario.setEmail(EMAIL);

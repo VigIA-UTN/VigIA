@@ -31,6 +31,7 @@ public class RegistroCohesionRepositoryTest {
     private RodeoLoteRepository rodeoLoteRepository;
 
     @Test
+    @SuppressWarnings("null")
     void testGuardarYConsultarRegistroCohesion() {
         Establecimiento est = new Establecimiento();
         est.setNombre("Establecimiento 1");
@@ -70,6 +71,7 @@ public class RegistroCohesionRepositoryTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void testAislamientoPorEstablecimiento() {
         Establecimiento est1 = new Establecimiento();
         est1.setNombre("Establecimiento 1");

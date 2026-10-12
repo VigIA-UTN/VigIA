@@ -1,6 +1,8 @@
 package dev.vigia.backend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
@@ -532,6 +534,7 @@ public class AlertaServiceImplTest {
         }
 
         /** Convierte mockAlerta (CELO) en una alerta de anestro como la genera AnestroDetectorService. */
+        @SuppressWarnings("null")
         private void prepararAlertaAnestro() {
                 mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
                 mockAlerta.setValorDetectado(60.0);
@@ -545,6 +548,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void obtenerDetalleAlerta_Anestro_DescribeDiasSinCelo() {
                 prepararAlertaAnestro();
 
@@ -555,6 +559,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void obtenerEstadoVentanaInseminacion_Anestro_Rechaza() {
                 prepararAlertaAnestro();
 
@@ -563,6 +568,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void obtenerLineaTiempoAlertas_Anestro_ExponeSubtipoYMantieneTipoCelo() {
                 mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
@@ -580,6 +586,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void obtenerLineaTiempoAlertas_AlertaResuelta_ExponeQuienYCuandoLaResolvio() {
                 Usuario vet = new Usuario();
                 vet.setNombre("Laura");
@@ -610,6 +617,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void obtenerLineaTiempoAlertas_AlertaPendiente_SinResolucion() {
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
                 when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
@@ -626,6 +634,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void obtenerLineaTiempoAlertas_Anestro_ExponeDiasSinCicloYEstadoArchivada() {
                 mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
                 mockAlerta.setEstado(EstadoAlerta.ARCHIVADA);
@@ -647,6 +656,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void archivarAlertaPorVencimiento_Anestro_RechazaYNoGuarda() {
                 prepararAlertaAnestro();
 
@@ -681,7 +691,7 @@ public class AlertaServiceImplTest {
                 assertNull(result.getDetalleSanitario());
         }
 
-
+        @SuppressWarnings("null")
         private AlertaDetalleResponse detalleConUltimaSenial(LocalDateTime ultimaSenial) {
                 dev.vigia.backend.model.Caravana caravana = new dev.vigia.backend.model.Caravana();
                 caravana.setUltimaSenial(ultimaSenial);
@@ -810,6 +820,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void actualizarEstadoAlerta_ConfirmarAnestro_RegistraEstadoAnestro() {
                 mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
@@ -833,6 +844,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void actualizarEstadoAlerta_ConfirmarCelo_RegistraEstadoCelo() {
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
                 when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
@@ -964,6 +976,7 @@ public class AlertaServiceImplTest {
         }
 
         @Test
+        @SuppressWarnings("null")
         void actualizarEstadoAlerta_ThrowsAlertaYaProcesada_WhenAlertaArchivada() {
                 mockAlerta.setEstado(EstadoAlerta.ARCHIVADA);
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
