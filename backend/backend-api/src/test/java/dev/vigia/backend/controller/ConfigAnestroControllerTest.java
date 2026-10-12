@@ -97,7 +97,8 @@ class ConfigAnestroControllerTest {
         Usuario productor  = crearUsuario("productor@vigia.dev",  "prod123",  Rol.PRODUCTOR);
         Usuario veterinario = crearUsuario("vet@vigia.dev",        "vet123",   Rol.VETERINARIO);
         Usuario campero    = crearUsuario("campero@vigia.dev",    "camp123",  Rol.CAMPERO);
-        //Usuario admin      = crearUsuario("admin@vigia.dev",      "admin123", Rol.ADMINISTRADOR);
+        @SuppressWarnings("unused")
+        Usuario admin      = crearUsuario("admin@vigia.dev",      "admin123", Rol.ADMINISTRADOR);
         crearUsuario("ajeno@vigia.dev", "ajeno123", Rol.PRODUCTOR);
 
         // 2. Establecimiento principal con productor + veterinario + campero vinculados
