@@ -278,7 +278,7 @@ public class CohesionBatchConfig {
                     .orElse(null);
             if (episodio != null) {
                 episodio.setTsRegreso(null);
-                episodio.setTsInicio(ahora);
+                episodio.setTsInicio(inicioDe(ga, ahora));
                 actualizar(episodio, ga);
             } else {
                 episodio = nuevoEpisodio(ga, telemetriaList, ahora);
@@ -297,10 +297,15 @@ public class CohesionBatchConfig {
     private AlertaAnimalAislado nuevoEpisodio(GeoAlerta ga, List<Telemetria> telemetriaList, LocalDateTime ahora) {
         AlertaAnimalAislado episodio = AlertaAnimalAislado.builder()
                 .animal(animalDe(Long.parseLong(ga.getAnimalId()), telemetriaList))
-                .tsInicio(ahora)
+                .tsInicio(inicioDe(ga, ahora))
                 .build();
         actualizar(episodio, ga);
         return episodio;
+    }
+
+    /** Cuándo se alejó: el episodio se abre recién tras minutosFueraMinimo seguidos afuera. */
+    private static LocalDateTime inicioDe(GeoAlerta ga, LocalDateTime ahora) {
+        return ahora.minusSeconds(ga.getTiempoFueraContinuoS().longValue());
     }
 
     private static void actualizar(AlertaAnimalAislado episodio, GeoAlerta ga) {

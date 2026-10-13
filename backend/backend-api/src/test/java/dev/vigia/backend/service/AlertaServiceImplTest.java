@@ -368,9 +368,13 @@ public class AlertaServiceImplTest {
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, null, null))
                                 .thenReturn(List.of(mockAlerta));
+                AlertaAnimalAislado sigueAfuera = episodioAislamiento(otro, 2400L, 400.0);
+                sigueAfuera.setTsInicio(LocalDateTime.now().minusMinutes(25));
+                AlertaAnimalAislado volvio = episodioAislamiento(mockAnimal, 1830L, 120.4);
+                volvio.setTsInicio(LocalDateTime.now().minusMinutes(50));
+                volvio.setTsRegreso(LocalDateTime.now().minusMinutes(38));
                 when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(ALERTA_ID))
-                                .thenReturn(List.of(episodioAislamiento(otro, 2400L, 400.0),
-                                                episodioAislamiento(mockAnimal, 1830L, 120.4)));
+                                .thenReturn(List.of(sigueAfuera, volvio));
 
                 // Act
                 List<AlertaResponse> result = alertaService.listarAlertas(EMAIL, ESTABLECIMIENTO_ID, null, null, null);
@@ -381,12 +385,14 @@ public class AlertaServiceImplTest {
                 assertEquals(11L, aislados.get(0).getAnimalId());
                 assertEquals("CAR-456", aislados.get(0).getIdentificador());
                 assertNull(aislados.get(0).getAlias());
-                assertEquals(40L, aislados.get(0).getMinutosFuera());
+                assertEquals(40L, aislados.get(0).getMinutosFuera()); // acumulado en 24 h
+                assertEquals(25L, aislados.get(0).getMinutosFueraSeguidos()); // sigue afuera: hasta ahora
                 assertEquals(400L, aislados.get(0).getDistanciaGrupoM());
                 assertEquals("ALTA", aislados.get(0).getSeveridad());
                 assertEquals(10L, aislados.get(1).getAnimalId());
                 assertEquals("Lola", aislados.get(1).getAlias());
                 assertEquals(30L, aislados.get(1).getMinutosFuera());
+                assertEquals(12L, aislados.get(1).getMinutosFueraSeguidos()); // volvió: hasta el regreso
                 assertEquals(120L, aislados.get(1).getDistanciaGrupoM());
                 assertEquals("MEDIA", aislados.get(1).getSeveridad());
         }

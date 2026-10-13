@@ -250,7 +250,9 @@ class CohesionBatchConfigTest {
                 .containsExactlyInAnyOrder(tuple(10L, 1800L, 400.0), tuple(11L, 2400L, 200.0));
         assertThat(episodios.getAllValues()).allSatisfy(e -> {
             assertThat(e.getAlerta()).isSameAs(alerta.getValue());
-            assertThat(e.getTsInicio()).isNotNull();
+            // El aislamiento empezó cuando se alejó (hace 1200 s seguidos), no cuando se abrió la alerta
+            assertThat(e.getTsInicio()).isBetween(
+                    LocalDateTime.now().minusSeconds(1205), LocalDateTime.now().minusSeconds(1195));
             assertThat(e.getTsRegreso()).isNull();
         });
 
@@ -475,6 +477,8 @@ class CohesionBatchConfigTest {
         verify(alertaAnimalAisladoRepository).save(cerrado);
         assertThat(cerrado.getTsRegreso()).isNull();
         assertThat(cerrado.getSegundosFuera()).isEqualTo(2700L);
+        assertThat(cerrado.getTsInicio()).isBetween( // se alejó de nuevo hace 900 s seguidos
+                LocalDateTime.now().minusSeconds(905), LocalDateTime.now().minusSeconds(895));
         verify(alertaRepository).save(pendiente);
     }
 
