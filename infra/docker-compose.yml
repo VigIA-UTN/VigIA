@@ -79,6 +79,8 @@ services:
       - ML_CELO_URL=http://ml-celo:8001
       - ML_SALUD_URL=http://ml-salud:8002
       - ML_GEO_URL=http://ml-geo:8003
+      - VIGIA_BATCH_GEO_RATE=${VIGIA_BATCH_GEO_RATE:-900000}
+      - VIGIA_GEO_VENTANA_HORAS=${VIGIA_GEO_VENTANA_HORAS:-24}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - MAIL_HOST=${MAIL_HOST:-mail}
       - MAIL_PORT=${MAIL_PORT:-1025}

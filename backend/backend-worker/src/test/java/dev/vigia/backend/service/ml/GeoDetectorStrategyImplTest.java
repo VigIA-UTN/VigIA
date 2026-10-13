@@ -1,14 +1,15 @@
 package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.vigia.backend.client.MlGeoClient;
 import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.geo.AlertaAnimalDTO;
 import dev.vigia.backend.dto.ml.geo.GeoAnalyzeResponseDTO;
-import dev.vigia.backend.dto.ml.geo.MatrizDensidadDTO;
 import dev.vigia.backend.model.*;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,11 +36,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GeoDetectorStrategyImpl - Pruebas Unitarias")
 class GeoDetectorStrategyImplTest {
+
+    private static final String URL_ANALYZE = "http://localhost:8003/api/internal/ml/geo/analyze";
 
     @Mock
     private TelemetriaRepository telemetriaRepository;
@@ -51,258 +55,296 @@ class GeoDetectorStrategyImplTest {
     private AnimalRepository animalRepository;
 
     @Mock
+    private RegistroCohesionRepository registroCohesionRepository;
+
+    @Mock
     private RabbitTemplate rabbitTemplate;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private MockRestServiceServer mockServer;
     private GeoDetectorStrategyImpl geoDetectorStrategy;
 
+    private Establecimiento establecimiento;
+
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder();
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost:8003");
         mockServer = MockRestServiceServer.bindTo(builder).build();
 
         geoDetectorStrategy = new GeoDetectorStrategyImpl(
-                builder,
-                "http://localhost:8003",
+                new MlGeoClient(builder.build()),
                 telemetriaRepository,
                 alertaRepository,
                 animalRepository,
+                registroCohesionRepository,
                 rabbitTemplate,
                 6);
+
+        establecimiento = new Establecimiento();
+        establecimiento.setId(1L);
+        establecimiento.setUmbralAislamientoM(120.0);
     }
 
-    private Telemetria crearTelemetria(Animal animal, Double lat, Double lng, EstadoInferencia estado, LocalDateTime fechaHora) {
+    private Animal animal(Long id, RodeoLote rodeo) {
+        Animal a = new Animal();
+        a.setId(id);
+        a.setEstablecimiento(establecimiento);
+        a.setRodeoLote(rodeo);
+        return a;
+    }
+
+    private RodeoLote rodeo(Long id) {
+        RodeoLote r = new RodeoLote();
+        r.setId(id);
+        return r;
+    }
+
+    private Telemetria telemetria(Animal animal, Double lat, Double lng, LocalDateTime fechaHora) {
         Caravana caravana = new Caravana();
-        caravana.setCodigo("CAR-00" + animal.getId());
         caravana.setAnimal(animal);
+        caravana.setEstablecimiento(establecimiento);
 
         Telemetria t = new Telemetria();
         t.setCaravana(caravana);
         t.setLatitud(lat);
         t.setLongitud(lng);
-        t.setEstadoInferenciaGeo(estado);
+        t.setEstadoInferenciaGeo(EstadoInferencia.PENDIENTE);
         t.setFechaHora(fechaHora);
         return t;
     }
 
+    private AlertaAnimalDTO resultado(String animalId, double indice, double distancia, boolean aislado, double tiempoFuera) {
+        return AlertaAnimalDTO.builder()
+                .animalId(animalId)
+                .indiceCohesion(indice)
+                .distanciaCentroideM(distancia)
+                .alertaAislamiento(aislado)
+                .tiempoFueraGrupoS(tiempoFuera)
+                .build();
+    }
+
+    private String respuesta(AlertaAnimalDTO... alertas) throws Exception {
+        return objectMapper.writeValueAsString(GeoAnalyzeResponseDTO.builder()
+                .mapaCalor(Collections.emptyList())
+                .alertas(List.of(alertas))
+                .build());
+    }
+
     @Test
-    void testProcess_listaNulaOVacia_noHaceNada() {
+    void listaNulaOVacia_noHaceNada() {
         geoDetectorStrategy.process(null, "corr-null");
         geoDetectorStrategy.process(Collections.emptyList(), "corr-empty");
 
-        verify(telemetriaRepository, never()).saveAll(anyList());
-        verify(alertaRepository, never()).save(any());
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        mockServer.verify();
+        verifyNoInteractions(telemetriaRepository, alertaRepository, registroCohesionRepository, rabbitTemplate);
     }
 
     @Test
-    void testProcess_sinCoordenadasValidas_marcaCompletadosYNoLlamaMicroservicio() {
-        Animal animal = new Animal();
-        animal.setId(1L);
+    void sinCoordenadasValidas_marcaCompletadosYNoLlamaMicroservicio() {
+        Telemetria t = telemetria(animal(1L, null), null, null, LocalDateTime.now());
 
-        Telemetria t = crearTelemetria(animal, null, null, EstadoInferencia.PENDIENTE, LocalDateTime.now());
-        List<Telemetria> lista = List.of(t);
+        geoDetectorStrategy.process(List.of(t), "corr-sin-coord");
 
-        geoDetectorStrategy.process(lista, "corr-sin-coord");
-
+        mockServer.verify();
         assertEquals(EstadoInferencia.COMPLETADO, t.getEstadoInferenciaGeo());
         verify(telemetriaRepository).saveAll(anyList());
-        verify(alertaRepository, never()).save(any());
+        verifyNoInteractions(registroCohesionRepository, alertaRepository);
     }
 
     @Test
     @SuppressWarnings("null")
-    void testProcess_llamadaExitosaSinAislamiento_marcaCompletadosYNoGeneraAlerta() throws Exception {
-        Establecimiento est = new Establecimiento();
-        est.setUmbralAislamientoM(120.0);
+    @DisplayName("Sin aislamiento: envía el umbral del establecimiento, guarda un RegistroCohesion por animal y no alerta")
+    void sinAislamiento_guardaRegistrosYNoGeneraAlerta() throws Exception {
+        RodeoLote r = rodeo(100L);
+        Telemetria t1 = telemetria(animal(10L, r), -34.500, -58.500, LocalDateTime.now().minusMinutes(10));
+        Telemetria t2 = telemetria(animal(20L, r), -34.501, -58.501, LocalDateTime.now().minusMinutes(5));
 
-        Animal a1 = new Animal();
-        a1.setId(10L);
-        a1.setEstablecimiento(est);
-
-        Animal a2 = new Animal();
-        a2.setId(20L);
-        a2.setEstablecimiento(est);
-
-        Telemetria t1 = crearTelemetria(a1, -34.500, -58.500, EstadoInferencia.PENDIENTE, LocalDateTime.now().minusMinutes(10));
-        Telemetria t2 = crearTelemetria(a2, -34.501, -58.501, EstadoInferencia.PENDIENTE, LocalDateTime.now().minusMinutes(5));
-        List<Telemetria> lista = List.of(t1, t2);
-
-        GeoAnalyzeResponseDTO mlResponse = GeoAnalyzeResponseDTO.builder()
-                .mapaCalor(List.of(MatrizDensidadDTO.builder().lat(-34.5).lng(-58.5).intensidad(1.0).build()))
-                .alertas(List.of(
-                        AlertaAnimalDTO.builder()
-                                .animalId("10")
-                                .indiceCohesion(0.95)
-                                .distanciaCentroideM(15.0)
-                                .alertaAislamiento(false)
-                                .tiempoFueraGrupoS(0.0)
-                                .build(),
-                        AlertaAnimalDTO.builder()
-                                .animalId("20")
-                                .indiceCohesion(0.95)
-                                .distanciaCentroideM(15.0)
-                                .alertaAislamiento(false)
-                                .tiempoFueraGrupoS(0.0)
-                                .build()
-                ))
-                .build();
-
-        mockServer.expect(requestTo("http://localhost:8003/api/internal/ml/geo/analyze"))
+        mockServer.expect(requestTo(URL_ANALYZE))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("X-Correlation-ID", "corr-ok"))
-                .andRespond(withSuccess(objectMapper.writeValueAsString(mlResponse), MediaType.APPLICATION_JSON));
+                .andExpect(jsonPath("$.umbral_aislamiento_m").value(120.0))
+                .andExpect(jsonPath("$.historial_7d.length()").value(2))
+                .andRespond(withSuccess(respuesta(
+                        resultado("10", 0.95, 15.0, false, 0.0),
+                        resultado("20", 0.90, 20.0, false, 0.0)), MediaType.APPLICATION_JSON));
 
-        geoDetectorStrategy.process(lista, "corr-ok");
+        geoDetectorStrategy.process(List.of(t1, t2), "corr-ok");
 
         mockServer.verify();
+        ArgumentCaptor<RegistroCohesion> registros = ArgumentCaptor.forClass(RegistroCohesion.class);
+        verify(registroCohesionRepository, times(2)).save(registros.capture());
+        RegistroCohesion r10 = registros.getAllValues().get(0);
+        assertEquals(10L, r10.getAnimal().getId());
+        assertSame(establecimiento, r10.getEstablecimiento());
+        assertEquals(0.95, r10.getIndiceCohesion());
+        assertEquals(0L, r10.getTiempoFueraGrupoS());
+        assertEquals(15.0, r10.getDistanciaCentroideM());
+        assertNotNull(r10.getFecha());
 
         assertEquals(EstadoInferencia.COMPLETADO, t1.getEstadoInferenciaGeo());
         assertEquals(EstadoInferencia.COMPLETADO, t2.getEstadoInferenciaGeo());
-        verify(telemetriaRepository).saveAll(anyList());
         verify(alertaRepository, never()).save(any());
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        verifyNoInteractions(rabbitTemplate);
+    }
+
+    @Test
+    @DisplayName("Sin umbral configurado se envía el default de 100 m")
+    void sinUmbralConfigurado_usaDefault() throws Exception {
+        establecimiento.setUmbralAislamientoM(null);
+        Telemetria t = telemetria(animal(10L, null), -34.5, -58.5, LocalDateTime.now());
+
+        mockServer.expect(requestTo(URL_ANALYZE))
+                .andExpect(jsonPath("$.umbral_aislamiento_m").value(100.0))
+                .andRespond(withSuccess(respuesta(resultado("10", 1.0, 0.0, false, 0.0)), MediaType.APPLICATION_JSON));
+
+        geoDetectorStrategy.process(List.of(t), "corr-default");
+
+        mockServer.verify();
     }
 
     @Test
     @SuppressWarnings("null")
-    void testProcess_alertaAislamientoDetectada_generaAlertaYPublicaRabbit() throws Exception {
-        Establecimiento est = new Establecimiento();
-        est.setUmbralAislamientoM(100.0);
-
-        Animal a1 = new Animal();
-        a1.setId(10L);
-        a1.setEstablecimiento(est);
-
-        Animal a2 = new Animal();
-        a2.setId(20L);
-        a2.setEstablecimiento(est);
-
+    @DisplayName("Animal aislado: genera alerta AISLAMIENTO_SOCIAL con su última posición y la publica")
+    void animalAislado_generaAlertaAislamientoSocialYPublicaRabbit() throws Exception {
+        RodeoLote r = rodeo(100L);
+        Animal a1 = animal(10L, r);
+        Animal a2 = animal(20L, r);
         LocalDateTime ahora = LocalDateTime.now();
-        Telemetria t1 = crearTelemetria(a1, -34.500, -58.500, EstadoInferencia.PENDIENTE, ahora.minusMinutes(10));
-        Telemetria t2 = crearTelemetria(a2, -34.550, -58.550, EstadoInferencia.PENDIENTE, ahora.minusMinutes(5));
-        List<Telemetria> lista = List.of(t1, t2);
+        Telemetria t1 = telemetria(a1, -34.500, -58.500, ahora.minusMinutes(10));
+        Telemetria t2Vieja = telemetria(a2, -34.540, -58.540, ahora.minusMinutes(20));
+        Telemetria t2 = telemetria(a2, -34.550, -58.550, ahora.minusMinutes(5));
 
-        when(animalRepository.findById(20L)).thenReturn(Optional.of(a2));
-        when(alertaRepository.findFirstByAnimalAndDisparadorAndTsGeneracionAfterOrderByTsGeneracionDesc(
-                eq(a2), eq(DisparadorAlerta.ABIGEATO), any(LocalDateTime.class)))
-                .thenReturn(Optional.empty());
-
-        when(alertaRepository.save(any(Alerta.class))).thenAnswer(invocation -> {
-            Alerta arg = invocation.getArgument(0);
-            arg.setId(777L);
-            return arg;
+        when(alertaRepository.save(any(Alerta.class))).thenAnswer(inv -> {
+            Alerta a = inv.getArgument(0);
+            a.setId(777L);
+            return a;
         });
 
-        GeoAnalyzeResponseDTO mlResponse = GeoAnalyzeResponseDTO.builder()
-                .mapaCalor(Collections.emptyList())
-                .alertas(List.of(
-                        AlertaAnimalDTO.builder()
-                                .animalId("20")
-                                .indiceCohesion(0.20)
-                                .distanciaCentroideM(400.0)
-                                .alertaAislamiento(true)
-                                .tiempoFueraGrupoS(1800.0)
-                                .build()
-                ))
-                .build();
+        mockServer.expect(requestTo(URL_ANALYZE))
+                .andRespond(withSuccess(respuesta(
+                        resultado("10", 0.95, 15.0, false, 0.0),
+                        resultado("20", 0.20, 400.0, true, 1800.0)), MediaType.APPLICATION_JSON));
 
-        mockServer.expect(requestTo("http://localhost:8003/api/internal/ml/geo/analyze"))
-                .andExpect(method(HttpMethod.POST))
-                .andExpect(header("X-Correlation-ID", "corr-alerta"))
-                .andRespond(withSuccess(objectMapper.writeValueAsString(mlResponse), MediaType.APPLICATION_JSON));
-
-        geoDetectorStrategy.process(lista, "corr-alerta");
+        geoDetectorStrategy.process(List.of(t1, t2Vieja, t2), "corr-alerta");
 
         mockServer.verify();
 
         ArgumentCaptor<Alerta> alertaCaptor = ArgumentCaptor.forClass(Alerta.class);
         verify(alertaRepository).save(alertaCaptor.capture());
-        Alerta alertaGuardada = alertaCaptor.getValue();
+        Alerta alerta = alertaCaptor.getValue();
+        assertSame(a2, alerta.getAnimal());
+        assertEquals(DisparadorAlerta.AISLAMIENTO_SOCIAL, alerta.getDisparador());
+        assertEquals("AISLAMIENTO_SOCIAL", alerta.getTipo());
+        assertEquals(SeveridadAlerta.ALTA, alerta.getSeveridad());
+        assertEquals(EstadoAlerta.PENDIENTE, alerta.getEstado());
+        assertEquals(120.0, alerta.getValorUmbral());
+        assertEquals(400.0, alerta.getValorDetectado());
+        assertEquals(-34.550, alerta.getLatitud());
+        assertEquals(-58.550, alerta.getLongitud());
+        assertNull(alerta.getConfianzaModelo());
 
-        assertEquals(a2, alertaGuardada.getAnimal());
-        assertEquals("Aislamiento de Rodeo", alertaGuardada.getTipo());
-        assertEquals(SeveridadAlerta.ALTA, alertaGuardada.getSeveridad());
-        assertEquals(DisparadorAlerta.ABIGEATO, alertaGuardada.getDisparador());
-        assertEquals(100.0, alertaGuardada.getValorUmbral());
-        assertEquals(400.0, alertaGuardada.getValorDetectado());
-        assertEquals(0.20f, alertaGuardada.getConfianzaModelo());
-        assertEquals(-34.550, alertaGuardada.getLatitud());
-        assertEquals(-58.550, alertaGuardada.getLongitud());
-        assertEquals(EstadoAlerta.PENDIENTE, alertaGuardada.getEstado());
+        ArgumentCaptor<AlertaEventDTO> evento = ArgumentCaptor.forClass(AlertaEventDTO.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), evento.capture());
+        assertEquals(777L, evento.getValue().getId());
+        assertEquals(20L, evento.getValue().getAnimalId());
+        assertEquals(DisparadorAlerta.AISLAMIENTO_SOCIAL, evento.getValue().getDisparador());
 
-        ArgumentCaptor<AlertaEventDTO> rabbitCaptor = ArgumentCaptor.forClass(AlertaEventDTO.class);
-        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), rabbitCaptor.capture());
-        AlertaEventDTO evento = rabbitCaptor.getValue();
-
-        assertEquals(777L, evento.getId());
-        assertEquals(20L, evento.getAnimalId());
-        assertEquals(DisparadorAlerta.ABIGEATO, evento.getDisparador());
-        assertEquals(400.0, evento.getValorDetectado());
+        ArgumentCaptor<RegistroCohesion> registros = ArgumentCaptor.forClass(RegistroCohesion.class);
+        verify(registroCohesionRepository, times(2)).save(registros.capture());
+        assertEquals(1800L, registros.getAllValues().get(1).getTiempoFueraGrupoS());
     }
 
     @Test
     @SuppressWarnings("null")
-    void testProcess_alertaExistentePendiente_actualizaPosicionYNoDuplicaAlerta() throws Exception {
-        Animal a1 = new Animal();
-        a1.setId(10L);
+    @DisplayName("Alerta de aislamiento pendiente: actualiza posición y distancia sin duplicar ni publicar")
+    void alertaPendiente_actualizaPosicionYNoDuplica() throws Exception {
+        Animal a1 = animal(10L, null);
+        Telemetria t1 = telemetria(a1, -34.600, -58.600, LocalDateTime.now());
 
-        Telemetria t1 = crearTelemetria(a1, -34.600, -58.600, EstadoInferencia.PENDIENTE, LocalDateTime.now());
-        List<Telemetria> lista = List.of(t1);
+        Alerta existente = new Alerta();
+        existente.setId(888L);
+        existente.setAnimal(a1);
+        existente.setDisparador(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+        existente.setEstado(EstadoAlerta.PENDIENTE);
+        existente.setLatitud(-34.500);
+        existente.setLongitud(-58.500);
+        when(alertaRepository.alertasAnimalActivas(10L)).thenReturn(List.of(existente));
 
-        Alerta alertaExistente = new Alerta();
-        alertaExistente.setId(888L);
-        alertaExistente.setAnimal(a1);
-        alertaExistente.setEstado(EstadoAlerta.PENDIENTE);
-        alertaExistente.setLatitud(-34.500);
-        alertaExistente.setLongitud(-58.500);
+        mockServer.expect(requestTo(URL_ANALYZE))
+                .andRespond(withSuccess(respuesta(resultado("10", 0.15, 550.0, true, 3600.0)),
+                        MediaType.APPLICATION_JSON));
 
-        when(animalRepository.findById(10L)).thenReturn(Optional.of(a1));
-        when(alertaRepository.findFirstByAnimalAndDisparadorAndTsGeneracionAfterOrderByTsGeneracionDesc(
-                eq(a1), eq(DisparadorAlerta.ABIGEATO), any(LocalDateTime.class)))
-                .thenReturn(Optional.of(alertaExistente));
-
-        GeoAnalyzeResponseDTO mlResponse = GeoAnalyzeResponseDTO.builder()
-                .alertas(List.of(
-                        AlertaAnimalDTO.builder()
-                                .animalId("10")
-                                .indiceCohesion(0.15)
-                                .distanciaCentroideM(550.0)
-                                .alertaAislamiento(true)
-                                .tiempoFueraGrupoS(3600.0)
-                                .build()
-                ))
-                .build();
-
-        mockServer.expect(requestTo("http://localhost:8003/api/internal/ml/geo/analyze"))
-                .andExpect(method(HttpMethod.POST))
-                .andRespond(withSuccess(objectMapper.writeValueAsString(mlResponse), MediaType.APPLICATION_JSON));
-
-        geoDetectorStrategy.process(lista, "corr-update");
+        geoDetectorStrategy.process(List.of(t1), "corr-update");
 
         mockServer.verify();
-
-        verify(alertaRepository).save(alertaExistente);
-        assertEquals(-34.600, alertaExistente.getLatitud());
-        assertEquals(-58.600, alertaExistente.getLongitud());
-        assertEquals(550.0, alertaExistente.getValorDetectado());
-
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(alertaRepository).save(existente);
+        assertEquals(-34.600, existente.getLatitud());
+        assertEquals(-58.600, existente.getLongitud());
+        assertEquals(550.0, existente.getValorDetectado());
+        verifyNoInteractions(rabbitTemplate);
     }
 
     @Test
-    void testProcess_errorMicroservicio_ejecutaFallbackYMarcaInferenciaPendiente() {
-        Animal a1 = new Animal();
-        a1.setId(10L);
+    @DisplayName("Alerta de aislamiento resuelta dentro del cooldown: no vuelve a alertar")
+    void alertaResueltaEnCooldown_noGeneraNueva() throws Exception {
+        Animal a1 = animal(10L, null);
+        Telemetria t1 = telemetria(a1, -34.6, -58.6, LocalDateTime.now());
 
-        Telemetria t1 = crearTelemetria(a1, -34.5, -58.5, EstadoInferencia.PENDIENTE, LocalDateTime.now());
-        List<Telemetria> lista = List.of(t1);
+        Alerta descartada = new Alerta();
+        descartada.setEstado(EstadoAlerta.DESCARTADA);
+        when(alertaRepository.findFirstByAnimalAndDisparadorAndTsGeneracionAfterOrderByTsGeneracionDesc(
+                eq(a1), eq(DisparadorAlerta.AISLAMIENTO_SOCIAL), any(LocalDateTime.class)))
+                .thenReturn(Optional.of(descartada));
 
-        geoDetectorStrategy.fallbackProcess(lista, "corr-fallback", new RuntimeException("Timeout"));
+        mockServer.expect(requestTo(URL_ANALYZE))
+                .andRespond(withSuccess(respuesta(resultado("10", 0.15, 550.0, true, 3600.0)),
+                        MediaType.APPLICATION_JSON));
 
+        geoDetectorStrategy.process(List.of(t1), "corr-cooldown");
+
+        verify(alertaRepository, never()).save(any());
+        verifyNoInteractions(rabbitTemplate);
+    }
+
+    @Test
+    @DisplayName("Cada rodeo se analiza contra su propio grupo: una llamada a ml-geo por rodeo")
+    void dosRodeos_unaLlamadaPorRodeo() throws Exception {
+        RodeoLote norte = rodeo(1L);
+        RodeoLote sur = rodeo(2L);
+        LocalDateTime ahora = LocalDateTime.now();
+        Telemetria n1 = telemetria(animal(10L, norte), -34.50, -58.50, ahora);
+        Telemetria n2 = telemetria(animal(11L, norte), -34.50, -58.50, ahora);
+        Telemetria s1 = telemetria(animal(20L, sur), -34.90, -58.90, ahora);
+
+        mockServer.expect(requestTo(URL_ANALYZE))
+                .andExpect(jsonPath("$.historial_7d[*].animal_id").value(org.hamcrest.Matchers.containsInAnyOrder("10", "11")))
+                .andRespond(withSuccess(respuesta(
+                        resultado("10", 1.0, 0.0, false, 0.0),
+                        resultado("11", 1.0, 0.0, false, 0.0)), MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo(URL_ANALYZE))
+                .andExpect(jsonPath("$.historial_7d[*].animal_id").value(org.hamcrest.Matchers.contains("20")))
+                .andRespond(withSuccess(respuesta(resultado("20", 1.0, 0.0, false, 0.0)), MediaType.APPLICATION_JSON));
+
+        geoDetectorStrategy.process(List.of(n1, s1, n2), "corr-rodeos");
+
+        mockServer.verify();
+        verify(registroCohesionRepository, times(3)).save(any());
+        verify(alertaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("ml-geo caído: marca la telemetría como INFERENCIA_PENDIENTE sin propagar la excepción")
+    void mlGeoCaido_marcaInferenciaPendiente() {
+        Telemetria t1 = telemetria(animal(10L, null), -34.5, -58.5, LocalDateTime.now());
+
+        mockServer.expect(requestTo(URL_ANALYZE)).andRespond(withServerError());
+
+        assertDoesNotThrow(() -> geoDetectorStrategy.process(List.of(t1), "corr-caido"));
+
+        mockServer.verify();
         assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferenciaGeo());
         verify(telemetriaRepository).saveAll(anyList());
+        verifyNoInteractions(registroCohesionRepository, rabbitTemplate);
         verify(alertaRepository, never()).save(any());
     }
 }

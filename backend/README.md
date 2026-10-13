@@ -14,7 +14,7 @@ El backend está dividido en tres módulos principales para separar las responsa
 
 Hay dos caminos distintos hacia los microservicios, según quién dispara el análisis:
 
-- **Batch, desde `backend-worker`** — el Spring Batch junta la telemetría pendiente y la empuja a los microservicios para que generen alertas. Implementado para **Celo** (`CeloDetectorStrategyImpl`), **Salud** (`SaludDetectorStrategyImpl`) y **Geo** (`GeoDetectorStrategyImpl`, para cohesión/aislamiento y alertas de `ABIGEATO`).
+- **Batch, desde `backend-worker`** — el Spring Batch junta la telemetría pendiente y la empuja a los microservicios para que generen alertas. Implementado para **Celo** (`CeloDetectorStrategyImpl`), **Salud** (`SaludDetectorStrategyImpl`) y **Geo** (`GeoDetectorStrategyImpl`: por establecimiento y rodeo, guarda el índice de cohesión de cada animal en `registros_cohesion` y genera alertas `AISLAMIENTO_SOCIAL` según el umbral del establecimiento). Cada estrategia llama a su microservicio a través de un cliente (`MlCeloClient`, `MlSaludClient`, `MlGeoClient` en `backend-worker/.../client`) con timeouts, circuit breaker y reintentos sobre la llamada HTTP; si el microservicio no responde, la telemetría queda en `INFERENCIA_PENDIENTE` y el batch sigue con el resto.
 - **On-demand, desde `backend-api`** — el usuario pide un análisis y el backend lo resuelve en el momento. Es el caso de **Geo**: `GET /api/v1/mapa-calor` → `MapaCalorServiceImpl` → `MlGeoClient` → `ml-geo`, para el mapa de calor de pastoreo (H0025).
 
 ## Tecnologías Principales

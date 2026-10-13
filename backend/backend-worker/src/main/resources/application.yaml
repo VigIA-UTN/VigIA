@@ -46,7 +46,12 @@ vigia:
     geo-url: ${ML_GEO_URL}
   batch:
     salud-rate: ${VIGIA_BATCH_SALUD_RATE:60000}
-    geo-rate: ${VIGIA_BATCH_GEO_RATE:60000}
+    geo-rate: ${VIGIA_BATCH_GEO_RATE:900000}
+  geo:
+    # Ventana de posiciones (en horas) que se envía a ml-geo en cada análisis.
+    ventana-horas: ${VIGIA_GEO_VENTANA_HORAS:24}
+    # Horas sin volver a alertar aislamiento después de resolver una alerta.
+    cooldown-horas: ${VIGIA_GEO_COOLDOWN_HORAS:6}
   salud:
     calibracion-dias: ${VIGIA_SALUD_CALIBRACION_DIAS:7}
     recalibracion-dias: ${VIGIA_SALUD_RECALIBRACION_DIAS:30}
@@ -86,16 +91,3 @@ resilience4j:
       geoML:
         maxAttempts: 2
         waitDuration: 500ms
-  timelimiter:
-    instances:
-      celoML:
-        timeoutDuration: 2000ms
-      # saludML puede hacer DOS llamadas HTTP en un mismo ciclo (perfil
-      # + predict) cuando toca calcular/recalibrar el perfil, así que se
-      # le da más margen que a celoML (que siempre hace una sola).
-      saludML:
-        timeoutDuration: 4000ms
-      geoML:
-        timeoutDuration: 4000ms
-
-

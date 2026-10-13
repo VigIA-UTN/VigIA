@@ -20,24 +20,14 @@ public interface TelemetriaRepository extends JpaRepository<Telemetria, Long> {
         List<Telemetria> findByCaravanaAndEstadoInferenciaSaludAndFechaHoraAfter(Caravana caravana,
                         EstadoInferencia estadoInferenciaSalud, LocalDateTime fechaHora);
 
-        List<Telemetria> findByCaravanaAndEstadoInferenciaGeoAndFechaHoraAfter(Caravana caravana,
-                        EstadoInferencia estadoInferenciaGeo, LocalDateTime fechaHora);
-
-        @Query("SELECT t FROM Telemetria t " +
-                        "WHERE t.caravana.animal.rodeoLote.id = :rodeoLoteId " +
+        /** Hay telemetría del establecimiento todavía no analizada por ml-geo desde {@code desde}. */
+        @Query("SELECT COUNT(t) > 0 FROM Telemetria t " +
+                        "WHERE t.caravana.establecimiento.id = :establecimientoId " +
                         "AND t.estadoInferenciaGeo = :estado " +
                         "AND t.fechaHora > :desde")
-        List<Telemetria> findPendientesGeoByRodeoLoteId(
-                        @Param("rodeoLoteId") Long rodeoLoteId,
+        boolean existsPendientesGeoByEstablecimiento(
+                        @Param("establecimientoId") Long establecimientoId,
                         @Param("estado") EstadoInferencia estado,
-                        @Param("desde") LocalDateTime desde);
-
-        @Query("SELECT t FROM Telemetria t " +
-                        "WHERE t.caravana.animal.rodeoLote.id = :rodeoLoteId " +
-                        "AND t.fechaHora > :desde " +
-                        "ORDER BY t.fechaHora ASC")
-        List<Telemetria> findByRodeoLoteIdAndFechaHoraAfterOrderByFechaHoraAsc(
-                        @Param("rodeoLoteId") Long rodeoLoteId,
                         @Param("desde") LocalDateTime desde);
 
         List<Telemetria> findByCaravanaAndFechaHoraAfterOrderByFechaHoraAsc(Caravana caravana, LocalDateTime fechaHora);

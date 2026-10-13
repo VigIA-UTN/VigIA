@@ -1,5 +1,6 @@
 package dev.vigia.backend.service.ml;
 
+import dev.vigia.backend.client.MlGeoClient;
 import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.geo.AlertaAnimalDTO;
@@ -9,58 +10,74 @@ import dev.vigia.backend.dto.ml.geo.GeoAnalyzeResponseDTO;
 import dev.vigia.backend.model.*;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Cohesión y aislamiento social (RF de ml-geo). Recibe la telemetría de la
+ * ventana de un establecimiento y, por cada rodeo (los animales sin rodeo forman
+ * su propio grupo), le pide a ml-geo el índice de cohesión de cada animal usando
+ * el umbral de aislamiento del establecimiento. Guarda un {@link RegistroCohesion}
+ * por animal y genera una alerta AISLAMIENTO_SOCIAL para los que quedaron
+ * aislados del grupo.
+ */
 @Slf4j
 @Service
 public class GeoDetectorStrategyImpl implements DetectorStrategy {
 
-    private final RestClient restClient;
+    static final double UMBRAL_AISLAMIENTO_DEFAULT = 100.0;
+
+    private final MlGeoClient mlGeoClient;
     private final TelemetriaRepository telemetriaRepository;
     private final AlertaRepository alertaRepository;
     private final AnimalRepository animalRepository;
+    private final RegistroCohesionRepository registroCohesionRepository;
     private final RabbitTemplate rabbitTemplate;
-    private final int cooldownHours;
+    private final int cooldownHoras;
 
-    @SuppressWarnings("null")
     public GeoDetectorStrategyImpl(
-            RestClient.Builder restClientBuilder,
-            @Value("${vigia.ml.geo-url}") String geoUrl,
+            MlGeoClient mlGeoClient,
             TelemetriaRepository telemetriaRepository,
             AlertaRepository alertaRepository,
             AnimalRepository animalRepository,
+            RegistroCohesionRepository registroCohesionRepository,
             RabbitTemplate rabbitTemplate,
-            @Value("${vigia.geofence.cooldown-hours:6}") int cooldownHours) {
-        this.restClient = restClientBuilder.baseUrl(geoUrl).build();
+            @Value("${vigia.geo.cooldown-horas:6}") int cooldownHoras) {
+        this.mlGeoClient = mlGeoClient;
         this.telemetriaRepository = telemetriaRepository;
         this.alertaRepository = alertaRepository;
         this.animalRepository = animalRepository;
+        this.registroCohesionRepository = registroCohesionRepository;
         this.rabbitTemplate = rabbitTemplate;
-        this.cooldownHours = cooldownHours;
+        this.cooldownHoras = cooldownHoras;
     }
 
     @Override
-    @CircuitBreaker(name = "geoML", fallbackMethod = "fallbackProcess")
-    @Retry(name = "geoML", fallbackMethod = "fallbackProcess")
-    @SuppressWarnings("null")
     public void process(List<Telemetria> telemetriaList, String correlationId) {
         if (telemetriaList == null || telemetriaList.isEmpty()) {
             return;
         }
+        try {
+            procesar(telemetriaList, correlationId);
+        } catch (RuntimeException e) {
+            marcarInferenciaPendiente(telemetriaList, correlationId, e);
+        }
+    }
 
+    private void procesar(List<Telemetria> telemetriaList, String correlationId) {
         List<Telemetria> telemetriasValidas = telemetriaList.stream()
                 .filter(t -> t.getLatitud() != null && t.getLongitud() != null
                         && t.getCaravana() != null && t.getCaravana().getAnimal() != null)
@@ -73,9 +90,29 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
             return;
         }
 
-        Double umbralAislamientoM = resolverUmbralAislamiento(telemetriasValidas);
+        Establecimiento establecimiento = resolverEstablecimiento(telemetriasValidas);
+        double umbral = establecimiento != null && establecimiento.getUmbralAislamientoM() != null
+                ? establecimiento.getUmbralAislamientoM()
+                : UMBRAL_AISLAMIENTO_DEFAULT;
 
-        List<CoordenadaGPSDTO> coordenadas = telemetriasValidas.stream()
+        // La cohesión se mide contra el propio rodeo: con un centroide único por
+        // establecimiento, un rodeo entero en otro potrero quedaría "aislado".
+        Map<Optional<Long>, List<Telemetria>> porRodeo = telemetriasValidas.stream()
+                .collect(Collectors.groupingBy(
+                        t -> Optional.ofNullable(t.getCaravana().getAnimal().getRodeoLote()).map(RodeoLote::getId),
+                        LinkedHashMap::new, Collectors.toList()));
+
+        LocalDateTime ahora = LocalDateTime.now();
+        for (List<Telemetria> grupo : porRodeo.values()) {
+            analizarGrupo(grupo, establecimiento, umbral, ahora, correlationId);
+        }
+
+        marcarCompletados(telemetriaList);
+    }
+
+    private void analizarGrupo(List<Telemetria> grupo, Establecimiento establecimiento, double umbral,
+            LocalDateTime ahora, String correlationId) {
+        List<CoordenadaGPSDTO> coordenadas = grupo.stream()
                 .map(t -> CoordenadaGPSDTO.builder()
                         .animalId(t.getCaravana().getAnimal().getId().toString())
                         .lat(t.getLatitud())
@@ -86,126 +123,116 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
 
         GeoAnalyzeRequestDTO request = GeoAnalyzeRequestDTO.builder()
                 .historial7d(coordenadas)
-                .umbralAislamientoM(umbralAislamientoM)
+                .umbralAislamientoM(umbral)
                 .build();
 
-        log.info("Llamando a microservicio de geo (analyze) con {} puntos GPS y correlationId: {}",
-                coordenadas.size(), correlationId);
+        GeoAnalyzeResponseDTO response = mlGeoClient.analyze(request, correlationId);
+        if (response == null || response.getAlertas() == null) {
+            return;
+        }
 
-        GeoAnalyzeResponseDTO response = restClient.post()
-                .uri("/api/internal/ml/geo/analyze")
-                .header("X-Correlation-ID", correlationId)
-                .body(request)
-                .retrieve()
-                .body(GeoAnalyzeResponseDTO.class);
+        Map<Long, Animal> animales = grupo.stream()
+                .map(t -> t.getCaravana().getAnimal())
+                .collect(Collectors.toMap(Animal::getId, Function.identity(), (a, b) -> a));
 
-        log.info("Respuesta de microservicio de geo recibida con {} alertas (correlationId: {})",
-                response != null && response.getAlertas() != null ? response.getAlertas().size() : 0, correlationId);
+        for (AlertaAnimalDTO alertaAnimal : response.getAlertas()) {
+            Long animalId;
+            try {
+                animalId = Long.parseLong(alertaAnimal.getAnimalId());
+            } catch (NumberFormatException e) {
+                log.warn("ID de animal no numérico devuelto por ml-geo: {}", alertaAnimal.getAnimalId());
+                continue;
+            }
+            Animal animal = animales.containsKey(animalId)
+                    ? animales.get(animalId)
+                    : animalRepository.findById(animalId).orElse(null);
+            if (animal == null) {
+                log.warn("Animal con ID {} no encontrado al procesar el análisis de cohesión.", animalId);
+                continue;
+            }
 
-        marcarCompletados(telemetriaList);
+            if (alertaAnimal.getIndiceCohesion() != null && establecimiento != null) {
+                registroCohesionRepository.save(RegistroCohesion.builder()
+                        .animal(animal)
+                        .establecimiento(establecimiento)
+                        .fecha(ahora)
+                        .indiceCohesion(alertaAnimal.getIndiceCohesion())
+                        .tiempoFueraGrupoS(alertaAnimal.getTiempoFueraGrupoS() != null
+                                ? alertaAnimal.getTiempoFueraGrupoS().longValue()
+                                : 0L)
+                        .distanciaCentroideM(alertaAnimal.getDistanciaCentroideM())
+                        .build());
+            }
 
-        if (response != null && response.getAlertas() != null) {
-            for (AlertaAnimalDTO alertaAnimal : response.getAlertas()) {
-                if (Boolean.TRUE.equals(alertaAnimal.getAlertaAislamiento())) {
-                    procesarAlertaAislamiento(alertaAnimal, telemetriasValidas, umbralAislamientoM);
-                }
+            if (Boolean.TRUE.equals(alertaAnimal.getAlertaAislamiento())) {
+                Telemetria ultima = grupo.stream()
+                        .filter(t -> t.getCaravana().getAnimal().getId().equals(animalId))
+                        .max(Comparator.comparing(Telemetria::getFechaHora))
+                        .orElse(null);
+                procesarAlertaAislamiento(animal, alertaAnimal, ultima, umbral);
             }
         }
     }
 
-    private Double resolverUmbralAislamiento(List<Telemetria> telemetrias) {
+    private Establecimiento resolverEstablecimiento(List<Telemetria> telemetrias) {
         for (Telemetria t : telemetrias) {
-            if (t.getCaravana() != null && t.getCaravana().getEstablecimiento() != null
-                    && t.getCaravana().getEstablecimiento().getUmbralAislamientoM() != null) {
-                return t.getCaravana().getEstablecimiento().getUmbralAislamientoM();
+            if (t.getCaravana().getEstablecimiento() != null) {
+                return t.getCaravana().getEstablecimiento();
             }
-            if (t.getCaravana() != null && t.getCaravana().getAnimal() != null
-                    && t.getCaravana().getAnimal().getEstablecimiento() != null
-                    && t.getCaravana().getAnimal().getEstablecimiento().getUmbralAislamientoM() != null) {
-                return t.getCaravana().getAnimal().getEstablecimiento().getUmbralAislamientoM();
+            if (t.getCaravana().getAnimal().getEstablecimiento() != null) {
+                return t.getCaravana().getAnimal().getEstablecimiento();
             }
         }
-        return 100.0;
+        return null;
     }
 
     @SuppressWarnings("null")
-    private void procesarAlertaAislamiento(AlertaAnimalDTO alertaAnimal, List<Telemetria> telemetriasValidas,
-            Double umbralEfectivo) {
-        Long animalId;
-        try {
-            animalId = Long.parseLong(alertaAnimal.getAnimalId());
-        } catch (NumberFormatException e) {
-            log.warn("ID de animal no numérico devuelto por ml-geo: {}", alertaAnimal.getAnimalId());
-            return;
-        }
-
-        Optional<Animal> animalOpt = animalRepository.findById(animalId);
-        if (animalOpt.isEmpty()) {
-            log.warn("Animal con ID {} no encontrado al procesar alerta de aislamiento.", animalId);
-            return;
-        }
-        Animal animal = animalOpt.get();
-
-        Telemetria ultima = telemetriasValidas.stream()
-                .filter(t -> t.getCaravana().getAnimal().getId().equals(animalId))
-                .max(Comparator.comparing(Telemetria::getFechaHora))
-                .orElse(null);
-
+    private void procesarAlertaAislamiento(Animal animal, AlertaAnimalDTO alertaAnimal, Telemetria ultima,
+            double umbral) {
         Double latitud = ultima != null ? ultima.getLatitud() : null;
         Double longitud = ultima != null ? ultima.getLongitud() : null;
-        LocalDateTime tsAlerta = ultima != null ? ultima.getFechaHora() : LocalDateTime.now();
+        Double distancia = alertaAnimal.getDistanciaCentroideM();
 
-        LocalDateTime limiteCooldown = LocalDateTime.now().minusHours(cooldownHours);
-        Optional<Alerta> alertaReciente = alertaRepository
-                .findFirstByAnimalAndDisparadorAndTsGeneracionAfterOrderByTsGeneracionDesc(
-                        animal, DisparadorAlerta.ABIGEATO, limiteCooldown);
-
-        if (alertaReciente.isPresent()) {
-            Alerta activa = alertaReciente.get();
-            if (activa.getEstado() == EstadoAlerta.PENDIENTE) {
-                activa.setLatitud(latitud);
-                activa.setLongitud(longitud);
-                activa.setValorDetectado(alertaAnimal.getDistanciaCentroideM());
-                if (alertaAnimal.getIndiceCohesion() != null) {
-                    activa.setConfianzaModelo(alertaAnimal.getIndiceCohesion().floatValue());
-                }
-                alertaRepository.save(activa);
-                log.info("Animal {} sigue aislado del rodeo. Se actualiza posición de la alerta {}.",
-                        animal.getId(), activa.getId());
-            } else {
-                log.info(
-                        "Animal {} está aislado pero ya posee una alerta reciente de abigeato/aislamiento (últimas {}hs). Se omite duplicado.",
-                        animal.getId(), cooldownHours);
-            }
+        // Sigue aislado y la alerta sigue abierta: se actualiza su posición en vez de duplicarla.
+        Optional<Alerta> pendiente = alertaRepository.alertasAnimalActivas(animal.getId()).stream()
+                .filter(a -> a.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL)
+                .findFirst();
+        if (pendiente.isPresent()) {
+            Alerta activa = pendiente.get();
+            activa.setLatitud(latitud);
+            activa.setLongitud(longitud);
+            activa.setValorDetectado(distancia != null ? distancia : umbral);
+            alertaRepository.save(activa);
+            log.info("Animal {} sigue aislado del rodeo. Se actualiza la alerta {}.", animal.getId(), activa.getId());
             return;
         }
 
-        log.warn("¡ALERTA! Animal {} (Caravana: {}) aislado del rodeo (distancia al centroide: {} m, cohesión: {})",
-                animal.getId(),
-                animal.getCaravana() != null ? animal.getCaravana().getCodigo() : "N/A",
-                alertaAnimal.getDistanciaCentroideM(),
-                alertaAnimal.getIndiceCohesion());
+        // Recién confirmada o descartada: no se vuelve a alertar dentro del cooldown.
+        if (alertaRepository.findFirstByAnimalAndDisparadorAndTsGeneracionAfterOrderByTsGeneracionDesc(
+                animal, DisparadorAlerta.AISLAMIENTO_SOCIAL, LocalDateTime.now().minusHours(cooldownHoras))
+                .isPresent()) {
+            log.info("Animal {} aislado pero con una alerta de aislamiento resuelta en las últimas {} hs. Se omite.",
+                    animal.getId(), cooldownHoras);
+            return;
+        }
 
         Alerta alerta = new Alerta();
         alerta.setAnimal(animal);
-        alerta.setTipo("Aislamiento de Rodeo");
+        alerta.setDisparador(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+        alerta.setTipo("AISLAMIENTO_SOCIAL");
+        alerta.setEstado(EstadoAlerta.PENDIENTE);
         alerta.setSeveridad(SeveridadAlerta.ALTA);
-        alerta.setTsGeneracion(tsAlerta);
+        alerta.setTsGeneracion(LocalDateTime.now());
         alerta.setLatitud(latitud);
         alerta.setLongitud(longitud);
-        alerta.setDisparador(DisparadorAlerta.ABIGEATO);
-        alerta.setValorUmbral(umbralEfectivo != null ? umbralEfectivo : 100.0);
-        alerta.setValorDetectado(alertaAnimal.getDistanciaCentroideM());
-        alerta.setConfianzaModelo(alertaAnimal.getIndiceCohesion() != null
-                ? alertaAnimal.getIndiceCohesion().floatValue()
-                : null);
-        alerta.setEstado(EstadoAlerta.PENDIENTE);
+        alerta.setValorUmbral(umbral);
+        alerta.setValorDetectado(distancia != null ? distancia : umbral);
         alerta.setPosibleCausa("Animal aislado del rodeo a "
-                + Math.round(alertaAnimal.getDistanciaCentroideM() != null ? alertaAnimal.getDistanciaCentroideM() : 0.0)
-                + " metros del centroide del grupo");
-        alerta.setAccionRecomendada("Verificar ubicación del animal en el potrero para descartar extravío o abigeato.");
+                + Math.round(distancia != null ? distancia : 0.0) + " metros del centroide del grupo");
+        alerta.setAccionRecomendada("Recorrer la zona y verificar el estado de los animales alejados del rodeo.");
 
         alerta = alertaRepository.save(alerta);
+        log.info("Generada alerta AISLAMIENTO_SOCIAL {} para animal {}", alerta.getId(), animal.getId());
 
         AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                 .id(alerta.getId())
@@ -221,12 +248,8 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
                 .posibleCausa(alerta.getPosibleCausa())
                 .latitud(alerta.getLatitud())
                 .longitud(alerta.getLongitud())
-                .confianzaModelo(alerta.getConfianzaModelo())
                 .build();
-
         rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
-        log.info("Alerta de abigeato/aislamiento publicada en RabbitMQ con ID: {} para animal {}",
-                alerta.getId(), animal.getId());
     }
 
     private void marcarCompletados(List<Telemetria> telemetriaList) {
@@ -239,9 +262,9 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
         }
     }
 
-    public void fallbackProcess(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
-        log.error(
-                "Fallo al comunicarse con el microservicio ML de geo (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
+    /** ml-geo no respondió (o falló el procesamiento): se deja la telemetría para reintentar. */
+    void marcarInferenciaPendiente(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
+        log.error("Fallo en el análisis geoespacial (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
                 correlationId, t.getMessage());
         List<Telemetria> pendientes = telemetriaList.stream()
                 .filter(t1 -> t1.getEstadoInferenciaGeo() == EstadoInferencia.PENDIENTE)
