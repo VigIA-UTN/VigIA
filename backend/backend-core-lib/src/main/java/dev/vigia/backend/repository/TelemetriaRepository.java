@@ -20,6 +20,26 @@ public interface TelemetriaRepository extends JpaRepository<Telemetria, Long> {
         List<Telemetria> findByCaravanaAndEstadoInferenciaSaludAndFechaHoraAfter(Caravana caravana,
                         EstadoInferencia estadoInferenciaSalud, LocalDateTime fechaHora);
 
+        List<Telemetria> findByCaravanaAndEstadoInferenciaGeoAndFechaHoraAfter(Caravana caravana,
+                        EstadoInferencia estadoInferenciaGeo, LocalDateTime fechaHora);
+
+        @Query("SELECT t FROM Telemetria t " +
+                        "WHERE t.caravana.animal.rodeoLote.id = :rodeoLoteId " +
+                        "AND t.estadoInferenciaGeo = :estado " +
+                        "AND t.fechaHora > :desde")
+        List<Telemetria> findPendientesGeoByRodeoLoteId(
+                        @Param("rodeoLoteId") Long rodeoLoteId,
+                        @Param("estado") EstadoInferencia estado,
+                        @Param("desde") LocalDateTime desde);
+
+        @Query("SELECT t FROM Telemetria t " +
+                        "WHERE t.caravana.animal.rodeoLote.id = :rodeoLoteId " +
+                        "AND t.fechaHora > :desde " +
+                        "ORDER BY t.fechaHora ASC")
+        List<Telemetria> findByRodeoLoteIdAndFechaHoraAfterOrderByFechaHoraAsc(
+                        @Param("rodeoLoteId") Long rodeoLoteId,
+                        @Param("desde") LocalDateTime desde);
+
         List<Telemetria> findByCaravanaAndFechaHoraAfterOrderByFechaHoraAsc(Caravana caravana, LocalDateTime fechaHora);
 
         Optional<Telemetria> findFirstByCaravanaOrderByFechaHoraDesc(Caravana caravana);

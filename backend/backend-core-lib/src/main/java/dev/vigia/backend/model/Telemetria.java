@@ -40,4 +40,8 @@ public class Telemetria {
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_inferencia_salud")
     private EstadoInferencia estadoInferenciaSalud = EstadoInferencia.PENDIENTE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_inferencia_geo")
+    private EstadoInferencia estadoInferenciaGeo = EstadoInferencia.PENDIENTE;
 }
