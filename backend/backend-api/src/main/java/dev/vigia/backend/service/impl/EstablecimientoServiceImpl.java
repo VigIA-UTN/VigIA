@@ -28,6 +28,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class EstablecimientoServiceImpl implements EstablecimientoService {
 
+    private static final int NOMBRE_MIN = 3;
+    private static final int NOMBRE_MAX = 80;
+
     private static final int DIAS_MIN = 1;
     private static final int DIAS_MAX = 365;
 
@@ -40,8 +43,9 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
     private final UsuarioRepository usuarioRepository;
 
     public EstablecimientoResponse createEstablecimiento(EstablecimientoRequest request) {
+        validarDatosEstablecimiento(request);
         Establecimiento est = new Establecimiento();
-        est.setNombre(request.getNombre());
+        est.setNombre(request.getNombre().trim());
         est.setLatitud(request.getLatitud());
         est.setLongitud(request.getLongitud());
         est.setActivo(true);
@@ -77,7 +81,8 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 ? establecimientoRepository.findById(id)
                         .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"))
                 : findPerteneciente(id, emailUsuario);
-        est.setNombre(request.getNombre());
+        validarDatosEstablecimiento(request);
+        est.setNombre(request.getNombre().trim());
         est.setLatitud(request.getLatitud());
         est.setLongitud(request.getLongitud());
         return mapToResponse(establecimientoRepository.save(est));
@@ -287,6 +292,26 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 .diasDeteccionAnestro(est.getDiasDeteccionAnestro())
                 .severidadAnestro(est.getSeveridadAnestro())
                 .build();
+    }
+
+    /**
+     * Valida nombre y coordenadas del establecimiento (mismas reglas que el formulario del frontend).
+     */
+    private void validarDatosEstablecimiento(EstablecimientoRequest request) {
+        String nombre = request.getNombre() == null ? "" : request.getNombre().trim();
+        if (nombre.isEmpty()) {
+            throw new IllegalArgumentException("El nombre es obligatorio.");
+        }
+        if (nombre.length() < NOMBRE_MIN || nombre.length() > NOMBRE_MAX) {
+            throw new IllegalArgumentException(
+                    String.format("El nombre debe tener entre %d y %d caracteres.", NOMBRE_MIN, NOMBRE_MAX));
+        }
+        if (request.getLatitud() == null || request.getLatitud() < -90 || request.getLatitud() > 90) {
+            throw new IllegalArgumentException("La latitud debe estar entre -90 y 90.");
+        }
+        if (request.getLongitud() == null || request.getLongitud() < -180 || request.getLongitud() > 180) {
+            throw new IllegalArgumentException("La longitud debe estar entre -180 y 180.");
+        }
     }
 
     private void validarParametrosAislamiento(ConfigAislamientoRequest request) {

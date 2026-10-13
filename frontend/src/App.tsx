@@ -151,7 +151,7 @@ function App() {
         <Route
           path="/establecimientos/:id/configuracion"
           element={
-            <ProtectedRoute roles={['PRODUCTOR', 'VETERINARIO']}>
+            <ProtectedRoute roles={['ADMINISTRADOR', 'PRODUCTOR', 'VETERINARIO']}>
               <ConfiguracionEstablecimientoPage />
             </ProtectedRoute>
           }

@@ -1,7 +1,8 @@
 /* ── Layout de página ───────────────────────────────────────────────────── */
 .cfg-page {
   padding: 2rem 2rem 4rem;
-  max-width: 860px;
+  width: 100%; /* #root es flex: con margin auto, sin esto se encoge al ancho del contenido */
+  max-width: 1120px;
   margin: 0 auto;
   min-height: calc(100vh - 120px);
 }
@@ -97,7 +98,6 @@
   border-radius: 16px;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
   border: 1px solid #e8ecf0;
-  margin-bottom: 2rem;
   overflow: hidden;
 }
 
@@ -150,6 +150,28 @@
   color: #d97706;
 }
 
+.cfg-col-icon--teal {
+  background: linear-gradient(135deg, #e0f2f1, #b2dfdb);
+  color: #3B8D99;
+}
+
+.cfg-col-icon--red {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #dc2626;
+}
+
+.cfg-badge-info {
+  margin-left: auto;
+  align-self: flex-start;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .cfg-card-title {
   font-size: 1rem;
   font-weight: 700;
@@ -170,10 +192,85 @@
   gap: 0.45rem;
 }
 
+.cfg-field--narrow { max-width: 420px; }
+
+.cfg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.2rem;
+}
+
 .cfg-label {
   font-size: 0.85rem;
   font-weight: 600;
   color: #374151;
+}
+
+.cfg-hint-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+
+.cfg-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #3B8D99;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.cfg-link-btn:hover { color: #1E3A5F; }
+
+/* ── Vista previa del mapa (no interactiva; el pin queda fijo en el centro) ── */
+.cfg-map-preview {
+  position: relative;
+  isolation: isolate; /* encierra los z-index de Leaflet para que no tapen la barra fija */
+  height: 220px;
+  border-top: 1px solid #e8ecf0;
+  transition: height 0.25s ease; /* MapInvalidator smooth re-centra el mapa en cada frame */
+}
+
+.cfg-map-preview--ampliado { height: 440px; }
+
+.cfg-map-credit {
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 0.7rem;
+  color: #A0AEC0;
+}
+
+.cfg-map-preview--editable .leaflet-container { cursor: crosshair; }
+
+/* Mismo botón que el mapa de calor de la ficha del animal (ActividadTab) */
+.cfg-map-expand {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1001;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #1E3A5F;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+}
+
+.cfg-map-note {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: #374151;
+  z-index: 500;
 }
 
 .cfg-field-error {
@@ -239,13 +336,115 @@
   transition: border-color 0.2s;
 }
 
-/* ── Caja de ayuda ──────────────────────────────────────────────────────── */
-/* ── Botones de acción ──────────────────────────────────────────────────── */
-.cfg-actions {
+/* ── Layout: menú de secciones + formulario ─────────────────────────────── */
+.cfg-layout {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.8rem;
+  gap: 2rem;
+  align-items: flex-start;
 }
+
+.cfg-nav {
+  flex: 0 0 220px;
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #fff;
+  border: 1px solid #e8ecf0;
+  border-radius: 16px;
+  padding: 10px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
+}
+
+.cfg-nav-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #9ca3af;
+  letter-spacing: 0.06em;
+  padding: 6px 10px 8px;
+}
+
+.cfg-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #4b5563;
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.cfg-nav-item:hover { background: #f3f6f9; }
+.cfg-nav-item i:first-child { font-size: 1rem; width: 18px; }
+
+.cfg-nav-item--active {
+  background: #eef3f8;
+  color: #1E3A5F;
+  font-weight: 700;
+}
+
+.cfg-nav-label { flex: 1; }
+.cfg-nav-error { color: #ef4444; font-size: 0.85rem; }
+
+.cfg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #FFC700;
+  flex-shrink: 0;
+}
+
+.cfg-form {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.cfg-form .cfg-alert { margin-bottom: 0; }
+
+.cfg-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  scroll-margin-top: 24px;
+}
+
+/* ── Barra de acciones (fija abajo) ─────────────────────────────────────── */
+.cfg-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  /* Más ancha que la columna: tapa la sombra de las cards (≈16px) que asomaba en los extremos */
+  margin: 0 -1.5rem;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 255, 255, 0.96); /* mismo blanco que el fondo de la página (body de Bootstrap) */
+  border-top: 1px solid #e8ecf0;
+}
+
+.cfg-savebar-status {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: #6b7280;
+}
+
+/* ── Botones de acción ──────────────────────────────────────────────────── */
 
 .cfg-btn {
   display: inline-flex;
@@ -333,7 +532,21 @@
 .cfg-btn-back:hover { background: #152b47; }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .cfg-layout { flex-direction: column; align-items: stretch; }
+  .cfg-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .cfg-nav-title { display: none; }
+  .cfg-nav-item { width: auto; white-space: nowrap; }
+}
+
 @media (max-width: 600px) {
+  .cfg-page { padding: 1.5rem 1rem 4rem; }
+  /* El padding lateral de la página baja a 1rem: la barra no puede salirse más que eso (scroll horizontal) */
+  .cfg-savebar { margin: 0 -1rem; padding: 1rem; }
   .cfg-card-body {
     flex-direction: column;
   }
@@ -341,4 +554,10 @@
     width: auto;
     height: 1px;
   }
+}
+
+/* Campos de solo lectura (veterinario en General/Ubicación) */
+.cfg-form .form-control[readonly] {
+  background-color: #f9fafb;
+  color: #6b7280;
 }
