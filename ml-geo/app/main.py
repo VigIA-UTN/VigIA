@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request, Response
 # pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
 # pyrefly: ignore [missing-import]
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from collections import defaultdict, deque
 from datetime import datetime, timezone
@@ -33,7 +33,8 @@ class GeoAnalyzeRequest(BaseModel):
     historial_7d: List[CoordenadaGPS]
     # Umbral de aislamiento en metros para este análisis. Si no se envía, se usa el valor
     # por defecto configurado en la variable de entorno UMBRAL_AISLAMIENTO_METROS (100 m).
-    umbral_aislamiento_m: Optional[float] = None
+    # Debe ser > 0: con 0 el índice de cohesión de un animal pegado al grupo sería 0/0.
+    umbral_aislamiento_m: Optional[float] = Field(default=None, gt=0)
 
 class AlertaAnimal(BaseModel):
     animal_id: str
@@ -55,11 +56,15 @@ class GeoAnalyzeResponse(BaseModel):
 
 GRID_SIZE = 20  # Grilla de 20x20
 
-# Distancia al centroide del resto del rodeo, en metros, a partir de la cual se
-# considera que un animal quedó aislado. El default de 100 m es del orden del
-# diámetro de un rodeo en pastoreo: más lejos que eso el animal dejó de seguir
-# al grupo. Se ajusta por entorno mientras no sea configurable por establecimiento.
+# Umbral de aislamiento por defecto, en metros: distancia máxima entre dos
+# animales para considerarlos parte del mismo grupo. El default de 100 m es del
+# orden del diámetro de un rodeo en pastoreo. El backend envía el umbral de cada
+# establecimiento en umbral_aislamiento_m; este valor solo se usa si no llega.
 UMBRAL_AISLAMIENTO_METROS = float(os.getenv("UMBRAL_AISLAMIENTO_METROS", "100.0"))
+
+# Duración de los intervalos en que se agrupan las posiciones para medir el
+# tiempo fuera del grupo, en segundos.
+INTERVALO_COHESION_S = 300.0
 
 def _grilla(puntos):
     """Bounding box de los puntos dividido en GRID_SIZE x GRID_SIZE: (min_lat, min_lng, lat_step, lng_step)."""
@@ -110,8 +115,12 @@ def _indice_cohesion(distancia_m, umbral_m: float = None):
     """
     Cohesión con el rodeo en 0..1: 1.0 pegado al grupo, 0.5 exactamente sobre
     el umbral de aislamiento, y tendiendo a 0 a medida que el animal se aleja.
-    Por construcción indice < 0.5 <=> distancia > umbral, pero la alerta se
-    deriva de la distancia para no depender de la igualdad de floats.
+
+    Es una medida continua de la distancia al centroide de referencia (ver
+    _clasificar); la alerta, en cambio, es pertenecer o no al grupo principal.
+    En un rodeo compacto coinciden (indice < 0.5 <=> alerta), pero en uno
+    estirado en fila un animal de la punta puede seguir enlazado al grupo
+    (sin alerta) y estar a más del umbral del centroide (indice < 0.5).
 
     umbral_m: umbral efectivo para este análisis; si es None usa el global
     UMBRAL_AISLAMIENTO_METROS (valor de la variable de entorno).
@@ -119,48 +128,19 @@ def _indice_cohesion(distancia_m, umbral_m: float = None):
     u = umbral_m if umbral_m is not None else UMBRAL_AISLAMIENTO_METROS
     return u / (u + distancia_m)
 
-def _compute_isolation_times(historial_7d: List[CoordenadaGPS], umbral_m: float, interval_s: float = 300.0) -> dict:
-    """
-    Returns a dict: animal_id -> total_isolation_time_in_seconds.
-    Positions are grouped into time intervals (default 5 minutes).
-    For each interval, if an animal is further than umbral_m from the centroid
-    of other animals' positions in that same interval, it accumulates
-    interval_s seconds of isolation.
-    """
-    isolation_time = defaultdict(float)
-    if not historial_7d:
-        return isolation_time
+def _centroide(posiciones):
+    """Centroide (lat, lng) de una lista de pares (lat, lng)."""
+    return (
+        sum(lat for lat, _ in posiciones) / len(posiciones),
+        sum(lng for _, lng in posiciones) / len(posiciones),
+    )
 
-    intervalos = defaultdict(lambda: defaultdict(list))
-    for p in historial_7d:
-        t = _ts(p).timestamp()
-        interval_idx = int(t / interval_s)
-        intervalos[interval_idx][p.animal_id].append(p)
-        
-    for interval_idx, animales_en_intervalo in intervalos.items():
-        pos_animal = {}
-        for a_id, puntos in animales_en_intervalo.items():
-            avg_lat = sum(p.lat for p in puntos) / len(puntos)
-            avg_lng = sum(p.lng for p in puntos) / len(puntos)
-            pos_animal[a_id] = (avg_lat, avg_lng)
-            
-        for a_id, (lat, lng) in pos_animal.items():
-            otros_lat = [o_lat for o_id, (o_lat, o_lng) in pos_animal.items() if o_id != a_id]
-            otros_lng = [o_lng for o_id, (o_lat, o_lng) in pos_animal.items() if o_id != a_id]
-            
-            if otros_lat:
-                avg_otros_lat = sum(otros_lat) / len(otros_lat)
-                avg_otros_lng = sum(otros_lng) / len(otros_lng)
-                dist = _haversine(lat, lng, avg_otros_lat, avg_otros_lng)
-                if dist > umbral_m:
-                    isolation_time[a_id] += interval_s
-
-    return isolation_time
-
-def _grupo_principal(animales: list, umbral_m: float):
+def _grupo_principal(posiciones: dict, umbral_m: float):
     """
     Identifica el grupo principal del rodeo mediante BFS sobre el grafo de
     proximidad: dos animales están conectados si su distancia ≤ umbral_m.
+
+    posiciones: animal_id -> (lat, lng).
 
     El grupo principal es el cluster más grande (mayor cantidad de animales).
     Si hay dos o más clusters del mismo tamaño máximo (empate), retorna None
@@ -171,7 +151,8 @@ def _grupo_principal(animales: list, umbral_m: float):
       lista como alejado (no como cohesionado).
     - Si el rodeo se divide, el grupo de mayor cantidad es el principal.
     """
-    n = len(animales)
+    ids = list(posiciones)
+    n = len(ids)
     if n == 0:
         return set()
 
@@ -187,13 +168,11 @@ def _grupo_principal(animales: list, umbral_m: float):
         while queue:
             curr = queue.popleft()
             component.append(curr)
+            curr_lat, curr_lng = posiciones[ids[curr]]
             for other in range(n):
                 if not visited[other]:
-                    dist = _haversine(
-                        animales[curr].lat, animales[curr].lng,
-                        animales[other].lat, animales[other].lng,
-                    )
-                    if dist <= umbral_m:
+                    other_lat, other_lng = posiciones[ids[other]]
+                    if _haversine(curr_lat, curr_lng, other_lat, other_lng) <= umbral_m:
                         visited[other] = True
                         queue.append(other)
         components.append(component)
@@ -206,7 +185,63 @@ def _grupo_principal(animales: list, umbral_m: float):
         # entre sí, o una división perfectamente pareja del rodeo).
         return None
 
-    return {animales[i].animal_id for i in largest[0]}
+    return {ids[i] for i in largest[0]}
+
+def _clasificar(posiciones: dict, umbral_m: float) -> dict:
+    """
+    Única definición de "fuera del grupo", compartida por la alerta (última
+    posición) y por el tiempo acumulado (cada intervalo).
+
+    posiciones: animal_id -> (lat, lng).
+    Devuelve animal_id -> (distancia_centroide_m, alejado):
+    - Con grupo principal: distancia al centroide del grupo principal, y
+      alejado = no pertenece al grupo principal.
+    - En empate: distancia al centroide del resto y alejado = distancia > umbral,
+      como antes de existir el grupo principal. Con una división pareja esto
+      marca a todo el rodeo.
+    - Con un solo animal no hay rodeo contra el que medir: (0.0, False).
+      Sin animales devuelve {}.
+    """
+    if len(posiciones) <= 1:
+        return {a_id: (0.0, False) for a_id in posiciones}
+
+    principal = _grupo_principal(posiciones, umbral_m)
+    resultado = {}
+    if principal is None:
+        for a_id, (lat, lng) in posiciones.items():
+            c_lat, c_lng = _centroide([p for o_id, p in posiciones.items() if o_id != a_id])
+            distancia = _haversine(lat, lng, c_lat, c_lng)
+            resultado[a_id] = (distancia, distancia > umbral_m)
+    else:
+        c_lat, c_lng = _centroide([posiciones[a_id] for a_id in principal])
+        for a_id, (lat, lng) in posiciones.items():
+            resultado[a_id] = (_haversine(lat, lng, c_lat, c_lng), a_id not in principal)
+    return resultado
+
+def _compute_isolation_times(historial_7d: List[CoordenadaGPS], umbral_m: float, interval_s: float = INTERVALO_COHESION_S) -> dict:
+    """
+    animal_id -> segundos acumulados fuera del grupo.
+
+    Las caravanas no transmiten todas en el mismo instante, así que las
+    posiciones se agrupan en intervalos de interval_s (5 min por defecto) y en
+    cada uno se usa la posición promedio de cada animal. Un animal suma
+    interval_s por cada intervalo en el que _clasificar lo marca alejado. Los
+    intervalos en los que el animal no transmitió no suman (huecos sin datos).
+    """
+    isolation_time = defaultdict(float)
+
+    intervalos = defaultdict(lambda: defaultdict(list))
+    for p in historial_7d:
+        interval_idx = int(_ts(p).timestamp() // interval_s)
+        intervalos[interval_idx][p.animal_id].append((p.lat, p.lng))
+
+    for animales_en_intervalo in intervalos.values():
+        pos_animal = {a_id: _centroide(puntos) for a_id, puntos in animales_en_intervalo.items()}
+        for a_id, (_, alejado) in _clasificar(pos_animal, umbral_m).items():
+            if alejado:
+                isolation_time[a_id] += interval_s
+
+    return isolation_time
 
 @app.get("/health")
 def health():
@@ -258,56 +293,20 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
             if p.animal_id not in ultimas_posiciones or _ts(p) > _ts(ultimas_posiciones[p.animal_id]):
                 ultimas_posiciones[p.animal_id] = p
 
-        animales = list(ultimas_posiciones.values())
-        alertas = []
-        
+        # La alerta usa la última posición; el tiempo fuera del grupo, todo el
+        # historial por intervalos. Ambos clasifican con _clasificar.
+        posiciones = {a_id: (p.lat, p.lng) for a_id, p in ultimas_posiciones.items()}
         iso_times = _compute_isolation_times(payload.historial_7d, umbral_efectivo)
-
-        if len(animales) == 1:
-            # Con un solo animal, no hay aislamiento posible respecto a un rodeo
-            alertas.append(AlertaAnimal(
-                animal_id=animales[0].animal_id,
-                indice_cohesion=_indice_cohesion(0.0, umbral_efectivo),
-                distancia_centroide_m=0.0,
-                alerta_aislamiento=False,
-                tiempo_fuera_grupo_s=0.0
-            ))
-        elif len(animales) > 1:
-            ids_grupo_principal = _grupo_principal(animales, umbral_efectivo)
-
-            if ids_grupo_principal is None:
-                # Sin grupo principal definido (empate de clusters):
-                # cada animal se compara contra el centroide de los demás,
-                # preservando el comportamiento anterior en casos ambiguos.
-                for a in animales:
-                    otros = [o for o in animales if o.animal_id != a.animal_id]
-                    avg_lat = sum(o.lat for o in otros) / len(otros)
-                    avg_lng = sum(o.lng for o in otros) / len(otros)
-                    distancia_centroide = _haversine(a.lat, a.lng, avg_lat, avg_lng)
-                    alertas.append(AlertaAnimal(
-                        animal_id=a.animal_id,
-                        indice_cohesion=_indice_cohesion(distancia_centroide, umbral_efectivo),
-                        distancia_centroide_m=distancia_centroide,
-                        alerta_aislamiento=distancia_centroide > umbral_efectivo,
-                        tiempo_fuera_grupo_s=iso_times.get(a.animal_id, 0.0)
-                    ))
-            else:
-                # Hay un grupo principal claro: centroide de ese cluster.
-                # Los animales fuera de él se marcan como alejados,
-                # incluyendo subgrupos que se alejaron juntos.
-                principales = [a for a in animales if a.animal_id in ids_grupo_principal]
-                centroide_lat = sum(a.lat for a in principales) / len(principales)
-                centroide_lng = sum(a.lng for a in principales) / len(principales)
-
-                for a in animales:
-                    distancia_centroide = _haversine(a.lat, a.lng, centroide_lat, centroide_lng)
-                    alertas.append(AlertaAnimal(
-                        animal_id=a.animal_id,
-                        indice_cohesion=_indice_cohesion(distancia_centroide, umbral_efectivo),
-                        distancia_centroide_m=distancia_centroide,
-                        alerta_aislamiento=a.animal_id not in ids_grupo_principal,
-                        tiempo_fuera_grupo_s=iso_times.get(a.animal_id, 0.0)
-                    ))
+        alertas = [
+            AlertaAnimal(
+                animal_id=a_id,
+                indice_cohesion=_indice_cohesion(distancia, umbral_efectivo),
+                distancia_centroide_m=distancia,
+                alerta_aislamiento=alejado,
+                tiempo_fuera_grupo_s=iso_times.get(a_id, 0.0),
+            )
+            for a_id, (distancia, alejado) in _clasificar(posiciones, umbral_efectivo).items()
+        ]
 
         aisladas = sum(1 for a in alertas if a.alerta_aislamiento)
         print(f"[{correlation_id}] Análisis exitoso: {len(mapa_calor)} celdas, "

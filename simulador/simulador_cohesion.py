@@ -3,15 +3,19 @@ simulador_cohesion.py — Simula el escenario realista de cohesión de rodeo:
   1. Fase 1: Los 5 animales arrancan en las posiciones dispersas del DataInitializer
      y caminan progresivamente hacia el centro del potrero para juntarse.
   2. Fase 2: Todos se agrupan en las posiciones de reset_posiciones (pastoreo apiñado, <15m).
-  3. Fase 3: 3 animales se quedan juntos en el rodeo y 2 animales se van fuera del radio
-     permitido (umbral de aislamiento ~100m), frenando su deriva en ~125m para quedarse
-     pastoreando ahí sin irse a miles de kilómetros.
+  3. Fase 3: 3 animales se quedan juntos en el rodeo y 2 animales se van fuera del umbral
+     de aislamiento, frenando su deriva en ~175m del centro para quedarse pastoreando ahí.
+     Según --modo:
+       - aislados: 004 y 005 salen en direcciones opuestas (dos animales aislados).
+       - subgrupo: 004 y 005 salen juntos, a ~10 m entre sí (un subgrupo que se aleja).
 
 Uso:
-  py simulador_cohesion.py                        # usa valores por defecto
-  py simulador_cohesion.py --intervalo 5          # ciclo cada 5 s
-  py simulador_cohesion.py --ciclos-juntos 4      # se quedan 4 ciclos juntos antes de separar
-  py simulador_cohesion.py --distancia-aislado 125# radio límite de alejamiento en metros
+  py simulador_cohesion.py                          # usa valores por defecto (modo aislados)
+  py simulador_cohesion.py --modo subgrupo          # 004 y 005 se alejan juntos
+  py simulador_cohesion.py --intervalo 5            # ciclo cada 5 s
+  py simulador_cohesion.py --ciclos-juntos 4        # se quedan 4 ciclos juntos antes de separar
+  py simulador_cohesion.py --distancia-aislado 175  # radio límite de alejamiento en metros
+  py simulador_cohesion.py --umbral 100             # umbral del establecimiento (solo para el log)
 """
 
 import os
@@ -87,6 +91,14 @@ def _distancia_m(lat1, lng1, lat2, lng2):
 def _distancia_base_m(lat, lng):
     return _distancia_m(lat, lng, LAT_BASE, LNG_BASE)
 
+def _distancia_al_grupo_m(animales, lat, lng):
+    """
+    Distancia al animal más cercano del grupo que se queda (001..003). ml-geo
+    considera que un animal sigue en el grupo si está a menos del umbral de
+    alguno de sus miembros, así que esta es la distancia que decide la alerta.
+    """
+    return min(_distancia_m(lat, lng, animales[g]["lat"], animales[g]["lng"]) for g in IDS_GRUPO)
+
 def _mover_hacia(lat, lng, target_lat, target_lng, step_m):
     """Mueve la posición actual hacia la posición objetivo por un máximo de step_m metros."""
     dist = _distancia_m(lat, lng, target_lat, target_lng)
@@ -110,14 +122,26 @@ def _init_animales():
             "lat": lat_init,
             "lng": lng_init,
             "bateria": 100.0,
-            "heading": (
-                math.pi / 2 if dev_id == "VIGIA-ARG-004" else
-                -math.pi / 2 if dev_id == "VIGIA-ARG-005" else
-                random.uniform(0, 2 * math.pi)
-            ),
+            "heading": random.uniform(0, 2 * math.pi),
             "en_rodeo": False,
         }
     return animales
+
+def _iniciar_alejamiento(animales, modo):
+    """
+    Fija el rumbo de 004 y 005 al empezar la fase 3 (en la fase 2 el pastoreo
+    lo va cambiando). En modo subgrupo, 005 sigue a 004 a un desplazamiento
+    fijo, así que hace falta guardar ese desplazamiento.
+    """
+    lider, seguidor = IDS_ALEJADOS
+    animales[lider]["heading"] = math.pi / 2  # hacia el este
+    if modo == "subgrupo":
+        # ~10 m al norte del líder: quedan enlazados entre sí (< umbral)
+        animales[seguidor]["offset"] = (10.0 / 111320.0, 0.0)
+        animales[seguidor]["lat"] = animales[lider]["lat"] + animales[seguidor]["offset"][0]
+        animales[seguidor]["lng"] = animales[lider]["lng"]
+    else:
+        animales[seguidor]["heading"] = -math.pi / 2  # hacia el oeste
 
 # ---------------------------------------------------------------------------
 # Generación y Envío de Telemetría
@@ -180,8 +204,23 @@ def main():
     parser.add_argument(
         "--distancia-aislado",
         type=float,
-        default=125.0,
-        help="Distancia objetivo en metros del animal aislado (fuera del umbral de 100m, sin irse lejos) (default: 125.0)",
+        default=175.0,
+        help="Distancia al centro, en metros, a la que frenan los que se alejan. Con el grupo "
+             "pastoreando hasta 25 m del centro, tiene que superar umbral + 25 m con margen para "
+             "que la alerta no vaya y venga (default: 175.0)",
+    )
+    parser.add_argument(
+        "--modo",
+        choices=["aislados", "subgrupo"],
+        default="aislados",
+        help="aislados: 004 y 005 se alejan en direcciones opuestas; "
+             "subgrupo: se alejan juntos a ~10 m entre sí (default: aislados)",
+    )
+    parser.add_argument(
+        "--umbral",
+        type=float,
+        default=100.0,
+        help="Umbral de aislamiento del establecimiento en metros; solo se usa para el log (default: 100.0)",
     )
     args = parser.parse_args()
 
@@ -195,12 +234,15 @@ def main():
     print("  Sesion OTAA         : {}".format(session_id))
     print("  Intervalo           : {} s".format(args.intervalo))
     print("  Ciclos agrupados    : {} ciclos todas juntas".format(args.ciclos_juntos))
-    print("  Distancia aislado   : {} m (fuera del radio permitido de 100m)".format(args.distancia_aislado))
+    print("  Modo                : {}".format(args.modo))
+    print("  Distancia aislado   : {} m del centro".format(args.distancia_aislado))
+    print("  Umbral (log)        : {} m".format(args.umbral))
     print("")
     print("  Fases de la simulación:")
     print("    1. CONVERGENCIA : Arrancan dispersas (DataInitializer) y caminan al rodeo.")
     print("    2. AGRUPADAS    : Permanecen las 5 juntas en el potrero (reset_posiciones).")
-    print("    3. AISLAMIENTO  : 3 se quedan juntas; 004 y 005 van al radio de {}m y frenan.".format(args.distancia_aislado))
+    print("    3. AISLAMIENTO  : 3 se quedan juntas; 004 y 005 van {} al radio de {}m y frenan.".format(
+        "juntas" if args.modo == "subgrupo" else "por separado", args.distancia_aislado))
     print("=" * 76)
     print("", flush=True)
 
@@ -208,6 +250,7 @@ def main():
     f_cnt = 1
     ciclos_agrupadas_restantes = args.ciclos_juntos
     todas_en_rodeo = False
+    alejamiento_iniciado = False
 
     while True:
         inicio = time.time()
@@ -239,10 +282,11 @@ def main():
                     desc = f"en rodeo apiñado ({dist_centro:4.1f}m)"
                 else:
                     rol = "SE ALEJA"
-                    if dist_centro >= 100.0:
-                        desc = f"AISLADO FUERA DE RADIO ({dist_centro:4.1f}m > 100m)"
+                    dist_grupo = _distancia_al_grupo_m(animales, estado["lat"], estado["lng"])
+                    if dist_grupo > args.umbral:
+                        desc = f"FUERA DEL GRUPO (a {dist_grupo:4.1f}m del grupo > {args.umbral:g}m)"
                     else:
-                        desc = f"alejándose ({dist_centro:4.1f}m)"
+                        desc = f"alejándose (a {dist_grupo:4.1f}m del grupo)"
 
                 print("  {:17s} [{:8s}] lat={:.6f} lng={:.6f} -> {}".format(
                     device_id, rol, estado["lat"], estado["lng"], desc
@@ -253,6 +297,10 @@ def main():
 
         # 2. Actualizar posiciones para el próximo ciclo
         llegaron_todas_este_ciclo = True
+
+        if todas_en_rodeo and ciclos_agrupadas_restantes == 0 and not alejamiento_iniciado:
+            _iniciar_alejamiento(animales, args.modo)
+            alejamiento_iniciado = True
 
         for device_id, estado in animales.items():
             target_lat, target_lng = POSICIONES_RESET[device_id]
@@ -284,11 +332,24 @@ def main():
                 else:
                     estado["heading"] += math.pi
 
+            elif "offset" in estado:
+                # FASE 3, modo subgrupo: 005 acompaña a 004 (el líder se actualizó antes)
+                lider = animales[IDS_ALEJADOS[0]]
+                estado["lat"] = lider["lat"] + estado["offset"][0]
+                estado["lng"] = lider["lng"] + estado["offset"][1]
+
             else:
-                # FASE 3: Animales 004 y 005 se alejan hastaargs.distancia_aislado
+                # FASE 3: Animales 004 y 005 se alejan hasta args.distancia_aislado
                 dist_actual = _distancia_base_m(estado["lat"], estado["lng"])
 
                 if dist_actual < args.distancia_aislado:
+                    if estado.get("llego_al_limite"):
+                        # Volvió a entrar al radio pastoreando: retoma en dirección
+                        # opuesta al centro, para no volver a caminar hacia el rodeo
+                        estado["heading"] = math.atan2(
+                            (estado["lng"] - LNG_BASE) * math.cos(math.radians(LAT_BASE)),
+                            estado["lat"] - LAT_BASE,
+                        )
                     # Siguen avanzando en su dirección hacia el exterior
                     heading = estado["heading"] + random.gauss(0, 0.05)
                     dlat_deg = (SPEED_ALEJAMIENTO_M * math.cos(heading)) / 111320.0
@@ -298,6 +359,7 @@ def main():
                 else:
                     # Ya superaron el umbral y alcanzaron la distancia límite:
                     # FRENAN la deriva y pastorean suavemente en esa zona
+                    estado["llego_al_limite"] = True
                     estado["heading"] += random.gauss(0, 0.3)
                     dlat_deg = (SPEED_PASTOREO_M * math.cos(estado["heading"])) / 111320.0
                     dlng_deg = (SPEED_PASTOREO_M * math.sin(estado["heading"])) / (111320.0 * math.cos(math.radians(LAT_BASE)))
@@ -318,7 +380,8 @@ def main():
         elif todas_en_rodeo and ciclos_agrupadas_restantes > 0:
             ciclos_agrupadas_restantes -= 1
             if ciclos_agrupadas_restantes == 0:
-                print("\n  >>> FIN DEL PERÍODO DE AGRUPACIÓN: VIGIA-ARG-004 y 005 inician alejamiento controlado. <<<\n", flush=True)
+                print("\n  >>> FIN DEL PERÍODO DE AGRUPACIÓN: VIGIA-ARG-004 y 005 inician alejamiento controlado ({}). <<<\n".format(
+                    args.modo), flush=True)
 
         elapsed = time.time() - inicio
         espera = args.intervalo - elapsed

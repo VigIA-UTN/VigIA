@@ -87,6 +87,31 @@ como se espera ("prendo el simulador y a los pocos minutos aparece la
 alerta"), conviene reiniciar el backend (o re-disparar el
 `DataInitializer`) dentro de esa ventana de 24hs antes de la demo.
 
+## `simulador_cohesion.py` — escenarios de cohesión y aislamiento
+
+Simula las 5 caravanas `VIGIA-ARG-001..005` en tres fases. Primero convergen desde las posiciones de `DataInitializer`. Después quedan todas juntas `--ciclos-juntos` ciclos. Al final, 001 a 003 se quedan en el rodeo (a menos de 25 m del centro) y 004 y 005 se alejan hasta `--distancia-aislado` (175 m del centro por defecto) y pastorean ahí. Si vuelven a entrar al radio, retoman hacia afuera.
+
+Con `--modo aislados` (default), 004 y 005 se van en direcciones opuestas. Con `--modo subgrupo`, se van juntos, a ~10 m entre sí.
+
+La distancia por defecto es mayor que el umbral (100 m) más el radio del rodeo (25 m), con margen. Así el aislamiento es claro y la alerta no va y viene entre ciclos. Si el establecimiento usa otro umbral, pasarlo con `--umbral` (solo afecta al log) y ajustar `--distancia-aislado` a más de `umbral + 50`.
+
+Resultado esperado tras correr la fase 3 y disparar el job de cohesión (`cohesionJob`, umbral de 100 m):
+
+| Escenario | 001-003 | 004 y 005 |
+|---|---|---|
+| Fases 1-2 (rodeo cohesionado) | `alerta_aislamiento: false`, `tiempo_fuera_grupo_s: 0` | igual que 001-003 |
+| `--modo aislados` (fase 3) | sin alerta, tiempo 0 | alerta `AISLAMIENTO_SOCIAL`, tiempo > 0 |
+| `--modo subgrupo` (fase 3) | sin alerta, tiempo 0 | alerta `AISLAMIENTO_SOCIAL` para los dos, tiempo > 0, aunque estén juntos entre sí |
+
+El tiempo y el índice se ven en `registros_cohesion`. Las alertas, en `alertas` con disparador `AISLAMIENTO_SOCIAL`.
+
+```bash
+py simulador_cohesion.py --modo aislados
+py simulador_cohesion.py --modo subgrupo
+```
+
+Igual que con el resto, no correrlo al mismo tiempo que otro simulador que mande telemetría de los mismos device_id.
+
 ## `simulador_demo.py` — variante anterior (un solo proceso, todavía funcional)
 
 Antes de separar en `simulador_normal.py` + `simulador_celo.py`, existía
