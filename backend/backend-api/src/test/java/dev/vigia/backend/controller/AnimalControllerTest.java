@@ -30,6 +30,7 @@ import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.PerfilReferenciaRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -108,6 +109,8 @@ class AnimalControllerTest {
         private PerfilReferenciaRepository perfilReferenciaRepository;
         @Autowired
         private EstadoSaludRepository estadoSaludRepository;
+        @Autowired
+        private RegistroCohesionRepository registroCohesionRepository;
 
         private Long establecimientoId;
         private Long rodeoLoteId;
@@ -127,6 +130,7 @@ class AnimalControllerTest {
                 estadoReproductivoRepository.deleteAll();
                 estadoSaludRepository.deleteAll();
                 perfilReferenciaRepository.deleteAll();
+                registroCohesionRepository.deleteAll();
                 animalRepository.deleteAll();
                 caravanaRepository.deleteAll();
                 rodeoLoteRepository.deleteAll();
@@ -2433,5 +2437,87 @@ class AnimalControllerTest {
 
                 Animal animalEnDb = animalRepository.findById(animalId).orElseThrow();
                 assertThat(animalEnDb.getCaravana()).isNull();
+        }
+
+        // ── Índice de cohesión (#344) ────────────────────────────────────────────
+
+        private void guardarCohesion(Long animalId, LocalDateTime fecha, double indice) {
+                dev.vigia.backend.model.RegistroCohesion registro = dev.vigia.backend.model.RegistroCohesion.builder()
+                                .animal(animalRepository.findById(animalId).orElseThrow())
+                                .establecimiento(establecimientoRepository.findById(establecimientoId).orElseThrow())
+                                .fecha(fecha)
+                                .indiceCohesion(indice)
+                                .tiempoFueraGrupoS(0L)
+                                .build();
+                registroCohesionRepository.save(registro);
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Sin desde/hasta usa los últimos 7 días y promedia el rodeo")
+        @SuppressWarnings("null")
+        void getCohesion_sinRango_ultimos7DiasConPromedioDelRodeo() throws Exception {
+                Long vaca = crearAnimal("Vaca Cohesion", establecimientoId, rodeoLoteId);
+                Long companera = crearAnimal("Companera", establecimientoId, rodeoLoteId);
+                LocalDateTime corrida1 = LocalDateTime.now().minusDays(2).withNano(0);
+                LocalDateTime corrida2 = LocalDateTime.now().minusHours(1).withNano(0);
+                guardarCohesion(vaca, corrida1, 0.8);
+                guardarCohesion(companera, corrida1, 0.6);
+                guardarCohesion(vaca, corrida2, 0.4);
+                guardarCohesion(companera, corrida2, 1.0);
+                // Fuera de la ventana de 7 días: no debe aparecer
+                guardarCohesion(vaca, LocalDateTime.now().minusDays(10), 0.1);
+
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.actual").value(0.4))
+                                .andExpect(jsonPath("$.serie.length()").value(2))
+                                .andExpect(jsonPath("$.serie[0].valor").value(0.8))
+                                .andExpect(jsonPath("$.serie[0].promedioRodeo").value(0.7))
+                                .andExpect(jsonPath("$.serie[1].promedioRodeo").value(0.7))
+                                .andExpect(jsonPath("$.promedioRodeo").value(0.7));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Usuario de otro establecimiento recibe 403")
+        @SuppressWarnings("null")
+        void getCohesion_usuarioAjeno_403() throws Exception {
+                Usuario otroProductor = new Usuario();
+                otroProductor.setEmail("otro-cohesion@vigia.dev");
+                otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroProductor.setNombre("Otro Productor");
+                otroProductor.setRol(Rol.PRODUCTOR);
+                otroProductor.setActivo(true);
+                otroProductor = usuarioRepository.save(otroProductor);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Cohesion");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+                establecimientoRepository.save(otroEst);
+
+                String otroToken = getTokenFor("otro-cohesion@vigia.dev", "otro123");
+                Long animalId = crearAnimal("Vaca Ajena Cohesion", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/cohesion")
+                                .header("Authorization", "Bearer " + otroToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - desde posterior a hasta devuelve 400")
+        @SuppressWarnings("null")
+        void getCohesion_rangoInvertido_400() throws Exception {
+                Long animalId = crearAnimal("Vaca Rango", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/cohesion")
+                                .param("desde", "2026-10-10T00:00:00")
+                                .param("hasta", "2026-10-01T00:00:00")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isBadRequest());
         }
 }

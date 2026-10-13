@@ -1,6 +1,7 @@
 package dev.vigia.backend.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import dev.vigia.backend.model.EstadoAlerta;
 import lombok.Builder;
@@ -25,4 +26,7 @@ public class AlertaResponse {
     private LocalDateTime caravanaUltimaSenial;
     private boolean datoPosiblementeDesactualizado;
     private long horasUmbralDatoDesactualizado;
+
+    /** Solo AISLAMIENTO_SOCIAL: animales que se alejaron del grupo. */
+    private List<AnimalAisladoResponse> animalesAislados;
 }

@@ -6,6 +6,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -17,6 +21,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.AnimalAisladoResponse;
+import dev.vigia.backend.dto.DetalleAislamientoResponse;
 import dev.vigia.backend.dto.DetalleSanitarioResponse;
 import dev.vigia.backend.dto.DetalleGeoespacialResponse;
 import dev.vigia.backend.dto.DiagnosticoRequest;
@@ -33,6 +39,7 @@ import dev.vigia.backend.model.Diagnostico;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.model.RegistroCohesion;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
@@ -41,6 +48,7 @@ import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.EstadoSalud;
@@ -74,6 +82,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final RabbitTemplate rabbitTemplate;
         private final ObjectMapper objectMapper;
         private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
+        private final RegistroCohesionRepository registroCohesionRepository;
 
         @Override
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
@@ -108,8 +117,23 @@ public class AlertaServiceImpl implements AlertaService {
                 List<Alerta> alertas = alertaRepository.findByFiltros(establecimientoId, estado, disparadorEnum,
                                 severidadEnum);
 
+                // Una sola carga del contexto de aislamiento para todo el listado (sin N+1).
+                ContextoAislamiento aislamiento = alertas.stream().anyMatch(this::esAislamiento)
+                                ? cargarContextoAislamiento(establecimientoId)
+                                : null;
+
                 return alertas.stream()
-                                .map(this::toResponse)
+                                .map(alerta -> {
+                                        AlertaResponse response = toResponse(alerta);
+                                        if (aislamiento != null && esAislamiento(alerta)) {
+                                                response.setAnimalesAislados(
+                                                                grupoAislamiento(alerta, aislamiento).stream()
+                                                                                .map(a -> toAnimalAislado(a, aislamiento))
+                                                                                .sorted(POR_MINUTOS_FUERA_DESC)
+                                                                                .collect(Collectors.toList()));
+                                        }
+                                        return response;
+                                })
                                 .collect(Collectors.toList());
         }
 
@@ -283,6 +307,12 @@ public class AlertaServiceImpl implements AlertaService {
                         detalleGeoespacial = construirDetalleGeoespacial(alerta);
                 }
 
+                DetalleAislamientoResponse detalleAislamiento = null;
+                if (esAislamiento(alerta)) {
+                        detalleAislamiento = construirDetalleAislamiento(alerta,
+                                        cargarContextoAislamiento(establecimientoId));
+                }
+
                 String descripcionDatoOrigen = construirDescripcionDatoOrigen(alerta, detalleSanitario);
 
                 LocalDateTime ultimaSenial = ultimaSenialDe(alerta);
@@ -308,6 +338,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 .descripcionDatoOrigen(descripcionDatoOrigen)
                                 .detalleSanitario(detalleSanitario)
                                 .detalleGeoespacial(detalleGeoespacial)
+                                .detalleAislamiento(detalleAislamiento)
                                 .accionRecomendada(alerta.getAccionRecomendada())
                                 .caravanaUltimaSenial(ultimaSenial)
                                 .datoPosiblementeDesactualizado(esDatoDesactualizado(alerta, ultimaSenial))
@@ -440,6 +471,114 @@ public class AlertaServiceImpl implements AlertaService {
                                 .longitud(alerta.getLongitud())
                                 .nombreLote(nombreLote)
                                 .segundosFuera(segundosFuera)
+                                .build();
+        }
+
+        // ── Aislamiento social ────────────────────────────────────────────────────
+
+        private static final Comparator<AnimalAisladoResponse> POR_MINUTOS_FUERA_DESC =
+                        Comparator.comparingLong(AnimalAisladoResponse::getMinutosFuera).reversed();
+
+        /**
+         * Alertas de aislamiento pendientes del establecimiento y el último registro de
+         * cohesión de cada uno de esos animales.
+         */
+        private record ContextoAislamiento(List<Alerta> pendientes, Map<Long, RegistroCohesion> ultimoRegistro) {
+        }
+
+        private boolean esAislamiento(Alerta alerta) {
+                return alerta.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL;
+        }
+
+        private ContextoAislamiento cargarContextoAislamiento(Long establecimientoId) {
+                List<Alerta> pendientes = alertaRepository.findByFiltros(establecimientoId, EstadoAlerta.PENDIENTE,
+                                DisparadorAlerta.AISLAMIENTO_SOCIAL, null);
+                Set<Long> animalIds = pendientes.stream()
+                                .map(a -> a.getAnimal().getId())
+                                .collect(Collectors.toSet());
+                Map<Long, RegistroCohesion> ultimos = animalIds.isEmpty()
+                                ? Map.of()
+                                : registroCohesionRepository.findUltimosPorAnimal(establecimientoId, animalIds).stream()
+                                                .collect(Collectors.toMap(r -> r.getAnimal().getId(), Function.identity(),
+                                                                (a, b) -> a));
+                return new ContextoAislamiento(pendientes, ultimos);
+        }
+
+        /**
+         * Animales que se alejaron junto con el de esta alerta. Mientras está pendiente
+         * se agrupa con las demás alertas pendientes del mismo rodeo (el grupo contra el
+         * que ml-geo mide la cohesión); una alerta ya resuelta muestra solo su animal.
+         */
+        private List<Alerta> grupoAislamiento(Alerta alerta, ContextoAislamiento contexto) {
+                if (alerta.getEstado() != EstadoAlerta.PENDIENTE) {
+                        return List.of(alerta);
+                }
+                Long rodeoId = rodeoLoteId(alerta.getAnimal());
+                List<Alerta> grupo = new ArrayList<>();
+                grupo.add(alerta);
+                contexto.pendientes().stream()
+                                .filter(p -> !p.getId().equals(alerta.getId()))
+                                .filter(p -> Objects.equals(rodeoLoteId(p.getAnimal()), rodeoId))
+                                .filter(p -> grupo.stream().noneMatch(
+                                                g -> g.getAnimal().getId().equals(p.getAnimal().getId())))
+                                .forEach(grupo::add);
+                return grupo;
+        }
+
+        private static Long rodeoLoteId(Animal animal) {
+                return animal.getRodeoLote() != null ? animal.getRodeoLote().getId() : null;
+        }
+
+        private AnimalAisladoResponse toAnimalAislado(Alerta alerta, ContextoAislamiento contexto) {
+                Animal animal = alerta.getAnimal();
+                // El registro describe el estado actual: para una alerta ya resuelta se usa
+                // lo que quedó guardado en la alerta.
+                RegistroCohesion registro = alerta.getEstado() == EstadoAlerta.PENDIENTE
+                                ? contexto.ultimoRegistro().get(animal.getId())
+                                : null;
+
+                long minutosFuera;
+                if (registro != null && registro.getTiempoFueraGrupoS() != null) {
+                        minutosFuera = registro.getTiempoFueraGrupoS() / 60;
+                } else {
+                        LocalDateTime fin = alerta.getTsConfirmacion() != null ? alerta.getTsConfirmacion()
+                                        : LocalDateTime.now();
+                        minutosFuera = Math.max(0, Duration.between(alerta.getTsGeneracion(), fin).toMinutes());
+                }
+
+                Double distancia = registro != null && registro.getDistanciaCentroideM() != null
+                                ? registro.getDistanciaCentroideM()
+                                : alerta.getValorDetectado();
+
+                return AnimalAisladoResponse.builder()
+                                .animalId(animal.getId())
+                                .identificador(animal.getIdCaravanaOficial() != null ? animal.getIdCaravanaOficial()
+                                                : String.valueOf(animal.getId()))
+                                .alias(animal.getAlias())
+                                .minutosFuera(minutosFuera)
+                                .distanciaGrupoM(distancia != null ? Math.round(distancia) : 0L)
+                                .severidad(alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null)
+                                .build();
+        }
+
+        private DetalleAislamientoResponse construirDetalleAislamiento(Alerta alerta, ContextoAislamiento contexto) {
+                List<Alerta> grupo = grupoAislamiento(alerta, contexto);
+                LocalDateTime tsInicio = grupo.stream()
+                                .map(Alerta::getTsGeneracion)
+                                .filter(Objects::nonNull)
+                                .min(Comparator.naturalOrder())
+                                .orElse(alerta.getTsGeneracion());
+                String nombreLote = alerta.getAnimal().getRodeoLote() != null
+                                ? alerta.getAnimal().getRodeoLote().getNombre()
+                                : null;
+
+                return DetalleAislamientoResponse.builder()
+                                .animalesAislados(grupo.stream()
+                                                .map(a -> toAnimalAislado(a, contexto))
+                                                .sorted(POR_MINUTOS_FUERA_DESC)
+                                                .collect(Collectors.toList()))
+                                .tsInicio(tsInicio)
+                                .nombreLote(nombreLote)
                                 .build();
         }
 

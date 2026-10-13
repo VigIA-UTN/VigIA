@@ -33,6 +33,8 @@ public class AlertaDetalleResponse {
     private String descripcionDatoOrigen;
     private DetalleSanitarioResponse detalleSanitario;
     private DetalleGeoespacialResponse detalleGeoespacial;
+    /** Presente solo para alertas AISLAMIENTO_SOCIAL. */
+    private DetalleAislamientoResponse detalleAislamiento;
     private String accionRecomendada;
 
     private LocalDateTime caravanaUltimaSenial;

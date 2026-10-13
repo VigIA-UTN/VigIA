@@ -3,6 +3,7 @@ package dev.vigia.backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
@@ -25,6 +26,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AnimalAisladoResponse;
+import dev.vigia.backend.dto.DetalleAislamientoResponse;
 import dev.vigia.backend.dto.BloqueComparativoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
@@ -38,6 +41,8 @@ import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.RegistroCohesion;
+import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.TipoEstadoSalud;
 import dev.vigia.backend.model.TipoIntervencion;
@@ -51,6 +56,7 @@ import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.service.impl.AlertaServiceImpl;
 import dev.vigia.backend.model.Intervencion;
 
@@ -80,6 +86,9 @@ public class AlertaServiceImplTest {
 
         @Mock
         private AnimalRepository animalRepository;
+
+        @Mock
+        private RegistroCohesionRepository registroCohesionRepository;
 
         @Spy
         private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -1399,5 +1408,152 @@ public class AlertaServiceImplTest {
                                 result.getAccionRecomendada());
                 verify(alertaRepository, times(1)).save(mockAlerta);
         }
-}
 
+        // --- Aislamiento social (#351) ---
+
+        private Alerta alertaAislamiento(Long alertaId, Long animalId, String caravana, RodeoLote rodeo,
+                        LocalDateTime tsGeneracion, double distancia) {
+                Animal animal = new Animal();
+                animal.setId(animalId);
+                animal.setEstablecimiento(mockEstablecimiento);
+                animal.setIdCaravanaOficial(caravana);
+                animal.setRodeoLote(rodeo);
+
+                Alerta alerta = new Alerta();
+                alerta.setId(alertaId);
+                alerta.setAnimal(animal);
+                alerta.setDisparador(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+                alerta.setTipo("AISLAMIENTO_SOCIAL");
+                alerta.setEstado(EstadoAlerta.PENDIENTE);
+                alerta.setSeveridad(SeveridadAlerta.ALTA);
+                alerta.setTsGeneracion(tsGeneracion);
+                alerta.setValorDetectado(distancia);
+                return alerta;
+        }
+
+        private RodeoLote rodeo(Long id, String nombre) {
+                RodeoLote rodeo = new RodeoLote();
+                rodeo.setId(id);
+                rodeo.setNombre(nombre);
+                return rodeo;
+        }
+
+        private RegistroCohesion registro(Alerta alerta, long tiempoFueraS, double distancia) {
+                return RegistroCohesion.builder()
+                                .animal(alerta.getAnimal())
+                                .establecimiento(mockEstablecimiento)
+                                .fecha(LocalDateTime.now())
+                                .indiceCohesion(0.2)
+                                .tiempoFueraGrupoS(tiempoFueraS)
+                                .distanciaCentroideM(distancia)
+                                .build();
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_Aislamiento_AgrupaLasPendientesDelMismoRodeo() {
+                RodeoLote norte = rodeo(1L, "Lote Norte");
+                RodeoLote sur = rodeo(2L, "Lote Sur");
+                LocalDateTime ahora = LocalDateTime.now();
+                Alerta propia = alertaAislamiento(ALERTA_ID, 10L, "12345", norte, ahora.minusMinutes(30), 300.0);
+                Alerta mismoRodeo = alertaAislamiento(101L, 11L, "F4830", norte, ahora.minusMinutes(90), 210.0);
+                Alerta otroRodeo = alertaAislamiento(102L, 12L, "10872", sur, ahora.minusMinutes(10), 150.0);
+
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(propia));
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, EstadoAlerta.PENDIENTE,
+                                DisparadorAlerta.AISLAMIENTO_SOCIAL, null))
+                                .thenReturn(List.of(propia, mismoRodeo, otroRodeo));
+                // Solo el animal 10 tiene registro de cohesión; el 11 cae al fallback de la alerta.
+                when(registroCohesionRepository.findUltimosPorAnimal(eq(ESTABLECIMIENTO_ID), any()))
+                                .thenReturn(List.of(registro(propia, 2 * 3600, 340.4)));
+
+                DetalleAislamientoResponse detalle = alertaService
+                                .obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID).getDetalleAislamiento();
+
+                assertNotNull(detalle);
+                assertEquals("Lote Norte", detalle.getNombreLote());
+                assertEquals(mismoRodeo.getTsGeneracion(), detalle.getTsInicio());
+
+                List<AnimalAisladoResponse> aislados = detalle.getAnimalesAislados();
+                assertEquals(2, aislados.size(), "El animal del otro rodeo no debe aparecer");
+                // Más tiempo fuera primero: 120 min (registro) > ~90 min (desde la alerta)
+                assertEquals(10L, aislados.get(0).getAnimalId());
+                assertEquals("12345", aislados.get(0).getIdentificador());
+                assertEquals(120L, aislados.get(0).getMinutosFuera());
+                assertEquals(340L, aislados.get(0).getDistanciaGrupoM());
+                assertEquals("ALTA", aislados.get(0).getSeveridad());
+                assertEquals(11L, aislados.get(1).getAnimalId());
+                assertTrue(aislados.get(1).getMinutosFuera() >= 89 && aislados.get(1).getMinutosFuera() <= 91);
+                assertEquals(210L, aislados.get(1).getDistanciaGrupoM());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_AislamientoResuelto_MuestraSoloSuAnimal() {
+                LocalDateTime generada = LocalDateTime.now().minusDays(1);
+                Alerta resuelta = alertaAislamiento(ALERTA_ID, 10L, "12345", null, generada, 250.0);
+                resuelta.setEstado(EstadoAlerta.CONFIRMADA);
+                resuelta.setTsConfirmacion(generada.plusMinutes(45));
+                Alerta otraPendiente = alertaAislamiento(101L, 11L, "F4830", null, LocalDateTime.now(), 200.0);
+
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(resuelta));
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, EstadoAlerta.PENDIENTE,
+                                DisparadorAlerta.AISLAMIENTO_SOCIAL, null))
+                                .thenReturn(List.of(otraPendiente));
+
+                DetalleAislamientoResponse detalle = alertaService
+                                .obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID).getDetalleAislamiento();
+
+                assertEquals(1, detalle.getAnimalesAislados().size());
+                AnimalAisladoResponse aislado = detalle.getAnimalesAislados().get(0);
+                assertEquals(10L, aislado.getAnimalId());
+                assertEquals(45L, aislado.getMinutosFuera());
+                assertEquals(250L, aislado.getDistanciaGrupoM());
+                assertNull(detalle.getNombreLote());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_NoAislamiento_SinDetalleAislamiento() {
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+
+                assertNull(alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID)
+                                .getDetalleAislamiento());
+                verifyNoInteractions(registroCohesionRepository);
+        }
+
+        @Test
+        void listarAlertas_Aislamiento_ExponeAnimalesAisladosConUnaSolaConsulta() {
+                RodeoLote norte = rodeo(1L, "Lote Norte");
+                LocalDateTime ahora = LocalDateTime.now();
+                Alerta a1 = alertaAislamiento(ALERTA_ID, 10L, "12345", norte, ahora.minusMinutes(30), 300.0);
+                Alerta a2 = alertaAislamiento(101L, 11L, "F4830", norte, ahora.minusMinutes(20), 210.0);
+
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, null, null))
+                                .thenReturn(List.of(a1, a2, mockAlerta));
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, EstadoAlerta.PENDIENTE,
+                                DisparadorAlerta.AISLAMIENTO_SOCIAL, null))
+                                .thenReturn(List.of(a1, a2));
+                when(registroCohesionRepository.findUltimosPorAnimal(eq(ESTABLECIMIENTO_ID), any()))
+                                .thenReturn(List.of());
+
+                List<AlertaResponse> result = alertaService.listarAlertas(EMAIL, ESTABLECIMIENTO_ID, null, null, null);
+
+                assertEquals("AISLAMIENTO_SOCIAL", result.get(0).getTipo());
+                assertEquals(2, result.get(0).getAnimalesAislados().size());
+                assertEquals(2, result.get(1).getAnimalesAislados().size());
+                assertNull(result.get(2).getAnimalesAislados(), "Una alerta de celo no lleva animales aislados");
+                verify(registroCohesionRepository, times(1)).findUltimosPorAnimal(eq(ESTABLECIMIENTO_ID), any());
+        }
+}
