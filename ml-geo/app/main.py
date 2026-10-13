@@ -44,6 +44,8 @@ class AlertaAnimal(BaseModel):
     distancia_centroide_m: float
     alerta_aislamiento: bool
     tiempo_fuera_grupo_s: float
+    # Tramo final fuera del grupo sin volver (ver _compute_isolation_times)
+    tiempo_fuera_continuo_s: float
 
 class MatrizDensidad(BaseModel):
     lat: float
@@ -218,30 +220,43 @@ def _clasificar(posiciones: dict, umbral_m: float) -> dict:
             resultado[a_id] = (_haversine(lat, lng, c_lat, c_lng), a_id not in principal)
     return resultado
 
-def _compute_isolation_times(historial_7d: List[CoordenadaGPS], umbral_m: float, interval_s: float = INTERVALO_COHESION_S) -> dict:
+def _compute_isolation_times(historial_7d: List[CoordenadaGPS], umbral_m: float, interval_s: float = INTERVALO_COHESION_S) -> tuple:
     """
-    animal_id -> segundos acumulados fuera del grupo.
+    Devuelve (acumulado, continuo), ambos animal_id -> segundos fuera del grupo.
 
     Las caravanas no transmiten todas en el mismo instante, así que las
     posiciones se agrupan en intervalos de interval_s (5 min por defecto) y en
     cada uno se usa la posición promedio de cada animal. Un animal suma
     interval_s por cada intervalo en el que _clasificar lo marca alejado. Los
     intervalos en los que el animal no transmitió no suman (huecos sin datos).
-    """
-    isolation_time = defaultdict(float)
 
+    - acumulado: todos los intervalos alejados del historial.
+    - continuo: el tramo final, contado hacia atrás desde el último intervalo
+      con datos del animal hasta el primero en que estaba en el grupo. Los
+      huecos sin datos no suman ni cortan el tramo.
+    """
     intervalos = defaultdict(lambda: defaultdict(list))
     for p in historial_7d:
         interval_idx = int(_ts(p).timestamp() // interval_s)
         intervalos[interval_idx][p.animal_id].append((p.lat, p.lng))
 
-    for animales_en_intervalo in intervalos.values():
+    alejado_por_intervalo = defaultdict(dict)  # animal_id -> {interval_idx: alejado}
+    for interval_idx, animales_en_intervalo in intervalos.items():
         pos_animal = {a_id: _centroide(puntos) for a_id, puntos in animales_en_intervalo.items()}
         for a_id, (_, alejado) in _clasificar(pos_animal, umbral_m).items():
-            if alejado:
-                isolation_time[a_id] += interval_s
+            alejado_por_intervalo[a_id][interval_idx] = alejado
 
-    return isolation_time
+    acumulado = {}
+    continuo = {}
+    for a_id, por_intervalo in alejado_por_intervalo.items():
+        acumulado[a_id] = interval_s * sum(por_intervalo.values())
+        continuo[a_id] = 0.0
+        for idx in sorted(por_intervalo, reverse=True):
+            if not por_intervalo[idx]:
+                break
+            continuo[a_id] += interval_s
+
+    return acumulado, continuo
 
 @app.get("/health")
 def health():
@@ -296,7 +311,7 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
         # La alerta usa la última posición; el tiempo fuera del grupo, todo el
         # historial por intervalos. Ambos clasifican con _clasificar.
         posiciones = {a_id: (p.lat, p.lng) for a_id, p in ultimas_posiciones.items()}
-        iso_times = _compute_isolation_times(payload.historial_7d, umbral_efectivo)
+        iso_times, iso_continuo = _compute_isolation_times(payload.historial_7d, umbral_efectivo)
         alertas = [
             AlertaAnimal(
                 animal_id=a_id,
@@ -304,6 +319,7 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
                 distancia_centroide_m=distancia,
                 alerta_aislamiento=alejado,
                 tiempo_fuera_grupo_s=iso_times.get(a_id, 0.0),
+                tiempo_fuera_continuo_s=iso_continuo.get(a_id, 0.0),
             )
             for a_id, (distancia, alejado) in _clasificar(posiciones, umbral_efectivo).items()
         ]
