@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 import sys
 import os
 import math
+from datetime import datetime, timedelta, timezone
 
 # Añadir el directorio raíz de ml-geo al PYTHONPATH
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -269,10 +270,10 @@ class TestCohesionAislamiento:
         assert main_app._indice_cohesion(0.0, UMBRAL_AISLAMIENTO_METROS) == pytest.approx(1.0)
         assert main_app._indice_cohesion(UMBRAL_AISLAMIENTO_METROS, UMBRAL_AISLAMIENTO_METROS) == pytest.approx(0.5)
 
-    def test_alerta_equivale_a_indice_bajo_medio(self):
+    def test_en_rodeo_compacto_alerta_equivale_a_indice_bajo_medio(self):
         """
-        Invariante del contrato: alerta_aislamiento <=> distancia > umbral <=> indice < 0.5.
-        La alerta se deriva de la distancia, pero ambas lecturas deben coincidir.
+        En un rodeo compacto: alerta_aislamiento <=> distancia > umbral <=> indice < 0.5.
+        La alerta es estar fuera del grupo principal, pero acá ambas lecturas coinciden.
         """
         puntos = [
             make_punto("A1", -34.0, -59.0),
@@ -287,6 +288,22 @@ class TestCohesionAislamiento:
             esperada = alerta["distancia_centroide_m"] > UMBRAL_AISLAMIENTO_METROS
             assert alerta["alerta_aislamiento"] is esperada
             assert (alerta["indice_cohesion"] < 0.5) is esperada
+
+    def test_en_rodeo_estirado_la_punta_tiene_indice_bajo_sin_alerta(self):
+        """
+        11 animales en fila separados 90 m: cada uno enlaza con el siguiente, así
+        que forman un solo grupo y nadie alerta. Pero la punta queda a ~450 m del
+        centroide, con indice < 0.5. Alerta e indice pueden no coincidir.
+        """
+        paso = 90 / 111_195  # ~90 m en grados de latitud
+        puntos = [make_punto(f"F{i}", -34.0 - i * paso, -59.0) for i in range(11)]
+        response = client.post(ENDPOINT, json={"historial_7d": puntos})
+
+        assert response.status_code == 200
+        alertas = {a["animal_id"]: a for a in response.json()["alertas"]}
+        assert all(a["alerta_aislamiento"] is False for a in alertas.values())
+        assert alertas["F0"]["distancia_centroide_m"] == pytest.approx(450, rel=0.01)
+        assert alertas["F0"]["indice_cohesion"] < 0.5
 
     def test_animales_cercanos_no_generan_alerta_aislamiento(self):
         """
@@ -549,31 +566,142 @@ class TestGrupoPrincipal:
         Test unitario de _grupo_principal: el cluster más grande es el retornado;
         en empate retorna None.
         """
-        from app.main import _grupo_principal, CoordenadaGPS
-        from datetime import datetime, timezone
-
-        def make_animal(aid, lat, lng):
-            return CoordenadaGPS(
-                animal_id=aid, lat=lat, lng=lng,
-                timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc)
-            )
-
         # Caso: cluster de 3 + cluster de 1 -> retorna el de 3
-        animales = [
-            make_animal("A", -34.0000, -59.0),
-            make_animal("B", -34.0001, -59.0),  # ~11 m de A -> mismo cluster
-            make_animal("C", -34.0002, -59.0),  # ~22 m de A -> mismo cluster
-            make_animal("D", -36.0,    -59.0),  # lejos -> cluster propio
-        ]
-        principal = _grupo_principal(animales, umbral_m=100.0)
-        assert principal == {"A", "B", "C"}
+        posiciones = {
+            "A": (-34.0000, -59.0),
+            "B": (-34.0001, -59.0),  # ~11 m de A -> mismo cluster
+            "C": (-34.0002, -59.0),  # ~22 m de A -> mismo cluster
+            "D": (-36.0,    -59.0),  # lejos -> cluster propio
+        }
+        assert main_app._grupo_principal(posiciones, umbral_m=100.0) == {"A", "B", "C"}
 
         # Caso empate: 2 clusters de tamaño 1 -> None
-        animales_empate = [
-            make_animal("X", -34.0, -59.0),
-            make_animal("Y", -36.0, -59.0),  # lejos de X
-        ]
-        assert _grupo_principal(animales_empate, umbral_m=100.0) is None
+        posiciones_empate = {"X": (-34.0, -59.0), "Y": (-36.0, -59.0)}
+        assert main_app._grupo_principal(posiciones_empate, umbral_m=100.0) is None
+
+    def test_clasificar_marca_fuera_del_grupo_principal(self):
+        posiciones = {
+            "A": (-34.0000, -59.0),
+            "B": (-34.0001, -59.0),
+            "C": (-34.0002, -59.0),
+            "D": (-34.0200, -59.0),  # ~2.2 km del resto
+        }
+        clasificacion = main_app._clasificar(posiciones, umbral_m=100.0)
+
+        assert {a for a, (_, alejado) in clasificacion.items() if alejado} == {"D"}
+        # La distancia se mide contra el centroide del grupo principal (B)
+        assert clasificacion["B"][0] == pytest.approx(0.0, abs=1e-3)
+
+    def test_clasificar_en_empate_compara_contra_el_resto(self):
+        """Sin grupo principal, alejado = distancia al centroide del resto > umbral."""
+        clasificacion = main_app._clasificar({"X": (-34.0, -59.0), "Y": (-36.0, -59.0)}, umbral_m=100.0)
+
+        assert clasificacion["X"][1] is True
+        assert clasificacion["Y"][1] is True
+
+    def test_clasificar_un_animal_o_ninguno(self):
+        assert main_app._clasificar({"A": (-34.0, -59.0)}, umbral_m=100.0) == {"A": (0.0, False)}
+        assert main_app._clasificar({}, umbral_m=100.0) == {}
+
+
+# ===========================================================================
+# TIEMPO FUERA DEL GRUPO - Historia de usuario: Calcular el tiempo acumulado
+# ===========================================================================
+
+INTERVALO_S = 300  # Debe coincidir con INTERVALO_COHESION_S en main.py
+T0 = datetime(2024, 1, 1, tzinfo=timezone.utc)  # alineado al inicio de un intervalo
+SUR_2KM = -34.02  # ~2.2 km al sur del rodeo
+
+
+def en_intervalo(i: int, segundos: int = 0) -> str:
+    return (T0 + timedelta(seconds=i * INTERVALO_S + segundos)).isoformat()
+
+
+def serie(animal_id: str, lat: float, intervalos, segundos: int = 0, lng: float = -59.0):
+    """Una posición por intervalo, fija en (lat, lng)."""
+    return [make_punto(animal_id, lat, lng, en_intervalo(i, segundos)) for i in intervalos]
+
+
+def rodeo(intervalos, n: int = 5, segundos: int = 0):
+    """n animales G0..Gn-1 a ~11 m entre sí."""
+    return [p for i in range(n) for p in serie(f"G{i}", -34.0 + i * 0.0001, intervalos, segundos)]
+
+
+def tiempos(puntos, **extra):
+    response = client.post(ENDPOINT, json={"historial_7d": puntos, **extra})
+    assert response.status_code == 200
+    return {a["animal_id"]: a["tiempo_fuera_grupo_s"] for a in response.json()["alertas"]}
+
+
+class TestTiempoFueraGrupo:
+    """El historial se agrupa en intervalos de 5 min; cada intervalo fuera del grupo suma 300 s."""
+
+    def test_rodeo_cohesionado_no_acumula_tiempo(self):
+        t = tiempos(rodeo(range(6)))
+
+        assert all(v == 0.0 for v in t.values())
+
+    def test_animal_alejado_acumula_solo_los_intervalos_fuera(self):
+        puntos = rodeo(range(6))
+        puntos += serie("A", -34.0002, range(0, 3))  # junto al rodeo
+        puntos += serie("A", SUR_2KM, range(3, 6))   # alejado
+        t = tiempos(puntos)
+
+        assert t["A"] == 3 * INTERVALO_S
+        assert all(t[f"G{i}"] == 0.0 for i in range(5))
+
+    def test_subgrupo_alejado_junto_acumula_tiempo(self):
+        puntos = rodeo(range(4))
+        puntos += serie("S1", SUR_2KM, range(4))
+        puntos += serie("S2", SUR_2KM + 0.0001, range(4))  # ~11 m de S1
+        t = tiempos(puntos)
+
+        assert t["S1"] == t["S2"] == 4 * INTERVALO_S
+        assert all(t[f"G{i}"] == 0.0 for i in range(5))
+
+    def test_huecos_sin_datos_no_suman(self):
+        """A está alejado todo el tiempo pero no transmite en los intervalos 2 y 3."""
+        puntos = rodeo(range(6))
+        puntos += serie("A", SUR_2KM, [0, 1, 4, 5])
+        t = tiempos(puntos)
+
+        assert t["A"] == 4 * INTERVALO_S
+
+    def test_caravanas_desfasadas_dentro_del_intervalo_se_comparan_juntas(self):
+        """
+        El rodeo transmite al segundo 5 y A al segundo 290 de cada intervalo.
+        Caen en el mismo intervalo, así que A se compara contra el rodeo.
+        """
+        puntos = rodeo(range(3), segundos=5)
+        puntos += serie("A", SUR_2KM, range(3), segundos=290)
+        t = tiempos(puntos)
+
+        assert t["A"] == 3 * INTERVALO_S
+
+    def test_umbral_del_request_cambia_el_tiempo(self):
+        """A está a ~55 m de G1: dentro del grupo con 100 m, afuera con 25 m."""
+        puntos = rodeo(range(3), n=2)
+        puntos += serie("A", -34.0001 - 0.0005, range(3))
+
+        assert tiempos(puntos)["A"] == 0.0
+        assert tiempos(puntos, umbral_aislamiento_m=25.0)["A"] == 3 * INTERVALO_S
+
+    def test_subgrupo_cercano_alerta_y_acumula_tiempo(self):
+        """
+        Regresión: 6 animales juntos y un subgrupo de 4 a ~140 m. Contra el
+        centroide de "todos los demás" el subgrupo quedaba a ~93 m y no sumaba
+        tiempo aunque alertaba. Alerta y tiempo deben salir del mismo cálculo.
+        """
+        puntos = rodeo(range(2), n=6)  # G0..G5 entre -34.0000 y -34.0005
+        borde_sur = -34.0005 - 140 / 111_195
+        puntos += [p for i in range(4) for p in serie(f"S{i}", borde_sur - i * 0.0001, range(2))]
+        response = client.post(ENDPOINT, json={"historial_7d": puntos})
+
+        assert response.status_code == 200
+        for alerta in response.json()["alertas"]:
+            alejado = alerta["animal_id"].startswith("S")
+            assert alerta["alerta_aislamiento"] is alejado
+            assert alerta["tiempo_fuera_grupo_s"] == (2 * INTERVALO_S if alejado else 0.0)
 
 
 # ===========================================================================
@@ -641,6 +769,14 @@ class TestContratoYErrores:
 
         assert response.status_code == 422
         assert response.json()["detail"][0]["loc"] == ["body", "historial_7d", 0, "timestamp"]
+
+    @pytest.mark.parametrize("umbral", [0, -50.0])
+    def test_umbral_no_positivo_devuelve_422(self, umbral):
+        puntos = [make_punto("A1", -34.0, -59.0), make_punto("A2", -34.0, -59.0)]
+        response = client.post(ENDPOINT, json={"umbral_aislamiento_m": umbral, "historial_7d": puntos})
+
+        assert response.status_code == 422
+        assert response.json()["detail"][0]["loc"] == ["body", "umbral_aislamiento_m"]
 
     def test_error_interno_devuelve_503_con_trace_id(self, monkeypatch):
         """Ante un fallo inesperado se responde 503 con el formato de error comun a los ml-*."""
