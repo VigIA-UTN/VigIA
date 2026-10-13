@@ -6,12 +6,16 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+// UPDATE solo con las columnas modificadas: los PUT de anestro y aislamiento llegan en paralelo
+// y, con el UPDATE de todas las columnas, el último pisaba el cambio del otro.
 @Entity
+@DynamicUpdate
 @Table(name = "establecimientos")
 @Getter
 @Setter

@@ -235,7 +235,7 @@ export default function EstablecimientosPage() {
                                 )}
                                 {puedeConfigurar && (
                                   <Dropdown.Item as="button" onClick={() => navigate(`/establecimientos/${est.id}/configuracion`)}>
-                                    Configurar anestro
+                                    Configuración
                                     <i className="bi bi-gear" />
                                   </Dropdown.Item>
                                 )}
@@ -483,7 +483,7 @@ export default function EstablecimientosPage() {
                 onClick={() => navigate(`/establecimientos/${establecimientoDetail.id}/configuracion`)}
               >
                 <i className="bi bi-gear-fill me-2" />
-                Configurar anestro
+                Configuración
               </Button>
             )}
 
