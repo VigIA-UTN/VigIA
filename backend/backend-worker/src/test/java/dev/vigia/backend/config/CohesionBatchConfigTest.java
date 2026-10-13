@@ -1,5 +1,6 @@
 package dev.vigia.backend.config;
 
+import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.model.*;
 import dev.vigia.backend.repository.*;
@@ -253,7 +254,12 @@ class CohesionBatchConfigTest {
             assertThat(e.getTsRegreso()).isNull();
         });
 
-        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), any(AlertaEventDTO.class));
+        ArgumentCaptor<AlertaEventDTO> evento = ArgumentCaptor.forClass(AlertaEventDTO.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), evento.capture());
+        assertThat(evento.getValue().getAnimalesAislados())
+                .extracting(AnimalAisladoResponse::getAnimalId, AnimalAisladoResponse::getMinutosFuera,
+                        AnimalAisladoResponse::getSeveridad)
+                .containsExactly(tuple(11L, 40L, "MEDIA"), tuple(10L, 30L, "ALTA"));
     }
 
     @Test
@@ -441,6 +447,9 @@ class CohesionBatchConfigTest {
         ArgumentCaptor<AlertaEventDTO> evento = ArgumentCaptor.forClass(AlertaEventDTO.class);
         verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), evento.capture());
         assertThat(evento.getValue().getId()).isEqualTo(900L);
+        assertThat(evento.getValue().getAnimalesAislados())
+                .extracting(AnimalAisladoResponse::getAnimalId)
+                .containsExactly(11L, 10L); // el que se sumó y el que ya estaba, más tiempo fuera primero
     }
 
     @Test

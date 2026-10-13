@@ -16,8 +16,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.DetalleSanitarioResponse;
+import dev.vigia.backend.dto.DetalleAislamientoResponse;
 import dev.vigia.backend.dto.DetalleGeoespacialResponse;
 import dev.vigia.backend.dto.DiagnosticoRequest;
 import dev.vigia.backend.dto.DiagnosticoResponse;
@@ -28,12 +30,14 @@ import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.exception.AlertaYaProcesadaException;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.AlertaAnimalAislado;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Diagnostico;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.DiagnosticoRepository;
@@ -74,6 +78,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final RabbitTemplate rabbitTemplate;
         private final ObjectMapper objectMapper;
         private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
+        private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
         @Override
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
@@ -196,8 +201,11 @@ public class AlertaServiceImpl implements AlertaService {
                                 reproductivo = count;
                         } else if (disparador == DisparadorAlerta.SALUD) {
                                 sanitario = count;
-                        } else if (disparador == DisparadorAlerta.ABIGEATO) {
-                                geoespacial = count;
+                        } else if (disparador == DisparadorAlerta.ABIGEATO
+                                        || disparador == DisparadorAlerta.FUERA_DE_PERIMETRO
+                                        || disparador == DisparadorAlerta.AISLAMIENTO_SOCIAL) {
+                                // Mismo grupo que el filtro GEO del mapa
+                                geoespacial += count;
                         }
                 }
 
@@ -283,6 +291,11 @@ public class AlertaServiceImpl implements AlertaService {
                         detalleGeoespacial = construirDetalleGeoespacial(alerta);
                 }
 
+                DetalleAislamientoResponse detalleAislamiento = null;
+                if (alerta.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL) {
+                        detalleAislamiento = construirDetalleAislamiento(alerta);
+                }
+
                 String descripcionDatoOrigen = construirDescripcionDatoOrigen(alerta, detalleSanitario);
 
                 LocalDateTime ultimaSenial = ultimaSenialDe(alerta);
@@ -308,6 +321,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 .descripcionDatoOrigen(descripcionDatoOrigen)
                                 .detalleSanitario(detalleSanitario)
                                 .detalleGeoespacial(detalleGeoespacial)
+                                .detalleAislamiento(detalleAislamiento)
                                 .accionRecomendada(alerta.getAccionRecomendada())
                                 .caravanaUltimaSenial(ultimaSenial)
                                 .datoPosiblementeDesactualizado(esDatoDesactualizado(alerta, ultimaSenial))
@@ -443,6 +457,26 @@ public class AlertaServiceImpl implements AlertaService {
                                 .build();
         }
 
+        private DetalleAislamientoResponse construirDetalleAislamiento(Alerta alerta) {
+                List<AlertaAnimalAislado> episodios = alertaAnimalAisladoRepository
+                                .findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId());
+
+                String nombreLote = (alerta.getAnimal() != null && alerta.getAnimal().getRodeoLote() != null)
+                                ? alerta.getAnimal().getRodeoLote().getNombre()
+                                : null;
+
+                return DetalleAislamientoResponse.builder()
+                                .animalesAislados(episodios.stream()
+                                                .map(episodio -> AnimalAisladoResponse.from(episodio, alerta.getValorUmbral()))
+                                                .toList())
+                                .tsInicio(episodios.stream()
+                                                .map(AlertaAnimalAislado::getTsInicio)
+                                                .min(Comparator.naturalOrder())
+                                                .orElse(alerta.getTsGeneracion()))
+                                .nombreLote(nombreLote)
+                                .build();
+        }
+
         private String descripcionGenerica(String severidad, String posibleCausa) {
                 String sev = severidad != null ? severidad.toLowerCase() : "desconocida";
                 String causa = (posibleCausa != null && !posibleCausa.isBlank()) ? posibleCausa : "no determinada";
@@ -469,7 +503,18 @@ public class AlertaServiceImpl implements AlertaService {
                                 .caravanaUltimaSenial(ultimaSenial)
                                 .datoPosiblementeDesactualizado(esDatoDesactualizado(alerta, ultimaSenial))
                                 .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
+                                .animalesAislados(animalesAislados(alerta))
                                 .build();
+        }
+
+        // ponytail: una consulta por cada alerta de aislamiento de un listado; cargarlas en lote si los listados crecen.
+        private List<AnimalAisladoResponse> animalesAislados(Alerta alerta) {
+                if (alerta.getDisparador() != DisparadorAlerta.AISLAMIENTO_SOCIAL) {
+                        return null;
+                }
+                return alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId()).stream()
+                                .map(episodio -> AnimalAisladoResponse.from(episodio, alerta.getValorUmbral()))
+                                .toList();
         }
 
         @Override

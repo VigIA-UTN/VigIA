@@ -1,6 +1,7 @@
 package dev.vigia.backend.repository;
 
 import dev.vigia.backend.model.AlertaAnimalAislado;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,5 +13,6 @@ public interface AlertaAnimalAisladoRepository extends JpaRepository<AlertaAnima
     /** Episodios abiertos (el animal sigue fuera del grupo) de los animales del establecimiento. */
     List<AlertaAnimalAislado> findByAnimal_Establecimiento_IdAndTsRegresoIsNull(Long establecimientoId);
 
+    @EntityGraph(attributePaths = { "animal", "alerta" })
     List<AlertaAnimalAislado> findByAlerta_IdOrderBySegundosFueraDesc(Long alertaId);
 }

@@ -24,6 +24,7 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
@@ -257,7 +258,7 @@ public class CohesionBatchConfig {
             alertaAnimalAisladoRepository.save(episodio);
         }
         log.info("Generada alerta de AISLAMIENTO_SOCIAL {} con {} animales", guardada.getId(), episodios.size());
-        publicar(guardada);
+        publicar(guardada, episodios);
     }
 
     /**
@@ -290,7 +291,7 @@ public class CohesionBatchConfig {
         resumir(pendiente, episodios, umbral, telemetriaList);
         alertaRepository.save(pendiente);
         log.info("Alerta de AISLAMIENTO_SOCIAL {} actualizada: {} animales nuevos", pendiente.getId(), nuevos.size());
-        publicar(pendiente);
+        publicar(pendiente, episodios);
     }
 
     private AlertaAnimalAislado nuevoEpisodio(GeoAlerta ga, List<Telemetria> telemetriaList, LocalDateTime ahora) {
@@ -335,8 +336,13 @@ public class CohesionBatchConfig {
         alerta.setLongitud(ultima != null ? ultima.getLongitud() : null);
     }
 
-    private void publicar(Alerta alerta) {
+    /** Manda la lista de animales en el evento: las filas todavía no están commiteadas cuando el api lo consume. */
+    private void publicar(Alerta alerta, List<AlertaAnimalAislado> episodios) {
         try {
+            List<AnimalAisladoResponse> animalesAislados = episodios.stream()
+                    .sorted(Comparator.comparing(AlertaAnimalAislado::getSegundosFuera).reversed())
+                    .map(e -> AnimalAisladoResponse.from(e, alerta.getValorUmbral()))
+                    .toList();
             AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                     .id(alerta.getId())
                     .animalId(alerta.getAnimal().getId())
@@ -350,6 +356,7 @@ public class CohesionBatchConfig {
                     .accionRecomendada(alerta.getAccionRecomendada())
                     .latitud(alerta.getLatitud())
                     .longitud(alerta.getLongitud())
+                    .animalesAislados(animalesAislados)
                     .build();
 
             rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);

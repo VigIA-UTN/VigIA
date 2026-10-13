@@ -3,6 +3,7 @@ package dev.vigia.backend.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AuthRequest;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.AlertaAnimalAislado;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Diagnostico;
 import dev.vigia.backend.model.DisparadorAlerta;
@@ -14,6 +15,7 @@ import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.DiagnosticoRepository;
@@ -81,6 +83,8 @@ class AlertaControllerTest {
     private EstadoReproductivoRepository estadoReproductivoRepository;
     @Autowired
     private DiagnosticoRepository diagnosticoRepository;
+    @Autowired
+    private AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
     private Long alertaId;
     private Long alertaOtroEstId;
@@ -683,6 +687,41 @@ class AlertaControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/alertas?tipo=aislamiento_social - expone los animales aislados con el contrato del frontend")
+    @SuppressWarnings("null")
+    void listarAlertas_aislamiento_exponeAnimalesAislados() throws Exception {
+        Animal animal = animalPropio();
+        animal.setAlias("Lola");
+        Alerta alerta = alertaRepository.findById(
+                crearAlerta(animal, DisparadorAlerta.AISLAMIENTO_SOCIAL, EstadoAlerta.PENDIENTE)).orElseThrow();
+        alerta.setValorUmbral(150.0);
+        alertaAnimalAisladoRepository.save(AlertaAnimalAislado.builder()
+                .alerta(alerta)
+                .animal(animal)
+                .segundosFuera(1800L)
+                .distanciaGrupoM(320.4)
+                .tsInicio(LocalDateTime.now().minusMinutes(30))
+                .build());
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString())
+                .param("tipo", "aislamiento_social"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].tipo").value("AISLAMIENTO_SOCIAL"))
+                .andExpect(jsonPath("$[0].animalesAislados.length()").value(1))
+                .andExpect(jsonPath("$[0].animalesAislados[0].length()").value(6))
+                .andExpect(jsonPath("$[0].animalesAislados[0].animalId").value(animal.getId()))
+                .andExpect(jsonPath("$[0].animalesAislados[0].identificador").value("CAR-001"))
+                .andExpect(jsonPath("$[0].animalesAislados[0].alias").value("Lola"))
+                .andExpect(jsonPath("$[0].animalesAislados[0].minutosFuera").value(30))
+                .andExpect(jsonPath("$[0].animalesAislados[0].distanciaGrupoM").value(320))
+                .andExpect(jsonPath("$[0].animalesAislados[0].severidad").value("ALTA"));
+    }
+
+    @Test
     @DisplayName("GET /api/v1/alertas/resumen - Conteo correcto de alertas por tipo")
     @SuppressWarnings("null")
     void obtenerResumenAlertas_conteoCorrecto() throws Exception {
@@ -722,7 +761,11 @@ class AlertaControllerTest {
         alertaGeo.setValorUmbral(0.0);
         alertaGeo.setValorDetectado(0.0);
         alertaRepository.save(alertaGeo);
-        
+
+        // Aislamiento social y fuera de perímetro también son geoespaciales (mismo grupo que el filtro GEO del mapa)
+        crearAlerta(animal, DisparadorAlerta.AISLAMIENTO_SOCIAL, EstadoAlerta.PENDIENTE);
+        crearAlerta(animal, DisparadorAlerta.FUERA_DE_PERIMETRO, EstadoAlerta.PENDIENTE);
+
         // Agregamos 1 DESCARTADA (no debería contar si el resumen es de activas)
         Alerta alertaDescartada = new Alerta();
         alertaDescartada.setAnimal(animal);
@@ -741,7 +784,7 @@ class AlertaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reproductivo").value(1))
                 .andExpect(jsonPath("$.sanitario").value(2))
-                .andExpect(jsonPath("$.geoespacial").value(1));
+                .andExpect(jsonPath("$.geoespacial").value(3));
     }
 
     // =========================================================================
