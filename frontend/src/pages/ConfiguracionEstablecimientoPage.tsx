@@ -10,9 +10,11 @@ import { SEVERIDAD } from '../utils/severidadColores';
 import {
   getConfigAnestro, updateConfigAnestro,
   getConfigAislamiento, updateConfigAislamiento,
-  getEstablecimientos,
+  getEstablecimientos, updateEstablecimiento,
 } from '../api/establecimientosApi';
+import type { EstablecimientoResponse } from '../api/establecimientosApi';
 import { useAuthStore } from '../store/authStore';
+import { useEstablecimientoStore } from '../store/establecimientoStore';
 import {
   schema, SECCIONES,
   DEFAULT_DIAS, DEFAULT_SEVERIDAD,
@@ -36,6 +38,14 @@ function mensajeError(err: unknown, accion: 'ver' | 'editar') {
   return e.response?.data?.message || (accion === 'ver' ? 'Error al cargar la configuración.' : 'Error al guardar los cambios.');
 }
 
+// El Navbar carga la lista de establecimientos una sola vez: se actualiza a mano tras renombrar/mover.
+function sincronizarStore(r: EstablecimientoResponse) {
+  const { establecimientos, setEstablecimientos } = useEstablecimientoStore.getState();
+  setEstablecimientos(establecimientos.map((e) => (
+    e.id === r.id ? { ...e, nombre: r.nombre, latitud: r.latitud, longitud: r.longitud } : e
+  )));
+}
+
 // Mismo estilo que el aviso de calibración de AnimalDetailPage.
 function InfoParametro({ children }: { children: ReactNode }) {
   return (
@@ -54,8 +64,12 @@ export default function ConfiguracionEstablecimientoPage() {
   const numId = Number(id);
   const navigate = useNavigate();
   const rol = useAuthStore((s) => s.rol);
+  const esAdmin = rol === 'ADMINISTRADOR';
+  // Mismos roles que el backend: PUT /establecimientos/{id} es ADMIN/PRODUCTOR; anestro/aislamiento, PRODUCTOR/VETERINARIO.
+  const editaDatos = esAdmin || rol === 'PRODUCTOR';
+  const veAlertas = !esAdmin;
   // El veterinario no tiene acceso a /establecimientos (llega desde el Navbar): vuelve a la página anterior.
-  const veListado = rol === 'PRODUCTOR';
+  const veListado = rol === 'PRODUCTOR' || esAdmin;
   const volver = () => (veListado ? navigate('/establecimientos') : navigate(-1));
 
   const [nombreGuardado, setNombreGuardado] = useState<string | null>(null);
@@ -90,21 +104,24 @@ export default function ConfiguracionEstablecimientoPage() {
 
     const fetchData = async () => {
       try {
-        const [anestro, aislamiento, establecimientos] = await Promise.all([
-          getConfigAnestro(numId),
-          getConfigAislamiento(numId),
-          // Solo para precargar General/Ubicación, que todavía no se guardan: si falla, quedan vacías.
-          getEstablecimientos().catch(() => []),
+        // GET /establecimientos devuelve todos al admin y solo los propios al resto.
+        const [est, anestro, aislamiento] = await Promise.all([
+          getEstablecimientos().then((lista) => lista.find((e) => e.id === numId)),
+          veAlertas ? getConfigAnestro(numId) : null,
+          veAlertas ? getConfigAislamiento(numId) : null,
         ]);
-        const est = establecimientos.find((e) => e.id === numId);
-        setNombreGuardado(anestro.nombreEstablecimiento);
+        if (!est) {
+          setErrorGlobal('No se encontró el establecimiento o no tenés acceso.');
+          return;
+        }
+        setNombreGuardado(est.nombre);
         reset({
-          nombre: anestro.nombreEstablecimiento,
-          latitud: est?.latitud,
-          longitud: est?.longitud,
-          diasDeteccionAnestro: anestro.diasDeteccionAnestro ?? DEFAULT_DIAS,
-          severidadAnestro: (anestro.severidadAnestro as Severidad) ?? DEFAULT_SEVERIDAD,
-          umbralAislamientoM: aislamiento.umbralAislamientoM ?? DEFAULT_AISLAMIENTO,
+          nombre: est.nombre,
+          latitud: est.latitud,
+          longitud: est.longitud,
+          diasDeteccionAnestro: anestro?.diasDeteccionAnestro ?? DEFAULT_DIAS,
+          severidadAnestro: (anestro?.severidadAnestro as Severidad) ?? DEFAULT_SEVERIDAD,
+          umbralAislamientoM: aislamiento?.umbralAislamientoM ?? DEFAULT_AISLAMIENTO,
         });
       } catch (err) {
         setErrorGlobal(mensajeError(err, 'ver'));
@@ -113,7 +130,7 @@ export default function ConfiguracionEstablecimientoPage() {
       }
     };
     fetchData();
-  }, [id, numId, navigate, reset]);
+  }, [id, numId, veAlertas, navigate, reset]);
 
   // Resalta en el menú la sección que está a la vista.
   useEffect(() => {
@@ -128,13 +145,13 @@ export default function ConfiguracionEstablecimientoPage() {
     return () => observer.disconnect();
   }, [loading]);
 
-  const secciones = SECCIONES.map((s) => ({
+  const secciones = SECCIONES.filter((s) => veAlertas || !s.soloConfigAlertas).map((s) => ({
     ...s,
     conError: s.fields.some((f) => errors[f]),
     sucia: s.fields.some((f) => dirtyFields[f]),
   }));
   const sucias = secciones.filter((s) => s.sucia);
-  const puedeGuardar = !saving && sucias.some((s) => s.guardable);
+  const puedeGuardar = !saving && sucias.length > 0;
   const estaSucia = (seccionId: SeccionId) => sucias.some((s) => s.id === seccionId);
 
   const irA = (seccionId: SeccionId) => {
@@ -145,9 +162,23 @@ export default function ConfiguracionEstablecimientoPage() {
   const onSubmit = async (data: FormData) => {
     setSaving(true);
     setErrorGlobal(null);
-    // Solo se envían las secciones guardables con cambios; cada una se resetea por separado
+    // Solo se envían las secciones con cambios; cada una se resetea por separado
     // para que, si una falla, siga marcada como pendiente.
     const tareas: Promise<unknown>[] = [];
+    if (estaSucia('general') || estaSucia('ubicacion')) {
+      // El endpoint recibe nombre y coordenadas juntos.
+      tareas.push(updateEstablecimiento(numId, {
+        nombre: data.nombre,
+        latitud: data.latitud,
+        longitud: data.longitud,
+      }).then((r) => {
+        resetField('nombre', { defaultValue: r.nombre });
+        resetField('latitud', { defaultValue: r.latitud });
+        resetField('longitud', { defaultValue: r.longitud });
+        setNombreGuardado(r.nombre);
+        sincronizarStore(r);
+      }));
+    }
     if (estaSucia('anestro')) {
       tareas.push(updateConfigAnestro(numId, {
         diasDeteccionAnestro: data.diasDeteccionAnestro,
@@ -174,13 +205,13 @@ export default function ConfiguracionEstablecimientoPage() {
 
   // ── Acceso restringido (guard de UI — el backend también lo valida) ─────────
 
-  if (rol !== 'PRODUCTOR' && rol !== 'VETERINARIO') {
+  if (!esAdmin && rol !== 'PRODUCTOR' && rol !== 'VETERINARIO') {
     return (
       <div className="cfg-page">
         <div className="cfg-access-denied">
           <i className="bi bi-lock-fill cfg-lock-icon" />
           <h3>Acceso restringido</h3>
-          <p>Solo productores y veterinarios pueden editar la configuración del establecimiento.</p>
+          <p>Solo administradores, productores y veterinarios pueden editar la configuración del establecimiento.</p>
           <button className="cfg-btn-back" onClick={() => navigate(-1)}>
             <i className="bi bi-arrow-left me-2" />Volver
           </button>
@@ -288,7 +319,7 @@ export default function ConfiguracionEstablecimientoPage() {
                     <h2 className="cfg-card-title">Datos generales</h2>
                     <p className="cfg-card-subtitle">Cómo se identifica el establecimiento en VigIA</p>
                   </div>
-                  <span className="cfg-badge-pronto">Se guardará próximamente</span>
+                  {!editaDatos && <span className="cfg-badge-info">Solo el productor puede editar estos datos</span>}
                 </div>
                 <div className="cfg-field cfg-field--narrow">
                   <label className="cfg-label" htmlFor="nombre">Nombre</label>
@@ -297,6 +328,7 @@ export default function ConfiguracionEstablecimientoPage() {
                     type="text"
                     maxLength={80}
                     {...register('nombre')}
+                    readOnly={!editaDatos}
                     isInvalid={!!errors.nombre}
                   />
                   <Form.Control.Feedback type="invalid">{errors.nombre?.message}</Form.Control.Feedback>
@@ -317,7 +349,7 @@ export default function ConfiguracionEstablecimientoPage() {
                     <h2 className="cfg-card-title">Ubicación</h2>
                     <p className="cfg-card-subtitle">Coordenadas del casco del establecimiento</p>
                   </div>
-                  <span className="cfg-badge-pronto">Se guardará próximamente</span>
+                  {!editaDatos && <span className="cfg-badge-info">Solo el productor puede editar estos datos</span>}
                 </div>
                 <div className="cfg-grid">
                   {(['latitud', 'longitud'] as const).map((campo) => (
@@ -329,6 +361,7 @@ export default function ConfiguracionEstablecimientoPage() {
                           type="number"
                           step="0.000001"
                           {...register(campo, { valueAsNumber: true })}
+                          readOnly={!editaDatos}
                           isInvalid={!!errors[campo]}
                         />
                         <InputGroup.Text>°</InputGroup.Text>
@@ -365,160 +398,164 @@ export default function ConfiguracionEstablecimientoPage() {
             </div>
           </section>
 
-          {/* ── Anestro ───────────────────────────────────────────────────── */}
-          <section id="cfg-anestro" className="cfg-section">
-            <div className="cfg-card">
-              <div className="cfg-card-body">
+          {/* Anestro y aislamiento: no aplican al administrador (el backend le devuelve 403). */}
+          {veAlertas && (<>
+            {/* ── Anestro ───────────────────────────────────────────────────── */}
+            <section id="cfg-anestro" className="cfg-section">
+              <div className="cfg-card">
+                <div className="cfg-card-body">
 
-                {/* Columna: días */}
-                <div className="cfg-col">
-                  <div className="cfg-col-header">
-                    <div className="cfg-col-icon cfg-col-icon--blue">
-                      <i className="bi bi-calendar-check" />
+                  {/* Columna: días */}
+                  <div className="cfg-col">
+                    <div className="cfg-col-header">
+                      <div className="cfg-col-icon cfg-col-icon--blue">
+                        <i className="bi bi-calendar-check" />
+                      </div>
+                      <div>
+                        <h2 className="cfg-card-title">Días sin ciclo</h2>
+                        <p className="cfg-card-subtitle">Umbral de detección de anestro</p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="cfg-card-title">Días sin ciclo</h2>
-                      <p className="cfg-card-subtitle">Umbral de detección de anestro</p>
+
+                    <div className="cfg-field">
+                      <label className="cfg-label" htmlFor="diasDeteccionAnestro">
+                        Cantidad de días
+                      </label>
+                      <InputGroup hasValidation>
+                        <Form.Control
+                          id="diasDeteccionAnestro"
+                          type="number"
+                          min={1}
+                          max={365}
+                          placeholder={String(DEFAULT_DIAS)}
+                          {...register('diasDeteccionAnestro', { valueAsNumber: true })}
+                          isInvalid={!!errors.diasDeteccionAnestro}
+                        />
+                        <InputGroup.Text>días</InputGroup.Text>
+                        <Form.Control.Feedback type="invalid">
+                          {errors.diasDeteccionAnestro?.message}
+                        </Form.Control.Feedback>
+                      </InputGroup>
                     </div>
                   </div>
 
-                  <div className="cfg-field">
-                    <label className="cfg-label" htmlFor="diasDeteccionAnestro">
-                      Cantidad de días
+                  {/* Divisor vertical */}
+                  <div className="cfg-divider" />
+
+                  {/* Columna: prioridad */}
+                  <div className="cfg-col">
+                    <div className="cfg-col-header">
+                      <div className="cfg-col-icon cfg-col-icon--amber">
+                        <i className="bi bi-bell-fill" />
+                      </div>
+                      <div>
+                        <h2 className="cfg-card-title">Prioridad de la alerta</h2>
+                        <p className="cfg-card-subtitle">Nivel de severidad al dispararse</p>
+                      </div>
+                    </div>
+
+                    <div className="cfg-field">
+                      <label className="cfg-label">Nivel de prioridad</label>
+                      <Controller
+                        control={control}
+                        name="severidadAnestro"
+                        render={({ field }) => (
+                          <div className="cfg-toggle-group">
+                            {(['BAJA', 'MEDIA', 'ALTA'] as const).map((nivel) => {
+                              const opcion = SEVERIDAD_OPCION[nivel];
+                              const isActive = field.value === nivel;
+                              return (
+                                <button
+                                  key={nivel}
+                                  type="button"
+                                  className={`cfg-toggle-pill ${isActive ? 'cfg-toggle-pill--active' : ''}`}
+                                  style={isActive ? { backgroundColor: SEVERIDAD[nivel].bar, color: opcion.texto } : {}}
+                                  onClick={() => field.onChange(nivel)}
+                                >
+                                  {opcion.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      />
+                      {errors.severidadAnestro && (
+                        <span className="cfg-field-error">
+                          <i className="bi bi-exclamation-circle me-1" />
+                          {errors.severidadAnestro.message}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <InfoParametro>
+                Define cuántos días consecutivos sin actividad de ciclo reproductivo
+                deben transcurrir para que el sistema genere una alerta de anestro.
+                El valor por defecto es <strong>{DEFAULT_DIAS} días</strong>.
+              </InfoParametro>
+            </section>
+
+            {/* ── Aislamiento ───────────────────────────────────────────────── */}
+            <section id="cfg-aislamiento" className="cfg-section">
+              <div className="cfg-card">
+                <div className="cfg-col">
+                  <div className="cfg-col-header">
+                    <div className="cfg-col-icon cfg-col-icon--red">
+                      <i className="bi bi-bounding-box-circles" />
+                    </div>
+                    <div>
+                      <h2 className="cfg-card-title">Umbral de aislamiento</h2>
+                      <p className="cfg-card-subtitle">Distancia al rodeo para considerar a un animal aislado</p>
+                    </div>
+                  </div>
+
+                  <div className="cfg-field cfg-field--narrow">
+                    <label className="cfg-label" htmlFor="umbralAislamientoM">
+                      Distancia mínima al rodeo
                     </label>
                     <InputGroup hasValidation>
                       <Form.Control
-                        id="diasDeteccionAnestro"
+                        id="umbralAislamientoM"
                         type="number"
-                        min={1}
-                        max={365}
-                        placeholder={String(DEFAULT_DIAS)}
-                        {...register('diasDeteccionAnestro', { valueAsNumber: true })}
-                        isInvalid={!!errors.diasDeteccionAnestro}
+                        min={AISLAMIENTO_MIN}
+                        max={AISLAMIENTO_MAX}
+                        placeholder={String(DEFAULT_AISLAMIENTO)}
+                        {...register('umbralAislamientoM', { valueAsNumber: true })}
+                        isInvalid={!!errors.umbralAislamientoM}
                       />
-                      <InputGroup.Text>días</InputGroup.Text>
+                      <InputGroup.Text>metros</InputGroup.Text>
                       <Form.Control.Feedback type="invalid">
-                        {errors.diasDeteccionAnestro?.message}
+                        {errors.umbralAislamientoM?.message}
                       </Form.Control.Feedback>
                     </InputGroup>
-                  </div>
-                </div>
-
-                {/* Divisor vertical */}
-                <div className="cfg-divider" />
-
-                {/* Columna: prioridad */}
-                <div className="cfg-col">
-                  <div className="cfg-col-header">
-                    <div className="cfg-col-icon cfg-col-icon--amber">
-                      <i className="bi bi-bell-fill" />
-                    </div>
-                    <div>
-                      <h2 className="cfg-card-title">Prioridad de la alerta</h2>
-                      <p className="cfg-card-subtitle">Nivel de severidad al dispararse</p>
-                    </div>
-                  </div>
-
-                  <div className="cfg-field">
-                    <label className="cfg-label">Nivel de prioridad</label>
-                    <Controller
-                      control={control}
-                      name="severidadAnestro"
-                      render={({ field }) => (
-                        <div className="cfg-toggle-group">
-                          {(['BAJA', 'MEDIA', 'ALTA'] as const).map((nivel) => {
-                            const opcion = SEVERIDAD_OPCION[nivel];
-                            const isActive = field.value === nivel;
-                            return (
-                              <button
-                                key={nivel}
-                                type="button"
-                                className={`cfg-toggle-pill ${isActive ? 'cfg-toggle-pill--active' : ''}`}
-                                style={isActive ? { backgroundColor: SEVERIDAD[nivel].bar, color: opcion.texto } : {}}
-                                onClick={() => field.onChange(nivel)}
-                              >
-                                {opcion.label}
-                              </button>
-                            );
-                          })}
-                        </div>
+                    <div className="cfg-hint-row">
+                      <span>Entre {AISLAMIENTO_MIN} y {AISLAMIENTO_MAX} m</span>
+                      {umbral !== DEFAULT_AISLAMIENTO && (
+                        <button
+                          type="button"
+                          className="cfg-link-btn"
+                          onClick={() => setValue('umbralAislamientoM', DEFAULT_AISLAMIENTO, { shouldDirty: true, shouldValidate: true })}
+                        >
+                          <i className="bi bi-arrow-counterclockwise me-1" />
+                          Restablecer a {DEFAULT_AISLAMIENTO} m
+                        </button>
                       )}
-                    />
-                    {errors.severidadAnestro && (
-                      <span className="cfg-field-error">
-                        <i className="bi bi-exclamation-circle me-1" />
-                        {errors.severidadAnestro.message}
-                      </span>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <InfoParametro>
-              Define cuántos días consecutivos sin actividad de ciclo reproductivo
-              deben transcurrir para que el sistema genere una alerta de anestro.
-              El valor por defecto es <strong>{DEFAULT_DIAS} días</strong>.
-            </InfoParametro>
-          </section>
+              <InfoParametro>
+                Define a qué distancia del resto del rodeo tiene que permanecer un animal
+                para que el sistema lo considere aislado y genere una alerta sanitaria.
+                Un valor menor detecta antes, pero puede generar más falsas alarmas.
+                El valor por defecto es <strong>{DEFAULT_AISLAMIENTO} metros</strong>.
+              </InfoParametro>
+            </section>
 
-          {/* ── Aislamiento ───────────────────────────────────────────────── */}
-          <section id="cfg-aislamiento" className="cfg-section">
-            <div className="cfg-card">
-              <div className="cfg-col">
-                <div className="cfg-col-header">
-                  <div className="cfg-col-icon cfg-col-icon--red">
-                    <i className="bi bi-bounding-box-circles" />
-                  </div>
-                  <div>
-                    <h2 className="cfg-card-title">Umbral de aislamiento</h2>
-                    <p className="cfg-card-subtitle">Distancia al rodeo para considerar a un animal aislado</p>
-                  </div>
-                </div>
-
-                <div className="cfg-field cfg-field--narrow">
-                  <label className="cfg-label" htmlFor="umbralAislamientoM">
-                    Distancia mínima al rodeo
-                  </label>
-                  <InputGroup hasValidation>
-                    <Form.Control
-                      id="umbralAislamientoM"
-                      type="number"
-                      min={AISLAMIENTO_MIN}
-                      max={AISLAMIENTO_MAX}
-                      placeholder={String(DEFAULT_AISLAMIENTO)}
-                      {...register('umbralAislamientoM', { valueAsNumber: true })}
-                      isInvalid={!!errors.umbralAislamientoM}
-                    />
-                    <InputGroup.Text>metros</InputGroup.Text>
-                    <Form.Control.Feedback type="invalid">
-                      {errors.umbralAislamientoM?.message}
-                    </Form.Control.Feedback>
-                  </InputGroup>
-                  <div className="cfg-hint-row">
-                    <span>Entre {AISLAMIENTO_MIN} y {AISLAMIENTO_MAX} m</span>
-                    {umbral !== DEFAULT_AISLAMIENTO && (
-                      <button
-                        type="button"
-                        className="cfg-link-btn"
-                        onClick={() => setValue('umbralAislamientoM', DEFAULT_AISLAMIENTO, { shouldDirty: true, shouldValidate: true })}
-                      >
-                        <i className="bi bi-arrow-counterclockwise me-1" />
-                        Restablecer a {DEFAULT_AISLAMIENTO} m
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <InfoParametro>
-              Define a qué distancia del resto del rodeo tiene que permanecer un animal
-              para que el sistema lo considere aislado y genere una alerta sanitaria.
-              Un valor menor detecta antes, pero puede generar más falsas alarmas.
-              El valor por defecto es <strong>{DEFAULT_AISLAMIENTO} metros</strong>.
-            </InfoParametro>
-          </section>
+          </>)}
 
           {/* Barra de acciones */}
           <div className="cfg-savebar">

@@ -1,6 +1,7 @@
 /* ── Layout de página ───────────────────────────────────────────────────── */
 .cfg-page {
   padding: 2rem 2rem 4rem;
+  width: 100%; /* #root es flex: con margin auto, sin esto se encoge al ancho del contenido */
   max-width: 1120px;
   margin: 0 auto;
   min-height: calc(100vh - 120px);
@@ -159,7 +160,7 @@
   color: #dc2626;
 }
 
-.cfg-badge-pronto {
+.cfg-badge-info {
   margin-left: auto;
   align-self: flex-start;
   padding: 0.2rem 0.6rem;
@@ -533,4 +534,10 @@
     width: auto;
     height: 1px;
   }
+}
+
+/* Campos de solo lectura (veterinario en General/Ubicación) */
+.cfg-form .form-control[readonly] {
+  background-color: #f9fafb;
+  color: #6b7280;
 }

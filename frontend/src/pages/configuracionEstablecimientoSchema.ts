@@ -37,12 +37,15 @@ export const schema = z.object({
 
 export type FormData = z.infer<typeof schema>;
 
-// guardable: false → la sección todavía no tiene integración con el backend (se edita pero no se envía).
+// Nombre y coordenadas: compartido con el alta de establecimientos (mismas reglas que el backend).
+export const datosEstablecimientoSchema = schema.pick({ nombre: true, latitud: true, longitud: true });
+
+// soloConfigAlertas: los endpoints de anestro/aislamiento rechazan al ADMINISTRADOR, se ocultan para él.
 export const SECCIONES = [
-  { id: 'general', label: 'General', icon: 'bi-building', fields: ['nombre'], guardable: false },
-  { id: 'ubicacion', label: 'Ubicación', icon: 'bi-geo-alt', fields: ['latitud', 'longitud'], guardable: false },
-  { id: 'anestro', label: 'Anestro', icon: 'bi-calendar-check', fields: ['diasDeteccionAnestro', 'severidadAnestro'], guardable: true },
-  { id: 'aislamiento', label: 'Aislamiento', icon: 'bi-bounding-box-circles', fields: ['umbralAislamientoM'], guardable: true },
-] as const satisfies readonly { id: string; label: string; icon: string; fields: readonly (keyof FormData)[]; guardable: boolean }[];
+  { id: 'general', label: 'General', icon: 'bi-building', fields: ['nombre'], soloConfigAlertas: false },
+  { id: 'ubicacion', label: 'Ubicación', icon: 'bi-geo-alt', fields: ['latitud', 'longitud'], soloConfigAlertas: false },
+  { id: 'anestro', label: 'Anestro', icon: 'bi-calendar-check', fields: ['diasDeteccionAnestro', 'severidadAnestro'], soloConfigAlertas: true },
+  { id: 'aislamiento', label: 'Aislamiento', icon: 'bi-bounding-box-circles', fields: ['umbralAislamientoM'], soloConfigAlertas: true },
+] as const satisfies readonly { id: string; label: string; icon: string; fields: readonly (keyof FormData)[]; soloConfigAlertas: boolean }[];
 
 export type SeccionId = (typeof SECCIONES)[number]['id'];

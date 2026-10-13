@@ -4,13 +4,12 @@ import { createPortal } from 'react-dom';
 
 import { Container, Row, Col, Button, Modal, Form, Spinner, Alert, OverlayTrigger, Popover, Toast, Dropdown } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   getEstablecimientos,
   createEstablecimiento,
   desactivarEstablecimiento,
-  updateEstablecimiento,
   activarEstablecimiento
 } from '../api/establecimientosApi';
 import type { EstablecimientoResponse } from '../api/establecimientosApi';
@@ -19,20 +18,14 @@ import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import './EstablecimientosPage.css';
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import { useAuthStore } from '../store/authStore';
+import { datosEstablecimientoSchema } from './configuracionEstablecimientoSchema';
 
-const schema = z.object({
-  nombre: z.string().min(1, 'El nombre es requerido'),
-  latitud: z.number({ message: 'Debe ser un número válido' }),
-  longitud: z.number({ message: 'Debe ser un número válido' }),
-});
-
-type FormData = z.infer<typeof schema>;
+type FormData = z.infer<typeof datosEstablecimientoSchema>;
 
 export default function EstablecimientosPage() {
   const rol = useAuthStore(state => state.rol);
-  // Mismos roles que exige el backend para cada endpoint
-  const puedeEditar = rol === 'ADMINISTRADOR' || rol === 'PRODUCTOR';
-  const puedeConfigurar = rol === 'PRODUCTOR' || rol === 'VETERINARIO';
+  // Mismos roles que la ruta /establecimientos/:id/configuracion (cada sección se ajusta al rol adentro)
+  const puedeConfigurar = rol === 'ADMINISTRADOR' || rol === 'PRODUCTOR' || rol === 'VETERINARIO';
   const navigate = useNavigate();
   const [establecimientos, setEstablecimientos] = useState<EstablecimientoResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,10 +34,6 @@ export default function EstablecimientosPage() {
 
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [submittingUpdate, setSubmittingUpdate] = useState(false);
-  const [establecimientoEdit, setEstablecimientoEdit] = useState<EstablecimientoResponse | null>(null);
 
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [establecimientoDetail, setEstablecimientoDetail] = useState<EstablecimientoResponse | null>(null);
@@ -59,11 +48,7 @@ export default function EstablecimientosPage() {
   const [undoToast, setUndoToast] = useState<{ id: number; nombre: string } | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
-
-  const { register: registerUpdate, handleSubmit: handleSubmitUpdate, reset: resetUpdate, formState: { errors: errorsUpdate } } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(datosEstablecimientoSchema),
   });
 
   useEffect(() => {
@@ -96,22 +81,6 @@ export default function EstablecimientosPage() {
       setSubmitting(false);
     }
   };
-
-  const onUpdate = async (data: FormData) => {
-    try {
-      setSubmittingUpdate(true);
-      setError(null);
-      if (!establecimientoEdit) return;
-      const actualizado = await updateEstablecimiento(establecimientoEdit.id, data);
-      setEstablecimientos(establecimientos.map(e => e.id === actualizado.id ? actualizado : e));
-      setShowUpdateModal(false);
-    } catch (err) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      setError(axiosError.response?.data?.message || 'Error al actualizar establecimiento');
-    } finally {
-      setSubmittingUpdate(false);
-    }
-  }
 
   const handleDesactivar = async (est: EstablecimientoResponse) => {
     setConfirmDesactivarId(null);
@@ -150,12 +119,6 @@ export default function EstablecimientosPage() {
   const handleCloseModal = () => {
     setShowModal(false);
     reset();
-  };
-
-  const handleCloseUpdateModal = () => {
-    setShowUpdateModal(false);
-    setEstablecimientoEdit(null);
-    resetUpdate();
   };
 
   const handleShowModal = () => setShowModal(true);
@@ -210,7 +173,7 @@ export default function EstablecimientosPage() {
                       {/* Overlay degradado para que el nombre se lea bien */}
                       <div className="est-card-map-overlay" />
                       {/* Menú de acciones */}
-                      {(puedeEditar || puedeConfigurar) && (
+                      {puedeConfigurar && (
                         <div className="est-card-top-actions">
                           <Dropdown align="end">
                             <Dropdown.Toggle as="button" bsPrefix="est-icon-btn" title="Más acciones">
@@ -219,26 +182,10 @@ export default function EstablecimientosPage() {
                             {/* Portal: la card tiene overflow hidden y filter, recortaría el menú */}
                             {createPortal(
                               <Dropdown.Menu className="est-menu">
-                                {puedeEditar && (
-                                  <Dropdown.Item as="button" onClick={() => {
-                                    setEstablecimientoEdit(est);
-                                    resetUpdate({
-                                      nombre: est.nombre,
-                                      latitud: est.latitud,
-                                      longitud: est.longitud,
-                                    });
-                                    setShowUpdateModal(true);
-                                  }}>
-                                    Editar establecimiento
-                                    <i className="bi bi-pencil" />
-                                  </Dropdown.Item>
-                                )}
-                                {puedeConfigurar && (
-                                  <Dropdown.Item as="button" onClick={() => navigate(`/establecimientos/${est.id}/configuracion`)}>
-                                    Configuración
-                                    <i className="bi bi-gear" />
-                                  </Dropdown.Item>
-                                )}
+                                <Dropdown.Item as="button" onClick={() => navigate(`/establecimientos/${est.id}/configuracion`)}>
+                                  Configuración
+                                  <i className="bi bi-gear" />
+                                </Dropdown.Item>
                               </Dropdown.Menu>,
                               document.body
                             )}
@@ -391,64 +338,6 @@ export default function EstablecimientosPage() {
         </Form>
       </Modal>
 
-      {/* Modal Editar */}
-      {establecimientoEdit && (
-        <Modal show={showUpdateModal} onHide={handleCloseUpdateModal} centered dialogClassName="modal-nuevo-animal">
-          <Modal.Header closeButton>
-            <Modal.Title>Actualizar establecimiento</Modal.Title>
-          </Modal.Header>
-          <Form onSubmit={handleSubmitUpdate(onUpdate)}>
-            <Modal.Body>
-              <Form.Group className="mb-3">
-                <Form.Label>Nombre</Form.Label>
-                <Form.Control
-                  type="text"
-                  placeholder="Ej: Tres Arroyos"
-                  {...registerUpdate('nombre')}
-                  isInvalid={!!errorsUpdate.nombre}
-                />
-                <Form.Control.Feedback type="invalid">
-                  {errorsUpdate.nombre?.message}
-                </Form.Control.Feedback>
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Latitud</Form.Label>
-                <Form.Control
-                  type="number"
-                  step="any"
-                  placeholder="Ej: -34.6037"
-                  {...registerUpdate('latitud', { valueAsNumber: true })}
-                  isInvalid={!!errorsUpdate.latitud}
-                />
-                <Form.Control.Feedback type="invalid">
-                  {errorsUpdate.latitud?.message}
-                </Form.Control.Feedback>
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Longitud</Form.Label>
-                <Form.Control
-                  type="number"
-                  step="any"
-                  placeholder="Ej: -58.3816"
-                  {...registerUpdate('longitud', { valueAsNumber: true })}
-                  isInvalid={!!errorsUpdate.longitud}
-                />
-                <Form.Control.Feedback type="invalid">
-                  {errorsUpdate.longitud?.message}
-                </Form.Control.Feedback>
-              </Form.Group>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button type="submit" className="btn-guardar-animal" disabled={submittingUpdate}>
-                {submittingUpdate ? <Spinner size="sm" animation="border" /> : 'Confirmar'}
-              </Button>
-            </Modal.Footer>
-          </Form>
-        </Modal>
-      )}
-
       {/* Modal Detalle */}
       {establecimientoDetail && (
         <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} centered size="lg">
@@ -477,7 +366,7 @@ export default function EstablecimientosPage() {
               </Marker>
             </MapContainer>
 
-            {(rol === 'PRODUCTOR' || rol === 'VETERINARIO') && (
+            {puedeConfigurar && (
               <Button
                 className="btn-vigia-secondary"
                 onClick={() => navigate(`/establecimientos/${establecimientoDetail.id}/configuracion`)}

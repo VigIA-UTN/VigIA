@@ -249,12 +249,16 @@ class EstablecimientoControllerTest {
 
     // ── PUT /{id}: chequeo de pertenencia ────────────────────────────────────
 
-    @SuppressWarnings("null")
     private ResultActions putEstablecimiento(String token, String nombre) throws Exception {
+        return putEstablecimiento(token, nombre, -34.0, -58.0);
+    }
+
+    @SuppressWarnings("null")
+    private ResultActions putEstablecimiento(String token, String nombre, Double latitud, Double longitud) throws Exception {
         EstablecimientoRequest request = new EstablecimientoRequest();
         request.setNombre(nombre);
-        request.setLatitud(-34.0);
-        request.setLongitud(-58.0);
+        request.setLatitud(latitud);
+        request.setLongitud(longitud);
         return mockMvc.perform(put("/api/v1/establecimientos/" + establecimientoId)
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -300,6 +304,45 @@ class EstablecimientoControllerTest {
     @DisplayName("PUT /api/v1/establecimientos/{id} - Veterinario sigue sin poder editar el establecimiento")
     void updateEstablecimiento_asVeterinario_forbidden() throws Exception {
         putEstablecimiento(vetToken, "No deberia").andExpect(status().isForbidden());
+    }
+
+    // ── Validación de nombre y coordenadas ─────────────────────────────────────
+
+    @Test
+    @SuppressWarnings("null")
+    @DisplayName("PUT /api/v1/establecimientos/{id} - Latitud fuera de rango devuelve 400 y no se modifica nada")
+    void updateEstablecimiento_latitudFueraDeRango_badRequest() throws Exception {
+        putEstablecimiento(userToken, "Renombrado", 91.0, -58.0)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("La latitud debe estar entre -90 y 90."));
+
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        assertThat(est.getNombre()).isEqualTo("Establecimiento Test");
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/establecimientos/{id} - Nombre vacío devuelve 400")
+    void updateEstablecimiento_nombreVacio_badRequest() throws Exception {
+        putEstablecimiento(userToken, "   ")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("El nombre es obligatorio."));
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    @DisplayName("POST /api/v1/establecimientos - Longitud fuera de rango devuelve 400")
+    void createEstablecimiento_longitudFueraDeRango_badRequest() throws Exception {
+        EstablecimientoRequest request = new EstablecimientoRequest();
+        request.setNombre("Nuevo Est");
+        request.setLatitud(-35.0);
+        request.setLongitud(181.0);
+
+        mockMvc.perform(post("/api/v1/establecimientos")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("La longitud debe estar entre -180 y 180."));
     }
 
     // ── Tests para GET /{id}/intervenciones ─────────────────────────────────────
