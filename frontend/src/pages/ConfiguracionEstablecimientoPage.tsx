@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Form, InputGroup } from 'react-bootstrap';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import MapInvalidator from '../components/MapInvalidator';
+import { PIN_NORMAL } from '../utils/animalPins';
 import { SEVERIDAD } from '../utils/severidadColores';
 import {
   getConfigAnestro, updateConfigAnestro,
@@ -36,6 +38,25 @@ function mensajeError(err: unknown, accion: 'ver' | 'editar') {
   const e = err as { response?: { status?: number; data?: { message?: string } } };
   if (e.response?.status === 403) return `No tenés permiso para ${accion} la configuración de este establecimiento.`;
   return e.response?.data?.message || (accion === 'ver' ? 'Error al cargar la configuración.' : 'Error al guardar los cambios.');
+}
+
+// Centro del mapa si el establecimiento no tiene coordenadas válidas al cargar.
+const CENTRO_DEFAULT: [number, number] = [-34.6037, -58.3816];
+
+// Click en el mapa → nuevas coordenadas.
+function SelectorUbicacion({ onElegir }: { onElegir: (lat: number, lng: number) => void }) {
+  useMapEvents({ click: (e) => onElegir(e.latlng.lat, e.latlng.lng) });
+  return null;
+}
+
+// Si la posición queda fuera de la vista (p. ej. se tipeó otra coordenada), mueve el mapa hasta ella.
+function SeguirPosicion({ lat, lng }: { lat?: number; lng?: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (lat == null || lng == null) return;
+    if (!map.getBounds().contains([lat, lng])) map.panTo([lat, lng]);
+  }, [map, lat, lng]);
+  return null;
 }
 
 // El Navbar carga la lista de establecimientos una sola vez: se actualiza a mano tras renombrar/mover.
@@ -78,6 +99,7 @@ export default function ConfiguracionEstablecimientoPage() {
   const [saved, setSaved] = useState(false);
   const [errorGlobal, setErrorGlobal] = useState<string | null>(null);
   const [activa, setActiva] = useState<SeccionId>('general');
+  const [mapaAmpliado, setMapaAmpliado] = useState(false);
 
   const {
     register,
@@ -132,6 +154,9 @@ export default function ConfiguracionEstablecimientoPage() {
     fetchData();
   }, [id, numId, veAlertas, navigate, reset]);
 
+  // Mientras dura el scroll suave de irA, guarda cómo terminarlo; el observer no toca la sección activa.
+  const saltando = useRef<(() => void) | null>(null);
+
   // Resalta en el menú la sección que está a la vista.
   useEffect(() => {
     if (loading) return;
@@ -139,7 +164,7 @@ export default function ConfiguracionEstablecimientoPage() {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((e) => (e.isIntersecting ? visibles.add(e.target.id) : visibles.delete(e.target.id)));
       const primera = SECCIONES.find((s) => visibles.has(`cfg-${s.id}`));
-      if (primera) setActiva(primera.id);
+      if (primera && !saltando.current) setActiva(primera.id);
     }, { rootMargin: '-140px 0px -60% 0px' });
     SECCIONES.forEach((s) => { const el = document.getElementById(`cfg-${s.id}`); if (el) observer.observe(el); });
     return () => observer.disconnect();
@@ -155,7 +180,17 @@ export default function ConfiguracionEstablecimientoPage() {
   const estaSucia = (seccionId: SeccionId) => sucias.some((s) => s.id === seccionId);
 
   const irA = (seccionId: SeccionId) => {
+    saltando.current?.(); // un click durante otro salto lo reemplaza
     setActiva(seccionId);
+    const terminar = () => {
+      window.removeEventListener('scrollend', terminar);
+      window.clearTimeout(corte);
+      saltando.current = null;
+    };
+    // scrollend no llega si no hubo scroll (ya estaba en esa sección) o si el navegador no lo soporta.
+    const corte = window.setTimeout(terminar, 1200);
+    window.addEventListener('scrollend', terminar);
+    saltando.current = terminar;
     document.getElementById(`cfg-${seccionId}`)?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -247,6 +282,12 @@ export default function ConfiguracionEstablecimientoPage() {
 
   const coordsValidas = schema.shape.latitud.safeParse(latitud).success
     && schema.shape.longitud.safeParse(longitud).success;
+  const posicion: [number, number] | null = coordsValidas ? [latitud, longitud] : null;
+  // Mismo redondeo que el step de los inputs (6 decimales ≈ 10 cm).
+  const elegirUbicacion = (lat: number, lng: number) => {
+    setValue('latitud', Number(lat.toFixed(6)), { shouldDirty: true, shouldValidate: true });
+    setValue('longitud', Number(lng.toFixed(6)), { shouldDirty: true, shouldValidate: true });
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -371,30 +412,45 @@ export default function ConfiguracionEstablecimientoPage() {
                   ))}
                 </div>
               </div>
-              {coordsValidas && (
-                <div className="cfg-map-preview">
-                  {/* key: MapContainer no re-centra al cambiar props, se remonta con las nuevas coordenadas. */}
-                  <MapContainer
-                    key={`${latitud},${longitud}`}
-                    center={[latitud, longitud]}
-                    zoom={14}
-                    zoomControl={false}
-                    dragging={false}
-                    scrollWheelZoom={false}
-                    doubleClickZoom={false}
-                    touchZoom={false}
-                    keyboard={false}
-                    style={{ height: '100%' }}
-                  >
-                    <TileLayer
-                      attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                      url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                    />
-                  </MapContainer>
-                  <i className="bi bi-geo-alt-fill cfg-map-pin" />
-                  <span className="cfg-map-note">Vista previa · se actualiza al cambiar las coordenadas</span>
-                </div>
-              )}
+              <div className={`cfg-map-preview${mapaAmpliado ? ' cfg-map-preview--ampliado' : ''}${editaDatos ? ' cfg-map-preview--editable' : ''}`}>
+                {/* Siempre visible: aunque las coordenadas tipeadas sean inválidas, se puede elegir la ubicación con un click. */}
+                <MapContainer
+                  center={posicion ?? CENTRO_DEFAULT}
+                  zoom={14}
+                  zoomControl={false}
+                  attributionControl={false}
+                  scrollWheelZoom={false}
+                  style={{ height: '100%' }}
+                >
+                  <ZoomControl position="bottomright" />
+                  <TileLayer
+                    attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                  />
+                  {/* interactive=false: el click sobre el pin también llega al mapa */}
+                  {posicion && <Marker position={posicion} icon={PIN_NORMAL} interactive={false} />}
+                  {editaDatos && <SelectorUbicacion onElegir={elegirUbicacion} />}
+                  <SeguirPosicion lat={posicion?.[0]} lng={posicion?.[1]} />
+                  <MapInvalidator smooth />
+                </MapContainer>
+                <button
+                  type="button"
+                  className="cfg-map-expand"
+                  onClick={() => setMapaAmpliado((v) => !v)}
+                  aria-label={mapaAmpliado ? 'Reducir mapa' : 'Ampliar mapa'}
+                  aria-pressed={mapaAmpliado}
+                  title={mapaAmpliado ? 'Reducir mapa' : 'Ampliar mapa'}
+                >
+                  <i className={`bi ${mapaAmpliado ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}`} />
+                </button>
+                <span className="cfg-map-note">
+                  {editaDatos ? 'Hacé click en el mapa para elegir la ubicación' : 'Vista previa de la ubicación'}
+                </span>
+              </div>
+              {/* Crédito de Esri fuera del mapa (attributionControl desactivado), igual que en ActividadTab */}
+              <p className="cfg-map-credit">
+                Imágenes: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP y la comunidad de usuarios de GIS.
+              </p>
             </div>
           </section>
 

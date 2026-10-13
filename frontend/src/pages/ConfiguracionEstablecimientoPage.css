@@ -229,20 +229,36 @@
 .cfg-map-preview {
   position: relative;
   isolation: isolate; /* encierra los z-index de Leaflet para que no tapen la barra fija */
-  height: 200px;
+  height: 220px;
   border-top: 1px solid #e8ecf0;
+  transition: height 0.25s ease; /* MapInvalidator smooth re-centra el mapa en cada frame */
 }
 
-.cfg-map-pin {
+.cfg-map-preview--ampliado { height: 440px; }
+
+.cfg-map-credit {
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 0.7rem;
+  color: #A0AEC0;
+}
+
+.cfg-map-preview--editable .leaflet-container { cursor: crosshair; }
+
+/* Mismo botón que el mapa de calor de la ficha del animal (ActividadTab) */
+.cfg-map-expand {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -100%);
-  font-size: 2rem;
-  color: #D50000;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
-  z-index: 500;
-  pointer-events: none;
+  top: 10px;
+  right: 10px;
+  z-index: 1001;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #1E3A5F;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
 }
 
 .cfg-map-note {
@@ -412,8 +428,10 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 0.8rem;
-  padding: 1rem 0;
-  background: rgba(248, 250, 252, 0.96);
+  /* Más ancha que la columna: tapa la sombra de las cards (≈16px) que asomaba en los extremos */
+  margin: 0 -1.5rem;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 255, 255, 0.96); /* mismo blanco que el fondo de la página (body de Bootstrap) */
   border-top: 1px solid #e8ecf0;
 }
 
@@ -527,6 +545,8 @@
 
 @media (max-width: 600px) {
   .cfg-page { padding: 1.5rem 1rem 4rem; }
+  /* El padding lateral de la página baja a 1rem: la barra no puede salirse más que eso (scroll horizontal) */
+  .cfg-savebar { margin: 0 -1rem; padding: 1rem; }
   .cfg-card-body {
     flex-direction: column;
   }

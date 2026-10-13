@@ -20,6 +20,9 @@ const PIN_ICONS = Object.fromEntries(
   ['normal', 'borde', 'critico', 'sindatos'].map(e => [e, [makePin(e, false), makePin(e, true)]])
 ) as Record<string, [L.Icon, L.Icon]>;
 
+/** Pin verde (estado normal, sin seleccionar). */
+export const PIN_NORMAL = PIN_ICONS.normal[0];
+
 /** Pin del animal según sus alertas (crítico / borde / normal) o si no tiene datos recientes. */
 export function determinarIcono(animal: AnimalMapa, selected = false) {
   const severidades = animal.alertasAnimal.map(a => a.severidad);
