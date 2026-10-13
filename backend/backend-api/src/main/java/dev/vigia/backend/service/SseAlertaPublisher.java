@@ -1,11 +1,13 @@
 package dev.vigia.backend.service;
 
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,8 @@ public class SseAlertaPublisher {
     private final AnimalRepository animalRepository;
 
     private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
+
+    private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
@@ -76,7 +80,8 @@ public class SseAlertaPublisher {
                                 alerta.getLatitud(),
                                 alerta.getLongitud(),
                                 alerta.getAccionRecomendada(),
-                                alerta.getAnimal());
+                                alerta.getAnimal(),
+                                animalesAislados(alerta.getId(), alerta.getDisparador(), null));
                     } catch (Exception e) {
                         log.error("Fallo enviando alerta perdida, cancelando el resto. {}", e.getMessage());
                         list.remove(emitter);
@@ -120,6 +125,8 @@ public class SseAlertaPublisher {
                 list.size(),
                 establecimientoId);
 
+        List<AnimalAisladoResponse> aislados = animalesAislados(alertaEvent.getId(), alertaEvent.getDisparador(),
+                alertaEvent.getAnimalesAislados());
         for (SseEmitter emitter : list) {
             try {
                 sendToEmitter(emitter, alertaEvent.getId(), alertaEvent.getAnimalId(),
@@ -131,7 +138,8 @@ public class SseAlertaPublisher {
                         alertaEvent.getLatitud(),
                         alertaEvent.getLongitud(),
                         alertaEvent.getAccionRecomendada(),
-                        animalOpt.get());
+                        animalOpt.get(),
+                        aislados);
             } catch (Exception e) {
                 log.error("Error enviando alerta por SSE a un cliente, removiendo emitter.", e);
                 list.remove(emitter);
@@ -139,10 +147,29 @@ public class SseAlertaPublisher {
         }
     }
 
+    /**
+     * Animales de una alerta AISLAMIENTO_SOCIAL. El worker los manda en el evento (sus filas todavía no
+     * están commiteadas); los eventos de cambio de estado y el reenvío por lastEventId no los traen y se
+     * leen de la base.
+     */
+    List<AnimalAisladoResponse> animalesAislados(Long alertaId, DisparadorAlerta disparador,
+            List<AnimalAisladoResponse> delEvento) {
+        if (disparador != DisparadorAlerta.AISLAMIENTO_SOCIAL) {
+            return null;
+        }
+        if (delEvento != null) {
+            return delEvento;
+        }
+        return alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alertaId).stream()
+                .map(e -> AnimalAisladoResponse.from(e, e.getAlerta().getValorUmbral()))
+                .toList();
+    }
+
     @SuppressWarnings("null")
     private void sendToEmitter(SseEmitter emitter, Long id, Long animalId, DisparadorAlerta disparador,
             String subtipo, String severidad, EstadoAlerta estado, LocalDateTime tsGeneracion,
-            Double latitud, Double longitud, String accionRecomendada, Animal animal)
+            Double latitud, Double longitud, String accionRecomendada, Animal animal,
+            List<AnimalAisladoResponse> animalesAislados)
             throws IOException {
         LocalDateTime ultimaSenial = datoDesactualizadoEvaluator.aplica(disparador, subtipo, estado)
                 && animal != null && animal.getCaravana() != null
@@ -163,6 +190,7 @@ public class SseAlertaPublisher {
                 .datoPosiblementeDesactualizado(
                         datoDesactualizadoEvaluator.esDatoDesactualizado(disparador, subtipo, estado, ultimaSenial))
                 .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
+                .animalesAislados(animalesAislados)
                 .build();
 
         emitter.send(SseEmitter.event()

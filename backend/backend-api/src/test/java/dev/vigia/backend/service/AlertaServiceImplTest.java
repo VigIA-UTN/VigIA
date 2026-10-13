@@ -25,12 +25,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AnimalAisladoResponse;
+import dev.vigia.backend.dto.DetalleAislamientoResponse;
 import dev.vigia.backend.dto.BloqueComparativoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
 import dev.vigia.backend.exception.AlertaYaProcesadaException;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.AlertaAnimalAislado;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
@@ -38,11 +41,13 @@ import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.TipoEstadoSalud;
 import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
@@ -80,6 +85,9 @@ public class AlertaServiceImplTest {
 
         @Mock
         private AnimalRepository animalRepository;
+
+        @Mock
+        private AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
         @Spy
         private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -345,6 +353,149 @@ public class AlertaServiceImplTest {
                 assertEquals(-34.6037, result.get(0).getLatitud());
                 assertEquals(-58.3816, result.get(0).getLongitud());
                 assertEquals(mockAlerta.getTsGeneracion(), result.get(0).getTsGeneracion());
+        }
+
+        @Test
+        void listarAlertas_Aislamiento_ExponeAnimalesAislados() {
+                // Arrange: umbral 150 m, uno a 400 m (ALTA) y otro a 120 m (MEDIA)
+                mockAlerta.setDisparador(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+                mockAlerta.setValorUmbral(150.0);
+                Animal otro = new Animal();
+                otro.setId(11L);
+                otro.setIdCaravanaOficial("CAR-456");
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, null, null))
+                                .thenReturn(List.of(mockAlerta));
+                AlertaAnimalAislado sigueAfuera = episodioAislamiento(otro, 2400L, 400.0);
+                sigueAfuera.setTsInicio(LocalDateTime.now().minusMinutes(25));
+                AlertaAnimalAislado volvio = episodioAislamiento(mockAnimal, 1830L, 120.4);
+                volvio.setTsInicio(LocalDateTime.now().minusMinutes(50));
+                volvio.setTsRegreso(LocalDateTime.now().minusMinutes(38));
+                when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(ALERTA_ID))
+                                .thenReturn(List.of(sigueAfuera, volvio));
+
+                // Act
+                List<AlertaResponse> result = alertaService.listarAlertas(EMAIL, ESTABLECIMIENTO_ID, null, null, null);
+
+                // Assert: mismo orden que el repositorio (más tiempo fuera primero)
+                List<AnimalAisladoResponse> aislados = result.get(0).getAnimalesAislados();
+                assertEquals(2, aislados.size());
+                assertEquals(11L, aislados.get(0).getAnimalId());
+                assertEquals("CAR-456", aislados.get(0).getIdentificador());
+                assertNull(aislados.get(0).getAlias());
+                assertEquals(40L, aislados.get(0).getMinutosFuera()); // acumulado en 24 h
+                assertEquals(25L, aislados.get(0).getMinutosFueraSeguidos()); // sigue afuera: hasta ahora
+                assertEquals(400L, aislados.get(0).getDistanciaGrupoM());
+                assertEquals("ALTA", aislados.get(0).getSeveridad());
+                assertEquals(10L, aislados.get(1).getAnimalId());
+                assertEquals("Lola", aislados.get(1).getAlias());
+                assertEquals(30L, aislados.get(1).getMinutosFuera());
+                assertEquals(12L, aislados.get(1).getMinutosFueraSeguidos()); // volvió: hasta el regreso
+                assertEquals(120L, aislados.get(1).getDistanciaGrupoM());
+                assertEquals("MEDIA", aislados.get(1).getSeveridad());
+        }
+
+        @Test
+        void listarAlertas_Celo_NoConsultaAnimalesAislados() {
+                // Arrange: mockAlerta es de CELO
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, null, null))
+                                .thenReturn(List.of(mockAlerta));
+
+                // Act
+                List<AlertaResponse> result = alertaService.listarAlertas(EMAIL, ESTABLECIMIENTO_ID, null, null, null);
+
+                // Assert
+                assertNull(result.get(0).getAnimalesAislados());
+                verifyNoInteractions(alertaAnimalAisladoRepository);
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_Aislamiento_ExponeAnimalesInicioYRodeo() {
+                // Arrange
+                RodeoLote lote = new RodeoLote();
+                lote.setNombre("Lote Norte");
+                mockAnimal.setRodeoLote(lote);
+                mockAlerta.setDisparador(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+                mockAlerta.setValorUmbral(150.0);
+                Animal otro = new Animal();
+                otro.setId(11L);
+                otro.setIdCaravanaOficial("CAR-456");
+                LocalDateTime inicio = LocalDateTime.now().minusMinutes(50);
+                AlertaAnimalAislado masTiempo = episodioAislamiento(otro, 2400L, 400.0);
+                masTiempo.setTsInicio(inicio.plusMinutes(10));
+                AlertaAnimalAislado primeroEnAlejarse = episodioAislamiento(mockAnimal, 1830L, 120.0);
+                primeroEnAlejarse.setTsInicio(inicio);
+
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(ALERTA_ID))
+                                .thenReturn(List.of(masTiempo, primeroEnAlejarse));
+
+                // Act
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert
+                DetalleAislamientoResponse detalle = result.getDetalleAislamiento();
+                assertNotNull(detalle);
+                assertEquals(inicio, detalle.getTsInicio());
+                assertEquals("Lote Norte", detalle.getNombreLote());
+                assertEquals(List.of(11L, 10L),
+                                detalle.getAnimalesAislados().stream().map(AnimalAisladoResponse::getAnimalId).toList());
+                assertEquals(40L, detalle.getAnimalesAislados().get(0).getMinutosFuera());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void obtenerDetalleAlerta_Aislamiento_AnimalSinRodeo_NombreLoteNulo() {
+                // Arrange
+                mockAlerta.setDisparador(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+                mockAlerta.setValorUmbral(150.0);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(ALERTA_ID))
+                                .thenReturn(List.of(episodioAislamiento(mockAnimal, 900L, 200.0)));
+
+                // Act
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert
+                assertNotNull(result.getDetalleAislamiento());
+                assertNull(result.getDetalleAislamiento().getNombreLote());
+        }
+
+        @Test
+        void obtenerDetalleAlerta_Celo_SinDetalleAislamiento() {
+                // Arrange: mockAlerta es de CELO
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+
+                // Act
+                AlertaDetalleResponse result = alertaService.obtenerDetalleAlerta(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);
+
+                // Assert
+                assertNull(result.getDetalleAislamiento());
+                verifyNoInteractions(alertaAnimalAisladoRepository);
+        }
+
+        private static AlertaAnimalAislado episodioAislamiento(Animal animal, Long segundosFuera, Double distancia) {
+                return AlertaAnimalAislado.builder()
+                                .animal(animal)
+                                .segundosFuera(segundosFuera)
+                                .distanciaGrupoM(distancia)
+                                .tsInicio(LocalDateTime.now().minusSeconds(segundosFuera))
+                                .build();
         }
 
         @Test

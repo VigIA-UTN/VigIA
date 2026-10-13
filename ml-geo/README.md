@@ -44,6 +44,8 @@ En un rodeo compacto `indice_cohesion < 0.5` coincide con `alerta_aislamiento: t
 
 **Tiempo fuera del grupo (todo el historial).** Las caravanas no transmiten en el mismo instante, así que el historial se agrupa en intervalos de 5 minutos (`INTERVALO_COHESION_S`). En cada intervalo se usa la posición promedio de cada animal que transmitió y se clasifica con la misma regla. `tiempo_fuera_grupo_s` suma 300 s por cada intervalo en que el animal quedó afuera. Los intervalos en los que el animal no transmitió no suman: los huecos sin datos no cuentan como tiempo fuera.
 
+**Tiempo fuera continuo.** `tiempo_fuera_continuo_s` es solo el tramo final: se cuenta hacia atrás desde el último intervalo con datos del animal y se corta en el primero en que estaba dentro del grupo. Los huecos sin datos no suman ni cortan el tramo. El backend lo usa para alertar recién cuando el animal lleva un mínimo de tiempo afuera sin volver.
+
 Las alertas se calculan **siempre sobre el historial completo**, sin importar el filtro: el aislamiento solo tiene sentido contra todo el rodeo. Con un único animal en el historial no hay grupo contra el que medir, así que se reporta `indice_cohesion: 1.0`, `distancia_centroide_m: 0.0`, `alerta_aislamiento: false` y `tiempo_fuera_grupo_s: 0.0`.
 
 ### Endpoint Principal
@@ -79,7 +81,8 @@ Las alertas se calculan **siempre sobre el historial completo**, sin importar el
       "indice_cohesion": 0.25,
       "distancia_centroide_m": 300.0,
       "alerta_aislamiento": true,
-      "tiempo_fuera_grupo_s": 2700.0
+      "tiempo_fuera_grupo_s": 2700.0,
+      "tiempo_fuera_continuo_s": 900.0
     }
   ]
 }
