@@ -1,6 +1,7 @@
 package dev.vigia.backend.service;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -13,6 +14,7 @@ import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
+import dev.vigia.backend.dto.CohesionResponse;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.IntervencionResponse;
@@ -74,4 +76,7 @@ public interface AnimalService {
         AnimalResponse vincularCaravana(Long animalId, Long caravanaId, String emailUsuario);
 
         AnimalResponse desvincularCaravana(Long animalId, String emailUsuario);
+
+        CohesionResponse obtenerCohesion(String emailUsuario, Long animalId,
+                        LocalDateTime desde, LocalDateTime hasta);
 }

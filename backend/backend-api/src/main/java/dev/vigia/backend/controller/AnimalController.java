@@ -27,6 +27,7 @@ import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.VincularCaravanaRequest;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
+import dev.vigia.backend.dto.CohesionResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
@@ -368,9 +369,9 @@ public class AnimalController {
      * <p>
      * Carga masiva de animales a partir de un archivo (CSV/Excel).
      *
-     * @param file               archivo con los animales a cargar
-     * @param establecimientoId  ID del establecimiento destino
-     * @param authentication     contexto de seguridad inyectado por Spring Security
+     * @param file              archivo con los animales a cargar
+     * @param establecimientoId ID del establecimiento destino
+     * @param authentication    contexto de seguridad inyectado por Spring Security
      * @return 201 con el resumen de la carga, 400 si hay error de validación o de
      *         lectura del archivo
      */
@@ -397,9 +398,9 @@ public class AnimalController {
      * <p>
      * Carga masiva de estados reproductivos a partir de un archivo (CSV/Excel).
      *
-     * @param file               archivo con los estados reproductivos a cargar
-     * @param establecimientoId  ID del establecimiento destino
-     * @param authentication     contexto de seguridad inyectado por Spring Security
+     * @param file              archivo con los estados reproductivos a cargar
+     * @param establecimientoId ID del establecimiento destino
+     * @param authentication    contexto de seguridad inyectado por Spring Security
      * @return 201 con el resumen de la carga, 400 si hay error de validación o de
      *         lectura del archivo
      */
@@ -654,9 +655,11 @@ public class AnimalController {
         }
     }
 
-    // ── Línea de tiempo de alertas ────────────────────────────────────────────────────
+    // ── Línea de tiempo de alertas
+    // ────────────────────────────────────────────────────
     /**
-     * GET /api/v1/animales/{id}/linea-tiempo-alertas?tipo={tipo}&desde={desde}&hasta={hasta}
+     * GET
+     * /api/v1/animales/{id}/linea-tiempo-alertas?tipo={tipo}&desde={desde}&hasta={hasta}
      * <p>
      * Devuelve la línea de tiempo unificada de alertas e intervenciones de un
      * animal, ordenada cronológicamente.
@@ -674,20 +677,14 @@ public class AnimalController {
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getLineaTiempoAlertas(
             @PathVariable("id") Long animalId,
-            @RequestParam(name = "tipo",  required = false) String tipo,
-            @RequestParam(name = "desde", required = false)
-            @org.springframework.format.annotation.DateTimeFormat(
-                    iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
-                    java.time.LocalDateTime desde,
-            @RequestParam(name = "hasta", required = false)
-            @org.springframework.format.annotation.DateTimeFormat(
-                    iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
-                    java.time.LocalDateTime hasta,
+            @RequestParam(name = "tipo", required = false) String tipo,
+            @RequestParam(name = "desde", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime desde,
+            @RequestParam(name = "hasta", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime hasta,
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            List<LineaTiempoEventoResponse> response =
-                    alertaService.obtenerLineaTiempoAlertas(email, animalId, tipo, desde, hasta);
+            List<LineaTiempoEventoResponse> response = alertaService.obtenerLineaTiempoAlertas(email, animalId, tipo,
+                    desde, hasta);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -731,6 +728,24 @@ public class AnimalController {
             if ("Animal no encontrado.".equals(e.getMessage())) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
             }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/cohesion")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> getCohesion(
+            @PathVariable("id") Long animalId,
+            @RequestParam(name = "desde", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime desde,
+            @RequestParam(name = "hasta", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime hasta,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            CohesionResponse response = animalService.obtenerCohesion(email, animalId, desde, hasta);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

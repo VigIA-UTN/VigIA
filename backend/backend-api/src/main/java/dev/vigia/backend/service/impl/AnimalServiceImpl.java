@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +31,8 @@ import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.CargaMasivaResult;
+import dev.vigia.backend.dto.CohesionPuntoSerie;
+import dev.vigia.backend.dto.CohesionResponse;
 import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.EstadoReproductivoCsvRequest;
 import dev.vigia.backend.dto.EstadoReproductivoParseResult;
@@ -53,6 +56,7 @@ import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.PerfilReferencia;
+import dev.vigia.backend.model.RegistroCohesion;
 import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.TipoIntervencion;
@@ -68,6 +72,7 @@ import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.model.Caravana;
@@ -99,6 +104,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final RegistroPesoRepository registroPesoRepository;
         private final CaravanaRepository caravanaRepository;
         private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
+        private final RegistroCohesionRepository cohesionRepository;
 
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
@@ -231,7 +237,8 @@ public class AnimalServiceImpl implements AnimalService {
 
                 if (request.getAlias() != null && !request.getAlias().isBlank()
                                 && (!request.getAlias().equals(animal.getAlias())
-                                                || !request.getEstablecimientoId().equals(establecimientoActual.getId()))
+                                                || !request.getEstablecimientoId()
+                                                                .equals(establecimientoActual.getId()))
                                 && animalRepository.existsByAliasAndEstablecimientoId(request.getAlias(),
                                                 request.getEstablecimientoId())) {
                         throw new IllegalArgumentException(
@@ -1565,5 +1572,72 @@ public class AnimalServiceImpl implements AnimalService {
                         default:
                                 return "No hay revisiones de estado de salud cargadas para este animal.";
                 }
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public CohesionResponse obtenerCohesion(String emailUsuario, Long animalId,
+                        LocalDateTime desde, LocalDateTime hasta) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimiento = animal.getEstablecimiento();
+
+                boolean productorActivoEnEstablecimiento = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo());
+
+                if (!productorActivoEnEstablecimiento) {
+                        throw new IllegalArgumentException(
+                                        "El productor no pertenece a este establecimiento o no está activo.");
+                }
+
+                List<RegistroCohesion> cohesionRegistros = cohesionRepository
+                                .findByEstablecimientoIdAndAnimalIdAndFechaBetweenOrderByFechaAsc(
+                                                establecimiento.getId(),
+                                                animalId, desde, hasta);
+
+                LocalDateTime hastaAnterior = desde;
+                LocalDateTime desdeAnterior = hastaAnterior.minus(
+                                hasta.toEpochSecond(ZoneOffset.UTC) - desde.toEpochSecond(ZoneOffset.UTC),
+                                ChronoUnit.SECONDS);
+
+                List<RegistroCohesion> cohesionRegistrosAnterior = cohesionRepository
+                                .findByEstablecimientoIdAndAnimalIdAndFechaBetweenOrderByFechaAsc(
+                                                establecimiento.getId(),
+                                                animalId, desdeAnterior, hastaAnterior);
+
+                Double promedio = cohesionRegistros.stream()
+                                .mapToDouble(RegistroCohesion::getIndiceCohesion)
+                                .average()
+                                .orElse(0.0);
+
+                Double promedioAnterior = cohesionRegistrosAnterior.stream()
+                                .mapToDouble(RegistroCohesion::getIndiceCohesion)
+                                .average()
+                                .orElse(0.0);
+
+                Double indiceActual = 0.0;
+
+                if (!cohesionRegistros.isEmpty()) {
+                        indiceActual = cohesionRegistros.get(cohesionRegistros.size() - 1).getIndiceCohesion();
+                }
+
+                List<CohesionPuntoSerie> serie = cohesionRegistros.stream()
+                                .map(registro -> new CohesionPuntoSerie(
+                                                registro.getFecha(),
+                                                registro.getIndiceCohesion(),
+                                                promedio))
+                                .collect(Collectors.toList());
+
+                return CohesionResponse.builder()
+                                .actual(indiceActual)
+                                .promedioRodeo(promedio)
+                                .promedioPeriodoAnterior(promedioAnterior)
+                                .serie(serie)
+                                .build();
         }
 }
