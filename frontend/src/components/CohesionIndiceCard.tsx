@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     LineChart, Line, ReferenceLine, ReferenceArea, ReferenceDot,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -27,6 +27,8 @@ const PERIODOS: { key: Periodo; label: string; dias: number }[] = [
 const NAVY = '#1E3A5F';
 const GRIS = '#949494';
 const SIN_DATOS = '#EDF2F7';
+
+const SIN_MOVIMIENTO = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const fmtFecha = (t: number) => new Date(t).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -68,6 +70,32 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
     const [data, setData] = useState<CohesionResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const grupoRef = useRef<HTMLDivElement>(null);
+    const pillRef = useRef<HTMLSpanElement>(null);
+    const [pill, setPill] = useState<React.CSSProperties>({ opacity: 0 });
+
+    // La pastilla blanca sigue al preset activo (también si el grupo cambia de tamaño o se acomoda en otra fila).
+    useLayoutEffect(() => {
+        const grupo = grupoRef.current;
+        if (!grupo) return;
+        const medir = () => {
+            const b = grupo.querySelector<HTMLElement>('[aria-pressed="true"]');
+            if (b) setPill({ left: b.offsetLeft, top: b.offsetTop, width: b.offsetWidth, height: b.offsetHeight, opacity: 1 });
+        };
+        medir();
+        const ro = new ResizeObserver(medir);
+        ro.observe(grupo);
+        return () => ro.disconnect();
+    }, [periodo, enCalibracion]);
+
+    const elegirPeriodo = (p: Periodo) => {
+        if (p === periodo) return;
+        setPeriodo(p);
+        if (!SIN_MOVIMIENTO) pillRef.current?.animate(
+            [{ transform: 'scale(1)' }, { transform: 'scale(1.04, 0.94)' }, { transform: 'scale(1)' }],
+            { duration: 350, easing: 'ease-out' },
+        );
+    };
 
     useEffect(() => {
         if (enCalibracion) return;
@@ -148,7 +176,15 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
                     Índice de cohesión
                 </h5>
                 {!enCalibracion && (
-                    <div role="group" aria-label="Período" className="d-flex flex-wrap gap-1 p-1" style={{ background: '#F3F3F3', borderRadius: 12 }}>
+                    <div ref={grupoRef} role="group" aria-label="Período" className="d-flex flex-wrap gap-1 p-1" style={{ background: '#F3F3F3', borderRadius: 12, position: 'relative' }}>
+                        <span
+                            ref={pillRef}
+                            aria-hidden
+                            style={{
+                                ...pill, position: 'absolute', background: '#fff', borderRadius: 9, boxShadow: '0 2px 4px rgba(0,0,0,.25)',
+                                transition: SIN_MOVIMIENTO ? 'none' : 'left .35s cubic-bezier(.34,1.2,.64,1), top .35s cubic-bezier(.34,1.2,.64,1), width .35s cubic-bezier(.34,1.2,.64,1), opacity .2s',
+                            }}
+                        />
                         {PERIODOS.map(p => {
                             const on = p.key === periodo;
                             return (
@@ -156,11 +192,10 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
                                     key={p.key}
                                     type="button"
                                     aria-pressed={on}
-                                    onClick={() => setPeriodo(p.key)}
+                                    onClick={() => elegirPeriodo(p.key)}
                                     style={{
-                                        border: 0, borderRadius: 9, padding: '6px 14px', fontSize: 14, fontWeight: 500,
-                                        background: on ? '#fff' : 'transparent', color: on ? NAVY : '#5A5A5A',
-                                        boxShadow: on ? '0 2px 4px rgba(0,0,0,.25)' : 'none', transition: 'background .15s ease',
+                                        position: 'relative', border: 0, borderRadius: 9, padding: '6px 14px', fontSize: 14, fontWeight: 500,
+                                        background: 'transparent', color: on ? NAVY : '#5A5A5A', transition: 'color .2s ease',
                                     }}
                                 >
                                     {p.label}

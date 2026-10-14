@@ -358,7 +358,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                 <div className="d-flex align-items-center gap-3 rounded-4 px-4 py-3" style={{ backgroundColor: '#FDECEC' }}>
                   <i className="bi bi-clock-history fs-3" style={{ color: '#dc3545' }}></i>
                   <div>
-                    <small className="d-block" style={{ color: '#5A5A5A' }}>Tiempo acumulado fuera del grupo</small>
+                    <small className="d-block" style={{ color: '#5A5A5A' }}>Tiempo acumulado fuera del grupo (últimas 24 h)</small>
                     <span className="fw-bold" style={{ color: '#B00020', fontSize: '1.4rem' }}>
                       {aislados.length ? formatMinutos(Math.max(...aislados.map(a => a.minutosFuera))) : '—'}
                     </span>
@@ -398,6 +398,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                         </span>
                         <span className="text-end text-nowrap">
                           <span className="d-block fw-semibold" style={{ color: '#263238', fontSize: '0.9rem' }}>{a.tsRegreso ? `Estuvo fuera ${formatMinutos(a.minutosFueraSeguidos)}` : formatMinutos(a.minutosFueraSeguidos)}</span>
+                          <small className="d-block text-muted">{formatMinutos(a.minutosFuera)} en 24 h</small>
                           <small className="d-block text-muted">a {a.distanciaGrupoM} m del grupo</small>
                         </span>
                         <i className="bi bi-chevron-right" style={{ color: '#98A2B3' }}></i>
