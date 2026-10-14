@@ -17,8 +17,10 @@ import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -157,7 +159,7 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
     @SuppressWarnings("null")
     public ConfigAnestroResponse getConfigAnestro(Long establecimientoId, String emailUsuario) {
         Establecimiento est = establecimientoRepository.findById(establecimientoId)
-                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+                .orElseThrow(() -> establecimientoNoEncontrado());
 
         verificarPertenencia(est, emailUsuario);
 
@@ -174,7 +176,7 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                                                      ConfigAnestroRequest request,
                                                      String emailUsuario) {
         Establecimiento est = establecimientoRepository.findById(establecimientoId)
-                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+                .orElseThrow(() -> establecimientoNoEncontrado());
 
         verificarPertenencia(est, emailUsuario);
         validarParametrosAnestro(request);
@@ -195,7 +197,7 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
     @SuppressWarnings("null")
     public ConfigAislamientoResponse getConfigAislamiento(Long establecimientoId, String emailUsuario) {
         Establecimiento est = establecimientoRepository.findById(establecimientoId)
-                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+                .orElseThrow(() -> establecimientoNoEncontrado());
 
         verificarPertenencia(est, emailUsuario);
 
@@ -212,7 +214,7 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                                                              ConfigAislamientoRequest request,
                                                              String emailUsuario) {
         Establecimiento est = establecimientoRepository.findById(establecimientoId)
-                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+                .orElseThrow(() -> establecimientoNoEncontrado());
 
         verificarPertenencia(est, emailUsuario);
         validarParametrosAislamiento(request);
@@ -223,6 +225,10 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
     }
 
     // ── Helpers privados ──────────────────────────────────────────────────────
+
+    private static ResponseStatusException establecimientoNoEncontrado() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Establecimiento no encontrado");
+    }
 
     /**
      * Verifica que el usuario autenticado sea PRODUCTOR o VETERINARIO activo

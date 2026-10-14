@@ -1,6 +1,7 @@
 package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.vigia.backend.client.MlSaludClient;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.ml.SaludPredictResponseDTO;
 import dev.vigia.backend.model.Animal;
@@ -36,6 +37,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,12 +59,11 @@ class SaludDetectorStrategyImplTest {
 
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder();
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost:8000");
         mockServer = MockRestServiceServer.bindTo(builder).build();
 
         saludDetectorStrategy = new SaludDetectorStrategyImpl(
-                builder,
-                "http://localhost:8000",
+                new MlSaludClient(builder.build()),
                 telemetriaRepository,
                 alertaRepository,
                 perfilReferenciaRepository,
@@ -108,13 +109,13 @@ class SaludDetectorStrategyImplTest {
 
     @SuppressWarnings("null")
     @Test
-    void testFallbackProcess() {
+    void testMarcarInferenciaPendiente() {
         Telemetria t1 = new Telemetria();
         t1.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
 
         List<Telemetria> lista = List.of(t1);
 
-        saludDetectorStrategy.fallbackProcess(lista, "12345", new RuntimeException("Timeout"));
+        saludDetectorStrategy.marcarInferenciaPendiente(lista, "12345", new RuntimeException("Timeout"));
 
         assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferenciaSalud());
         verify(telemetriaRepository).saveAll(anyList());
@@ -319,6 +320,38 @@ class SaludDetectorStrategyImplTest {
 
         assertEquals(EstadoInferencia.COMPLETADO, lista.get(0).getEstadoInferenciaSalud());
         verify(telemetriaRepository).saveAll(anyList());
+    }
+
+    @SuppressWarnings("null")
+    @Test
+    void testProcess_mlSaludFalla_marcaInferenciaPendienteSinPropagar() {
+        Animal animal = new Animal();
+        animal.setId(3L);
+        animal.setFechaAlta(LocalDate.now().minusDays(10));
+
+        Caravana c = new Caravana();
+        c.setAnimal(animal);
+        animal.setCaravana(c);
+
+        List<Telemetria> lista = crearVentana(animal, 288);
+
+        PerfilReferencia perfil = new PerfilReferencia();
+        perfil.setAnimal(animal);
+        perfil.setFechaCalculo(LocalDateTime.now().minusDays(1));
+        perfil.setPerfilJson("{\"feature1\": 1.0}");
+
+        when(perfilReferenciaRepository.findByAnimal(animal)).thenReturn(Optional.of(perfil));
+        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(eq(animal), any(), any()))
+                .thenReturn(false);
+
+        mockServer.expect(requestTo("http://localhost:8000/api/internal/ml/salud/predict"))
+                .andRespond(withServerError());
+
+        saludDetectorStrategy.process(lista, "corr-caido");
+
+        mockServer.verify();
+        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, lista.get(0).getEstadoInferenciaSalud());
+        verify(alertaRepository, never()).save(any());
     }
 
     @Test

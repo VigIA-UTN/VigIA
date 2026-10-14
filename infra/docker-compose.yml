@@ -40,6 +40,7 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
       - OAUTH2_REDIRECT_URI=${OAUTH2_REDIRECT_URI:-http://localhost:5173/oauth2/callback}
+      - CELO_HORAS_DATO_DESACTUALIZADO=${CELO_HORAS_DATO_DESACTUALIZADO:-2}
       - ML_CELO_URL=http://ml-celo:8001
       - ML_SALUD_URL=http://ml-salud:8002
       - ML_GEO_URL=http://ml-geo:8003
@@ -79,6 +80,16 @@ services:
       - ML_CELO_URL=http://ml-celo:8001
       - ML_SALUD_URL=http://ml-salud:8002
       - ML_GEO_URL=http://ml-geo:8003
+      - TTN_WEBHOOK_API_KEY=${TTN_WEBHOOK_API_KEY:-apiKey}
+      - VIGIA_BATCH_CELO_RATE=${VIGIA_BATCH_CELO_RATE:-60000}
+      - VIGIA_BATCH_SALUD_RATE=${VIGIA_BATCH_SALUD_RATE:-60000}
+      - VIGIA_BATCH_GEO_RATE=${VIGIA_BATCH_GEO_RATE:-900000}
+      - "VIGIA_BATCH_ANESTRO_CRON=${VIGIA_BATCH_ANESTRO_CRON:-0 * * * * *}"
+      - VIGIA_BATCH_ANESTRO_SILENCIO_DIAS=${VIGIA_BATCH_ANESTRO_SILENCIO_DIAS:-21}
+      - VIGIA_SALUD_CALIBRACION_DIAS=${VIGIA_SALUD_CALIBRACION_DIAS:-7}
+      - VIGIA_SALUD_RECALIBRACION_DIAS=${VIGIA_SALUD_RECALIBRACION_DIAS:-30}
+      - VIGIA_GEO_VENTANA_HORAS=${VIGIA_GEO_VENTANA_HORAS:-24}
+      - VIGIA_GEO_MINUTOS_FUERA_MINIMO=${VIGIA_GEO_MINUTOS_FUERA_MINIMO:-15}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - MAIL_HOST=${MAIL_HOST:-mail}
       - MAIL_PORT=${MAIL_PORT:-1025}
@@ -111,7 +122,7 @@ services:
     ports:
       - "${ML_CELO_PORT:-8001}:8001"
     environment:
-      - CELO_THRESHOLD=${CELO_THRESHOLD:-0.5}
+      - CELO_THRESHOLD=${CELO_THRESHOLD:-0.943}
     volumes:
       - ../ml-celo/app:/app/app
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload" ]

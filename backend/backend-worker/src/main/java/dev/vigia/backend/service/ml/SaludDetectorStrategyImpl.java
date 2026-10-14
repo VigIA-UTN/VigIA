@@ -1,6 +1,7 @@
 package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import dev.vigia.backend.client.MlSaludClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
@@ -23,13 +24,10 @@ import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.PerfilReferenciaRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,7 +40,7 @@ import java.util.stream.Collectors;
 @Service
 public class SaludDetectorStrategyImpl implements DetectorStrategy {
 
-    private final RestClient restClient;
+    private final MlSaludClient mlSaludClient;
     private final TelemetriaRepository telemetriaRepository;
     private final AlertaRepository alertaRepository;
     private final PerfilReferenciaRepository perfilReferenciaRepository;
@@ -51,10 +49,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
     private final int calibracionDias;
     private final int recalibracionDias;
 
-    @SuppressWarnings("null")
     public SaludDetectorStrategyImpl(
-            RestClient.Builder restClientBuilder,
-            @Value("${vigia.ml.salud-url}") String saludUrl,
+            MlSaludClient mlSaludClient,
             TelemetriaRepository telemetriaRepository,
             AlertaRepository alertaRepository,
             PerfilReferenciaRepository perfilReferenciaRepository,
@@ -62,7 +58,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
             ObjectMapper objectMapper,
             @Value("${vigia.salud.calibracion-dias:7}") int calibracionDias,
             @Value("${vigia.salud.recalibracion-dias:30}") int recalibracionDias) {
-        this.restClient = restClientBuilder.baseUrl(saludUrl).build();
+        this.mlSaludClient = mlSaludClient;
         this.telemetriaRepository = telemetriaRepository;
         this.alertaRepository = alertaRepository;
         this.perfilReferenciaRepository = perfilReferenciaRepository;
@@ -73,13 +69,19 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
     }
 
     @Override
-    @CircuitBreaker(name = "saludML", fallbackMethod = "fallbackProcess")
-    @Retry(name = "saludML", fallbackMethod = "fallbackProcess")
-    @SuppressWarnings("null")
     public void process(List<Telemetria> telemetriaList, String correlationId) {
         if (telemetriaList == null || telemetriaList.isEmpty()) {
             return;
         }
+        try {
+            procesar(telemetriaList, correlationId);
+        } catch (RuntimeException e) {
+            marcarInferenciaPendiente(telemetriaList, correlationId, e);
+        }
+    }
+
+    @SuppressWarnings("null")
+    private void procesar(List<Telemetria> telemetriaList, String correlationId) {
 
         Caravana caravana = telemetriaList.get(0).getCaravana();
         Animal animal = caravana != null ? caravana.getAnimal() : null;
@@ -182,13 +184,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
                         .build())
                 .collect(Collectors.toList());
 
-        log.info("Llamando a microservicio de salud (predict) con correlationId: {}", correlationId);
-        SaludPredictResponseDTO response = restClient.post()
-                .uri("/api/internal/ml/salud/predict")
-                .header("X-Correlation-ID", correlationId)
-                .body(SaludPredictRequestDTO.builder().serie(serie).perfil(perfil).build())
-                .retrieve()
-                .body(SaludPredictResponseDTO.class);
+        SaludPredictResponseDTO response = mlSaludClient.predict(
+                SaludPredictRequestDTO.builder().serie(serie).perfil(perfil).build(), correlationId);
 
         log.info("Respuesta de microservicio de salud recibida: {}", response);
         marcarCompletados(telemetriaList);
@@ -240,12 +237,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         log.info("Calculando perfil de salud para animal {} ({} puntos, primera calibración: {}, correlationId: {})",
                 animal.getId(), puntos.size(), esPrimerCalculo, correlationId);
 
-        PerfilCalibracionResponseDTO response = restClient.post()
-                .uri("/api/internal/ml/salud/perfil")
-                .header("X-Correlation-ID", correlationId)
-                .body(PerfilCalibracionRequestDTO.builder().calibracion(puntos).build())
-                .retrieve()
-                .body(PerfilCalibracionResponseDTO.class);
+        PerfilCalibracionResponseDTO response = mlSaludClient.calcularPerfil(
+                PerfilCalibracionRequestDTO.builder().calibracion(puntos).build(), correlationId);
 
         if (response == null || response.getPerfil() == null) {
             log.warn("ml-salud no devolvió un perfil válido para el animal {} (correlationId: {}).",
@@ -361,7 +354,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         telemetriaRepository.saveAll(pendientes);
     }
 
-    public void fallbackProcess(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
+    /** ml-salud no respondió (o falló el procesamiento): se deja la telemetría para reintentar. */
+    void marcarInferenciaPendiente(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
         log.error(
                 "Fallo al comunicarse con el microservicio ML de salud (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
                 correlationId, t.getMessage());

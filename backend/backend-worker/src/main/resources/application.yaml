@@ -45,7 +45,17 @@ vigia:
     salud-url: ${ML_SALUD_URL}
     geo-url: ${ML_GEO_URL}
   batch:
+    celo-rate: ${VIGIA_BATCH_CELO_RATE:60000}
     salud-rate: ${VIGIA_BATCH_SALUD_RATE:60000}
+    geo-rate: ${VIGIA_BATCH_GEO_RATE:900000}
+    # Detector de anestro (cron de Spring: seg min hora día mes día-semana).
+    anestro-cron: "${VIGIA_BATCH_ANESTRO_CRON:0 * * * * *}"
+    anestro-silencio-dias: ${VIGIA_BATCH_ANESTRO_SILENCIO_DIAS:21}
+  geo:
+    # Ventana de posiciones (en horas) que se envía a ml-geo en cada análisis.
+    ventana-horas: ${VIGIA_GEO_VENTANA_HORAS:24}
+    # Minutos seguidos fuera del grupo antes de abrir un aislamiento (filtra GPS errático y salidas cortas).
+    minutos-fuera-minimo: ${VIGIA_GEO_MINUTOS_FUERA_MINIMO:15}
   salud:
     calibracion-dias: ${VIGIA_SALUD_CALIBRACION_DIAS:7}
     recalibracion-dias: ${VIGIA_SALUD_RECALIBRACION_DIAS:30}
@@ -57,6 +67,8 @@ cors:
   allowed-origins: ${CORS_ORIGINS}
 
 resilience4j:
+  # Un 4xx (p. ej. 422 por datos insuficientes) es una respuesta del servicio, no una
+  # caída: no se reintenta ni cuenta para abrir el circuito.
   circuitbreaker:
     instances:
       celoML:
@@ -64,26 +76,36 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
       saludML:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+      geoML:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
   retry:
     instances:
       celoML:
         maxAttempts: 2
         waitDuration: 500ms
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
       saludML:
         maxAttempts: 2
         waitDuration: 500ms
-  timelimiter:
-    instances:
-      celoML:
-        timeoutDuration: 2000ms
-      # saludML puede hacer DOS llamadas HTTP en un mismo ciclo (perfil
-      # + predict) cuando toca calcular/recalibrar el perfil, así que se
-      # le da más margen que a celoML (que siempre hace una sola).
-      saludML:
-        timeoutDuration: 4000ms
-
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+      geoML:
+        maxAttempts: 2
+        waitDuration: 500ms
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException

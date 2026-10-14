@@ -76,8 +76,10 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
 
   const formatHora = (iso: string | null) => {
     if (!iso) return '--:--';
-    const date = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
-    return date.toLocaleString();
+    // El backend manda LocalDateTime en hora local (sin zona): no forzar UTC.
+    return new Date(iso).toLocaleString('es-AR', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
   };
 
   return (

@@ -39,6 +39,8 @@ vigia:
       api-key: test-api-key
 
 resilience4j:
+  # Un 4xx (p. ej. 422 por datos insuficientes) es una respuesta del servicio, no una
+  # caída: no se reintenta ni cuenta para abrir el circuito.
   circuitbreaker:
     instances:
       celoML:
@@ -46,22 +48,36 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
       saludML:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+      geoML:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
   retry:
     instances:
       celoML:
         maxAttempts: 2
         waitDuration: 500ms
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
       saludML:
         maxAttempts: 2
         waitDuration: 500ms
-  timelimiter:
-    instances:
-      celoML:
-        timeoutDuration: 2000ms
-      saludML:
-        timeoutDuration: 4000ms
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+      geoML:
+        maxAttempts: 2
+        waitDuration: 500ms
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException

@@ -95,7 +95,7 @@ Con `--modo aislados` (default), 004 y 005 se van en direcciones opuestas. Con `
 
 La distancia por defecto es mayor que el umbral (100 m) más el radio del rodeo (25 m), con margen. Así el aislamiento es claro y la alerta no va y viene entre ciclos. Si el establecimiento usa otro umbral, pasarlo con `--umbral` (solo afecta al log) y ajustar `--distancia-aislado` a más de `umbral + 50`.
 
-Resultado esperado tras correr la fase 3 y disparar el job de cohesión (`cohesionJob`, umbral de 100 m):
+Resultado esperado tras correr la fase 3 y que corra el job de geo del worker (`geoJob`, umbral de 100 m; cada `VIGIA_BATCH_GEO_RATE` ms, 15 min por defecto):
 
 | Escenario | 001-003 | 004 y 005 |
 |---|---|---|
