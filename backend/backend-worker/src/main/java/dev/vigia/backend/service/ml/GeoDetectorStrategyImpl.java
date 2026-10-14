@@ -1,7 +1,7 @@
 package dev.vigia.backend.service.ml;
 
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.client.MlGeoClient;
-import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.geo.AlertaAnimalDTO;
@@ -15,13 +15,14 @@ import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,9 +52,11 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
     private final AnimalRepository animalRepository;
     private final RegistroCohesionRepository registroCohesionRepository;
     private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
-    private final RabbitTemplate rabbitTemplate;
+    private final PublicadorDeAlertas publicadorDeAlertas;
     /** Minutos seguidos fuera del grupo antes de alertar: filtra lecturas GPS erráticas y salidas cortas. */
     private final long minutosFueraMinimo;
+    /** Horas sin posiciones tras las que un aislamiento abierto se cierra como SIN_DATOS (caravana muda). */
+    private final long horasSinDatosCierre;
 
     public GeoDetectorStrategyImpl(
             MlGeoClient mlGeoClient,
@@ -62,16 +65,18 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
             AnimalRepository animalRepository,
             RegistroCohesionRepository registroCohesionRepository,
             AlertaAnimalAisladoRepository alertaAnimalAisladoRepository,
-            RabbitTemplate rabbitTemplate,
-            @Value("${vigia.geo.minutos-fuera-minimo:15}") long minutosFueraMinimo) {
+            PublicadorDeAlertas publicadorDeAlertas,
+            @Value("${vigia.geo.minutos-fuera-minimo:15}") long minutosFueraMinimo,
+            @Value("${vigia.geo.horas-sin-datos-cierre:6}") long horasSinDatosCierre) {
         this.mlGeoClient = mlGeoClient;
         this.telemetriaRepository = telemetriaRepository;
         this.alertaRepository = alertaRepository;
         this.animalRepository = animalRepository;
         this.registroCohesionRepository = registroCohesionRepository;
         this.alertaAnimalAisladoRepository = alertaAnimalAisladoRepository;
-        this.rabbitTemplate = rabbitTemplate;
+        this.publicadorDeAlertas = publicadorDeAlertas;
         this.minutosFueraMinimo = minutosFueraMinimo;
+        this.horasSinDatosCierre = horasSinDatosCierre;
     }
 
     @Override
@@ -97,6 +102,14 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
                 ? establecimiento.getUmbralAislamientoM()
                 : UMBRAL_AISLAMIENTO_DEFAULT;
 
+        // Episodios abiertos del establecimiento: se cargan una vez y cada rodeo reconcilia los suyos.
+        Map<Long, AlertaAnimalAislado> abiertos = new HashMap<>();
+        if (establecimiento != null) {
+            alertaAnimalAisladoRepository.findByAnimal_Establecimiento_IdAndTsRegresoIsNull(establecimiento.getId())
+                    .forEach(e -> abiertos.putIfAbsent(e.getAnimal().getId(), e));
+            cerrarSinDatos(abiertos, telemetriasValidas, LocalDateTime.now());
+        }
+
         // La cohesión se mide contra el propio rodeo: con un centroide único por
         // establecimiento, un rodeo entero en otro potrero quedaría "aislado".
         Map<Optional<Long>, List<Telemetria>> porRodeo = telemetriasValidas.stream()
@@ -107,7 +120,8 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
             // Una falla en un rodeo (ml-geo caído, respuesta inválida) no frena a los demás:
             // su telemetría queda pendiente de inferencia y el resto se procesa igual.
             try {
-                analizarRodeo(establecimiento, grupo.getKey().orElse(null), umbral, grupo.getValue(), correlationId);
+                analizarRodeo(establecimiento, grupo.getKey().orElse(null), umbral, grupo.getValue(), abiertos,
+                        correlationId);
             } catch (RuntimeException e) {
                 marcarInferenciaPendiente(grupo.getValue(), correlationId, e);
             }
@@ -117,7 +131,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
     }
 
     private void analizarRodeo(Establecimiento establecimiento, Long rodeoId, double umbral,
-            List<Telemetria> telemetriaDelRodeo, String correlationId) {
+            List<Telemetria> telemetriaDelRodeo, Map<Long, AlertaAnimalAislado> abiertos, String correlationId) {
         GeoAnalyzeRequestDTO request = GeoAnalyzeRequestDTO.builder()
                 .historial7d(telemetriaDelRodeo.stream()
                         .map(t -> CoordenadaGPSDTO.builder()
@@ -164,7 +178,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
         }
 
         if (establecimiento != null) {
-            reconciliarAislamiento(establecimiento, rodeoId, umbral, analizados, telemetriaDelRodeo, ahora);
+            reconciliarAislamiento(establecimiento, rodeoId, umbral, analizados, telemetriaDelRodeo, abiertos, ahora);
         }
     }
 
@@ -176,6 +190,41 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
     }
 
     /**
+     * Cierra como SIN_DATOS los aislamientos abiertos de animales sin posiciones hace más de
+     * horasSinDatosCierre (caravana sin batería, rota, animal vendido): si no, quedarían abiertos para
+     * siempre y bloquearían un aislamiento nuevo. La última posición es la más reciente de la ventana o,
+     * si no hay ninguna, la última señal de la caravana. Re-publica las alertas afectadas.
+     */
+    private void cerrarSinDatos(Map<Long, AlertaAnimalAislado> abiertos, List<Telemetria> telemetrias,
+            LocalDateTime ahora) {
+        Map<Long, LocalDateTime> ultimaPosicion = telemetrias.stream()
+                .collect(Collectors.toMap(t -> t.getCaravana().getAnimal().getId(), Telemetria::getFechaHora,
+                        (a, b) -> a.isAfter(b) ? a : b));
+        LocalDateTime limite = ahora.minusHours(horasSinDatosCierre);
+
+        Map<Long, Alerta> afectadas = new LinkedHashMap<>();
+        for (Iterator<AlertaAnimalAislado> it = abiertos.values().iterator(); it.hasNext();) {
+            AlertaAnimalAislado episodio = it.next();
+            Animal animal = episodio.getAnimal();
+            LocalDateTime ultima = ultimaPosicion.get(animal.getId());
+            if (ultima == null && animal.getCaravana() != null) {
+                ultima = animal.getCaravana().getUltimaSenial();
+            }
+            if (ultima != null && !ultima.isBefore(limite)) {
+                continue;
+            }
+            episodio.setTsRegreso(ahora);
+            episodio.setMotivoCierre(MotivoCierreAislamiento.SIN_DATOS);
+            alertaAnimalAisladoRepository.save(episodio);
+            afectadas.putIfAbsent(episodio.getAlerta().getId(), episodio.getAlerta());
+            it.remove();
+            log.info("Aislamiento del animal {} cerrado sin datos (última posición: {})", animal.getId(), ultima);
+        }
+        afectadas.values().forEach(alerta -> publicar(alerta,
+                alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId())));
+    }
+
+    /**
      * Mantiene los episodios de aislamiento del rodeo con el resultado de ml-geo:
      * - alejado con episodio abierto: refresca tiempo y distancia (mismo aislamiento, sin alerta nueva);
      * - en el grupo con episodio abierto: lo cierra (volvió). La alerta no se resuelve sola;
@@ -184,11 +233,8 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
      *   suma a la alerta pendiente del rodeo si hay una, o abre una alerta nueva.
      */
     private void reconciliarAislamiento(Establecimiento est, Long rodeoId, double umbral,
-            List<Analizado> analizados, List<Telemetria> telemetriaDelRodeo, LocalDateTime ahora) {
-        Map<Long, AlertaAnimalAislado> abiertos = alertaAnimalAisladoRepository
-                .findByAnimal_Establecimiento_IdAndTsRegresoIsNull(est.getId()).stream()
-                .collect(Collectors.toMap(e -> e.getAnimal().getId(), Function.identity(), (a, b) -> a));
-
+            List<Analizado> analizados, List<Telemetria> telemetriaDelRodeo,
+            Map<Long, AlertaAnimalAislado> abiertos, LocalDateTime ahora) {
         if (analizados.stream().anyMatch(a -> a.alejado() && a.resultado().getTiempoFueraContinuoS() == null)) {
             log.warn("ml-geo no devolvió tiempo_fuera_continuo_s: no se abren aislamientos hasta actualizar ml-geo.");
         }
@@ -203,6 +249,8 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
                     actualizar(abierto, analizado.resultado());
                 } else {
                     abierto.setTsRegreso(ahora);
+                    abierto.setMotivoCierre(MotivoCierreAislamiento.REGRESO);
+                    abiertos.remove(analizado.animal().getId());
                     conRegresos.putIfAbsent(abierto.getAlerta().getId(), abierto.getAlerta());
                 }
                 alertaAnimalAisladoRepository.save(abierto);
@@ -218,13 +266,16 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
             return;
         }
 
+        // La fila se bloquea antes de sumarle animales: si el usuario la confirmó o descartó mientras
+        // tanto, guardarla la volvería a PENDIENTE (y el trigger de V16 haría rollback). Se abre otra.
         Alerta pendiente = alertaRepository
                 .findByFiltros(est.getId(), EstadoAlerta.PENDIENTE, Set.of(DisparadorAlerta.AISLAMIENTO_SOCIAL), null).stream()
                 .filter(a -> Objects.equals(rodeoIdDe(a.getAnimal()), rodeoId))
                 .findFirst()
+                .filter(a -> EstadoAlerta.PENDIENTE.name().equals(alertaRepository.bloquearYObtenerEstado(a.getId())))
                 .orElse(null);
         if (pendiente != null) {
-            sumarAAlertaPendiente(pendiente, nuevos, umbral, telemetriaDelRodeo, ahora);
+            sumarAAlertaPendiente(pendiente, nuevos, umbral, telemetriaDelRodeo, abiertos, ahora);
             return;
         }
 
@@ -244,6 +295,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
         for (AlertaAnimalAislado episodio : episodios) {
             episodio.setAlerta(guardada);
             alertaAnimalAisladoRepository.save(episodio);
+            abiertos.put(episodio.getAnimal().getId(), episodio);
         }
         log.info("Generada alerta de AISLAMIENTO_SOCIAL {} con {} animales", guardada.getId(), episodios.size());
         publicar(guardada, episodios);
@@ -255,7 +307,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
      * el mismo id para que el frontend actualice la misma tarjeta.
      */
     private void sumarAAlertaPendiente(Alerta pendiente, List<Analizado> nuevos, double umbral,
-            List<Telemetria> telemetriaDelRodeo, LocalDateTime ahora) {
+            List<Telemetria> telemetriaDelRodeo, Map<Long, AlertaAnimalAislado> abiertos, LocalDateTime ahora) {
         List<AlertaAnimalAislado> episodios = new ArrayList<>(
                 alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(pendiente.getId()));
         for (Analizado nuevo : nuevos) {
@@ -265,6 +317,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
                     .orElse(null);
             if (episodio != null) {
                 episodio.setTsRegreso(null);
+                episodio.setMotivoCierre(null);
                 episodio.setTsInicio(inicioDe(nuevo.resultado(), ahora));
                 actualizar(episodio, nuevo.resultado());
             } else {
@@ -275,6 +328,8 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
             alertaAnimalAisladoRepository.save(episodio);
         }
 
+        episodios.stream().filter(e -> e.getTsRegreso() == null)
+                .forEach(e -> abiertos.put(e.getAnimal().getId(), e));
         resumir(pendiente, episodios, umbral, telemetriaDelRodeo);
         alertaRepository.save(pendiente);
         log.info("Alerta de AISLAMIENTO_SOCIAL {} actualizada: {} animales nuevos", pendiente.getId(), nuevos.size());
@@ -327,7 +382,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
         alerta.setLongitud(ultima != null ? ultima.getLongitud() : null);
     }
 
-    /** Manda la lista de animales en el evento: las filas todavía no están commiteadas cuando el api lo consume. */
+    /** Publica la alerta con su lista de animales (sale recién cuando commitea el chunk). */
     private void publicar(Alerta alerta, List<AlertaAnimalAislado> episodios) {
         try {
             List<AnimalAisladoResponse> animalesAislados = episodios.stream()
@@ -349,9 +404,9 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
                     .longitud(alerta.getLongitud())
                     .animalesAislados(animalesAislados)
                     .build();
-            rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
+            publicadorDeAlertas.publicar(eventDTO);
         } catch (Exception e) {
-            log.error("Error al emitir evento RabbitMQ para alerta {}: {}", alerta.getId(), e.getMessage());
+            log.error("Error al armar el evento de la alerta {}: {}", alerta.getId(), e.getMessage());
         }
     }
 

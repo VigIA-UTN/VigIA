@@ -56,6 +56,8 @@ vigia:
     ventana-horas: ${VIGIA_GEO_VENTANA_HORAS:24}
     # Minutos seguidos fuera del grupo antes de abrir un aislamiento (filtra GPS errático y salidas cortas).
     minutos-fuera-minimo: ${VIGIA_GEO_MINUTOS_FUERA_MINIMO:15}
+    # Horas sin telemetría tras las que se cierra un aislamiento abierto como "sin datos".
+    horas-sin-datos-cierre: ${VIGIA_GEO_HORAS_SIN_DATOS_CIERRE:6}
   salud:
     calibracion-dias: ${VIGIA_SALUD_CALIBRACION_DIAS:7}
     recalibracion-dias: ${VIGIA_SALUD_RECALIBRACION_DIAS:30}

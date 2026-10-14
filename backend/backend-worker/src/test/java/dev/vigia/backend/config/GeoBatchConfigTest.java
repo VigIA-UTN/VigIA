@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.Job;
@@ -106,6 +107,23 @@ class GeoBatchConfigTest {
         verify(telemetriaRepository).findByEstablecimientoAndFechaHoraBetween(
                 eq(7L), desde.capture(), hasta.capture(), isNull());
         assertEquals(Duration.ofHours(24), Duration.between(desde.getValue(), hasta.getValue()));
+    }
+
+    @Test
+    @DisplayName("Bloquea el establecimiento antes de ver si hay telemetría pendiente (varias réplicas del worker)")
+    void bloqueaElEstablecimientoAntesDeBuscarPendientes() throws Exception {
+        Establecimiento est = establecimiento(5L);
+        when(telemetriaRepository.existsPendientesGeoByEstablecimiento(
+                eq(5L), eq(EstadoInferencia.PENDIENTE), any(LocalDateTime.class)))
+                .thenReturn(false);
+
+        geoBatchConfig.geoProcessor().process(est);
+
+        InOrder orden = inOrder(establecimientoRepository, telemetriaRepository);
+        orden.verify(establecimientoRepository).bloquear(5L);
+        orden.verify(telemetriaRepository).existsPendientesGeoByEstablecimiento(
+                eq(5L), eq(EstadoInferencia.PENDIENTE), any(LocalDateTime.class));
+        verifyNoInteractions(geoDetectorStrategy);
     }
 
     @Test

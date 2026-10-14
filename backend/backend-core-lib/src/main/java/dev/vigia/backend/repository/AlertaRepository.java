@@ -63,6 +63,13 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
        @Query("SELECT a FROM Alerta a WHERE a.id = :id")
        Optional<Alerta> findByIdForUpdate(@Param("id") Long id);
 
+       /**
+        * Bloquea la fila de la alerta hasta el fin de la transacción y devuelve su estado leído de la base
+        * (no del contexto de persistencia, que puede tener la alerta cargada desde antes del bloqueo).
+        */
+       @Query(value = "SELECT estado FROM alertas WHERE id = :id FOR UPDATE", nativeQuery = true)
+       String bloquearYObtenerEstado(@Param("id") Long id);
+
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND a.id > :lastId " +

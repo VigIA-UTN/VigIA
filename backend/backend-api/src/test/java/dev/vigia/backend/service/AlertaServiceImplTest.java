@@ -20,7 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -83,7 +83,7 @@ public class AlertaServiceImplTest {
         private EstadoSaludRepository estadoSaludRepository;
 
         @Mock
-        private RabbitTemplate rabbitTemplate;
+        private PublicadorDeAlertas publicadorDeAlertas;
 
         @Mock
         private AnimalRepository animalRepository;
@@ -454,6 +454,7 @@ public class AlertaServiceImplTest {
                 assertEquals(List.of(11L, 10L),
                                 detalle.getAnimalesAislados().stream().map(AnimalAisladoResponse::getAnimalId).toList());
                 assertEquals(40L, detalle.getAnimalesAislados().get(0).getMinutosFuera());
+                assertEquals(24, detalle.getVentanaHoras());
         }
 
         @Test
@@ -813,7 +814,11 @@ public class AlertaServiceImplTest {
         @Test
         @SuppressWarnings("null")
         void archivarAlertaPorVencimiento_Anestro_RechazaYNoGuarda() {
-                prepararAlertaAnestro();
+                mockAlerta.setTipo(Alerta.TIPO_ANESTRO);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
 
                 assertThrows(IllegalArgumentException.class,
                                 () -> alertaService.archivarAlertaPorVencimiento(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID));
@@ -992,10 +997,34 @@ public class AlertaServiceImplTest {
                 assertEquals(OrigenEstado.MANUAL, captor.getValue().getOrigen());
 
                 // El evento SSE de actualización conserva el texto con los días (la tarjeta se reemplaza con él)
-                ArgumentCaptor<Object> evento = ArgumentCaptor.forClass(Object.class);
-                verify(rabbitTemplate).convertAndSend(anyString(), anyString(), evento.capture());
+                ArgumentCaptor<dev.vigia.backend.dto.ml.AlertaEventDTO> evento = ArgumentCaptor.forClass(dev.vigia.backend.dto.ml.AlertaEventDTO.class);
+                verify(publicadorDeAlertas).publicar(evento.capture());
                 assertEquals(mockAlerta.getAccionRecomendada(),
                                 ((dev.vigia.backend.dto.ml.AlertaEventDTO) evento.getValue()).getAccionRecomendada());
+        }
+
+        @Test
+        @SuppressWarnings("null")
+        void actualizarEstadoAlerta_eventoLlevaLaAlertaCompleta() {
+                mockAlerta.setDisparador(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+                mockAlerta.setSeveridad(SeveridadAlerta.MEDIA);
+                mockAlerta.setLatitud(-34.6);
+                mockAlerta.setLongitud(-58.4);
+                when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
+                                .thenReturn(List.of(mockEstablecimiento));
+                when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
+
+                alertaService.actualizarEstadoAlerta(EMAIL, ALERTA_ID, EstadoAlerta.DESCARTADA, null);
+
+                ArgumentCaptor<dev.vigia.backend.dto.ml.AlertaEventDTO> evento = ArgumentCaptor.forClass(dev.vigia.backend.dto.ml.AlertaEventDTO.class);
+                verify(publicadorDeAlertas).publicar(evento.capture());
+                dev.vigia.backend.dto.ml.AlertaEventDTO enviado = evento.getValue();
+                assertEquals(EstadoAlerta.DESCARTADA, enviado.getEstado());
+                assertEquals(SeveridadAlerta.MEDIA, enviado.getSeveridad());
+                assertEquals(-34.6, enviado.getLatitud());
+                assertEquals(-58.4, enviado.getLongitud());
         }
 
         @Test
@@ -1543,7 +1572,7 @@ public class AlertaServiceImplTest {
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
-                when(alertaRepository.findById(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
+                when(alertaRepository.findByIdForUpdate(ALERTA_ID)).thenReturn(Optional.of(mockAlerta));
                 when(alertaRepository.save(mockAlerta)).thenReturn(mockAlerta);
 
                 AlertaResponse result = alertaService.archivarAlertaPorVencimiento(EMAIL, ESTABLECIMIENTO_ID, ALERTA_ID);

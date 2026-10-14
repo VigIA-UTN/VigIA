@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { AlertaResponse, AlertaDetalleResponse, AnimalAislado, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
-import { updateAlertaEstado, getAlertaDetalle, esAnestro, esAislamiento } from '../api/alertaApi';
+import { updateAlertaEstado, getAlertaDetalle, esAnestro, esAislamiento, estadoAislado } from '../api/alertaApi';
 import { formatMinutos } from '../utils/fechas';
 import { SEVERIDAD } from '../utils/severidadColores';
 import SanitarioAlertDetail, { SeveridadBadge } from './SanitarioAlertDetail';
@@ -78,6 +78,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   }
   const aislados = [...(aisladosSse ?? detAisl?.animalesAislados ?? alerta.animalesAislados ?? [])]
     .sort((a, b) => Number(!!a.tsRegreso) - Number(!!b.tsRegreso) || b.minutosFueraSeguidos - a.minutosFueraSeguidos);
+  const ventanaHoras = detAisl?.ventanaHoras ?? 24;
   const tituloAislamiento = aislados.length > 1
     ? `${aislados.length} animales aislados del rodeo`
     : `#${aislados[0]?.identificador ?? alerta.animalId} aislado del rodeo`;
@@ -358,7 +359,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                 <div className="d-flex align-items-center gap-3 rounded-4 px-4 py-3" style={{ backgroundColor: '#FDECEC' }}>
                   <i className="bi bi-clock-history fs-3" style={{ color: '#dc3545' }}></i>
                   <div>
-                    <small className="d-block" style={{ color: '#5A5A5A' }}>Tiempo acumulado fuera del grupo (últimas 24 h)</small>
+                    <small className="d-block" style={{ color: '#5A5A5A' }}>Tiempo acumulado fuera del grupo (últimas {ventanaHoras} h)</small>
                     <span className="fw-bold" style={{ color: '#B00020', fontSize: '1.4rem' }}>
                       {aislados.length ? formatMinutos(Math.max(...aislados.map(a => a.minutosFuera))) : '—'}
                     </span>
@@ -388,18 +389,24 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                         <span className="flex-grow-1" style={{ minWidth: 0 }}>
                           <span className="d-block fw-semibold" style={{ color: '#1E3A5F' }}>
                             #{a.identificador}
-                            {a.tsRegreso && (
+                            {estadoAislado(a) === 'VOLVIO' && (
                               <span className="badge rounded-pill ms-2" style={{ backgroundColor: '#E6F4EA', color: '#2E7D32', fontWeight: 600 }}>
-                                Volvió {new Date(a.tsRegreso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                Volvió {new Date(a.tsRegreso!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                            {estadoAislado(a) === 'SIN_DATOS' && (
+                              <span className="badge rounded-pill ms-2" style={{ backgroundColor: '#EDF2F7', color: '#4A5568', fontWeight: 600 }}
+                                title="La caravana dejó de transmitir: no se sabe si volvió al grupo.">
+                                Sin datos desde {new Date(a.tsRegreso!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
                           </span>
                           <small className="d-block text-muted text-truncate">{a.alias ?? 'Sin alias'}</small>
                         </span>
                         <span className="text-end text-nowrap">
-                          <span className="d-block fw-semibold" style={{ color: '#263238', fontSize: '0.9rem' }}>{a.tsRegreso ? `Estuvo fuera ${formatMinutos(a.minutosFueraSeguidos)}` : formatMinutos(a.minutosFueraSeguidos)}</span>
-                          <small className="d-block text-muted">{formatMinutos(a.minutosFuera)} en 24 h</small>
-                          <small className="d-block text-muted">a {a.distanciaGrupoM} m del grupo</small>
+                          <span className="d-block fw-semibold" style={{ color: '#263238', fontSize: '0.9rem' }}>{estadoAislado(a) === 'VOLVIO' ? `Estuvo fuera ${formatMinutos(a.minutosFueraSeguidos)}` : formatMinutos(a.minutosFueraSeguidos)}</span>
+                          <small className="d-block text-muted">{formatMinutos(a.minutosFuera)} en {ventanaHoras} h</small>
+                          <small className="d-block text-muted">{a.distanciaGrupoM != null ? `a ${a.distanciaGrupoM} m del grupo` : 'distancia sin datos'}</small>
                         </span>
                         <i className="bi bi-chevron-right" style={{ color: '#98A2B3' }}></i>
                       </button>
@@ -708,12 +715,6 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                       <span className="fw-semibold text-dark">{detalle.animalRaza}</span>
                     </div>
                   )}
-                  <div>
-                    <small className="text-muted d-block mb-1">Última ubicación</small>
-                    <a href="#" className="fw-semibold text-primary text-decoration-none d-flex align-items-center gap-1">
-                      Ver en mapa <i className="bi bi-geo-alt-fill"></i>
-                    </a>
-                  </div>
                 </div>
               </div>
             </div>

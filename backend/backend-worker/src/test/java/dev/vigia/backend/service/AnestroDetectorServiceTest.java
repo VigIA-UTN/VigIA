@@ -22,7 +22,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
@@ -48,7 +48,7 @@ class AnestroDetectorServiceTest {
     @Mock
     private AlertaRepository alertaRepository;
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private PublicadorDeAlertas publicadorDeAlertas;
 
     @InjectMocks
     private AnestroDetectorService service;
@@ -117,8 +117,8 @@ class AnestroDetectorServiceTest {
         assertEquals(100.0, captor.getValue().getValorDetectado());
 
         // El evento que llega por SSE trae el texto con los días, para la tarjeta en vivo
-        ArgumentCaptor<Object> evento = ArgumentCaptor.forClass(Object.class);
-        verify(rabbitTemplate).convertAndSend(anyString(), eq(""), evento.capture());
+        ArgumentCaptor<dev.vigia.backend.dto.ml.AlertaEventDTO> evento = ArgumentCaptor.forClass(dev.vigia.backend.dto.ml.AlertaEventDTO.class);
+        verify(publicadorDeAlertas).publicar(evento.capture());
         assertEquals(captor.getValue().getAccionRecomendada(), ((AlertaEventDTO) evento.getValue()).getAccionRecomendada());
         assertTrue(((AlertaEventDTO) evento.getValue()).getAccionRecomendada().contains("100 días"));
     }
@@ -205,7 +205,7 @@ class AnestroDetectorServiceTest {
         verify(alertaRepository).save(captor.capture());
         assertEquals(EstadoAlerta.ARCHIVADA, captor.getValue().getEstado());
         assertEquals("ciclo_registrado", captor.getValue().getMotivoDescarte());
-        verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(publicadorDeAlertas).publicar(any());
     }
 
     @Test

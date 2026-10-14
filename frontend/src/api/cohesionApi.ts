@@ -1,19 +1,20 @@
 import { SEVERIDAD } from '../utils/severidadColores';
 import axiosClient from './axiosClient';
 
-/** Un punto de la serie de cohesión. `valor` null = sin datos en ese intervalo. */
+/** Un punto de la serie de cohesión (una hora o un día). `valor` null = sin datos en ese intervalo. */
 export interface CohesionPunto {
+  /** Inicio del intervalo, ISO con offset. */
   ts: string;
   valor: number | null;
   promedioRodeo: number | null;
 }
 
 export interface CohesionResponse {
-  /** Índice actual, 0–100. */
-  actual: number;
-  promedioRodeo: number;
-  /** Promedio del período anterior de igual duración (para el delta). */
-  promedioPeriodoAnterior: number;
+  /** Índice actual, 0–100; null si no hubo análisis en el período. */
+  actual: number | null;
+  promedioRodeo: number | null;
+  /** Promedio del período anterior de igual duración (para el delta); null sin datos. */
+  promedioPeriodoAnterior: number | null;
   serie: CohesionPunto[];
 }
 
@@ -35,63 +36,13 @@ export function estadoCohesion(valor: number) {
   return { clave, ...ESTADOS[clave] };
 }
 
-const HORA = 3600_000;
-const DIA = 24 * HORA;
-
-/**
- * Índice de cohesión de un animal entre `desde` y `hasta` (epoch ms).
- * TODO backend: reemplazar por
- *   axiosClient.get<CohesionResponse>(`/animales/${animalId}/cohesion`, { params: { desde: iso, hasta: iso } })
- */
+/** Índice de cohesión de un animal entre `desde` y `hasta` (epoch ms). */
 export async function getCohesionAnimal(animalId: number, desde: number, hasta: number): Promise<CohesionResponse> {
-
-  const fechaDesde = new Date(desde).toISOString();
-  const fechaHasta = new Date(hasta).toISOString();
-
   const response = await axiosClient.get<CohesionResponse>(`/animales/${animalId}/cohesion`, {
     params: {
-      desde: fechaDesde,
-      hasta: fechaHasta
-    }
+      desde: new Date(desde).toISOString(),
+      hasta: new Date(hasta).toISOString(),
+    },
   });
-
   return response.data;
-  //return mockCohesion(animalId, desde, hasta);
-}
-
-/** Serie simulada: estable cerca del rodeo y cae hacia `actual` en el último cuarto, con un tramo sin datos. */
-export function mockCohesion(animalId: number, desde: number, hasta: number): CohesionResponse {
-  const span = hasta - desde;
-  const paso = span <= 1.5 * DIA ? HORA : span <= 8 * DIA ? 6 * HORA : span <= 31 * DIA ? DIA : 7 * DIA;
-  const n = Math.max(2, Math.floor(span / paso) + 1);
-  const actual = [78, 52, 34][animalId % 3];
-  let seed = animalId * 7919 + n;
-  const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-  const caida = Math.floor(n * 0.75);
-  const gapIni = Math.floor(n * 0.4);
-  const gapFin = gapIni + Math.max(1, Math.round(n * 0.08));
-
-  const serie = Array.from({ length: n }, (_, i): CohesionPunto => {
-    let v = 76 + (rnd() - 0.5) * 10;
-    if (i >= caida) {
-      const t = (i - caida) / Math.max(1, n - 1 - caida);
-      v = v * (1 - t) + actual * t;
-    }
-    if (i === n - 1) v = actual;
-    const rodeo = Math.round(74 + (rnd() - 0.5) * 6);
-    const sinDatos = i >= gapIni && i < gapFin && i < n - 1;
-    return {
-      ts: new Date(hasta - (n - 1 - i) * paso).toISOString(),
-      valor: sinDatos ? null : Math.max(0, Math.min(100, Math.round(v))),
-      promedioRodeo: sinDatos ? null : rodeo,
-    };
-  });
-
-  const rodeos = serie.flatMap(p => (p.promedioRodeo == null ? [] : [p.promedioRodeo]));
-  return {
-    actual,
-    promedioRodeo: Math.round(rodeos.reduce((a, b) => a + b, 0) / rodeos.length),
-    promedioPeriodoAnterior: 76,
-    serie,
-  };
 }

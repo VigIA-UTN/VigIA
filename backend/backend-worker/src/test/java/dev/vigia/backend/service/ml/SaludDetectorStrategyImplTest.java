@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -50,7 +50,7 @@ class SaludDetectorStrategyImplTest {
     @Mock
     private PerfilReferenciaRepository perfilReferenciaRepository;
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private PublicadorDeAlertas publicadorDeAlertas;
 
     private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
@@ -67,7 +67,7 @@ class SaludDetectorStrategyImplTest {
                 telemetriaRepository,
                 alertaRepository,
                 perfilReferenciaRepository,
-                rabbitTemplate,
+                publicadorDeAlertas,
                 objectMapper,
                 7,
                 30);
@@ -198,7 +198,7 @@ class SaludDetectorStrategyImplTest {
 
         mockServer.verify();
         verify(alertaRepository).save(any());
-        verify(rabbitTemplate).convertAndSend(anyString(), eq(""), any(dev.vigia.backend.dto.ml.AlertaEventDTO.class));
+        verify(publicadorDeAlertas).publicar(any(dev.vigia.backend.dto.ml.AlertaEventDTO.class));
 
         // La telemetría procesada se marca como COMPLETADA
         assertEquals(EstadoInferencia.COMPLETADO, lista.get(0).getEstadoInferenciaSalud());
@@ -275,7 +275,7 @@ class SaludDetectorStrategyImplTest {
 
         org.mockito.ArgumentCaptor<dev.vigia.backend.dto.ml.AlertaEventDTO> eventCaptor =
                 org.mockito.ArgumentCaptor.forClass(dev.vigia.backend.dto.ml.AlertaEventDTO.class);
-        verify(rabbitTemplate).convertAndSend(anyString(), eq(""), eventCaptor.capture());
+        verify(publicadorDeAlertas).publicar(eventCaptor.capture());
         dev.vigia.backend.dto.ml.AlertaEventDTO evento = eventCaptor.getValue();
         assertEquals(Boolean.TRUE, evento.getDesvioDetectado());
         assertEquals("Enfermedad moderada / Cojera clínica", evento.getPosibleCausa());
@@ -316,7 +316,7 @@ class SaludDetectorStrategyImplTest {
 
         mockServer.verify();
         verify(alertaRepository, never()).save(any());
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(publicadorDeAlertas, never()).publicar(any());
 
         assertEquals(EstadoInferencia.COMPLETADO, lista.get(0).getEstadoInferenciaSalud());
         verify(telemetriaRepository).saveAll(anyList());

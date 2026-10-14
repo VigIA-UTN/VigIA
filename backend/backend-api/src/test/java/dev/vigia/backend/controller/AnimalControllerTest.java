@@ -2512,7 +2512,7 @@ class AnimalControllerTest {
                 assertThat(animalEnDb.getCaravana()).isNull();
         }
 
-        // ── Índice de cohesión (#344) ────────────────────────────────────────────
+        // ── Índice de cohesión (#346) ────────────────────────────────────────────
 
         private void guardarCohesion(Long animalId, LocalDateTime fecha, double indice) {
                 dev.vigia.backend.model.RegistroCohesion registro = dev.vigia.backend.model.RegistroCohesion.builder()
@@ -2525,14 +2525,19 @@ class AnimalControllerTest {
                 registroCohesionRepository.save(registro);
         }
 
+        /** Posición en la serie por defecto (hoy y los 6 días anteriores) del día de la fecha. */
+        private static int diaEnSerie(LocalDateTime fecha) {
+                return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now().minusDays(6), fecha.toLocalDate());
+        }
+
         @Test
-        @DisplayName("GET /api/v1/animales/{id}/cohesion - Sin desde/hasta usa los últimos 7 días y promedia el rodeo")
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Sin desde/hasta: un punto por día de los últimos 7, con los días sin datos en null")
         @SuppressWarnings("null")
-        void getCohesion_sinRango_ultimos7DiasConPromedioDelRodeo() throws Exception {
+        void getCohesion_sinRango_sieteDiasConDiasSinDatosEnNull() throws Exception {
                 Long vaca = crearAnimal("Vaca Cohesion", establecimientoId, rodeoLoteId);
                 Long companera = crearAnimal("Companera", establecimientoId, rodeoLoteId);
                 LocalDateTime corrida1 = LocalDateTime.now().minusDays(2).withNano(0);
-                LocalDateTime corrida2 = LocalDateTime.now().minusHours(1).withNano(0);
+                LocalDateTime corrida2 = LocalDateTime.now().minusMinutes(1).withNano(0);
                 guardarCohesion(vaca, corrida1, 0.8);
                 guardarCohesion(companera, corrida1, 0.6);
                 guardarCohesion(vaca, corrida2, 0.4);
@@ -2540,15 +2545,88 @@ class AnimalControllerTest {
                 // Fuera de la ventana de 7 días: no debe aparecer
                 guardarCohesion(vaca, LocalDateTime.now().minusDays(10), 0.1);
 
+                int dia1 = diaEnSerie(corrida1);
+                int dia2 = diaEnSerie(corrida2);
+                int sinDatos = dia1 == 0 ? 1 : 0;
                 mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.actual").value(40.0))
-                                .andExpect(jsonPath("$.serie.length()").value(2))
-                                .andExpect(jsonPath("$.serie[0].valor").value(80.0))
-                                .andExpect(jsonPath("$.serie[0].promedioRodeo").value(70.0))
-                                .andExpect(jsonPath("$.serie[1].promedioRodeo").value(70.0))
+                                .andExpect(jsonPath("$.serie.length()").value(7))
+                                .andExpect(jsonPath("$.serie[0].ts").value(org.hamcrest.Matchers.startsWith(
+                                                LocalDate.now().minusDays(6) + "T00:00")))
+                                .andExpect(jsonPath("$.serie[" + dia1 + "].valor").value(80.0))
+                                .andExpect(jsonPath("$.serie[" + dia1 + "].promedioRodeo").value(70.0))
+                                .andExpect(jsonPath("$.serie[" + dia2 + "].valor").value(40.0))
+                                .andExpect(jsonPath("$.serie[" + dia2 + "].promedioRodeo").value(70.0))
+                                .andExpect(jsonPath("$.serie[" + sinDatos + "].valor").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.serie[" + sinDatos + "].promedioRodeo").value(org.hamcrest.Matchers.nullValue()))
                                 .andExpect(jsonPath("$.promedioRodeo").value(70.0));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Sin análisis en el período: actual y promedios en null, días en null")
+        @SuppressWarnings("null")
+        void getCohesion_sinDatos_actualNull() throws Exception {
+                Long vaca = crearAnimal("Vaca Sin Datos", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.actual").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.promedioRodeo").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.promedioPeriodoAnterior").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.serie.length()").value(7))
+                                .andExpect(jsonPath("$.serie[*].valor").value(org.hamcrest.Matchers.everyItem(
+                                                org.hamcrest.Matchers.nullValue())));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Rango de hasta 48 h con offset: un punto por hora")
+        @SuppressWarnings("null")
+        void getCohesion_rangoCortoConOffset_puntosPorHora() throws Exception {
+                Long vaca = crearAnimal("Vaca Horas", establecimientoId, rodeoLoteId);
+                java.time.ZonedDateTime hasta = java.time.ZonedDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.HOURS);
+                java.time.ZonedDateTime desde = hasta.minusHours(23);
+                guardarCohesion(vaca, hasta.toLocalDateTime().minusHours(2).plusMinutes(10), 0.5);
+
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .param("desde", desde.toOffsetDateTime().withOffsetSameInstant(java.time.ZoneOffset.UTC).toString())
+                                .param("hasta", hasta.toOffsetDateTime().withOffsetSameInstant(java.time.ZoneOffset.UTC).toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.serie.length()").value(24))
+                                .andExpect(jsonPath("$.serie[21].valor").value(50.0))
+                                .andExpect(jsonPath("$.serie[20].valor").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.actual").value(50.0));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Un veterinario del establecimiento puede consultarlo")
+        void getCohesion_veterinario_200() throws Exception {
+                Long vaca = crearAnimal("Vaca Vet", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .header("Authorization", "Bearer " + veterinarioToken))
+                                .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - ADMINISTRADOR no accede a datos operativos: 403")
+        void getCohesion_administrador_403() throws Exception {
+                Long vaca = crearAnimal("Vaca Admin", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Animal inexistente: 404")
+        void getCohesion_animalInexistente_404() throws Exception {
+                mockMvc.perform(get("/api/v1/animales/999999/cohesion")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isNotFound());
         }
 
         @Test
@@ -2588,8 +2666,8 @@ class AnimalControllerTest {
                 Long animalId = crearAnimal("Vaca Rango", establecimientoId, rodeoLoteId);
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/cohesion")
-                                .param("desde", "2026-10-10T00:00:00")
-                                .param("hasta", "2026-10-01T00:00:00")
+                                .param("desde", "2026-10-10T00:00:00Z")
+                                .param("hasta", "2026-10-01T00:00:00Z")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isBadRequest());
         }

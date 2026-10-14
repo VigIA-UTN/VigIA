@@ -2,6 +2,7 @@ package dev.vigia.backend.controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -400,16 +402,29 @@ public class AlertaController {
      * @param lastEventId       (opcional) ID del último evento recibido por el
      *                          cliente, usado para reanudar el stream tras una
      *                          reconexión sin perder eventos
+     * @param lastEventIdHeader header Last-Event-ID que manda el navegador al
+     *                          reconectar solo (la URL conserva el lastEventId
+     *                          viejo); se usa el mayor de los dos
      * @param authentication    contexto de seguridad inyectado por Spring Security
-     * @return emisor SSE registrado para el establecimiento indicado
+     * @return emisor SSE registrado para el establecimiento indicado, o 403 si
+     *         el usuario no es miembro activo del establecimiento
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamAlertas(
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<SseEmitter> streamAlertas(
             @RequestParam(name = "establecimientoId") Long establecimientoId,
             @RequestParam(name = "lastEventId", required = false) Long lastEventId,
+            @RequestHeader(name = "Last-Event-ID", required = false) Long lastEventIdHeader,
             Authentication authentication) {
 
-        return sseAlertaPublisher.registrarClienteSse(establecimientoId, lastEventId);
+        if (!sseAlertaPublisher.puedeSuscribirse(authentication.getName(), establecimientoId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        Long desde = lastEventId;
+        if (lastEventIdHeader != null && (desde == null || lastEventIdHeader > desde)) {
+            desde = lastEventIdHeader;
+        }
+        return ResponseEntity.ok(sseAlertaPublisher.registrarClienteSse(establecimientoId, desde));
     }
 
     /**

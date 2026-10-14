@@ -37,6 +37,6 @@ public class AlertaEventDTO {
     private Double latitud;
     private Double longitud;
 
-    /** Solo AISLAMIENTO_SOCIAL: lo arma el worker porque sus filas todavía no están commiteadas al publicar. */
+    /** Solo AISLAMIENTO_SOCIAL: la lista de animales, armada por el worker al publicar. */
     private List<AnimalAisladoResponse> animalesAislados;
 }

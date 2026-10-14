@@ -2,7 +2,6 @@ package dev.vigia.backend.service.ml;
 
 import dev.vigia.backend.client.MlGeoClient;
 import dev.vigia.backend.client.MlServicioDegradadoException;
-import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.geo.AlertaAnimalDTO;
@@ -22,7 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -56,7 +55,7 @@ class GeoDetectorStrategyImplTest {
     @Mock
     private AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private PublicadorDeAlertas publicadorDeAlertas;
 
     private GeoDetectorStrategyImpl strategy;
     private Establecimiento establecimiento;
@@ -64,7 +63,7 @@ class GeoDetectorStrategyImplTest {
     @BeforeEach
     void setUp() {
         strategy = new GeoDetectorStrategyImpl(mlGeoClient, telemetriaRepository, alertaRepository,
-                animalRepository, registroCohesionRepository, alertaAnimalAisladoRepository, rabbitTemplate, 15);
+                animalRepository, registroCohesionRepository, alertaAnimalAisladoRepository, publicadorDeAlertas, 15, 6);
         establecimiento = new Establecimiento();
         establecimiento.setId(1L);
         establecimiento.setUmbralAislamientoM(150.0);
@@ -212,7 +211,7 @@ class GeoDetectorStrategyImplTest {
         });
 
         ArgumentCaptor<AlertaEventDTO> evento = ArgumentCaptor.forClass(AlertaEventDTO.class);
-        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), evento.capture());
+        verify(publicadorDeAlertas).publicar(evento.capture());
         assertThat(evento.getValue().getAnimalesAislados())
                 .extracting(AnimalAisladoResponse::getAnimalId, AnimalAisladoResponse::getMinutosFuera,
                         AnimalAisladoResponse::getSeveridad)
@@ -231,7 +230,7 @@ class GeoDetectorStrategyImplTest {
 
         verify(alertaRepository, never()).save(any());
         verify(alertaAnimalAisladoRepository, never()).save(any());
-        verifyNoInteractions(rabbitTemplate);
+        verifyNoInteractions(publicadorDeAlertas);
     }
 
     @Test
@@ -266,7 +265,7 @@ class GeoDetectorStrategyImplTest {
         strategy.process(List.of(telemetria(10L, r1), telemetria(11L, r1)), "corr");
 
         verify(alertaRepository, never()).save(any());
-        verifyNoInteractions(rabbitTemplate);
+        verifyNoInteractions(publicadorDeAlertas);
     }
 
     @Test
@@ -281,7 +280,7 @@ class GeoDetectorStrategyImplTest {
         strategy.process(List.of(telemetria(10L, r1), telemetria(11L, r1)), "corr");
 
         verify(alertaRepository, never()).save(any());
-        verifyNoInteractions(rabbitTemplate);
+        verifyNoInteractions(publicadorDeAlertas);
         verify(alertaAnimalAisladoRepository).save(episodio);
         assertThat(episodio.getSegundosFuera()).isEqualTo(2400L);
         assertThat(episodio.getDistanciaGrupoM()).isEqualTo(420.0);
@@ -338,12 +337,14 @@ class GeoDetectorStrategyImplTest {
         strategy.process(List.of(telemetria(10L, r1), telemetria(11L, r1), telemetria(12L, r1)), "corr");
 
         ArgumentCaptor<AlertaEventDTO> evento = ArgumentCaptor.forClass(AlertaEventDTO.class);
-        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), evento.capture());
+        verify(publicadorDeAlertas).publicar(evento.capture());
         assertThat(evento.getValue().getId()).isEqualTo(900L);
         assertThat(evento.getValue().getEstado()).isEqualTo(EstadoAlerta.PENDIENTE); // sin auto-resolver
         assertThat(evento.getValue().getAnimalesAislados())
-                .extracting(AnimalAisladoResponse::getAnimalId, a -> a.getTsRegreso() != null)
-                .containsExactlyInAnyOrder(tuple(10L, true), tuple(11L, true));
+                .extracting(AnimalAisladoResponse::getAnimalId, a -> a.getTsRegreso() != null,
+                        AnimalAisladoResponse::getMotivoCierre)
+                .containsExactlyInAnyOrder(tuple(10L, true, MotivoCierreAislamiento.REGRESO),
+                        tuple(11L, true, MotivoCierreAislamiento.REGRESO));
         verify(alertaRepository, never()).save(any());
     }
 
@@ -364,6 +365,7 @@ class GeoDetectorStrategyImplTest {
                 .thenReturn(List.of(pendiente));
         when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(900L))
                 .thenReturn(List.of(episodio10));
+        when(alertaRepository.bloquearYObtenerEstado(900L)).thenReturn("PENDIENTE");
         alertaRepositoryAsignaIds();
 
         strategy.process(List.of(telemetria(10L, r1), telemetria(11L, r1), telemetria(12L, r1)), "corr");
@@ -383,7 +385,7 @@ class GeoDetectorStrategyImplTest {
                 .satisfies(e -> assertThat(e.getAlerta()).isSameAs(pendiente));
 
         ArgumentCaptor<AlertaEventDTO> evento = ArgumentCaptor.forClass(AlertaEventDTO.class);
-        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), evento.capture());
+        verify(publicadorDeAlertas).publicar(evento.capture());
         assertThat(evento.getValue().getId()).isEqualTo(900L);
         assertThat(evento.getValue().getAnimalesAislados())
                 .extracting(AnimalAisladoResponse::getAnimalId)
@@ -401,6 +403,7 @@ class GeoDetectorStrategyImplTest {
                 .thenReturn(List.of(pendiente));
         when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(900L))
                 .thenReturn(List.of(cerrado));
+        when(alertaRepository.bloquearYObtenerEstado(900L)).thenReturn("PENDIENTE");
         alertaRepositoryAsignaIds();
 
         strategy.process(List.of(telemetria(10L, r1), telemetria(11L, r1)), "corr");
@@ -432,18 +435,90 @@ class GeoDetectorStrategyImplTest {
     }
 
     @Test
-    @DisplayName("Un animal sin datos en esta corrida conserva su episodio abierto")
+    @DisplayName("Un animal sin datos en esta corrida (ml-geo no lo clasifica) conserva su episodio abierto")
     void animalSinDatos_conservaSuEpisodioAbierto() {
         RodeoLote r1 = rodeo(100L);
         mlGeoResponde(geo("10", false, 20.0, 0.0, 0.0), geo("11", false, 20.0, 0.0, 0.0));
         AlertaAnimalAislado sinDatos = episodio(alerta(900L, 30L, r1, EstadoAlerta.PENDIENTE), 30L, null);
         when(alertaAnimalAisladoRepository.findByAnimal_Establecimiento_IdAndTsRegresoIsNull(1L))
                 .thenReturn(List.of(sinDatos));
+        Telemetria haceDosHoras = telemetria(30L, r1);
+        haceDosHoras.setFechaHora(LocalDateTime.now().minusHours(2));
 
-        strategy.process(List.of(telemetria(10L, r1), telemetria(11L, r1)), "corr");
+        strategy.process(List.of(telemetria(10L, r1), telemetria(11L, r1), haceDosHoras), "corr");
 
         verify(alertaAnimalAisladoRepository, never()).save(any());
         assertThat(sinDatos.getTsRegreso()).isNull();
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    @DisplayName("Un aislamiento abierto sin posiciones hace más de 6 h se cierra como SIN_DATOS y se re-publica la alerta")
+    void episodioSinPosicionesHaceMasDe6h_seCierraSinDatos() {
+        RodeoLote r1 = rodeo(100L);
+        mlGeoResponde(geo("10", false, 20.0, 0.0, 0.0), geo("11", false, 20.0, 0.0, 0.0));
+        Alerta pendiente = alerta(900L, 30L, r1, EstadoAlerta.PENDIENTE);
+        AlertaAnimalAislado mudo = episodio(pendiente, 30L, null);
+        Caravana caravana = new Caravana();
+        caravana.setUltimaSenial(LocalDateTime.now().minusHours(7));
+        mudo.getAnimal().setCaravana(caravana);
+        when(alertaAnimalAisladoRepository.findByAnimal_Establecimiento_IdAndTsRegresoIsNull(1L))
+                .thenReturn(List.of(mudo));
+        when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(900L)).thenReturn(List.of(mudo));
+
+        strategy.process(List.of(telemetria(10L, r1), telemetria(11L, r1)), "corr");
+
+        verify(alertaAnimalAisladoRepository).save(mudo);
+        assertThat(mudo.getTsRegreso()).isNotNull();
+        assertThat(mudo.getMotivoCierre()).isEqualTo(MotivoCierreAislamiento.SIN_DATOS);
+        assertThat(pendiente.getEstado()).isEqualTo(EstadoAlerta.PENDIENTE);
+        verify(alertaRepository, never()).save(any());
+
+        ArgumentCaptor<AlertaEventDTO> evento = ArgumentCaptor.forClass(AlertaEventDTO.class);
+        verify(publicadorDeAlertas).publicar(evento.capture());
+        assertThat(evento.getValue().getId()).isEqualTo(900L);
+        assertThat(evento.getValue().getAnimalesAislados())
+                .extracting(AnimalAisladoResponse::getAnimalId, AnimalAisladoResponse::getMotivoCierre)
+                .containsExactly(tuple(30L, MotivoCierreAislamiento.SIN_DATOS));
+    }
+
+    @Test
+    @DisplayName("Sin posiciones en la ventana pero con señal reciente de la caravana, el aislamiento sigue abierto")
+    void episodioSinPosicionesConSenialReciente_sigueAbierto() {
+        RodeoLote r1 = rodeo(100L);
+        mlGeoResponde(geo("10", false, 20.0, 0.0, 0.0));
+        AlertaAnimalAislado episodio = episodio(alerta(900L, 30L, r1, EstadoAlerta.PENDIENTE), 30L, null);
+        Caravana caravana = new Caravana();
+        caravana.setUltimaSenial(LocalDateTime.now().minusHours(1));
+        episodio.getAnimal().setCaravana(caravana);
+        when(alertaAnimalAisladoRepository.findByAnimal_Establecimiento_IdAndTsRegresoIsNull(1L))
+                .thenReturn(List.of(episodio));
+
+        strategy.process(List.of(telemetria(10L, r1)), "corr");
+
+        assertThat(episodio.getTsRegreso()).isNull();
+        verify(alertaAnimalAisladoRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    @DisplayName("Si la alerta pendiente del rodeo se resolvió antes de bloquearla, no se la pisa: alerta nueva")
+    void alertaPendienteResueltaAlBloquearla_creaAlertaNueva() {
+        RodeoLote r1 = rodeo(100L);
+        mlGeoResponde(geo("11", true, 350.0, 3000.0, 900.0), geo("12", false, 20.0, 0.0, 0.0));
+        Alerta cargadaComoPendiente = alerta(900L, 10L, r1, EstadoAlerta.PENDIENTE);
+        when(alertaRepository.findByFiltros(1L, EstadoAlerta.PENDIENTE, Set.of(DisparadorAlerta.AISLAMIENTO_SOCIAL), null))
+                .thenReturn(List.of(cargadaComoPendiente));
+        when(alertaRepository.bloquearYObtenerEstado(900L)).thenReturn("CONFIRMADA");
+        alertaRepositoryAsignaIds();
+
+        strategy.process(List.of(telemetria(11L, r1), telemetria(12L, r1)), "corr");
+
+        ArgumentCaptor<Alerta> guardada = ArgumentCaptor.forClass(Alerta.class);
+        verify(alertaRepository).save(guardada.capture());
+        assertThat(guardada.getValue()).isNotSameAs(cargadaComoPendiente);
+        assertThat(guardada.getValue().getAnimal().getId()).isEqualTo(11L);
+        verify(alertaAnimalAisladoRepository, never()).findByAlerta_IdOrderBySegundosFueraDesc(900L);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

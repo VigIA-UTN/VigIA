@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Container, Spinner, Alert, Form, Button } from 'react-bootstrap';
-import { getAlertas, esAnestro, coincideFiltroTipo, type AlertaResponse } from '../api/alertaApi';
+import { getAlertas, esAnestro, aplicarAlertaEnLista, combinarAlerta, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
@@ -105,6 +105,8 @@ export default function AlertasPage() {
         }
 
         const eventSource = new EventSource(sseUrl);
+        const filtros = { tipo: filtroTipo, severidad: filtroSeveridad, estado: filtroEstado };
+        let reconectando = false;
 
         eventSource.onmessage = (event) => {
             if (!isMounted) return;
@@ -115,23 +117,21 @@ export default function AlertasPage() {
                 maxAlertaIdRef.current = newAlerta.id;
             }
 
-            // Actualizar si ya existe, o agregar si es nueva y cumple filtros
-            setAlertas((prev) => {
-                if (prev.some((a) => a.id === newAlerta.id)) {
-                    return prev.map(a => a.id === newAlerta.id ? newAlerta : a);
-                }
-                // Si estamos filtrando y la alerta nueva no matchea, la ignoramos
-                if (filtroEstado && newAlerta.estado !== filtroEstado) return prev;
-                if (!coincideFiltroTipo(newAlerta, filtroTipo)) return prev;
-                if (filtroSeveridad && newAlerta.severidad !== filtroSeveridad) return prev;
-                
-                return [newAlerta, ...prev];
-            });
+            // Reemplaza (sin perder campos que el evento no trae), saca si dejó de cumplir los filtros o agrega
+            setAlertas((prev) => aplicarAlertaEnLista(prev, newAlerta, filtros));
             // El detalle abierto sigue a la alerta (animales que se suman o vuelven)
-            setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? newAlerta : prev));
+            setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? combinarAlerta(prev, newAlerta) : prev));
+        };
+
+        // El replay del backend solo trae alertas nuevas: al reconectar se recarga la lista para no
+        // perder los cambios de estado y los animales que se sumaron mientras estuvo cortado.
+        eventSource.onopen = () => {
+            if (reconectando && isMounted) fetchAlertas();
+            reconectando = false;
         };
 
         eventSource.onerror = (error) => {
+            reconectando = true;
             console.error("SSE connection error in AlertasPage:", error);
         };
 
@@ -139,7 +139,7 @@ export default function AlertasPage() {
             isMounted = false;
             eventSource.close();
         };
-    }, [selectedId, token, filtroEstado, filtroTipo, filtroSeveridad]); // reconnect if filters change, to only get relevant SSE (though SSE from backend might send all, frontend filters them)
+    }, [selectedId, token, filtroEstado, filtroTipo, filtroSeveridad, fetchAlertas]); // reconnect if filters change, to only get relevant SSE (though SSE from backend might send all, frontend filters them)
 
     const handleActionComplete = (alertaId: number, nuevoEstado: 'CONFIRMADA' | 'DESCARTADA') => {
         setAlertas((prev) => {

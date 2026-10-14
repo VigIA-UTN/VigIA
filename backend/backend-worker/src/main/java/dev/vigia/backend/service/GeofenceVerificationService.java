@@ -1,13 +1,12 @@
 package dev.vigia.backend.service;
 
-import dev.vigia.backend.config.RabbitMQConfig;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.model.*;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.PerimetroRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +25,7 @@ public class GeofenceVerificationService {
 
     private final PerimetroRepository perimetroRepository;
     private final AlertaRepository alertaRepository;
-    private final RabbitTemplate rabbitTemplate;
+    private final PublicadorDeAlertas publicadorDeAlertas;
 
     @Value("${vigia.geofence.cooldown-hours:6}")
     private int cooldownHours = 6;
@@ -113,7 +112,7 @@ public class GeofenceVerificationService {
                 .longitud(alerta.getLongitud())
                 .build();
 
-        rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
+        publicadorDeAlertas.publicar(eventDTO);
         log.info("Alerta de salida de perímetro emitida con ID: {} para animal {}", alerta.getId(), animal.getId());
     }
 

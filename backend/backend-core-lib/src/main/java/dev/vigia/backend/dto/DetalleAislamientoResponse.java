@@ -17,4 +17,6 @@ public class DetalleAislamientoResponse {
     private List<AnimalAisladoResponse> animalesAislados;
     private LocalDateTime tsInicio;
     private String nombreLote;
+    /** Horas de telemetría que analiza el worker: el tiempo acumulado fuera del grupo es dentro de esta ventana. */
+    private Integer ventanaHoras;
 }

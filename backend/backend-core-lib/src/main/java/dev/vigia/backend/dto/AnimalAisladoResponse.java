@@ -5,14 +5,16 @@ import java.time.LocalDateTime;
 
 import dev.vigia.backend.model.AlertaAnimalAislado;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.MotivoCierreAislamiento;
 import lombok.Builder;
 import lombok.Data;
 
 /**
  * Un animal listado en una alerta AISLAMIENTO_SOCIAL. minutosFuera es el tiempo acumulado fuera del
- * grupo dentro de la ventana de 24 h que analiza el worker, así que nunca supera 1440.
- * minutosFueraSeguidos es la duración de este aislamiento; si la caravana deja de transmitir
- * mientras está afuera, sigue contando (no se la vio volver).
+ * grupo dentro de la ventana que analiza el worker (vigia.geo.ventana-horas, ver
+ * DetalleAislamientoResponse.ventanaHoras). minutosFueraSeguidos es la duración de este aislamiento;
+ * si la caravana deja de transmitir mientras está afuera, sigue contando hasta que el worker cierra
+ * el episodio como SIN_DATOS.
  */
 @Data
 @Builder
@@ -27,8 +29,10 @@ public class AnimalAisladoResponse {
     private Long distanciaGrupoM;
     /** ALTA si el animal está a más del doble del umbral del establecimiento; si no, MEDIA. */
     private String severidad;
-    /** Cuándo volvió al grupo; null mientras sigue afuera. El animal sigue listado mientras la alerta exista. */
+    /** Cuándo se cerró el episodio; null mientras sigue afuera. El animal sigue listado mientras la alerta exista. */
     private LocalDateTime tsRegreso;
+    /** REGRESO (volvió al grupo) o SIN_DATOS (dejó de transmitir); null mientras sigue afuera. */
+    private MotivoCierreAislamiento motivoCierre;
 
     public static AnimalAisladoResponse from(AlertaAnimalAislado episodio, double umbral) {
         Animal animal = episodio.getAnimal();
@@ -43,6 +47,7 @@ public class AnimalAisladoResponse {
                 .distanciaGrupoM(distancia != null ? Math.round(distancia) : null)
                 .severidad(distancia != null && distancia > 2 * umbral ? "ALTA" : "MEDIA")
                 .tsRegreso(episodio.getTsRegreso())
+                .motivoCierre(episodio.getMotivoCierre())
                 .build();
     }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import axios from 'axios';
 import {
     LineChart, Line, ReferenceLine, ReferenceArea, ReferenceDot,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -29,6 +30,14 @@ const GRIS = '#949494';
 const SIN_DATOS = '#EDF2F7';
 
 const SIN_MOVIMIENTO = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Medianoche local de hace `dias - 1` días: el período incluye hoy y coincide con los días que agrupa el backend. */
+const inicioDelPeriodo = (dias: number) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (dias - 1));
+    return d.getTime();
+};
 
 const fmtFecha = (t: number) => new Date(t).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -69,7 +78,7 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
     const [custom, setCustom] = useState(() => lastDaysRange(30));
     const [data, setData] = useState<CohesionResponse | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
+    const [error, setError] = useState<'permiso' | 'general' | null>(null);
     const grupoRef = useRef<HTMLDivElement>(null);
     const pillRef = useRef<HTMLSpanElement>(null);
     const [pill, setPill] = useState<React.CSSProperties>({ opacity: 0 });
@@ -104,15 +113,15 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
             const dias = PERIODOS.find(p => p.key === periodo)!.dias;
             const [desde, hasta] = periodo === 'custom'
                 ? [custom.from, custom.to + DIA - 1]
-                : [Date.now() - dias * DIA, Date.now()];
+                : [periodo === '24h' ? Date.now() - DIA : inicioDelPeriodo(dias), Date.now()];
             setLoading(true);
-            setError(false);
+            setError(null);
             try {
                 const r = await getCohesionAnimal(animalId, desde, hasta);
                 if (mounted) setData(r);
             } catch (err) {
                 console.error('Error al cargar índice de cohesión:', err);
-                if (mounted) setError(true);
+                if (mounted) setError(axios.isAxiosError(err) && err.response?.status === 403 ? 'permiso' : 'general');
             } finally {
                 if (mounted) setLoading(false);
             }
@@ -130,13 +139,13 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
             const hora = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
             return {
                 i,
-                label: periodo === '24h' ? hora : dia,
+                label: porHora ? hora : dia,
                 full: porHora ? `${dia} · ${hora}` : d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }),
                 valor: p.valor,
                 rodeo: p.promedioRodeo,
             };
         });
-    }, [data, periodo]);
+    }, [data]);
 
     // Tramos consecutivos sin datos → bandas grises sobre el gráfico.
     const huecos = useMemo(() => {
@@ -158,8 +167,11 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
 
     const conValor = filas.flatMap(f => (f.valor == null ? [] : [f.valor]));
     const promedio = conValor.length ? Math.round(conValor.reduce((a, b) => a + b, 0) / conValor.length) : null;
-    const estado = data ? estadoCohesion(data.actual) : null;
-    const delta = data ? data.actual - data.promedioPeriodoAnterior : 0;
+    const actual = data?.actual ?? null;
+    const estado = actual != null ? estadoCohesion(actual) : null;
+    const anterior = data?.promedioPeriodoAnterior ?? null;
+    const delta = actual != null && anterior != null ? Math.round((actual - anterior) * 10) / 10 : null;
+    const ultimoConValor = filas.findLastIndex(f => f.valor != null);
 
     const calendario = (
         <Popover style={{ maxWidth: 'none', border: 0, background: 'transparent' }}>
@@ -229,8 +241,14 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
 
                     {loading && !data ? (
                         <div className="text-center py-4" style={{ color: '#718096' }}>Cargando índice de cohesión...</div>
-                    ) : error || !data || !estado ? (
+                    ) : error === 'permiso' ? (
+                        <div className="text-center py-4" style={{ color: '#718096' }}>No tenés permiso para ver el índice de cohesión de este animal.</div>
+                    ) : error || !data ? (
                         <div className="text-center py-4 text-danger">No se pudo cargar el índice de cohesión.</div>
+                    ) : actual == null || !estado ? (
+                        <div className="text-center py-4" style={{ color: '#718096', opacity: loading ? 0.6 : 1 }}>
+                            <i className="bi bi-bar-chart me-2" />No hay datos de cohesión en el período.
+                        </div>
                     ) : (
                         <div className="d-flex flex-wrap gap-4" style={{ opacity: loading ? 0.6 : 1 }}>
                             {/* Valor actual + interpretación */}
@@ -238,21 +256,23 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
                                 <div className="d-flex flex-column gap-2">
                                     <small style={{ color: '#5A5A5A' }}>Actual</small>
                                     <div className="d-flex align-items-baseline gap-1">
-                                        <span style={{ fontSize: 64, fontWeight: 600, color: NAVY, lineHeight: 1 }}>{data.actual}</span>
+                                        <span style={{ fontSize: 64, fontWeight: 600, color: NAVY, lineHeight: 1 }}>{actual}</span>
                                         <span style={{ fontSize: 20, color: GRIS }}>/100</span>
                                     </div>
                                     <div className="d-flex align-items-center gap-2 flex-wrap">
                                         <span style={{ width: 14, height: 14, borderRadius: '50%', background: estado.color, boxShadow: '0 0 4px rgba(0,0,0,.25)' }} />
                                         <span style={{ fontSize: 15, fontWeight: 600, color: '#263238' }}>{estado.label}</span>
-                                        <small style={{ color: '#5A5A5A' }}>
-                                            {delta > 0 ? '+' : delta < 0 ? '−' : '±'}{Math.abs(delta)} pts vs. período anterior
-                                        </small>
+                                        {delta != null && (
+                                            <small style={{ color: '#5A5A5A' }}>
+                                                {delta > 0 ? '+' : delta < 0 ? '−' : '±'}{Math.abs(delta)} pts vs. período anterior
+                                            </small>
+                                        )}
                                     </div>
                                 </div>
                                 <p className="m-0" style={{ fontSize: 14, lineHeight: 1.45, color: '#3F3F3F' }}>{estado.explicacion}</p>
                                 <div className="d-flex flex-column gap-2 pt-3" style={{ borderTop: '1px dashed #E2E8F0', fontSize: 14 }}>
                                     <div className="d-flex justify-content-between"><span style={{ color: '#5A5A5A' }}>Promedio del período</span><strong>{promedio ?? '—'}</strong></div>
-                                    <div className="d-flex justify-content-between"><span style={{ color: '#5A5A5A' }}>Promedio del rodeo</span><strong>{data.promedioRodeo}</strong></div>
+                                    <div className="d-flex justify-content-between"><span style={{ color: '#5A5A5A' }}>Promedio del rodeo</span><strong>{data.promedioRodeo ?? '—'}</strong></div>
                                 </div>
                             </div>
 
@@ -279,7 +299,9 @@ export default function CohesionIndiceCard({ animalId, enCalibracion }: Props) {
                                         <Tooltip content={<CohesionTooltip />} />
                                         <Line dataKey="rodeo" stroke={GRIS} strokeWidth={1.5} strokeDasharray="5 4" dot={false} connectNulls={false} isAnimationActive={false} />
                                         <Line dataKey="valor" stroke={NAVY} strokeWidth={2.5} dot={false} connectNulls={false} activeDot={{ r: 5, fill: '#fff', stroke: NAVY, strokeWidth: 2.5 }} />
-                                        <ReferenceDot x={n - 1} y={data.actual} r={5} fill={estado.color} stroke="#fff" strokeWidth={2} />
+                                        {ultimoConValor >= 0 && (
+                                            <ReferenceDot x={ultimoConValor} y={filas[ultimoConValor].valor!} r={5} fill={estado.color} stroke="#fff" strokeWidth={2} />
+                                        )}
                                     </LineChart>
                                 </ResponsiveContainer>
                                 <div className="d-flex flex-wrap gap-3 mt-2" style={{ fontSize: 12, color: '#5A5A5A', paddingLeft: 24 }}>

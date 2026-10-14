@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import dev.vigia.backend.config.RabbitMQConfig;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
@@ -28,7 +28,6 @@ import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 @Slf4j
 @Service
@@ -38,7 +37,7 @@ public class AnestroDetectorService {
     private final EstablecimientoRepository establecimientoRepository;
     private final AnimalRepository animalRepository;
     private final AlertaRepository alertaRepository;
-    private final RabbitTemplate rabbitTemplate;
+    private final PublicadorDeAlertas publicadorDeAlertas;
 
     private static final Set<TipoReproductivo> ESTADOS_DE_CICLO = EnumSet.of(
             TipoReproductivo.CELO, TipoReproductivo.POSIBLE_CELO, TipoReproductivo.INSEMINADA, TipoReproductivo.GESTANTE,
@@ -138,7 +137,7 @@ public class AnestroDetectorService {
         alerta.setTsConfirmacion(LocalDateTime.now());
         alertaRepository.save(alerta);
 
-        rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "alerta.update", AlertaEventDTO.builder()
+        publicadorDeAlertas.publicar(AlertaEventDTO.builder()
                 .id(alerta.getId())
                 .animalId(alerta.getAnimal().getId())
                 .tipo(alerta.getTipo())
@@ -167,7 +166,6 @@ public class AnestroDetectorService {
 
         alerta = alertaRepository.save(alerta);
 
-        // Publicar evento en RabbitMQ
         AlertaEventDTO eventDTO = AlertaEventDTO.builder()
                 .id(alerta.getId())
                 .animalId(animal.getId())
@@ -181,7 +179,7 @@ public class AnestroDetectorService {
                 .accionRecomendada(alerta.getAccionRecomendada())
                 .build();
 
-        rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
+        publicadorDeAlertas.publicar(eventDTO);
         log.info("Alerta de anestro generada para el animal {} ({} días sin ciclo)", animal.getId(), diasSinCiclo);
     }
 }
