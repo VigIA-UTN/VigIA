@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Form from 'react-bootstrap/Form';
-import { getAlertas, type AlertaResponse } from '../api/alertaApi';
+import { coincideFiltroTipo, getAlertas, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from './AlertDetailSidebar';
@@ -136,15 +136,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
 
   // Derived filtered alerts
   const alertasFiltradas = alertas.filter(a => {
-    if (filtroTipo) {
-      // 'GEO' es el valor interno que agrupa ABIGEATO, FUERA_DE_PERIMETRO y AISLAMIENTO_SOCIAL
-      if (filtroTipo === 'GEO') {
-        const t = (a.tipo ?? '').toUpperCase();
-        if (!t.includes('FUERA') && !t.includes('PERIMETRO') && t !== 'ABIGEATO' && t !== 'GEOESPACIAL' && !t.includes('AISLAMIENTO')) return false;
-      } else if (a.tipo !== filtroTipo) {
-        return false;
-      }
-    }
+    if (filtroTipo && !coincideFiltroTipo(a, filtroTipo)) return false;
     if (filtroSeveridad && a.severidad !== filtroSeveridad) return false;
     return true;
   }).sort((a, b) => {
@@ -256,12 +248,12 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           <button
             className="btn rounded-pill px-2 py-1 fw-semibold d-flex align-items-center gap-1"
             style={{
-              backgroundColor: filtroTipo === 'GEO' ? '#13D4FB' : 'transparent',
+              backgroundColor: filtroTipo === 'GEOESPACIAL' ? '#13D4FB' : 'transparent',
               color: '#1E3A5F',
               border: '2px solid #1E3A5F',
               fontSize: '0.9rem'
             }}
-            onClick={() => setFiltroTipo(prev => prev === 'GEO' ? null : 'GEO')}
+            onClick={() => setFiltroTipo(prev => prev === 'GEOESPACIAL' ? null : 'GEOESPACIAL')}
           >
             <i className="bi bi-geo-alt-fill"></i> Geoespacial
           </button>

@@ -45,6 +45,16 @@ export interface DetalleAislamiento {
 /** Alerta geoespacial de aislamiento social: uno o más animales lejos del rodeo. */
 export const esAislamiento = (a: { tipo?: string | null }) => /AISLAMIENTO/i.test(a.tipo ?? '');
 
+/** Abigeato, fuera de perímetro y aislamiento: el mismo grupo que el contador "Geoespacial" y tipo=GEOESPACIAL. */
+export const esGeoespacial = (a: { tipo?: string | null }) => {
+  const t = (a.tipo ?? '').toUpperCase();
+  return t.includes('FUERA') || t.includes('PERIMETRO') || t === 'ABIGEATO' || t === 'GEOESPACIAL' || t.includes('AISLAMIENTO');
+};
+
+/** Si la alerta pasa el filtro de tipo ('' = todos). Mismos valores que el `tipo` de GET /alertas. */
+export const coincideFiltroTipo = (a: { tipo?: string | null }, filtro: string) =>
+  !filtro || (filtro === 'GEOESPACIAL' ? esGeoespacial(a) : a.tipo === filtro);
+
 /**
  * H0008: el backend marca la alerta al momento de enviarla. Como las listas no se refrescan solas,
  * además se re-evalúa con la última señal conocida para que una tarjeta abierta pase a "sin señal"

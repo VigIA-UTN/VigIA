@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Container, Spinner, Alert, Form, Button } from 'react-bootstrap';
-import { getAlertas, esAnestro, type AlertaResponse } from '../api/alertaApi';
+import { getAlertas, esAnestro, coincideFiltroTipo, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
@@ -122,7 +122,7 @@ export default function AlertasPage() {
                 }
                 // Si estamos filtrando y la alerta nueva no matchea, la ignoramos
                 if (filtroEstado && newAlerta.estado !== filtroEstado) return prev;
-                if (filtroTipo && newAlerta.tipo !== filtroTipo) return prev;
+                if (!coincideFiltroTipo(newAlerta, filtroTipo)) return prev;
                 if (filtroSeveridad && newAlerta.severidad !== filtroSeveridad) return prev;
                 
                 return [newAlerta, ...prev];
@@ -216,7 +216,7 @@ export default function AlertasPage() {
                                 <option value="">Todos los tipos</option>
                                 <option value="CELO">Celo</option>
                                 <option value="SALUD">Salud</option>
-                                <option value="ABIGEATO">Posición / Abigeato</option>
+                                <option value="GEOESPACIAL">Geoespacial</option>
                             </Form.Select>
                         </div>
                         <div style={{ flex: '1 1 200px' }}>
