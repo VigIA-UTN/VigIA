@@ -1,6 +1,7 @@
 package dev.vigia.backend.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -93,20 +94,20 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
 
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.id = :animalId " +
-                     "AND (:disparador IS NULL OR a.disparador = :disparador) " +
+                     "AND a.disparador IN :disparadores " +
                      "AND (cast(:desde as timestamp) IS NULL OR a.tsGeneracion >= :desde) " +
                      "AND (cast(:hasta as timestamp) IS NULL OR a.tsGeneracion <= :hasta) " +
                      "ORDER BY a.tsGeneracion ASC")
        List<Alerta> findByAnimalConFiltros(
                      @Param("animalId") Long animalId,
-                     @Param("disparador") DisparadorAlerta disparador,
+                     @Param("disparadores") Collection<DisparadorAlerta> disparadores,
                      @Param("desde") LocalDateTime desde,
                      @Param("hasta") LocalDateTime hasta);
 
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND (:estado IS NULL OR a.estado = :estado) " +
-                     "AND (:disparador IS NULL OR a.disparador = :disparador) " +
+                     "AND a.disparador IN :disparadores " +
                      "AND (:severidad IS NULL OR a.severidad = :severidad) " +
                      "ORDER BY " +
                      "  CASE WHEN a.severidad = 'ALTA' THEN 1 " +
@@ -117,7 +118,7 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
        List<Alerta> findByFiltros(
                      @Param("establecimientoId") Long establecimientoId,
                      @Param("estado") EstadoAlerta estado,
-                     @Param("disparador") DisparadorAlerta disparador,
+                     @Param("disparadores") Collection<DisparadorAlerta> disparadores,
                      @Param("severidad") SeveridadAlerta severidad);
 
        @Query("SELECT a FROM Alerta a " +

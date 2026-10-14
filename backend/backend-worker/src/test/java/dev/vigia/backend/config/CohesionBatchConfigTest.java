@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -424,7 +425,7 @@ class CohesionBatchConfigTest {
         AlertaAnimalAislado episodio10 = episodio(pendiente, 10L, null);
         when(alertaAnimalAisladoRepository.findByAnimal_Establecimiento_IdAndTsRegresoIsNull(1L))
                 .thenReturn(List.of(episodio10));
-        when(alertaRepository.findByFiltros(1L, EstadoAlerta.PENDIENTE, DisparadorAlerta.AISLAMIENTO_SOCIAL, null))
+        when(alertaRepository.findByFiltros(1L, EstadoAlerta.PENDIENTE, Set.of(DisparadorAlerta.AISLAMIENTO_SOCIAL), null))
                 .thenReturn(List.of(pendiente));
         when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(900L))
                 .thenReturn(List.of(episodio10));
@@ -466,7 +467,7 @@ class CohesionBatchConfigTest {
                 geo("11", false, 20.0, 0.0, 0.0));
         Alerta pendiente = alerta(900L, 10L, r1, EstadoAlerta.PENDIENTE);
         AlertaAnimalAislado cerrado = episodio(pendiente, 10L, LocalDateTime.now().minusMinutes(30));
-        when(alertaRepository.findByFiltros(1L, EstadoAlerta.PENDIENTE, DisparadorAlerta.AISLAMIENTO_SOCIAL, null))
+        when(alertaRepository.findByFiltros(1L, EstadoAlerta.PENDIENTE, Set.of(DisparadorAlerta.AISLAMIENTO_SOCIAL), null))
                 .thenReturn(List.of(pendiente));
         when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(900L))
                 .thenReturn(List.of(cerrado));
@@ -493,7 +494,7 @@ class CohesionBatchConfigTest {
         mlGeoResponde(
                 geo("10", true, 400.0, 1800.0, 1200.0),
                 geo("11", false, 20.0, 0.0, 0.0));
-        when(alertaRepository.findByFiltros(1L, EstadoAlerta.PENDIENTE, DisparadorAlerta.AISLAMIENTO_SOCIAL, null))
+        when(alertaRepository.findByFiltros(1L, EstadoAlerta.PENDIENTE, Set.of(DisparadorAlerta.AISLAMIENTO_SOCIAL), null))
                 .thenReturn(List.of(alerta(900L, 20L, rodeo(200L), EstadoAlerta.PENDIENTE)));
         alertaRepositoryAsignaIds();
 

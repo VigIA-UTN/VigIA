@@ -46,6 +46,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Configuration
@@ -231,7 +232,7 @@ public class CohesionBatchConfig {
         }
 
         Alerta pendiente = alertaRepository
-                .findByFiltros(est.getId(), EstadoAlerta.PENDIENTE, DisparadorAlerta.AISLAMIENTO_SOCIAL, null).stream()
+                .findByFiltros(est.getId(), EstadoAlerta.PENDIENTE, Set.of(DisparadorAlerta.AISLAMIENTO_SOCIAL), null).stream()
                 .filter(a -> Objects.equals(rodeoIdDe(a.getAnimal()), rodeoId))
                 .findFirst()
                 .orElse(null);

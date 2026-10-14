@@ -665,8 +665,9 @@ public class AnimalController {
      * animal, ordenada cronológicamente.
      *
      * @param animalId       ID del animal
-     * @param tipo           (opcional) filtro por tipo de alerta: celo, sanitario,
-     *                       geoespacial, perimetro (no filtra las intervenciones)
+     * @param tipo           (opcional) filtro por tipo de alerta, con los mismos
+     *                       valores que GET /alertas (no filtra las intervenciones);
+     *                       un valor desconocido responde 400
      * @param desde          (opcional) inicio del rango de fechas, inclusive
      * @param hasta          (opcional) fin del rango de fechas, inclusive
      * @param authentication contexto de seguridad inyectado por Spring Security

@@ -40,6 +40,8 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -720,6 +722,45 @@ class AlertaControllerTest {
                 .andExpect(jsonPath("$[0].animalesAislados[0].minutosFuera").value(30))
                 .andExpect(jsonPath("$[0].animalesAislados[0].distanciaGrupoM").value(320))
                 .andExpect(jsonPath("$[0].animalesAislados[0].severidad").value("ALTA"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/alertas?tipo= - Salud, Celo (con anestro) y Geoespacial filtran como el frontend; un tipo desconocido es 400")
+    @SuppressWarnings("null")
+    void listarAlertas_filtroTipo_valoresDelFrontend() throws Exception {
+        // En setUp ya se creó 1 alerta de CELO PENDIENTE.
+        Animal animal = animalPropio();
+        Alerta anestro = alertaRepository.findById(
+                crearAlerta(animal, DisparadorAlerta.CELO, EstadoAlerta.PENDIENTE)).orElseThrow();
+        anestro.setTipo("Anestro Detectado");
+        alertaRepository.save(anestro);
+        crearAlerta(animal, DisparadorAlerta.SALUD, EstadoAlerta.PENDIENTE);
+        crearAlerta(animal, DisparadorAlerta.FUERA_DE_PERIMETRO, EstadoAlerta.PENDIENTE);
+        crearAlerta(animal, DisparadorAlerta.AISLAMIENTO_SOCIAL, EstadoAlerta.PENDIENTE);
+
+        listarPorTipo("SALUD")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].tipo", containsInAnyOrder("SALUD")));
+        listarPorTipo("CELO")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].tipo", containsInAnyOrder("CELO", "CELO")))
+                .andExpect(jsonPath("$[*].subtipo", hasItem("Anestro Detectado")));
+        listarPorTipo("GEOESPACIAL")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].tipo", containsInAnyOrder("FUERA_DE_PERIMETRO", "AISLAMIENTO_SOCIAL")));
+        listarPorTipo("foo")
+                .andExpect(status().isBadRequest());
+        listarPorTipo("")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5));
+    }
+
+    @SuppressWarnings("null")
+    private org.springframework.test.web.servlet.ResultActions listarPorTipo(String tipo) throws Exception {
+        return mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString())
+                .param("tipo", tipo));
     }
 
     @Test

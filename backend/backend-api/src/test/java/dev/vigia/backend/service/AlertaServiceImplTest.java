@@ -7,8 +7,10 @@ import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -342,7 +344,7 @@ public class AlertaServiceImplTest {
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
-                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, null, null))
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, EnumSet.allOf(DisparadorAlerta.class), null))
                                 .thenReturn(List.of(mockAlerta));
 
                 // Act
@@ -366,7 +368,7 @@ public class AlertaServiceImplTest {
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
-                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, null, null))
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, EnumSet.allOf(DisparadorAlerta.class), null))
                                 .thenReturn(List.of(mockAlerta));
                 AlertaAnimalAislado sigueAfuera = episodioAislamiento(otro, 2400L, 400.0);
                 sigueAfuera.setTsInicio(LocalDateTime.now().minusMinutes(25));
@@ -403,7 +405,7 @@ public class AlertaServiceImplTest {
                 when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(mockUsuario));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
-                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, null, null))
+                when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, null, EnumSet.allOf(DisparadorAlerta.class), null))
                                 .thenReturn(List.of(mockAlerta));
 
                 // Act
@@ -509,7 +511,7 @@ public class AlertaServiceImplTest {
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
                 when(alertaRepository.findByFiltros(ESTABLECIMIENTO_ID, EstadoAlerta.CONFIRMADA,
-                                DisparadorAlerta.CELO, null))
+                                Set.of(DisparadorAlerta.CELO), null))
                                 .thenReturn(List.of(mockAlerta));
 
                 // Act
@@ -726,7 +728,7 @@ public class AlertaServiceImplTest {
                 when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
-                when(alertaRepository.findByAnimalConFiltros(10L, DisparadorAlerta.CELO, null, null))
+                when(alertaRepository.findByAnimalConFiltros(10L, Set.of(DisparadorAlerta.CELO), null, null))
                                 .thenReturn(List.of(mockAlerta));
 
                 LineaTiempoEventoResponse evento = alertaService
@@ -751,7 +753,7 @@ public class AlertaServiceImplTest {
                 when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
-                when(alertaRepository.findByAnimalConFiltros(10L, DisparadorAlerta.CELO, null, null))
+                when(alertaRepository.findByAnimalConFiltros(10L, Set.of(DisparadorAlerta.CELO), null, null))
                                 .thenReturn(List.of(mockAlerta));
 
                 LineaTiempoEventoResponse evento = alertaService
@@ -774,7 +776,7 @@ public class AlertaServiceImplTest {
                 when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
-                when(alertaRepository.findByAnimalConFiltros(10L, DisparadorAlerta.CELO, null, null))
+                when(alertaRepository.findByAnimalConFiltros(10L, Set.of(DisparadorAlerta.CELO), null, null))
                                 .thenReturn(List.of(mockAlerta));
 
                 LineaTiempoEventoResponse evento = alertaService
@@ -795,7 +797,7 @@ public class AlertaServiceImplTest {
                 when(animalRepository.findById(10L)).thenReturn(Optional.of(mockAnimal));
                 when(establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(EMAIL))
                                 .thenReturn(List.of(mockEstablecimiento));
-                when(alertaRepository.findByAnimalConFiltros(10L, DisparadorAlerta.CELO, null, null))
+                when(alertaRepository.findByAnimalConFiltros(10L, Set.of(DisparadorAlerta.CELO), null, null))
                                 .thenReturn(List.of(mockAlerta));
 
                 LineaTiempoEventoResponse evento = alertaService

@@ -5,7 +5,9 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -67,6 +69,11 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 @RequiredArgsConstructor
 public class AlertaServiceImpl implements AlertaService {
 
+        /** Mismo grupo que el filtro GEO del mapa: el contador "Geoespacial" y el filtro tipo=geoespacial. */
+        private static final Set<DisparadorAlerta> GEOESPACIALES = EnumSet.of(
+                        DisparadorAlerta.ABIGEATO, DisparadorAlerta.FUERA_DE_PERIMETRO,
+                        DisparadorAlerta.AISLAMIENTO_SOCIAL);
+
         private final AlertaRepository alertaRepository;
         private final AnimalRepository animalRepository;
         private final UsuarioRepository usuarioRepository;
@@ -97,7 +104,7 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                DisparadorAlerta disparadorEnum = resolverDisparador(tipo);
+                Set<DisparadorAlerta> disparadores = resolverDisparadores(tipo);
 
                 SeveridadAlerta severidadEnum = null;
                 if (severidad != null && !severidad.isBlank()) {
@@ -110,7 +117,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 severidadEnum = SeveridadAlerta.BAJA;
                 }
 
-                List<Alerta> alertas = alertaRepository.findByFiltros(establecimientoId, estado, disparadorEnum,
+                List<Alerta> alertas = alertaRepository.findByFiltros(establecimientoId, estado, disparadores,
                                 severidadEnum);
 
                 return alertas.stream()
@@ -201,10 +208,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 reproductivo = count;
                         } else if (disparador == DisparadorAlerta.SALUD) {
                                 sanitario = count;
-                        } else if (disparador == DisparadorAlerta.ABIGEATO
-                                        || disparador == DisparadorAlerta.FUERA_DE_PERIMETRO
-                                        || disparador == DisparadorAlerta.AISLAMIENTO_SOCIAL) {
-                                // Mismo grupo que el filtro GEO del mapa
+                        } else if (GEOESPACIALES.contains(disparador)) {
                                 geoespacial += count;
                         }
                 }
@@ -934,10 +938,10 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento del animal indicado.");
                 }
 
-                DisparadorAlerta disparadorEnum = resolverDisparador(tipo);
+                Set<DisparadorAlerta> disparadores = resolverDisparadores(tipo);
 
                 List<Alerta> alertas = alertaRepository.findByAnimalConFiltros(
-                                animalId, disparadorEnum, desde, hasta);
+                                animalId, disparadores, desde, hasta);
                 List<Intervencion> intervenciones = intervencionRepository
                                 .findByAnimalConRango(animalId, desde, hasta);
 
@@ -957,18 +961,20 @@ public class AlertaServiceImpl implements AlertaService {
                 return eventos;
         }
 
+        /** Disparadores del filtro {@code tipo}; sin tipo, todos. Un tipo desconocido es un 400, no "sin filtro". */
         @SuppressWarnings("null")
-        private DisparadorAlerta resolverDisparador(String tipo) {
+        private Set<DisparadorAlerta> resolverDisparadores(String tipo) {
                 if (tipo == null || tipo.isBlank()) {
-                        return null;
+                        return EnumSet.allOf(DisparadorAlerta.class);
                 }
                 return switch (tipo.trim().toLowerCase()) {
-                        case "celo", "reproductivo" -> DisparadorAlerta.CELO;
-                        case "sanitario" -> DisparadorAlerta.SALUD;
-                        case "geoespacial" -> DisparadorAlerta.ABIGEATO;
-                        case "perimetro" -> DisparadorAlerta.FUERA_DE_PERIMETRO;
-                        case "aislamiento_social" -> DisparadorAlerta.AISLAMIENTO_SOCIAL;
-                        default -> null;
+                        case "celo", "reproductivo" -> EnumSet.of(DisparadorAlerta.CELO);
+                        case "salud", "sanitario" -> EnumSet.of(DisparadorAlerta.SALUD);
+                        case "abigeato" -> EnumSet.of(DisparadorAlerta.ABIGEATO);
+                        case "perimetro", "fuera_de_perimetro" -> EnumSet.of(DisparadorAlerta.FUERA_DE_PERIMETRO);
+                        case "aislamiento_social" -> EnumSet.of(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+                        case "geoespacial" -> GEOESPACIALES;
+                        default -> throw new IllegalArgumentException("Tipo de alerta desconocido: " + tipo);
                 };
         }
 
