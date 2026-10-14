@@ -11,6 +11,8 @@ import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
+import dev.vigia.backend.repository.PerfilReferenciaRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -71,6 +73,8 @@ public class DataInitializer implements CommandLineRunner {
     private final DiagnosticoRepository diagnosticoRepository;
     private final CaravanaRepository caravanaRepository;
     private final TelemetriaRepository telemetriaRepository;
+    private final RegistroCohesionRepository registroCohesionRepository;
+    private final PerfilReferenciaRepository perfilReferenciaRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
@@ -89,6 +93,9 @@ public class DataInitializer implements CommandLineRunner {
         alertaRepository.deleteAll();
         estadoReproductivoRepository.deleteAll();
         estadoSaludRepository.deleteAll();
+        // Generados por los jobs del worker; referencian a animales sin ON DELETE CASCADE.
+        registroCohesionRepository.deleteAll();
+        perfilReferenciaRepository.deleteAll();
         invitacionRepository.deleteAll();
         animalRepository.deleteAll();
         caravanaRepository.deleteAll();
