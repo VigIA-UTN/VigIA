@@ -25,4 +25,8 @@ public class AlertaAnimalDTO {
 
     @JsonProperty("tiempo_fuera_grupo_s")
     private Double tiempoFueraGrupoS;
+
+    /** Tramo final fuera del grupo sin volver, en segundos (cuánto lleva alejado ahora). */
+    @JsonProperty("tiempo_fuera_continuo_s")
+    private Double tiempoFueraContinuoS;
 }

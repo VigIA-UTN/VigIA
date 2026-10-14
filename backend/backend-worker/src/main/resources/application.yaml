@@ -45,13 +45,17 @@ vigia:
     salud-url: ${ML_SALUD_URL}
     geo-url: ${ML_GEO_URL}
   batch:
+    celo-rate: ${VIGIA_BATCH_CELO_RATE:60000}
     salud-rate: ${VIGIA_BATCH_SALUD_RATE:60000}
     geo-rate: ${VIGIA_BATCH_GEO_RATE:900000}
+    # Detector de anestro (cron de Spring: seg min hora día mes día-semana).
+    anestro-cron: "${VIGIA_BATCH_ANESTRO_CRON:0 * * * * *}"
+    anestro-silencio-dias: ${VIGIA_BATCH_ANESTRO_SILENCIO_DIAS:21}
   geo:
     # Ventana de posiciones (en horas) que se envía a ml-geo en cada análisis.
     ventana-horas: ${VIGIA_GEO_VENTANA_HORAS:24}
-    # Horas sin volver a alertar aislamiento después de resolver una alerta.
-    cooldown-horas: ${VIGIA_GEO_COOLDOWN_HORAS:6}
+    # Minutos seguidos fuera del grupo antes de abrir un aislamiento (filtra GPS errático y salidas cortas).
+    minutos-fuera-minimo: ${VIGIA_GEO_MINUTOS_FUERA_MINIMO:15}
   salud:
     calibracion-dias: ${VIGIA_SALUD_CALIBRACION_DIAS:7}
     recalibracion-dias: ${VIGIA_SALUD_RECALIBRACION_DIAS:30}

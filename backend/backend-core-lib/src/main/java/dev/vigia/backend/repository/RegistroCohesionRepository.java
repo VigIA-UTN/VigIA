@@ -7,7 +7,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -19,16 +18,6 @@ public interface RegistroCohesionRepository extends JpaRepository<RegistroCohesi
 
     List<RegistroCohesion> findByEstablecimientoIdAndAnimalIdAndFechaBetweenOrderByFechaAsc(
             Long establecimientoId, Long animalId, LocalDateTime desde, LocalDateTime hasta);
-
-    /** Último registro de cada animal indicado (el del análisis más reciente). */
-    @Query("SELECT r FROM RegistroCohesion r " +
-            "WHERE r.establecimiento.id = :establecimientoId " +
-            "AND r.animal.id IN :animalIds " +
-            "AND r.fecha = (SELECT MAX(r2.fecha) FROM RegistroCohesion r2 " +
-            "               WHERE r2.establecimiento.id = :establecimientoId AND r2.animal.id = r.animal.id)")
-    List<RegistroCohesion> findUltimosPorAnimal(
-            @Param("establecimientoId") Long establecimientoId,
-            @Param("animalIds") Collection<Long> animalIds);
 
     /**
      * Promedio del índice de los animales de un rodeo en cada análisis del rango:
