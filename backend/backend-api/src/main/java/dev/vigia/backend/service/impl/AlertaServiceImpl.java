@@ -383,7 +383,7 @@ public class AlertaServiceImpl implements AlertaService {
                 }
 
                 if (disparador == DisparadorAlerta.AISLAMIENTO_SOCIAL) {
-                        return "La posición de este animal se mantuvo lejos del grupo principal del rodeo durante más tiempo que lo habitual.";
+                        return "La posición de los animales listados se mantuvo lejos del grupo principal del rodeo durante más tiempo que lo habitual.";
                 }
 
                 if (confianzaPct != null) {

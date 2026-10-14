@@ -389,12 +389,14 @@ public class AlertaServiceImplTest {
                 assertNull(aislados.get(0).getAlias());
                 assertEquals(40L, aislados.get(0).getMinutosFuera()); // acumulado en 24 h
                 assertEquals(25L, aislados.get(0).getMinutosFueraSeguidos()); // sigue afuera: hasta ahora
+                assertNull(aislados.get(0).getTsRegreso());
                 assertEquals(400L, aislados.get(0).getDistanciaGrupoM());
                 assertEquals("ALTA", aislados.get(0).getSeveridad());
                 assertEquals(10L, aislados.get(1).getAnimalId());
                 assertEquals("Lola", aislados.get(1).getAlias());
                 assertEquals(30L, aislados.get(1).getMinutosFuera());
                 assertEquals(12L, aislados.get(1).getMinutosFueraSeguidos()); // volvió: hasta el regreso
+                assertEquals(volvio.getTsRegreso(), aislados.get(1).getTsRegreso());
                 assertEquals(120L, aislados.get(1).getDistanciaGrupoM());
                 assertEquals("MEDIA", aislados.get(1).getSeveridad());
         }

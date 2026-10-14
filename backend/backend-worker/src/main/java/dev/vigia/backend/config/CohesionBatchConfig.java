@@ -212,6 +212,7 @@ public class CohesionBatchConfig {
         long minimoS = minutosFueraMinimo * 60;
         LocalDateTime ahora = LocalDateTime.now();
         List<GeoAlerta> nuevos = new ArrayList<>();
+        Map<Long, Alerta> conRegresos = new LinkedHashMap<>();
         for (GeoAlerta ga : analizadas) {
             boolean alejado = Boolean.TRUE.equals(ga.getAlertaAislamiento());
             AlertaAnimalAislado abierto = abiertos.get(Long.parseLong(ga.getAnimalId()));
@@ -220,6 +221,7 @@ public class CohesionBatchConfig {
                     actualizar(abierto, ga);
                 } else {
                     abierto.setTsRegreso(ahora);
+                    conRegresos.putIfAbsent(abierto.getAlerta().getId(), abierto.getAlerta());
                 }
                 alertaAnimalAisladoRepository.save(abierto);
             } else if (alejado && ga.getTiempoFueraContinuoS() != null && ga.getTiempoFueraContinuoS() >= minimoS
@@ -227,6 +229,9 @@ public class CohesionBatchConfig {
                 nuevos.add(ga);
             }
         }
+        // Un regreso re-publica la alerta (mismo id) para que la tarjeta abierta lo muestre; no cambia su estado.
+        conRegresos.values().forEach(alerta -> publicar(alerta,
+                alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId())));
         if (nuevos.isEmpty()) {
             return;
         }

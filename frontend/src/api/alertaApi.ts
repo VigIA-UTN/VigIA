@@ -1,8 +1,4 @@
 import axiosClient from './axiosClient';
-import { MOCK_ALERTA_AISLAMIENTO, MOCK_DETALLE_AISLAMIENTO } from './aislamientoMock';
-
-// El backend ya emite AISLAMIENTO_SOCIAL de forma nativa.
-const mockAislamiento = false;
 
 export interface AlertaResponse {
   id: number;
@@ -30,9 +26,14 @@ export interface AnimalAislado {
   animalId: number;
   identificador: string;
   alias: string | null;
+  /** Tiempo acumulado fuera del grupo en las últimas 24 h. */
   minutosFuera: number;
+  /** Duración de este aislamiento: hasta ahora, o hasta que volvió (queda fijo). */
+  minutosFueraSeguidos: number;
   distanciaGrupoM: number;
   severidad: SeveridadNivel;
+  /** Cuándo volvió al grupo; null mientras sigue afuera. */
+  tsRegreso: string | null;
 }
 
 /** Bloque de aislamiento del detalle de alerta (solo AISLAMIENTO_SOCIAL). */
@@ -99,9 +100,6 @@ export async function getAlertas(
   if (severidad) params.append('severidad', severidad);
   if (estado) params.append('estado', estado);
   const response = await axiosClient.get<AlertaResponse[]>(`/alertas?${params.toString()}`);
-  if (mockAislamiento && (!tipo || esAislamiento({ tipo })) && (!estado || estado === MOCK_ALERTA_AISLAMIENTO.estado)) {
-    return [...response.data, MOCK_ALERTA_AISLAMIENTO];
-  }
   return response.data;
 }
 
@@ -142,10 +140,6 @@ export async function updateAlertaEstado(
   nuevoEstado: 'CONFIRMADA' | 'DESCARTADA',
   notas?: string
 ): Promise<AlertaResponse> {
-  if (mockAislamiento && alertaId === MOCK_ALERTA_AISLAMIENTO.id) {
-    MOCK_ALERTA_AISLAMIENTO.estado = nuevoEstado;
-    return MOCK_ALERTA_AISLAMIENTO;
-  }
   const url = notas
     ? `/alertas/estado/${alertaId}?estado=${nuevoEstado}&notas=${encodeURIComponent(notas)}`
     : `/alertas/estado/${alertaId}?estado=${nuevoEstado}`;
@@ -242,9 +236,6 @@ export interface AlertaDetalleResponse {
 }
 
 export async function getAlertaDetalle(alertaId: number, establecimientoId: number): Promise<AlertaDetalleResponse> {
-  if (mockAislamiento && alertaId === MOCK_ALERTA_AISLAMIENTO.id) {
-    return { ...MOCK_DETALLE_AISLAMIENTO, estadoActual: MOCK_ALERTA_AISLAMIENTO.estado };
-  }
   const response = await axiosClient.get<AlertaDetalleResponse>(
     `/alertas/${alertaId}?establecimientoId=${establecimientoId}`
   );

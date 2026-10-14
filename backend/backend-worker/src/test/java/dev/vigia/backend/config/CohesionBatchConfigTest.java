@@ -411,6 +411,38 @@ class CohesionBatchConfigTest {
 
     @Test
     @SuppressWarnings("null")
+    @DisplayName("Cuando animales vuelven al grupo se re-publica su alerta una vez (mismo id), con el regreso marcado")
+    void animalesVuelven_republicanSuAlertaUnaVez() throws Exception {
+        Establecimiento est = establecimiento(150.0);
+        RodeoLote r1 = rodeo(100L);
+        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(eq(1L), any(), any(), isNull()))
+                .thenReturn(List.of(telemetria(10L, r1), telemetria(11L, r1), telemetria(12L, r1)));
+        mlGeoResponde(
+                geo("10", false, 30.0, 1800.0, 0.0),
+                geo("11", false, 25.0, 1500.0, 0.0),
+                geo("12", false, 20.0, 0.0, 0.0));
+        Alerta pendiente = alerta(900L, 10L, r1, EstadoAlerta.PENDIENTE);
+        AlertaAnimalAislado episodio10 = episodio(pendiente, 10L, null);
+        AlertaAnimalAislado episodio11 = episodio(pendiente, 11L, null);
+        when(alertaAnimalAisladoRepository.findByAnimal_Establecimiento_IdAndTsRegresoIsNull(1L))
+                .thenReturn(List.of(episodio10, episodio11));
+        when(alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(900L))
+                .thenReturn(List.of(episodio10, episodio11));
+
+        batchConfig.cohesionProcessor().process(est);
+
+        ArgumentCaptor<AlertaEventDTO> evento = ArgumentCaptor.forClass(AlertaEventDTO.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), evento.capture());
+        assertThat(evento.getValue().getId()).isEqualTo(900L);
+        assertThat(evento.getValue().getEstado()).isEqualTo(EstadoAlerta.PENDIENTE); // sin auto-resolver
+        assertThat(evento.getValue().getAnimalesAislados())
+                .extracting(AnimalAisladoResponse::getAnimalId, a -> a.getTsRegreso() != null)
+                .containsExactlyInAnyOrder(tuple(10L, true), tuple(11L, true));
+        verify(alertaRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("null")
     @DisplayName("Un animal nuevo que se aleja con una alerta pendiente del rodeo se suma a esa alerta")
     void nuevoAislamientoConAlertaPendienteDelRodeo_seSumaALaMismaAlerta() throws Exception {
         Establecimiento est = establecimiento(150.0);

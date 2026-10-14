@@ -70,14 +70,23 @@ export default function AlertNotificationCard({
   if (aislamiento) {
     titulo = aislados.length > 1 ? `${aislados.length} animales aislados del rodeo` : `#${aislados[0]?.identificador ?? alerta.animalId} aislado del rodeo`;
   }
-  const minutosAislado = aislados.length
-    ? Math.max(...aislados.map(a => a.minutosFuera))
+  // Los que volvieron siguen listados ("estuvo afuera"), pero el tiempo de la card es el de los que siguen afuera.
+  const fuera = aislados.filter(a => !a.tsRegreso);
+  const volvieron = aislados.length - fuera.length;
+  const minutosAislado = fuera.length
+    ? Math.max(...fuera.map(a => a.minutosFueraSeguidos))
     : minutosDesde(alerta.tsGeneracion);
+  let textoAislamiento = `Fuera del grupo hace ${formatMinutos(minutosAislado)}`;
+  if (aislados.length && !fuera.length) {
+    textoAislamiento = aislados.length > 1 ? 'Todos volvieron al grupo' : 'Volvió al grupo';
+  } else if (volvieron) {
+    textoAislamiento += ` · ${volvieron} ya ${volvieron > 1 ? 'volvieron' : 'volvió'}`;
+  }
 
   const cuerpoPrincipal = aislamiento ? (
     // Reserva las 3 líneas que ocupa la acción recomendada en las demás cards, para igualar la altura.
     <div style={{ minHeight: 'calc(3 * 1.35em)' }}>
-      Fuera del grupo hace {formatMinutos(minutosAislado)}
+      {textoAislamiento}
     </div>
   ) : isGeoespacial ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

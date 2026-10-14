@@ -27,6 +27,8 @@ public class AnimalAisladoResponse {
     private Long distanciaGrupoM;
     /** ALTA si el animal está a más del doble del umbral del establecimiento; si no, MEDIA. */
     private String severidad;
+    /** Cuándo volvió al grupo; null mientras sigue afuera. El animal sigue listado mientras la alerta exista. */
+    private LocalDateTime tsRegreso;
 
     public static AnimalAisladoResponse from(AlertaAnimalAislado episodio, double umbral) {
         Animal animal = episodio.getAnimal();
@@ -40,6 +42,7 @@ public class AnimalAisladoResponse {
                 .minutosFueraSeguidos(Duration.between(episodio.getTsInicio(), hasta).toMinutes())
                 .distanciaGrupoM(distancia != null ? Math.round(distancia) : null)
                 .severidad(distancia != null && distancia > 2 * umbral ? "ALTA" : "MEDIA")
+                .tsRegreso(episodio.getTsRegreso())
                 .build();
     }
 }

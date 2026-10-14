@@ -127,6 +127,8 @@ export default function AlertasPage() {
                 
                 return [newAlerta, ...prev];
             });
+            // El detalle abierto sigue a la alerta (animales que se suman o vuelven)
+            setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? newAlerta : prev));
         };
 
         eventSource.onerror = (error) => {
@@ -285,13 +287,18 @@ export default function AlertasPage() {
                                             // Fallback gravedad to severidad mapping just in case backend still sends gravedad
                                             const sev = a.severidad ?? (a.gravedad as 'ALTA' | 'MEDIA' | 'BAJA') ?? (a.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
                                             const tipoLower = esAnestro(a) ? 'anestro' : (a.tipo || 'CELO').toLowerCase();
+                                            // Aislamiento: todos sus animales, no solo el principal (las demás alertas no traen lista)
+                                            const aislados = a.animalesAislados ?? [];
+                                            const idAnimal = aislados.length > 1
+                                                ? `${aislados.length} animales`
+                                                : `#${aislados[0]?.identificador ?? a.animalId}`;
                                             
                                             return (
                                                 <tr key={a.id}>
-                                                    <td className="fw-medium">#{a.animalId}</td>
+                                                    <td className="fw-medium">{idAnimal}</td>
                                                     <td>
                                                         <div className="d-flex align-items-center gap-2 flex-wrap">
-                                                            <span className={`tipo-badge tipo-${tipoLower}`}>{esAnestro(a) ? 'ANESTRO' : a.tipo || 'CELO'}</span>
+                                                            <span className={`tipo-badge tipo-${tipoLower}`}>{esAnestro(a) ? 'ANESTRO' : (a.tipo || 'CELO').replace(/_/g, ' ')}</span>
                                                             <DatoDesactualizadoBadge alerta={a} />
                                                         </div>
                                                     </td>
