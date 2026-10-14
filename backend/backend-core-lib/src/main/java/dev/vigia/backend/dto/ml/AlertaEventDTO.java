@@ -8,7 +8,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import dev.vigia.backend.dto.AnimalAisladoResponse;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -33,4 +36,7 @@ public class AlertaEventDTO {
 
     private Double latitud;
     private Double longitud;
+
+    /** Solo AISLAMIENTO_SOCIAL: lo arma el worker porque sus filas todavía no están commiteadas al publicar. */
+    private List<AnimalAisladoResponse> animalesAislados;
 }

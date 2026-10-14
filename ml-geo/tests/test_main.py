@@ -704,6 +704,51 @@ class TestTiempoFueraGrupo:
             assert alerta["tiempo_fuera_grupo_s"] == (2 * INTERVALO_S if alejado else 0.0)
 
 
+def continuos(puntos, **extra):
+    response = client.post(ENDPOINT, json={"historial_7d": puntos, **extra})
+    assert response.status_code == 200
+    return {a["animal_id"]: a["tiempo_fuera_continuo_s"] for a in response.json()["alertas"]}
+
+
+class TestTiempoFueraContinuo:
+    """Tramo final fuera del grupo sin volver, contado hacia atrás desde el último intervalo con datos del animal."""
+
+    def test_alejado_en_los_ultimos_intervalos(self):
+        puntos = rodeo(range(6))
+        puntos += serie("A", -34.0002, range(0, 3))  # junto al rodeo
+        puntos += serie("A", SUR_2KM, range(3, 6))   # alejado
+
+        assert continuos(puntos)["A"] == 3 * INTERVALO_S
+        assert tiempos(puntos)["A"] == 3 * INTERVALO_S
+
+    def test_volver_al_grupo_corta_el_tramo(self):
+        puntos = rodeo(range(6))
+        puntos += serie("A", SUR_2KM, range(0, 3))
+        puntos += serie("A", -34.0002, range(3, 6))
+
+        assert continuos(puntos)["A"] == 0.0
+        assert tiempos(puntos)["A"] == 3 * INTERVALO_S
+
+    def test_solo_cuenta_el_ultimo_tramo(self):
+        puntos = rodeo(range(6))
+        puntos += serie("A", SUR_2KM, [0, 1])
+        puntos += serie("A", -34.0002, [2])
+        puntos += serie("A", SUR_2KM, range(3, 6))
+
+        assert continuos(puntos)["A"] == 3 * INTERVALO_S
+        assert tiempos(puntos)["A"] == 5 * INTERVALO_S
+
+    def test_huecos_sin_datos_no_cortan_el_tramo(self):
+        """A está alejado todo el tiempo pero no transmite en los intervalos 2 y 3."""
+        puntos = rodeo(range(6))
+        puntos += serie("A", SUR_2KM, [0, 1, 4, 5])
+
+        assert continuos(puntos)["A"] == 4 * INTERVALO_S
+
+    def test_rodeo_cohesionado_no_suma(self):
+        assert all(v == 0.0 for v in continuos(rodeo(range(6))).values())
+
+
 # ===========================================================================
 # FILTRO POR RODEO
 # ===========================================================================

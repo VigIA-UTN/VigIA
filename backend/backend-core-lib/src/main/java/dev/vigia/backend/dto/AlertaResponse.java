@@ -27,6 +27,6 @@ public class AlertaResponse {
     private boolean datoPosiblementeDesactualizado;
     private long horasUmbralDatoDesactualizado;
 
-    /** Solo AISLAMIENTO_SOCIAL: animales que se alejaron del grupo. */
+    /** Solo AISLAMIENTO_SOCIAL: animales que se alejaron del grupo, el de más tiempo fuera primero. */
     private List<AnimalAisladoResponse> animalesAislados;
 }
