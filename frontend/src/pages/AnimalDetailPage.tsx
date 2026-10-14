@@ -130,7 +130,6 @@ export default function AnimalDetailPage() {
                     estadoActual: data.estadoActual,
                     establecimientoId: data.establecimientoId
                 });
-                console.log("animal", data)
 
                 if (rol === 'PRODUCTOR') {
                     const lotes = await getRodeoLotes(data.establecimientoId);
@@ -304,7 +303,7 @@ export default function AnimalDetailPage() {
                 {activeTab === 'actividad' && (
                     <div key="actividad" className="tab-content-animated">
                         <ActividadTab animalId={animal.id} establecimientoId={animal.establecimientoId} />
-                        <CohesionIndiceCard animalId={animal.id} enCalibracion={false} />
+                        <CohesionIndiceCard animalId={animal.id} enCalibracion={animal.enCalibracion} />
                         <AnimalAlertasSanitarias animalId={animal.id} establecimientoId={animal.establecimientoId} onOpenIntervencion={(alerta) => {
                             setIntervencionAlerta(alerta);
                             setIsIntervencionOpen(true);

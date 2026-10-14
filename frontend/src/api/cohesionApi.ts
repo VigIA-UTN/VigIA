@@ -1,4 +1,5 @@
 import { SEVERIDAD } from '../utils/severidadColores';
+import axiosClient from './axiosClient';
 
 /** Un punto de la serie de cohesión. `valor` null = sin datos en ese intervalo. */
 export interface CohesionPunto {
@@ -43,7 +44,19 @@ const DIA = 24 * HORA;
  *   axiosClient.get<CohesionResponse>(`/animales/${animalId}/cohesion`, { params: { desde: iso, hasta: iso } })
  */
 export async function getCohesionAnimal(animalId: number, desde: number, hasta: number): Promise<CohesionResponse> {
-  return mockCohesion(animalId, desde, hasta);
+
+  const fechaDesde = new Date(desde).toISOString();
+  const fechaHasta = new Date(hasta).toISOString();
+
+  const response = await axiosClient.get<CohesionResponse>(`/animales/${animalId}/cohesion`, {
+    params: {
+      desde: fechaDesde,
+      hasta: fechaHasta
+    }
+  });
+
+  return response.data;
+  //return mockCohesion(animalId, desde, hasta);
 }
 
 /** Serie simulada: estable cerca del rodeo y cae hacia `actual` en el último cuarto, con un tramo sin datos. */

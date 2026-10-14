@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CohesionPuntoSerie {
-    LocalDateTime timestamp;
+    LocalDateTime ts;
     Double valor;
     Double promedioRodeo;
 }

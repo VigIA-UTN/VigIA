@@ -1,6 +1,7 @@
 package dev.vigia.backend.service.impl;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -984,7 +985,8 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
-        // ponytail: una consulta por alerta de aislamiento y por animal del mapa; cargarlas en lote si el mapa crece.
+        // ponytail: una consulta por alerta de aislamiento y por animal del mapa;
+        // cargarlas en lote si el mapa crece.
         private List<AnimalAisladoResponse> animalesAislados(Alerta alerta) {
                 return alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId()).stream()
                                 .map(episodio -> AnimalAisladoResponse.from(episodio, alerta.getValorUmbral()))
@@ -1656,12 +1658,19 @@ public class AnimalServiceImpl implements AnimalService {
                                 ? 0.0
                                 : cohesionRegistros.get(cohesionRegistros.size() - 1).getIndiceCohesion();
 
+                DecimalFormat formato = new DecimalFormat("#.00");
+
                 List<CohesionPuntoSerie> serie = cohesionRegistros.stream()
                                 .map(registro -> new CohesionPuntoSerie(
                                                 registro.getFecha(),
-                                                registro.getIndiceCohesion(),
-                                                promedioRodeoPorFecha.get(registro.getFecha())))
+                                                Double.parseDouble(formato.format(registro.getIndiceCohesion() * 100)),
+                                                Double.parseDouble(formato.format(
+                                                                promedioRodeoPorFecha.get(registro.getFecha()) * 100))))
                                 .collect(Collectors.toList());
+
+                indiceActual = Double.parseDouble(formato.format(indiceActual * 100));
+                promedioRodeo = Double.parseDouble(formato.format(promedioRodeo * 100));
+                promedioPeriodoAnterior = Double.parseDouble(formato.format(promedioPeriodoAnterior * 100));
 
                 return CohesionResponse.builder()
                                 .actual(indiceActual)
