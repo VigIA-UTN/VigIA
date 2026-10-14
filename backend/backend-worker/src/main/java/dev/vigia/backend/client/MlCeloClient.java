@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Cliente de ml-celo. Circuit breaker y reintentos envuelven solo la llamada
- * HTTP; si persiste el fallo lanza {@link MlServicioDegradadoException}.
+ * HTTP; si persiste el fallo (timeout, 5xx, circuito abierto) lanza {@link MlServicioDegradadoException}.
  */
 @Slf4j
 @Component
@@ -46,6 +46,6 @@ public class MlCeloClient {
     }
 
     public CeloPredictResponseDTO fallbackPredict(List<PuntoTelemetriaDTO> serie, String correlationId, Throwable t) {
-        throw new MlServicioDegradadoException("ml-celo degradado o inalcanzable (Correlation-ID: " + correlationId + ")", t);
+        throw MlClientes.errorDeServicio("ml-celo", correlationId, t);
     }
 }

@@ -12,7 +12,7 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Cliente de ml-geo para los batch del worker. Circuit breaker y reintentos
- * envuelven solo la llamada HTTP; si persiste el fallo lanza
+ * envuelven solo la llamada HTTP; si persiste el fallo (timeout, 5xx, circuito abierto) lanza
  * {@link MlServicioDegradadoException}.
  */
 @Slf4j
@@ -47,6 +47,6 @@ public class MlGeoClient {
     }
 
     public GeoAnalyzeResponseDTO fallbackAnalyze(GeoAnalyzeRequestDTO request, String correlationId, Throwable t) {
-        throw new MlServicioDegradadoException("ml-geo degradado o inalcanzable (Correlation-ID: " + correlationId + ")", t);
+        throw MlClientes.errorDeServicio("ml-geo", correlationId, t);
     }
 }

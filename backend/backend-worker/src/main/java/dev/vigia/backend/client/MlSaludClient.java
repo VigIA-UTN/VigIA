@@ -14,7 +14,7 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Cliente de ml-salud (cálculo de perfil de referencia y predicción). Circuit
- * breaker y reintentos envuelven solo cada llamada HTTP; si persiste el fallo
+ * breaker y reintentos envuelven solo cada llamada HTTP; si persiste el fallo (timeout, 5xx, circuito abierto)
  * lanza {@link MlServicioDegradadoException}.
  */
 @Slf4j
@@ -59,11 +59,11 @@ public class MlSaludClient {
     }
 
     public SaludPredictResponseDTO fallbackPredict(SaludPredictRequestDTO request, String correlationId, Throwable t) {
-        throw new MlServicioDegradadoException("ml-salud degradado o inalcanzable (Correlation-ID: " + correlationId + ")", t);
+        throw MlClientes.errorDeServicio("ml-salud", correlationId, t);
     }
 
     public PerfilCalibracionResponseDTO fallbackPerfil(PerfilCalibracionRequestDTO request, String correlationId,
             Throwable t) {
-        throw new MlServicioDegradadoException("ml-salud degradado o inalcanzable (Correlation-ID: " + correlationId + ")", t);
+        throw MlClientes.errorDeServicio("ml-salud", correlationId, t);
     }
 }
