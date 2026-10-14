@@ -605,7 +605,7 @@ export default function ConfiguracionEstablecimientoPage() {
 
               <InfoParametro>
                 Define a qué distancia del resto del rodeo tiene que permanecer un animal
-                para que el sistema lo considere aislado y genere una alerta sanitaria.
+                para que el sistema lo considere aislado y genere una alerta de aislamiento.
                 Un valor menor detecta antes, pero puede generar más falsas alarmas.
                 El valor por defecto es <strong>{DEFAULT_AISLAMIENTO} metros</strong>.
               </InfoParametro>

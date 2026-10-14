@@ -17,7 +17,7 @@ public class BatchScheduler {
     private final JobLauncher jobLauncher;
     private final Job celoJob;
     private final Job saludJob;
-    private final Job cohesionJob;
+    private final Job geoJob;
 
     @Scheduled(fixedRateString = "${vigia.batch.celo-rate:60000}")
     @SuppressWarnings("null")
@@ -49,18 +49,18 @@ public class BatchScheduler {
         }
     }
 
-    @Scheduled(fixedRateString = "${vigia.batch.cohesion-rate:60000}")
+    @Scheduled(fixedRateString = "${vigia.batch.geo-rate:900000}")
     @SuppressWarnings("null")
-    public void runCohesionJob() {
+    public void runGeoJob() {
         try {
-            log.info("Iniciando ejecución programada del Job de Cohesión");
+            log.info("Iniciando ejecución programada del Job de Geo");
             JobParameters parameters = new JobParametersBuilder()
                     .addLong("time", System.currentTimeMillis())
                     .toJobParameters();
 
-            jobLauncher.run(cohesionJob, parameters);
+            jobLauncher.run(geoJob, parameters);
         } catch (Exception e) {
-            log.error("Error al ejecutar el Job de Cohesión: {}", e.getMessage(), e);
+            log.error("Error al ejecutar el Job de Geo: {}", e.getMessage(), e);
         }
     }
 }

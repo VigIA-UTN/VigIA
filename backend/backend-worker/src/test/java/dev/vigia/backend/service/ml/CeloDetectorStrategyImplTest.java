@@ -1,6 +1,7 @@
 package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.vigia.backend.client.MlCeloClient;
 import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.CeloPredictResponseDTO;
@@ -44,6 +45,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,12 +70,11 @@ class CeloDetectorStrategyImplTest {
 
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder();
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost:8000");
         mockServer = MockRestServiceServer.bindTo(builder).build();
 
         celoDetectorStrategy = new CeloDetectorStrategyImpl(
-                builder,
-                "http://localhost:8000",
+                new MlCeloClient(builder.build()),
                 telemetriaRepository,
                 alertaRepository,
                 estadoReproductivoRepository,
@@ -342,13 +343,35 @@ class CeloDetectorStrategyImplTest {
 
     @Test
     @SuppressWarnings("null")
-    void testFallbackProcess() {
+    void testProcess_mlCeloFalla_marcaInferenciaPendienteSinPropagar() {
+        Animal animal = new Animal();
+        animal.setId(30L);
+        Telemetria t = crearTelemetria(animal, -34.0, -60.0, 3, EstadoInferencia.PENDIENTE);
+        List<Telemetria> lista = List.of(t);
+
+        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(
+                eq(animal), eq(DisparadorAlerta.CELO), any(LocalDateTime.class)))
+                .thenReturn(false);
+
+        mockServer.expect(requestTo("http://localhost:8000/api/internal/ml/celo/predict"))
+                .andRespond(withServerError());
+
+        assertDoesNotThrow(() -> celoDetectorStrategy.process(lista, "corr-caido"));
+
+        mockServer.verify();
+        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t.getEstadoInferenciaCelo());
+        verify(alertaRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void testMarcarInferenciaPendiente() {
         Telemetria t1 = new Telemetria();
         t1.setEstadoInferenciaCelo(EstadoInferencia.PENDIENTE);
 
         List<Telemetria> lista = List.of(t1);
 
-        celoDetectorStrategy.fallbackProcess(lista, "12345", new RuntimeException("Timeout"));
+        celoDetectorStrategy.marcarInferenciaPendiente(lista, "12345", new RuntimeException("Timeout"));
 
         assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferenciaCelo());
         verify(telemetriaRepository).saveAll(lista);

@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
@@ -1593,25 +1594,34 @@ public class AnimalServiceImpl implements AnimalService {
         public CohesionResponse obtenerCohesion(String emailUsuario, Long animalId,
                         LocalDateTime desde, LocalDateTime hasta) {
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
-                                .orElseThrow(() -> new IllegalArgumentException("Usuario productor no encontrado."));
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
                 Animal animal = animalRepository.findById(animalId)
                                 .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
 
                 Establecimiento establecimiento = animal.getEstablecimiento();
 
-                boolean productorActivoEnEstablecimiento = establecimiento.getEmpleados().stream()
+                boolean miembroActivo = establecimiento.getEmpleados().stream()
                                 .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo());
+                if (!miembroActivo) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento del animal o no está activo.");
+                }
 
-                if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
-                                        "El productor no pertenece a este establecimiento o no está activo.");
+                // Por defecto, los últimos 7 días (lo que muestra la ficha del animal).
+                if (hasta == null) {
+                        hasta = LocalDateTime.now();
+                }
+                if (desde == null) {
+                        desde = hasta.minusDays(7);
+                }
+                if (desde.isAfter(hasta)) {
+                        throw new IllegalArgumentException("La fecha 'desde' no puede ser posterior a 'hasta'.");
                 }
 
                 List<RegistroCohesion> cohesionRegistros = cohesionRepository
                                 .findByEstablecimientoIdAndAnimalIdAndFechaBetweenOrderByFechaAsc(
-                                                establecimiento.getId(),
-                                                animalId, desde, hasta);
+                                                establecimiento.getId(), animalId, desde, hasta);
 
                 LocalDateTime hastaAnterior = desde;
                 LocalDateTime desdeAnterior = hastaAnterior.minus(
@@ -1620,36 +1630,43 @@ public class AnimalServiceImpl implements AnimalService {
 
                 List<RegistroCohesion> cohesionRegistrosAnterior = cohesionRepository
                                 .findByEstablecimientoIdAndAnimalIdAndFechaBetweenOrderByFechaAsc(
-                                                establecimiento.getId(),
-                                                animalId, desdeAnterior, hastaAnterior);
+                                                establecimiento.getId(), animalId, desdeAnterior, hastaAnterior);
 
-                Double promedio = cohesionRegistros.stream()
+                Double promedioPeriodoAnterior = cohesionRegistrosAnterior.stream()
                                 .mapToDouble(RegistroCohesion::getIndiceCohesion)
                                 .average()
                                 .orElse(0.0);
 
-                Double promedioAnterior = cohesionRegistrosAnterior.stream()
-                                .mapToDouble(RegistroCohesion::getIndiceCohesion)
-                                .average()
-                                .orElse(0.0);
-
-                Double indiceActual = 0.0;
-
-                if (!cohesionRegistros.isEmpty()) {
-                        indiceActual = cohesionRegistros.get(cohesionRegistros.size() - 1).getIndiceCohesion();
+                // Promedio del rodeo del animal en cada análisis (ml-geo mide la cohesión
+                // contra su propio rodeo; los animales sin rodeo forman un grupo aparte).
+                List<Object[]> promediosRodeo = animal.getRodeoLote() != null
+                                ? cohesionRepository.promedioPorFechaDelRodeo(establecimiento.getId(),
+                                                animal.getRodeoLote().getId(), desde, hasta)
+                                : cohesionRepository.promedioPorFechaSinRodeo(establecimiento.getId(), desde, hasta);
+                Map<LocalDateTime, Double> promedioRodeoPorFecha = new HashMap<>();
+                for (Object[] fila : promediosRodeo) {
+                        promedioRodeoPorFecha.put((LocalDateTime) fila[0], ((Number) fila[1]).doubleValue());
                 }
+                Double promedioRodeo = promedioRodeoPorFecha.values().stream()
+                                .mapToDouble(Double::doubleValue)
+                                .average()
+                                .orElse(0.0);
+
+                Double indiceActual = cohesionRegistros.isEmpty()
+                                ? 0.0
+                                : cohesionRegistros.get(cohesionRegistros.size() - 1).getIndiceCohesion();
 
                 List<CohesionPuntoSerie> serie = cohesionRegistros.stream()
                                 .map(registro -> new CohesionPuntoSerie(
                                                 registro.getFecha(),
                                                 registro.getIndiceCohesion(),
-                                                promedio))
+                                                promedioRodeoPorFecha.get(registro.getFecha())))
                                 .collect(Collectors.toList());
 
                 return CohesionResponse.builder()
                                 .actual(indiceActual)
-                                .promedioRodeo(promedio)
-                                .promedioPeriodoAnterior(promedioAnterior)
+                                .promedioRodeo(promedioRodeo)
+                                .promedioPeriodoAnterior(promedioPeriodoAnterior)
                                 .serie(serie)
                                 .build();
         }

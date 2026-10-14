@@ -425,4 +425,18 @@ class ConfigAislamientoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.umbralAislamientoM").value(1000.0));
     }
+
+    @Test
+    @DisplayName("GET/PUT aislamiento: establecimiento inexistente → 404 Not Found")
+    void configAislamiento_establecimientoInexistente_404() throws Exception {
+        mockMvc.perform(get("/api/v1/establecimientos/{id}/aislamiento", 999_999L)
+                .header("Authorization", "Bearer " + tokenProductor))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(put("/api/v1/establecimientos/{id}/aislamiento", 999_999L)
+                .header("Authorization", "Bearer " + tokenProductor)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(crearRequest(150.0))))
+                .andExpect(status().isNotFound());
+    }
 }
