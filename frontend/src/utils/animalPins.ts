@@ -1,5 +1,6 @@
 import L from 'leaflet';
 import type { AnimalMapa } from '../api/animalesApi';
+import { severidadParaAnimal } from '../api/alertaApi';
 
 const pinUrls = import.meta.glob('../assets/pins/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 
@@ -25,7 +26,7 @@ export const PIN_NORMAL = PIN_ICONS.normal[0];
 
 /** Pin del animal según sus alertas (crítico / borde / normal) o si no tiene datos recientes. */
 export function determinarIcono(animal: AnimalMapa, selected = false) {
-  const severidades = animal.alertasAnimal.map(a => a.severidad);
+  const severidades = animal.alertasAnimal.map(a => severidadParaAnimal(a, animal.id));
   const estado = animal.sinDatosRecientes ? 'sindatos'
     : severidades.includes('ALTA') ? 'critico'
       : severidades.includes('MEDIA') || severidades.includes('BAJA') ? 'borde'

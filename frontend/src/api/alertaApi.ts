@@ -52,6 +52,45 @@ export const esGeoespacial = (a: { tipo?: string | null }) => {
   return t.includes('FUERA') || t.includes('PERIMETRO') || t === 'ABIGEATO' || t === 'GEOESPACIAL' || t.includes('AISLAMIENTO');
 };
 
+/** Si el animal figura en la alerta de aislamiento y ya volvió al grupo. */
+export const volvioAlGrupo = (alerta: AlertaResponse, animalId: number) =>
+  !!alerta.animalesAislados?.find(a => a.animalId === animalId)?.tsRegreso;
+
+/**
+ * Cuánto pesa la alerta en un animal (pin del mapa): en un aislamiento, la severidad de su propia fila,
+ * y MEDIA si ya volvió ("estuvo afuera un rato"); en las demás alertas, la de la alerta.
+ */
+export function severidadParaAnimal(alerta: AlertaResponse, animalId: number): AlertaResponse['severidad'] {
+  const propio = alerta.animalesAislados?.find(a => a.animalId === animalId);
+  if (!propio) return alerta.severidad;
+  return propio.tsRegreso ? 'MEDIA' : propio.severidad;
+}
+
+/**
+ * Aplica una alerta recibida por SSE a los animales del mapa: queda en cada animal que lista (aislamiento)
+ * o en su animal, reemplazando la versión anterior, y se quita de los que ya no la listan (cambio de principal).
+ */
+export function aplicarAlertaEnAnimales<T extends { id: number; alertasAnimal: AlertaResponse[] }>(
+  animales: T[],
+  alerta: AlertaResponse,
+): T[] {
+  const destinos = new Set(alerta.animalesAislados?.length
+    ? alerta.animalesAislados.map(a => a.animalId)
+    : [alerta.animalId]);
+  return animales.map(animal => {
+    const laTiene = animal.alertasAnimal.some(a => a.id === alerta.id);
+    if (!destinos.has(animal.id)) {
+      return laTiene ? { ...animal, alertasAnimal: animal.alertasAnimal.filter(a => a.id !== alerta.id) } : animal;
+    }
+    return {
+      ...animal,
+      alertasAnimal: laTiene
+        ? animal.alertasAnimal.map(a => a.id === alerta.id ? alerta : a)
+        : [alerta, ...animal.alertasAnimal],
+    };
+  });
+}
+
 /** Si la alerta pasa el filtro de tipo ('' = todos). Mismos valores que el `tipo` de GET /alertas. */
 export const coincideFiltroTipo = (a: { tipo?: string | null }, filtro: string) =>
   !filtro || (filtro === 'GEOESPACIAL' ? esGeoespacial(a) : a.tipo === filtro);

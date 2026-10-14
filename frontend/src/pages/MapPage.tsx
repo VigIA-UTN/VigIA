@@ -8,7 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import AlertSidebar from '../components/AlertSidebar';
 import PerimetroSidebar from '../components/PerimetroSidebar';
 import { type AnimalMapa, getAnimalesMapa, getAnimales } from '../api/animalesApi';
-import { type AlertaResumenResponse, type AlertaResponse, getResumenAlertas } from '../api/alertaApi';
+import { type AlertaResumenResponse, type AlertaResponse, aplicarAlertaEnAnimales, getResumenAlertas } from '../api/alertaApi';
 import {
   getPerimetros,
   activarPerimetro,
@@ -241,24 +241,8 @@ export default function MapPage() {
       try {
         const newAlerta = JSON.parse(event.data) as AlertaResponse;
 
-        // Actualizar el array de alertas del animal
-        setAnimales(prevAnimales => {
-          return prevAnimales.map(animal => {
-            if (animal.id === newAlerta.animalId) {
-              if (animal.alertasAnimal.some(a => a.id === newAlerta.id)) {
-                return {
-                  ...animal,
-                  alertasAnimal: animal.alertasAnimal.map(a => a.id === newAlerta.id ? newAlerta : a)
-                };
-              }
-              return {
-                ...animal,
-                alertasAnimal: [newAlerta, ...animal.alertasAnimal]
-              };
-            }
-            return animal;
-          });
-        });
+        // Actualizar las alertas de cada animal al que le corresponde (en aislamiento, todos los listados)
+        setAnimales(prevAnimales => aplicarAlertaEnAnimales(prevAnimales, newAlerta));
 
         // Refrescamos el resumen de alertas con un pequeño retraso
         // para dar tiempo a que la BD del worker commitee la transacción.

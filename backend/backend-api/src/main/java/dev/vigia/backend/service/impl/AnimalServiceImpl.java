@@ -25,6 +25,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.AnimalIndicadoresSaludResponse;
 import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalMetricaResponse;
@@ -68,6 +69,7 @@ import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
@@ -105,6 +107,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final CaravanaRepository caravanaRepository;
         private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
         private final RegistroCohesionRepository cohesionRepository;
+        private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
@@ -974,7 +977,17 @@ public class AnimalServiceImpl implements AnimalService {
                                                 alerta.getDisparador(), alerta.getTipo(), alerta.getEstado(),
                                                 ultimaSenial))
                                 .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
+                                .animalesAislados(alerta.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL
+                                                ? animalesAislados(alerta)
+                                                : null)
                                 .build();
+        }
+
+        // ponytail: una consulta por alerta de aislamiento y por animal del mapa; cargarlas en lote si el mapa crece.
+        private List<AnimalAisladoResponse> animalesAislados(Alerta alerta) {
+                return alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId()).stream()
+                                .map(episodio -> AnimalAisladoResponse.from(episodio, alerta.getValorUmbral()))
+                                .toList();
         }
 
         @Override
