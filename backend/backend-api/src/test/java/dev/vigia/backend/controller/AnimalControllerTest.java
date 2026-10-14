@@ -1253,7 +1253,8 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$.procesados").value(4))
                                 .andExpect(jsonPath("$.exitosos").value(0))
                                 .andExpect(jsonPath("$.fallidos").value(3))
-                                .andExpect(jsonPath("$.errores[0]").value("Fila 3: La fecha de nacimiento es obligatoria."))
+                                .andExpect(jsonPath("$.errores[0]")
+                                                .value("Fila 3: La fecha de nacimiento es obligatoria."))
                                 .andExpect(jsonPath("$.errores[1]").value("Fila 4: El rodeo/lote es obligatorio."))
                                 .andExpect(jsonPath("$.errores[2]").value(
                                                 "Fila 5: El rodeo/lote 'Rodeo Inventado' no existe o no está activo en el establecimiento."));
@@ -1504,6 +1505,7 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].tipo")
                                                 .value("CELO"));
         }
+
         @Test
         @DisplayName("GET /api/v1/animales/mapa - Una alerta de aislamiento pendiente aparece en cada animal que lista, con sus animales")
         @SuppressWarnings("null")
@@ -1540,14 +1542,20 @@ class AnimalControllerTest {
                                 .param("establecimientoId", establecimientoId.toString())
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$[?(@.id == " + principal.getId() + ")].alertasAnimal.length()").value(1))
-                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal.length()").value(1))
-                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal[0].id").value(alerta.getId().intValue()))
-                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal[0].animalesAislados.length()").value(2))
-                                .andExpect(jsonPath("$[?(@.id == " + noListadoId + ")].alertasAnimal.length()").value(0))
+                                .andExpect(jsonPath("$[?(@.id == " + principal.getId() + ")].alertasAnimal.length()")
+                                                .value(1))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal.length()")
+                                                .value(1))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal[0].id")
+                                                .value(alerta.getId().intValue()))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId()
+                                                + ")].alertasAnimal[0].animalesAislados.length()").value(2))
+                                .andExpect(jsonPath("$[?(@.id == " + noListadoId + ")].alertasAnimal.length()")
+                                                .value(0))
                                 .andReturn().getResponse().getContentAsString();
                 List<Object> regreso = JsonPath.read(json, "$[?(@.id == " + volvio.getId()
-                                + ")].alertasAnimal[0].animalesAislados[?(@.animalId == " + volvio.getId() + ")].tsRegreso");
+                                + ")].alertasAnimal[0].animalesAislados[?(@.animalId == " + volvio.getId()
+                                + ")].tsRegreso");
                 assertThat(regreso).singleElement().isNotNull();
 
                 // Confirmada deja de estar activa: no aparece en ningún pin
@@ -1557,8 +1565,10 @@ class AnimalControllerTest {
                                 .param("establecimientoId", establecimientoId.toString())
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$[?(@.id == " + principal.getId() + ")].alertasAnimal.length()").value(0))
-                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal.length()").value(0));
+                                .andExpect(jsonPath("$[?(@.id == " + principal.getId() + ")].alertasAnimal.length()")
+                                                .value(0))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal.length()")
+                                                .value(0));
         }
 
         // =========================================================================
@@ -2533,12 +2543,12 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
                                 .header("Authorization", "Bearer " + productorToken))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.actual").value(0.4))
+                                .andExpect(jsonPath("$.actual").value(40.0))
                                 .andExpect(jsonPath("$.serie.length()").value(2))
-                                .andExpect(jsonPath("$.serie[0].valor").value(0.8))
-                                .andExpect(jsonPath("$.serie[0].promedioRodeo").value(0.7))
-                                .andExpect(jsonPath("$.serie[1].promedioRodeo").value(0.7))
-                                .andExpect(jsonPath("$.promedioRodeo").value(0.7));
+                                .andExpect(jsonPath("$.serie[0].valor").value(80.0))
+                                .andExpect(jsonPath("$.serie[0].promedioRodeo").value(70.0))
+                                .andExpect(jsonPath("$.serie[1].promedioRodeo").value(70.0))
+                                .andExpect(jsonPath("$.promedioRodeo").value(70.0));
         }
 
         @Test

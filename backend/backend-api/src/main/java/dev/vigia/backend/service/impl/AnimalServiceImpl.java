@@ -1,7 +1,8 @@
 package dev.vigia.backend.service.impl;
 
 import java.io.IOException;
-import java.text.DecimalFormat;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -1658,19 +1659,19 @@ public class AnimalServiceImpl implements AnimalService {
                                 ? 0.0
                                 : cohesionRegistros.get(cohesionRegistros.size() - 1).getIndiceCohesion();
 
-                DecimalFormat formato = new DecimalFormat("#.00");
-
                 List<CohesionPuntoSerie> serie = cohesionRegistros.stream()
-                                .map(registro -> new CohesionPuntoSerie(
-                                                registro.getFecha(),
-                                                Double.parseDouble(formato.format(registro.getIndiceCohesion() * 100)),
-                                                Double.parseDouble(formato.format(
-                                                                promedioRodeoPorFecha.get(registro.getFecha()) * 100))))
+                                .map(registro -> {
+                                        Double promRodeo = promedioRodeoPorFecha.get(registro.getFecha());
+                                        return new CohesionPuntoSerie(
+                                                        registro.getFecha(),
+                                                        redondearDosDecimales(registro.getIndiceCohesion() * 100),
+                                                        promRodeo != null ? redondearDosDecimales(promRodeo * 100) : null);
+                                })
                                 .collect(Collectors.toList());
 
-                indiceActual = Double.parseDouble(formato.format(indiceActual * 100));
-                promedioRodeo = Double.parseDouble(formato.format(promedioRodeo * 100));
-                promedioPeriodoAnterior = Double.parseDouble(formato.format(promedioPeriodoAnterior * 100));
+                indiceActual = redondearDosDecimales(indiceActual * 100);
+                promedioRodeo = redondearDosDecimales(promedioRodeo * 100);
+                promedioPeriodoAnterior = redondearDosDecimales(promedioPeriodoAnterior * 100);
 
                 return CohesionResponse.builder()
                                 .actual(indiceActual)
@@ -1678,5 +1679,14 @@ public class AnimalServiceImpl implements AnimalService {
                                 .promedioPeriodoAnterior(promedioPeriodoAnterior)
                                 .serie(serie)
                                 .build();
+        }
+
+        private static Double redondearDosDecimales(Double valor) {
+                if (valor == null) {
+                        return null;
+                }
+                return BigDecimal.valueOf(valor)
+                                .setScale(2, RoundingMode.HALF_UP)
+                                .doubleValue();
         }
 }
