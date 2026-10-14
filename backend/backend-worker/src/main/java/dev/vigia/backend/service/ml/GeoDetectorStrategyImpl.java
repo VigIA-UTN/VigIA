@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -194,6 +195,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
 
         long minimoS = minutosFueraMinimo * 60;
         List<Analizado> nuevos = new ArrayList<>();
+        Map<Long, Alerta> conRegresos = new LinkedHashMap<>();
         for (Analizado analizado : analizados) {
             AlertaAnimalAislado abierto = abiertos.get(analizado.animal().getId());
             if (abierto != null) {
@@ -201,6 +203,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
                     actualizar(abierto, analizado.resultado());
                 } else {
                     abierto.setTsRegreso(ahora);
+                    conRegresos.putIfAbsent(abierto.getAlerta().getId(), abierto.getAlerta());
                 }
                 alertaAnimalAisladoRepository.save(abierto);
             } else if (analizado.alejado() && analizado.resultado().getTiempoFueraContinuoS() != null
@@ -208,12 +211,15 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
                 nuevos.add(analizado);
             }
         }
+        // Un regreso re-publica la alerta (mismo id) para que la tarjeta abierta lo muestre; no cambia su estado.
+        conRegresos.values().forEach(alerta -> publicar(alerta,
+                alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId())));
         if (nuevos.isEmpty()) {
             return;
         }
 
         Alerta pendiente = alertaRepository
-                .findByFiltros(est.getId(), EstadoAlerta.PENDIENTE, DisparadorAlerta.AISLAMIENTO_SOCIAL, null).stream()
+                .findByFiltros(est.getId(), EstadoAlerta.PENDIENTE, Set.of(DisparadorAlerta.AISLAMIENTO_SOCIAL), null).stream()
                 .filter(a -> Objects.equals(rodeoIdDe(a.getAnimal()), rodeoId))
                 .findFirst()
                 .orElse(null);

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Container, Spinner, Alert, Form, Button } from 'react-bootstrap';
-import { getAlertas, esAnestro, type AlertaResponse } from '../api/alertaApi';
+import { getAlertas, esAnestro, coincideFiltroTipo, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
@@ -122,11 +122,13 @@ export default function AlertasPage() {
                 }
                 // Si estamos filtrando y la alerta nueva no matchea, la ignoramos
                 if (filtroEstado && newAlerta.estado !== filtroEstado) return prev;
-                if (filtroTipo && newAlerta.tipo !== filtroTipo) return prev;
+                if (!coincideFiltroTipo(newAlerta, filtroTipo)) return prev;
                 if (filtroSeveridad && newAlerta.severidad !== filtroSeveridad) return prev;
                 
                 return [newAlerta, ...prev];
             });
+            // El detalle abierto sigue a la alerta (animales que se suman o vuelven)
+            setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? newAlerta : prev));
         };
 
         eventSource.onerror = (error) => {
@@ -216,7 +218,7 @@ export default function AlertasPage() {
                                 <option value="">Todos los tipos</option>
                                 <option value="CELO">Celo</option>
                                 <option value="SALUD">Salud</option>
-                                <option value="ABIGEATO">Posición / Abigeato</option>
+                                <option value="GEOESPACIAL">Geoespacial</option>
                             </Form.Select>
                         </div>
                         <div style={{ flex: '1 1 200px' }}>
@@ -285,13 +287,18 @@ export default function AlertasPage() {
                                             // Fallback gravedad to severidad mapping just in case backend still sends gravedad
                                             const sev = a.severidad ?? (a.gravedad as 'ALTA' | 'MEDIA' | 'BAJA') ?? (a.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
                                             const tipoLower = esAnestro(a) ? 'anestro' : (a.tipo || 'CELO').toLowerCase();
+                                            // Aislamiento: todos sus animales, no solo el principal (las demás alertas no traen lista)
+                                            const aislados = a.animalesAislados ?? [];
+                                            const idAnimal = aislados.length > 1
+                                                ? `${aislados.length} animales`
+                                                : `#${aislados[0]?.identificador ?? a.animalId}`;
                                             
                                             return (
                                                 <tr key={a.id}>
-                                                    <td className="fw-medium">#{a.animalId}</td>
+                                                    <td className="fw-medium">{idAnimal}</td>
                                                     <td>
                                                         <div className="d-flex align-items-center gap-2 flex-wrap">
-                                                            <span className={`tipo-badge tipo-${tipoLower}`}>{esAnestro(a) ? 'ANESTRO' : a.tipo || 'CELO'}</span>
+                                                            <span className={`tipo-badge tipo-${tipoLower}`}>{esAnestro(a) ? 'ANESTRO' : (a.tipo || 'CELO').replace(/_/g, ' ')}</span>
                                                             <DatoDesactualizadoBadge alerta={a} />
                                                         </div>
                                                     </td>

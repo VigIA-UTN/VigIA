@@ -43,13 +43,17 @@ public class AlertaController {
      * /api/v1/alertas?establecimientoId={id}&tipo={tipo}&severidad={severidad}&estado={estado}
      * <p>
      * Obtiene las alertas de un establecimiento. Permite filtrar opcionalmente
-     * por tipo (reproductivo, sanitario, geoespacial), severidad (alta, media,
-     * baja) y estado.
+     * por tipo, severidad (alta, media, baja) y estado. El tipo "geoespacial"
+     * agrupa abigeato, fuera de perímetro y aislamiento social, como el contador
+     * "Geoespacial" del mapa.
      * Si no se envían filtros, devuelve todas las alertas.
      * Ordena por defecto por severidad descendente.
      *
      * @param establecimientoId ID del establecimiento
-     * @param tipo              (opcional) reproductivo, sanitario, geoespacial
+     * @param tipo              (opcional) celo/reproductivo, salud/sanitario,
+     *                          geoespacial, abigeato, perimetro/fuera_de_perimetro,
+     *                          aislamiento_social (sin distinguir mayúsculas); otro
+     *                          valor responde 400
      * @param severidad         (opcional) ALTA, MEDIA, BAJA
      * @param estado            (opcional) PENDIENTE, CONFIRMADA, DESCARTADA
      * @param authentication    contexto de seguridad inyectado por Spring Security

@@ -35,6 +35,9 @@ import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
+import dev.vigia.backend.model.AlertaAnimalAislado;
+import com.jayway.jsonpath.JsonPath;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.EstadoAlerta;
@@ -56,6 +59,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -105,6 +109,8 @@ class AnimalControllerTest {
         private EntityManager entityManager;
         @Autowired
         private AlertaRepository alertaRepository;
+        @Autowired
+        private AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
         @Autowired
         private PerfilReferenciaRepository perfilReferenciaRepository;
         @Autowired
@@ -1498,6 +1504,63 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].tipo")
                                                 .value("CELO"));
         }
+        @Test
+        @DisplayName("GET /api/v1/animales/mapa - Una alerta de aislamiento pendiente aparece en cada animal que lista, con sus animales")
+        @SuppressWarnings("null")
+        void getPosicionesMapa_aislamiento_enCadaAnimalListado() throws Exception {
+                Animal principal = animalRepository.findById(
+                                crearAnimal("Principal", establecimientoId, rodeoLoteId)).orElseThrow();
+                Animal volvio = animalRepository.findById(
+                                crearAnimal("Volvio", establecimientoId, rodeoLoteId)).orElseThrow();
+                Long noListadoId = crearAnimal("No Listado", establecimientoId, rodeoLoteId);
+
+                Alerta alerta = new Alerta();
+                alerta.setAnimal(principal);
+                alerta.setDisparador(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+                alerta.setTipo("AISLAMIENTO_SOCIAL");
+                alerta.setEstado(EstadoAlerta.PENDIENTE);
+                alerta.setSeveridad(SeveridadAlerta.ALTA);
+                alerta.setTsGeneracion(LocalDateTime.now());
+                alerta.setValorUmbral(150.0);
+                alerta.setValorDetectado(400.0);
+                alerta = alertaRepository.save(alerta);
+                alertaAnimalAisladoRepository.save(AlertaAnimalAislado.builder()
+                                .alerta(alerta).animal(principal)
+                                .segundosFuera(1800L).distanciaGrupoM(400.0)
+                                .tsInicio(LocalDateTime.now().minusMinutes(30))
+                                .build());
+                alertaAnimalAisladoRepository.save(AlertaAnimalAislado.builder()
+                                .alerta(alerta).animal(volvio)
+                                .segundosFuera(900L).distanciaGrupoM(200.0)
+                                .tsInicio(LocalDateTime.now().minusMinutes(40))
+                                .tsRegreso(LocalDateTime.now().minusMinutes(10))
+                                .build());
+
+                String json = mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[?(@.id == " + principal.getId() + ")].alertasAnimal.length()").value(1))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal.length()").value(1))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal[0].id").value(alerta.getId().intValue()))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal[0].animalesAislados.length()").value(2))
+                                .andExpect(jsonPath("$[?(@.id == " + noListadoId + ")].alertasAnimal.length()").value(0))
+                                .andReturn().getResponse().getContentAsString();
+                List<Object> regreso = JsonPath.read(json, "$[?(@.id == " + volvio.getId()
+                                + ")].alertasAnimal[0].animalesAislados[?(@.animalId == " + volvio.getId() + ")].tsRegreso");
+                assertThat(regreso).singleElement().isNotNull();
+
+                // Confirmada deja de estar activa: no aparece en ningún pin
+                alerta.setEstado(EstadoAlerta.CONFIRMADA);
+                alertaRepository.save(alerta);
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[?(@.id == " + principal.getId() + ")].alertasAnimal.length()").value(0))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal.length()").value(0));
+        }
+
         // =========================================================================
         // GET /api/v1/animales/{id}/metricas
         // =========================================================================

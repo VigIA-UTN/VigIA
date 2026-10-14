@@ -75,6 +75,18 @@
     color: #6B46C1;
 }
 
+/* Geoespaciales: mismos tonos rojos que la categoría "Geoespacial" del mapa */
+.tipo-fuera_de_perimetro {
+    background-color: #FED7D7;
+    color: #C53030;
+}
+
+.tipo-aislamiento_social {
+    background-color: #FFF0F0;
+    color: #B00020;
+    border: 1px solid #F5C2C7;
+}
+
 /* Anestro: reproductiva (disparador CELO) pero con distintivo propio */
 .tipo-anestro {
     background-color: #E6FFFA;

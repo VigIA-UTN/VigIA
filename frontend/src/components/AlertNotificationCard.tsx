@@ -1,4 +1,4 @@
-import { esAislamiento, esAnestro, textoAccionRecomendada, type AlertaResponse } from '../api/alertaApi';
+import { esAislamiento, esAnestro, textoAccionRecomendada, volvioAlGrupo, type AlertaResponse } from '../api/alertaApi';
 import { formatMinutos } from '../utils/fechas';
 import SidebarCard, { type Categoria, type Severidad } from './SidebarCard';
 import DatoDesactualizadoBadge from './DatoDesactualizadoBadge';
@@ -8,6 +8,8 @@ interface AlertNotificationCardProps {
   onClick: (alerta: AlertaResponse) => void;
   isMenuOpen?: boolean;
   isUnread?: boolean;
+  /** Animal desde el que se mira la alerta (panel del mapa): si ya volvió al grupo, la card lo dice. */
+  animalId?: number;
 }
 
 const ESTADO_ANIMAL: Record<Severidad, string> = { BAJA: 'NORMAL', MEDIA: 'BORDE', ALTA: 'CRITICO' };
@@ -54,6 +56,7 @@ export default function AlertNotificationCard({
   onClick,
   isMenuOpen = false,
   isUnread = false,
+  animalId,
 }: AlertNotificationCardProps) {
   const resuelta = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
   // Severidad: el backend manda ALTA/MEDIA/BAJA. Fallback por tipo mientras no llegue.
@@ -70,14 +73,25 @@ export default function AlertNotificationCard({
   if (aislamiento) {
     titulo = aislados.length > 1 ? `${aislados.length} animales aislados del rodeo` : `#${aislados[0]?.identificador ?? alerta.animalId} aislado del rodeo`;
   }
-  const minutosAislado = aislados.length
-    ? Math.max(...aislados.map(a => a.minutosFuera))
+  // Los que volvieron siguen listados ("estuvo afuera"), pero el tiempo de la card es el de los que siguen afuera.
+  const fuera = aislados.filter(a => !a.tsRegreso);
+  const volvieron = aislados.length - fuera.length;
+  const minutosAislado = fuera.length
+    ? Math.max(...fuera.map(a => a.minutosFueraSeguidos))
     : minutosDesde(alerta.tsGeneracion);
+  let textoAislamiento = `Fuera del grupo hace ${formatMinutos(minutosAislado)}`;
+  if (animalId != null && volvioAlGrupo(alerta, animalId)) {
+    textoAislamiento = 'Este animal ya volvió al grupo';
+  } else if (aislados.length && !fuera.length) {
+    textoAislamiento = aislados.length > 1 ? 'Todos volvieron al grupo' : 'Volvió al grupo';
+  } else if (volvieron) {
+    textoAislamiento += ` · ${volvieron} ya ${volvieron > 1 ? 'volvieron' : 'volvió'}`;
+  }
 
   const cuerpoPrincipal = aislamiento ? (
     // Reserva las 3 líneas que ocupa la acción recomendada en las demás cards, para igualar la altura.
     <div style={{ minHeight: 'calc(3 * 1.35em)' }}>
-      Fuera del grupo hace {formatMinutos(minutosAislado)}
+      {textoAislamiento}
     </div>
   ) : isGeoespacial ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
