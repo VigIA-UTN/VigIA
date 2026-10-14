@@ -75,6 +75,10 @@ public class GeoBatchConfig {
                 return establecimiento;
             }
 
+            // Con varias réplicas del worker, la segunda espera acá a que la primera commitee y, al
+            // seguir, ya no encuentra telemetría pendiente: nadie analiza dos veces el mismo establecimiento.
+            establecimientoRepository.bloquear(establecimiento.getId());
+
             LocalDateTime hasta = LocalDateTime.now();
             LocalDateTime desde = hasta.minusHours(ventanaHoras);
 
@@ -103,7 +107,9 @@ public class GeoBatchConfig {
     @SuppressWarnings("null")
     public Step geoStep() {
         return new StepBuilder("geoStep", jobRepository)
-                .<Establecimiento, Establecimiento>chunk(10, transactionManager)
+                // Una transacción por establecimiento: el bloqueo dura solo su análisis y un error de base
+                // en uno no deshace a los demás.
+                .<Establecimiento, Establecimiento>chunk(1, transactionManager)
                 .reader(establecimientoItemReaderGeo())
                 .processor(geoProcessor())
                 .writer(geoWriter())

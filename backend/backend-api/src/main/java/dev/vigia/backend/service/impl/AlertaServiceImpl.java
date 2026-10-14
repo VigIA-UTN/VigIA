@@ -12,10 +12,12 @@ import java.util.stream.Collectors;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AnimalAisladoResponse;
@@ -60,9 +62,7 @@ import dev.vigia.backend.service.AlertaService;
 import dev.vigia.backend.service.CeloDatoDesactualizadoEvaluator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 @Slf4j
 @Service
@@ -75,6 +75,10 @@ public class AlertaServiceImpl implements AlertaService {
                         DisparadorAlerta.AISLAMIENTO_SOCIAL);
 
         private final AlertaRepository alertaRepository;
+
+        /** Misma ventana que usa el worker para el análisis geoespacial (VIGIA_GEO_VENTANA_HORAS). */
+        @Value("${vigia.geo.ventana-horas:24}")
+        private int ventanaHorasGeo = 24;
         private final AnimalRepository animalRepository;
         private final UsuarioRepository usuarioRepository;
         private final EstablecimientoRepository establecimientoRepository;
@@ -82,7 +86,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final EstadoReproductivoRepository estadoReproductivoRepository;
         private final EstadoSaludRepository estadoSaludRepository;
         private final DiagnosticoRepository diagnosticoRepository;
-        private final RabbitTemplate rabbitTemplate;
+        private final PublicadorDeAlertas publicadorDeAlertas;
         private final ObjectMapper objectMapper;
         private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
         private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
@@ -478,6 +482,7 @@ public class AlertaServiceImpl implements AlertaService {
                                                 .min(Comparator.naturalOrder())
                                                 .orElse(alerta.getTsGeneracion()))
                                 .nombreLote(nombreLote)
+                                .ventanaHoras(ventanaHorasGeo)
                                 .build();
         }
 
@@ -587,16 +592,7 @@ public class AlertaServiceImpl implements AlertaService {
                 }
                 Alerta actualizado = alertaRepository.save(alerta);
 
-                AlertaEventDTO eventDTO = AlertaEventDTO.builder()
-                                .id(actualizado.getId())
-                                .animalId(actualizado.getAnimal().getId())
-                                .estado(actualizado.getEstado())
-                                .tipo(actualizado.getTipo())
-                                .disparador(actualizado.getDisparador())
-                                .accionRecomendada(actualizado.getAccionRecomendada())
-                                .tsGeneracion(actualizado.getTsGeneracion())
-                                .build();
-                rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
+                publicarCambioDeEstado(actualizado);
 
                 return this.toResponse(actualizado);
         }
@@ -619,7 +615,7 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                Alerta alerta = alertaRepository.findById(alertaId)
+                Alerta alerta = alertaRepository.findByIdForUpdate(alertaId)
                                 .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
 
                 if (alerta.getAnimal() == null || alerta.getAnimal().getEstablecimiento() == null ||
@@ -640,17 +636,30 @@ public class AlertaServiceImpl implements AlertaService {
                 alerta.setTsConfirmacion(LocalDateTime.now());
                 Alerta actualizado = alertaRepository.save(alerta);
 
-                AlertaEventDTO eventDTO = AlertaEventDTO.builder()
-                                .id(actualizado.getId())
-                                .animalId(actualizado.getAnimal().getId())
-                                .estado(actualizado.getEstado())
-                                .tipo(actualizado.getTipo())
-                                .tsGeneracion(actualizado.getTsGeneracion())
-                                .build();
-                rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "alerta.update", eventDTO);
+                publicarCambioDeEstado(actualizado);
 
                 return this.toResponse(actualizado);
         }
+
+        /** Publica la alerta completa, no solo el estado: el SSE la reenvía tal cual y el front reemplaza la tarjeta. */
+        private void publicarCambioDeEstado(Alerta alerta) {
+                AlertaEventDTO eventDTO = AlertaEventDTO.builder()
+                                .id(alerta.getId())
+                                .animalId(alerta.getAnimal().getId())
+                                .estado(alerta.getEstado())
+                                .tipo(alerta.getTipo())
+                                .disparador(alerta.getDisparador())
+                                .severidad(alerta.getSeveridad())
+                                .valorUmbral(alerta.getValorUmbral())
+                                .valorDetectado(alerta.getValorDetectado())
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
+                                .accionRecomendada(alerta.getAccionRecomendada())
+                                .tsGeneracion(alerta.getTsGeneracion())
+                                .build();
+                publicadorDeAlertas.publicar(eventDTO);
+        }
+
 
         @Override
         @SuppressWarnings("null")

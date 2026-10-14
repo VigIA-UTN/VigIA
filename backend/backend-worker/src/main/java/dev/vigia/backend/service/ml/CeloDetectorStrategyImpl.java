@@ -1,7 +1,7 @@
 package dev.vigia.backend.service.ml;
 
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.client.MlCeloClient;
-import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.PuntoTelemetriaDTO;
 import dev.vigia.backend.dto.ml.CeloPredictResponseDTO;
@@ -20,7 +20,6 @@ import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -34,19 +33,19 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
         private final TelemetriaRepository telemetriaRepository;
         private final AlertaRepository alertaRepository;
         private final EstadoReproductivoRepository estadoReproductivoRepository;
-        private final RabbitTemplate rabbitTemplate;
+        private final PublicadorDeAlertas publicadorDeAlertas;
 
         public CeloDetectorStrategyImpl(
                         MlCeloClient mlCeloClient,
                         TelemetriaRepository telemetriaRepository,
                         AlertaRepository alertaRepository,
                         EstadoReproductivoRepository estadoReproductivoRepository,
-                        RabbitTemplate rabbitTemplate) {
+                        PublicadorDeAlertas publicadorDeAlertas) {
                 this.mlCeloClient = mlCeloClient;
                 this.telemetriaRepository = telemetriaRepository;
                 this.alertaRepository = alertaRepository;
                 this.estadoReproductivoRepository = estadoReproductivoRepository;
-                this.rabbitTemplate = rabbitTemplate;
+                this.publicadorDeAlertas = publicadorDeAlertas;
         }
 
         @Override
@@ -148,8 +147,8 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
                                         .ventanaOptimaHoras(alerta.getVentanaOptimaHoras())
                                         .build();
 
-                        rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
-                        log.info("Alerta publicada en RabbitMQ con ID: {}", alerta.getId());
+                        publicadorDeAlertas.publicar(eventDTO);
+                        log.info("Alerta de celo {} generada; se publica al commitear", alerta.getId());
                 }
         }
 

@@ -35,6 +35,9 @@ class GeoAnalyzeRequest(BaseModel):
     # por defecto configurado en la variable de entorno UMBRAL_AISLAMIENTO_METROS (100 m).
     # Debe ser > 0: con 0 el índice de cohesión de un animal pegado al grupo sería 0/0.
     umbral_aislamiento_m: Optional[float] = Field(default=None, gt=0)
+    # Antigüedad máxima (s) de la última posición de un animal para clasificarlo ahora; si no se
+    # envía, se usa VIGENCIA_POSICION_S. Ver analyze.
+    vigencia_posicion_s: Optional[float] = Field(default=None, gt=0)
 
 class AlertaAnimal(BaseModel):
     animal_id: str
@@ -63,6 +66,11 @@ GRID_SIZE = 20  # Grilla de 20x20
 # orden del diámetro de un rodeo en pastoreo. El backend envía el umbral de cada
 # establecimiento en umbral_aislamiento_m; este valor solo se usa si no llega.
 UMBRAL_AISLAMIENTO_METROS = float(os.getenv("UMBRAL_AISLAMIENTO_METROS", "100.0"))
+
+# Antigüedad máxima, en segundos, de la última posición de un animal para usarla
+# en la alerta, medida contra la posición más reciente del historial. Una
+# caravana que dejó de transmitir no se compara con dónde está el rodeo ahora.
+VIGENCIA_POSICION_S = float(os.getenv("VIGENCIA_POSICION_S", "1800"))
 
 # Duración de los intervalos en que se agrupan las posiciones para medir el
 # tiempo fuera del grupo, en segundos.
@@ -309,8 +317,16 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
                 ultimas_posiciones[p.animal_id] = p
 
         # La alerta usa la última posición; el tiempo fuera del grupo, todo el
-        # historial por intervalos. Ambos clasifican con _clasificar.
-        posiciones = {a_id: (p.lat, p.lng) for a_id, p in ultimas_posiciones.items()}
+        # historial por intervalos. Ambos clasifican con _clasificar. Los animales
+        # cuya última posición es vieja (caravana muda) quedan fuera de la
+        # respuesta: el backend los trata como "sin datos en esta corrida".
+        vigencia_s = payload.vigencia_posicion_s if payload.vigencia_posicion_s is not None else VIGENCIA_POSICION_S
+        referencia = max(_ts(p) for p in ultimas_posiciones.values())
+        posiciones = {
+            a_id: (p.lat, p.lng)
+            for a_id, p in ultimas_posiciones.items()
+            if (referencia - _ts(p)).total_seconds() <= vigencia_s
+        }
         iso_times, iso_continuo = _compute_isolation_times(payload.historial_7d, umbral_efectivo)
         alertas = [
             AlertaAnimal(

@@ -41,6 +41,7 @@ services:
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
       - OAUTH2_REDIRECT_URI=${OAUTH2_REDIRECT_URI:-http://localhost:5173/oauth2/callback}
       - CELO_HORAS_DATO_DESACTUALIZADO=${CELO_HORAS_DATO_DESACTUALIZADO:-2}
+      - VIGIA_GEO_VENTANA_HORAS=${VIGIA_GEO_VENTANA_HORAS:-24}
       - ML_CELO_URL=http://ml-celo:8001
       - ML_SALUD_URL=http://ml-salud:8002
       - ML_GEO_URL=http://ml-geo:8003
@@ -90,6 +91,7 @@ services:
       - VIGIA_SALUD_RECALIBRACION_DIAS=${VIGIA_SALUD_RECALIBRACION_DIAS:-30}
       - VIGIA_GEO_VENTANA_HORAS=${VIGIA_GEO_VENTANA_HORAS:-24}
       - VIGIA_GEO_MINUTOS_FUERA_MINIMO=${VIGIA_GEO_MINUTOS_FUERA_MINIMO:-15}
+      - VIGIA_GEO_HORAS_SIN_DATOS_CIERRE=${VIGIA_GEO_HORAS_SIN_DATOS_CIERRE:-6}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - MAIL_HOST=${MAIL_HOST:-mail}
       - MAIL_PORT=${MAIL_PORT:-1025}
@@ -143,6 +145,7 @@ services:
       - "${ML_GEO_PORT:-8003}:8003"
     environment:
       - UMBRAL_AISLAMIENTO_METROS=${UMBRAL_AISLAMIENTO_METROS:-100.0}
+      - VIGENCIA_POSICION_S=${VIGENCIA_POSICION_S:-1800}
     volumes:
       - ../ml-geo/app:/app/app
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload" ]

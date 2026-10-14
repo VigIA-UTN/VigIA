@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Form from 'react-bootstrap/Form';
-import { coincideFiltroTipo, getAlertas, type AlertaResponse } from '../api/alertaApi';
+import { aplicarAlertaEnLista, coincideFiltroTipo, combinarAlerta, getAlertas, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertDetailSidebar from './AlertDetailSidebar';
@@ -66,6 +66,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
       }
 
       eventSource = new EventSource(sseUrl);
+      let reconectando = false;
 
       eventSource.onmessage = (event) => {
         if (!isMounted) return;
@@ -77,21 +78,25 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           maxAlertaIdRef.current = newAlerta.id;
         }
 
-        // Si la alerta ya existe, la actualizamos
-        setAlertas((prev) => {
-          if (prev.some(a => a.id === newAlerta.id)) {
-            return prev.map(a => a.id === newAlerta.id ? newAlerta : a);
-          }
-          // Solo guardamos si es PENDIENTE (al menos como alerta nueva)
-          if (newAlerta.estado !== 'PENDIENTE') return prev;
-          return [newAlerta, ...prev];
-        });
+        // El sidebar lista solo pendientes: una alerta resuelta sale de la lista
+        setAlertas((prev) => aplicarAlertaEnLista(prev, newAlerta, { tipo: '', severidad: '', estado: 'PENDIENTE' }));
 
         // Si la alerta actualizada es la que estamos viendo en detalle, actualizamos el estado
-        setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? newAlerta : prev));
+        setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? combinarAlerta(prev, newAlerta) : prev));
+      };
+
+      // Al reconectar se recarga la lista: el replay del backend solo trae alertas nuevas, no cambios.
+      eventSource.onopen = () => {
+        if (reconectando && isMounted) {
+          getAlertas(selectedId, undefined, undefined, 'PENDIENTE')
+            .then(data => { if (isMounted) setAlertas(data); })
+            .catch(error => console.error("Error recargando alertas:", error));
+        }
+        reconectando = false;
       };
 
       eventSource.onerror = (error) => {
+        reconectando = true;
         console.error("SSE connection error in sidebar:", error);
       };
     };

@@ -26,14 +26,16 @@ export interface AnimalAislado {
   animalId: number;
   identificador: string;
   alias: string | null;
-  /** Tiempo acumulado fuera del grupo en las últimas 24 h. */
+  /** Tiempo acumulado fuera del grupo dentro de la ventana analizada (DetalleAislamiento.ventanaHoras). */
   minutosFuera: number;
-  /** Duración de este aislamiento: hasta ahora, o hasta que volvió (queda fijo). */
+  /** Duración de este aislamiento: hasta ahora, o hasta que se cerró (queda fijo). */
   minutosFueraSeguidos: number;
-  distanciaGrupoM: number;
+  distanciaGrupoM: number | null;
   severidad: SeveridadNivel;
-  /** Cuándo volvió al grupo; null mientras sigue afuera. */
+  /** Cuándo se cerró el aislamiento; null mientras sigue afuera. */
   tsRegreso: string | null;
+  /** REGRESO = volvió al grupo; SIN_DATOS = la caravana dejó de transmitir y no se sabe. */
+  motivoCierre?: 'REGRESO' | 'SIN_DATOS' | null;
 }
 
 /** Bloque de aislamiento del detalle de alerta (solo AISLAMIENTO_SOCIAL). */
@@ -41,6 +43,8 @@ export interface DetalleAislamiento {
   animalesAislados: AnimalAislado[];
   tsInicio: string;
   nombreLote: string | null;
+  /** Horas de telemetría que analiza el worker (el acumulado fuera del grupo es dentro de esta ventana). */
+  ventanaHoras?: number | null;
 }
 
 /** Alerta geoespacial de aislamiento social: uno o más animales lejos del rodeo. */
@@ -52,9 +56,48 @@ export const esGeoespacial = (a: { tipo?: string | null }) => {
   return t.includes('FUERA') || t.includes('PERIMETRO') || t === 'ABIGEATO' || t === 'GEOESPACIAL' || t.includes('AISLAMIENTO');
 };
 
-/** Si el animal figura en la alerta de aislamiento y ya volvió al grupo. */
+/** Si el animal figura en la alerta de aislamiento y su aislamiento ya se cerró (volvió o dejó de transmitir). */
 export const volvioAlGrupo = (alerta: AlertaResponse, animalId: number) =>
   !!alerta.animalesAislados?.find(a => a.animalId === animalId)?.tsRegreso;
+
+/** Estado de un animal de la alerta de aislamiento para mostrar: sigue afuera, volvió o sin datos. */
+export const estadoAislado = (a: AnimalAislado): 'AFUERA' | 'VOLVIO' | 'SIN_DATOS' =>
+  !a.tsRegreso ? 'AFUERA' : a.motivoCierre === 'SIN_DATOS' ? 'SIN_DATOS' : 'VOLVIO';
+
+/** Alertas que todavía pesan en el animal (pin y color del mapa): las resueltas ya no. */
+export const alertasVigentes = (alertas: AlertaResponse[]) => alertas.filter(a => a.estado === 'PENDIENTE');
+
+/**
+ * Combina la versión que ya se tenía de una alerta con la que llega por SSE: los campos que el evento
+ * no trae (null/undefined) se conservan, así un evento incompleto no borra la severidad ni la lista.
+ */
+export function combinarAlerta(anterior: AlertaResponse | undefined | null, nueva: AlertaResponse): AlertaResponse {
+  if (!anterior || anterior.id !== nueva.id) return nueva;
+  const definidos = Object.fromEntries(Object.entries(nueva).filter(([, v]) => v !== null && v !== undefined));
+  return { ...anterior, ...definidos } as AlertaResponse;
+}
+
+/** Filtros de la lista de alertas ('' = sin filtro), con los mismos valores que GET /alertas. */
+export interface FiltrosAlerta { tipo: string; severidad: string; estado: string }
+
+/** Si la alerta pasa los filtros activos de la lista. */
+export const cumpleFiltros = (a: AlertaResponse, f: FiltrosAlerta) =>
+  (!f.estado || a.estado === f.estado)
+  && coincideFiltroTipo(a, f.tipo)
+  && (!f.severidad || a.severidad === f.severidad);
+
+/**
+ * Aplica una alerta recibida por SSE a la lista: reemplaza la existente (combinada), la saca si dejó de
+ * cumplir los filtros (p. ej. se confirmó con el filtro "Pendientes") o la agrega arriba si es nueva y los cumple.
+ */
+export function aplicarAlertaEnLista(lista: AlertaResponse[], llegada: AlertaResponse, filtros: FiltrosAlerta): AlertaResponse[] {
+  const anterior = lista.find(a => a.id === llegada.id);
+  const alerta = combinarAlerta(anterior, llegada);
+  if (!cumpleFiltros(alerta, filtros)) {
+    return anterior ? lista.filter(a => a.id !== alerta.id) : lista;
+  }
+  return anterior ? lista.map(a => (a.id === alerta.id ? alerta : a)) : [alerta, ...lista];
+}
 
 /**
  * Cuánto pesa la alerta en un animal (pin del mapa): en un aislamiento, la severidad de su propia fila,
@@ -79,13 +122,16 @@ export function aplicarAlertaEnAnimales<T extends { id: number; alertasAnimal: A
     : [alerta.animalId]);
   return animales.map(animal => {
     const laTiene = animal.alertasAnimal.some(a => a.id === alerta.id);
+    // Una alerta ya resuelta se actualiza donde está, pero no se vuelve a agregar (el worker re-publica
+    // las alertas de aislamiento cuando un animal vuelve, aunque ya estén confirmadas).
+    if (!laTiene && alerta.estado !== 'PENDIENTE') return animal;
     if (!destinos.has(animal.id)) {
       return laTiene ? { ...animal, alertasAnimal: animal.alertasAnimal.filter(a => a.id !== alerta.id) } : animal;
     }
     return {
       ...animal,
       alertasAnimal: laTiene
-        ? animal.alertasAnimal.map(a => a.id === alerta.id ? alerta : a)
+        ? animal.alertasAnimal.map(a => a.id === alerta.id ? combinarAlerta(a, alerta) : a)
         : [alerta, ...animal.alertasAnimal],
     };
   });

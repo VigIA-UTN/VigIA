@@ -15,4 +15,11 @@ public interface EstablecimientoRepository extends JpaRepository<Establecimiento
 
     @Query("SELECT e FROM Establecimiento e JOIN e.empleados v WHERE v.usuario.email = :email AND v.activo = true")
     List<Establecimiento> findActiveEstablecimientoByUsuarioEmail(@Param("email") String email);
+
+    /**
+     * Bloquea la fila del establecimiento hasta el fin de la transacción. El job geo lo usa para que dos
+     * réplicas del worker no analicen el mismo establecimiento a la vez.
+     */
+    @Query(value = "SELECT id FROM establecimientos WHERE id = :id FOR UPDATE", nativeQuery = true)
+    Long bloquear(@Param("id") Long id);
 }

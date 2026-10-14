@@ -97,6 +97,7 @@ Ante un fallo inesperado responde **503** con `{ "error", "mensaje", "trace_id" 
 | Variable | Default | Descripción |
 |---|---|---|
 | `UMBRAL_AISLAMIENTO_METROS` | `100.0` | Umbral de aislamiento **por defecto**: distancia máxima entre dos animales para considerarlos juntos. Solo se usa si el request no trae `umbral_aislamiento_m`. El default es del orden del diámetro de un rodeo en pastoreo. |
+| `VIGENCIA_POSICION_S` | `1800` | Antigüedad máxima, en segundos, de la última posición de un animal (contra la más reciente del historial) para clasificarlo en la alerta. Una caravana que dejó de transmitir no se compara con el rodeo actual y el animal no aparece en `alertas`. El request puede mandar `vigencia_posicion_s`. |
 
 Se declara en `infra/docker-compose.yml` y se documenta en `infra/.env.example`. El umbral real de cada establecimiento lo configura el productor y viaja en el request.
 

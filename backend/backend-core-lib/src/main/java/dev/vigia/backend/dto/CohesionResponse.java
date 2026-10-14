@@ -12,12 +12,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CohesionResponse {
-    /** Índice actual, 0–100. */
+    /** Índice actual, 0–100; null si no hay análisis en el período. */
     Double actual;
-    /** Promedio del rodeo en el período. */
+    /** Promedio del rodeo en el período; null sin datos. */
     Double promedioRodeo;
 
     Double promedioPeriodoAnterior;
-    /** Serie de puntos con marca de tiempo y valor. */
+    /** Un punto por hora (rangos de hasta 48 h) o por día, incluidos los intervalos sin datos. */
     List<CohesionPuntoSerie> serie;
 }

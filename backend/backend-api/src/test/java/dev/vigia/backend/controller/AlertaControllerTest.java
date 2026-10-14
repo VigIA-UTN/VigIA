@@ -46,6 +46,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -714,8 +715,9 @@ class AlertaControllerTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].tipo").value("AISLAMIENTO_SOCIAL"))
                 .andExpect(jsonPath("$[0].animalesAislados.length()").value(1))
-                .andExpect(jsonPath("$[0].animalesAislados[0].length()").value(8))
+                .andExpect(jsonPath("$[0].animalesAislados[0].length()").value(9))
                 .andExpect(jsonPath("$[0].animalesAislados[0].tsRegreso").isEmpty())
+                .andExpect(jsonPath("$[0].animalesAislados[0].motivoCierre").isEmpty())
                 .andExpect(jsonPath("$[0].animalesAislados[0].minutosFueraSeguidos").value(30))
                 .andExpect(jsonPath("$[0].animalesAislados[0].animalId").value(animal.getId()))
                 .andExpect(jsonPath("$[0].animalesAislados[0].identificador").value("CAR-001"))
@@ -1124,6 +1126,64 @@ class AlertaControllerTest {
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    @Test
+    @DisplayName("Stream SSE: un usuario que no es miembro del establecimiento recibe 403")
+    void streamAlertas_noMiembro_returns403() throws Exception {
+        crearUsuario("ajeno-stream@vigia.dev", "ajeno123", Rol.PRODUCTOR);
+        String ajenoToken = getTokenFor("ajeno-stream@vigia.dev", "ajeno123");
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + ajenoToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Stream SSE: ADMINISTRADOR no recibe alertas operativas (403)")
+    void streamAlertas_administrador_returns403() throws Exception {
+        crearUsuario("admin-stream@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+        String adminToken = getTokenFor("admin-stream@vigia.dev", "admin123");
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + adminToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Stream SSE: un miembro activo del establecimiento se suscribe")
+    void streamAlertas_miembro_abreElStream() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+    }
+
+    @Test
+    @DisplayName("Stream SSE: acepta el header Last-Event-ID de la reconexión automática, con o sin el parámetro")
+    void streamAlertas_conHeaderLastEventId_abreElStream() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + productorToken)
+                .header("Last-Event-ID", alertaId.toString())
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + productorToken)
+                .header("Last-Event-ID", alertaId.toString())
+                .param("establecimientoId", establecimientoId.toString())
+                .param("lastEventId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+    }
 
     private Usuario crearUsuario(String email, String password, Rol rol) {
         Usuario u = new Usuario();

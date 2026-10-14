@@ -1,8 +1,12 @@
 package dev.vigia.backend.controller;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -737,17 +741,26 @@ public class AnimalController {
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getCohesion(
             @PathVariable("id") Long animalId,
-            @RequestParam(name = "desde", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime desde,
-            @RequestParam(name = "hasta", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime hasta,
+            @RequestParam(name = "desde", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime desde,
+            @RequestParam(name = "hasta", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime hasta,
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            CohesionResponse response = animalService.obtenerCohesion(email, animalId, desde, hasta);
+            CohesionResponse response = animalService.obtenerCohesion(email, animalId, aHoraLocal(desde),
+                    aHoraLocal(hasta));
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (IllegalArgumentException e) {
+            if ("Animal no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    /** Los registros se guardan en la hora local del servidor: el instante recibido se lleva a esa zona. */
+    private static LocalDateTime aHoraLocal(OffsetDateTime fecha) {
+        return fecha == null ? null : fecha.atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
     }
 }

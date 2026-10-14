@@ -1,9 +1,9 @@
 package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.client.MlSaludClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.PerfilCalibracionRequestDTO;
 import dev.vigia.backend.dto.ml.PerfilCalibracionResponseDTO;
@@ -25,7 +25,6 @@ import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.PerfilReferenciaRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -44,7 +43,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
     private final TelemetriaRepository telemetriaRepository;
     private final AlertaRepository alertaRepository;
     private final PerfilReferenciaRepository perfilReferenciaRepository;
-    private final RabbitTemplate rabbitTemplate;
+    private final PublicadorDeAlertas publicadorDeAlertas;
     private final ObjectMapper objectMapper;
     private final int calibracionDias;
     private final int recalibracionDias;
@@ -54,7 +53,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
             TelemetriaRepository telemetriaRepository,
             AlertaRepository alertaRepository,
             PerfilReferenciaRepository perfilReferenciaRepository,
-            RabbitTemplate rabbitTemplate,
+            PublicadorDeAlertas publicadorDeAlertas,
             ObjectMapper objectMapper,
             @Value("${vigia.salud.calibracion-dias:7}") int calibracionDias,
             @Value("${vigia.salud.recalibracion-dias:30}") int recalibracionDias) {
@@ -62,7 +61,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         this.telemetriaRepository = telemetriaRepository;
         this.alertaRepository = alertaRepository;
         this.perfilReferenciaRepository = perfilReferenciaRepository;
-        this.rabbitTemplate = rabbitTemplate;
+        this.publicadorDeAlertas = publicadorDeAlertas;
         this.objectMapper = objectMapper;
         this.calibracionDias = calibracionDias;
         this.recalibracionDias = recalibracionDias;
@@ -313,8 +312,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
                 .accionRecomendada(buildAccionRecomendada(alerta.getPosibleCausa(), alerta.getSeveridad()))
                 .build();
 
-        rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
-        log.info("Alerta de salud publicada en RabbitMQ con ID: {}", alerta.getId());
+        publicadorDeAlertas.publicar(eventDTO);
+        log.info("Alerta de salud {} generada; se publica al commitear", alerta.getId());
     }
 
     private String serializarSerieComparativa(Animal animal, List<Telemetria> ventanaEvaluar,

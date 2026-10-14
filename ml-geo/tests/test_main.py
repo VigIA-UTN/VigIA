@@ -415,8 +415,8 @@ class TestCohesionAislamiento:
         """Los naive se asumen UTC; mezclarlos con aware no debe lanzar TypeError."""
         puntos = [
             make_punto("A1", -34.0, -59.0, "2024-01-01T00:00:00"),
-            make_punto("A1", -34.0, -59.0, "2024-01-02T00:00:00.123456Z"),
-            make_punto("A2", -34.0001, -59.0, "2024-01-01T12:00:00+00:00"),
+            make_punto("A1", -34.0, -59.0, "2024-01-01T00:20:00.123456Z"),
+            make_punto("A2", -34.0001, -59.0, "2024-01-01T00:10:00+00:00"),
         ]
         response = client.post(ENDPOINT, json={"historial_7d": puntos})
 
@@ -470,7 +470,7 @@ class TestCohesionAislamiento:
         """La respuesta debe tener exactamente un registro de alerta por animal unico."""
         puntos = [
             make_punto("A1", -34.0, -59.0, "2024-01-01T00:00:00Z"),
-            make_punto("A1", -34.0, -59.0, "2024-01-01T06:00:00Z"),  # mismo animal, otro timestamp
+            make_punto("A1", -34.0, -59.0, "2024-01-01T00:20:00Z"),  # mismo animal, otro timestamp
             make_punto("A2", -34.1, -59.1),
             make_punto("A3", -34.2, -59.2),
         ]
@@ -482,6 +482,36 @@ class TestCohesionAislamiento:
         ids = [a["animal_id"] for a in alertas]
         assert len(ids) == 3
         assert len(set(ids)) == 3  # sin duplicados
+
+
+    def test_animal_con_ultima_posicion_vieja_no_se_clasifica(self):
+        """
+        A3 dejó de transmitir hace 2 h estando lejos: su posición vieja no se
+        compara con el rodeo actual (no hay alerta falsa) y queda fuera de la respuesta.
+        """
+        puntos = [
+            make_punto("A1", -34.0, -59.0, "2024-01-01T12:00:00Z"),
+            make_punto("A2", -34.0001, -59.0, "2024-01-01T12:00:00Z"),
+            make_punto("A3", -34.02, -59.0, "2024-01-01T10:00:00Z"),
+        ]
+        response = client.post(ENDPOINT, json={"historial_7d": puntos})
+
+        assert response.status_code == 200
+        alertas = response.json()["alertas"]
+        assert sorted(a["animal_id"] for a in alertas) == ["A1", "A2"]
+        assert not any(a["alerta_aislamiento"] for a in alertas)
+
+    def test_vigencia_del_request_reemplaza_la_por_defecto(self):
+        puntos = [
+            make_punto("A1", -34.0, -59.0, "2024-01-01T12:00:00Z"),
+            make_punto("A2", -34.0001, -59.0, "2024-01-01T12:00:00Z"),
+            make_punto("A3", -34.02, -59.0, "2024-01-01T10:00:00Z"),
+        ]
+        response = client.post(ENDPOINT, json={"historial_7d": puntos, "vigencia_posicion_s": 3 * 3600})
+
+        assert response.status_code == 200
+        alertas = {a["animal_id"]: a for a in response.json()["alertas"]}
+        assert alertas["A3"]["alerta_aislamiento"] is True
 
 
 # ===========================================================================

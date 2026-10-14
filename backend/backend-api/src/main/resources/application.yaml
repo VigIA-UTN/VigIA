@@ -58,6 +58,9 @@ vigia:
     geo-url: ${ML_GEO_URL:http://localhost:8003}
   celo:
     horas-dato-desactualizado: ${CELO_HORAS_DATO_DESACTUALIZADO:2}
+  geo:
+    # Misma ventana que analiza el worker: rotula el tiempo acumulado fuera del grupo en el detalle.
+    ventana-horas: ${VIGIA_GEO_VENTANA_HORAS:24}
 
 cors:
   allowed-origins: ${CORS_ORIGINS}

@@ -2,6 +2,8 @@ package dev.vigia.backend.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -45,7 +47,7 @@ public class AlertaAnimalAislado {
     @JoinColumn(name = "animal_id", nullable = false)
     private Animal animal;
 
-    /** Tiempo acumulado fuera del grupo según ml-geo, sobre la ventana de 24 h que manda el worker. */
+    /** Tiempo acumulado fuera del grupo según ml-geo, sobre la ventana (vigia.geo.ventana-horas) que manda el worker. */
     @Column(name = "segundos_fuera", nullable = false)
     private Long segundosFuera;
 
@@ -55,6 +57,11 @@ public class AlertaAnimalAislado {
     @Column(name = "ts_inicio", nullable = false)
     private LocalDateTime tsInicio;
 
+    /** Cuándo se cerró el episodio (volvió o dejó de transmitir); null mientras sigue abierto. */
     @Column(name = "ts_regreso")
     private LocalDateTime tsRegreso;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "motivo_cierre", length = 20)
+    private MotivoCierreAislamiento motivoCierre;
 }

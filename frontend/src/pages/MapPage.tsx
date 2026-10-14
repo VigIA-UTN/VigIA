@@ -244,17 +244,13 @@ export default function MapPage() {
         // Actualizar las alertas de cada animal al que le corresponde (en aislamiento, todos los listados)
         setAnimales(prevAnimales => aplicarAlertaEnAnimales(prevAnimales, newAlerta));
 
-        // Refrescamos el resumen de alertas con un pequeño retraso
-        // para dar tiempo a que la BD del worker commitee la transacción.
-        setTimeout(async () => {
-          if (!isMounted) return;
-          try {
-            const resumenData = await getResumenAlertas(selectedId);
-            if (isMounted) setResumenAlertas(resumenData);
-          } catch (e) {
-            console.error('Error refrescando resumen de alertas', e);
-          }
-        }, 1500);
+        // Los eventos salen recién cuando la alerta ya está commiteada: el resumen se puede pedir al instante.
+        try {
+          const resumenData = await getResumenAlertas(selectedId);
+          if (isMounted) setResumenAlertas(resumenData);
+        } catch (e) {
+          console.error('Error refrescando resumen de alertas', e);
+        }
 
       } catch (error) {
         console.error('Error parseando evento SSE de alertas', error);

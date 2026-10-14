@@ -6,7 +6,7 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
@@ -120,6 +120,7 @@ public class AnimalServiceImpl implements AnimalService {
         private static final double SIGMA_ROJO_MOVIMIENTO = 2.0;
 
         private static final long HORAS_SIN_DATOS_MOVIMIENTO = 6;
+        private static final int DIAS_COHESION_POR_DEFECTO = 7;
 
         private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
@@ -1603,6 +1604,9 @@ public class AnimalServiceImpl implements AnimalService {
                                 .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
 
                 Establecimiento establecimiento = animal.getEstablecimiento();
+                if (establecimiento == null) {
+                        throw new AccessDeniedException("El animal no pertenece a ningún establecimiento.");
+                }
 
                 boolean miembroActivo = establecimiento.getEmpleados().stream()
                                 .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo());
@@ -1611,12 +1615,12 @@ public class AnimalServiceImpl implements AnimalService {
                                         "El usuario no pertenece al establecimiento del animal o no está activo.");
                 }
 
-                // Por defecto, los últimos 7 días (lo que muestra la ficha del animal).
+                // Por defecto, los últimos 7 días calendario incluyendo hoy (lo que muestra la ficha).
                 if (hasta == null) {
                         hasta = LocalDateTime.now();
                 }
                 if (desde == null) {
-                        desde = hasta.minusDays(7);
+                        desde = hasta.toLocalDate().minusDays(DIAS_COHESION_POR_DEFECTO - 1).atStartOfDay();
                 }
                 if (desde.isAfter(hasta)) {
                         throw new IllegalArgumentException("La fecha 'desde' no puede ser posterior a 'hasta'.");
@@ -1627,18 +1631,11 @@ public class AnimalServiceImpl implements AnimalService {
                                                 establecimiento.getId(), animalId, desde, hasta);
 
                 LocalDateTime hastaAnterior = desde;
-                LocalDateTime desdeAnterior = hastaAnterior.minus(
-                                hasta.toEpochSecond(ZoneOffset.UTC) - desde.toEpochSecond(ZoneOffset.UTC),
-                                ChronoUnit.SECONDS);
-
-                List<RegistroCohesion> cohesionRegistrosAnterior = cohesionRepository
+                LocalDateTime desdeAnterior = hastaAnterior.minus(Duration.between(desde, hasta));
+                Double promedioPeriodoAnterior = promedio(cohesionRepository
                                 .findByEstablecimientoIdAndAnimalIdAndFechaBetweenOrderByFechaAsc(
-                                                establecimiento.getId(), animalId, desdeAnterior, hastaAnterior);
-
-                Double promedioPeriodoAnterior = cohesionRegistrosAnterior.stream()
-                                .mapToDouble(RegistroCohesion::getIndiceCohesion)
-                                .average()
-                                .orElse(0.0);
+                                                establecimiento.getId(), animalId, desdeAnterior, hastaAnterior)
+                                .stream().map(RegistroCohesion::getIndiceCohesion).toList());
 
                 // Promedio del rodeo del animal en cada análisis (ml-geo mide la cohesión
                 // contra su propio rodeo; los animales sin rodeo forman un grupo aparte).
@@ -1646,39 +1643,53 @@ public class AnimalServiceImpl implements AnimalService {
                                 ? cohesionRepository.promedioPorFechaDelRodeo(establecimiento.getId(),
                                                 animal.getRodeoLote().getId(), desde, hasta)
                                 : cohesionRepository.promedioPorFechaSinRodeo(establecimiento.getId(), desde, hasta);
-                Map<LocalDateTime, Double> promedioRodeoPorFecha = new HashMap<>();
-                for (Object[] fila : promediosRodeo) {
-                        promedioRodeoPorFecha.put((LocalDateTime) fila[0], ((Number) fila[1]).doubleValue());
+
+                // Un punto por hora (rangos de hasta 48 h) o por día; los intervalos sin análisis van con null.
+                ChronoUnit unidad = Duration.between(desde, hasta).compareTo(Duration.ofHours(48)) <= 0
+                                ? ChronoUnit.HOURS
+                                : ChronoUnit.DAYS;
+                Map<LocalDateTime, List<Double>> animalPorIntervalo = cohesionRegistros.stream()
+                                .collect(Collectors.groupingBy(r -> r.getFecha().truncatedTo(unidad),
+                                                Collectors.mapping(RegistroCohesion::getIndiceCohesion,
+                                                                Collectors.toList())));
+                Map<LocalDateTime, List<Double>> rodeoPorIntervalo = promediosRodeo.stream()
+                                .collect(Collectors.groupingBy(fila -> ((LocalDateTime) fila[0]).truncatedTo(unidad),
+                                                Collectors.mapping(fila -> ((Number) fila[1]).doubleValue(),
+                                                                Collectors.toList())));
+
+                List<CohesionPuntoSerie> serie = new ArrayList<>();
+                for (LocalDateTime inicio = desde.truncatedTo(unidad); !inicio.isAfter(hasta); inicio = inicio
+                                .plus(1, unidad)) {
+                        serie.add(new CohesionPuntoSerie(
+                                        inicio.atZone(ZoneId.systemDefault()).toOffsetDateTime(),
+                                        escalarCohesion(promedio(animalPorIntervalo.get(inicio))),
+                                        escalarCohesion(promedio(rodeoPorIntervalo.get(inicio)))));
                 }
-                Double promedioRodeo = promedioRodeoPorFecha.values().stream()
-                                .mapToDouble(Double::doubleValue)
-                                .average()
-                                .orElse(0.0);
 
                 Double indiceActual = cohesionRegistros.isEmpty()
-                                ? 0.0
+                                ? null
                                 : cohesionRegistros.get(cohesionRegistros.size() - 1).getIndiceCohesion();
 
-                List<CohesionPuntoSerie> serie = cohesionRegistros.stream()
-                                .map(registro -> {
-                                        Double promRodeo = promedioRodeoPorFecha.get(registro.getFecha());
-                                        return new CohesionPuntoSerie(
-                                                        registro.getFecha(),
-                                                        redondearDosDecimales(registro.getIndiceCohesion() * 100),
-                                                        promRodeo != null ? redondearDosDecimales(promRodeo * 100) : null);
-                                })
-                                .collect(Collectors.toList());
-
-                indiceActual = redondearDosDecimales(indiceActual * 100);
-                promedioRodeo = redondearDosDecimales(promedioRodeo * 100);
-                promedioPeriodoAnterior = redondearDosDecimales(promedioPeriodoAnterior * 100);
-
                 return CohesionResponse.builder()
-                                .actual(indiceActual)
-                                .promedioRodeo(promedioRodeo)
-                                .promedioPeriodoAnterior(promedioPeriodoAnterior)
+                                .actual(escalarCohesion(indiceActual))
+                                .promedioRodeo(escalarCohesion(promedio(promediosRodeo.stream()
+                                                .map(fila -> ((Number) fila[1]).doubleValue()).toList())))
+                                .promedioPeriodoAnterior(escalarCohesion(promedioPeriodoAnterior))
                                 .serie(serie)
                                 .build();
+        }
+
+        /** Promedio de los valores, o null si no hay ninguno (sin datos no es 0). */
+        private static Double promedio(List<Double> valores) {
+                if (valores == null || valores.isEmpty()) {
+                        return null;
+                }
+                return valores.stream().mapToDouble(Double::doubleValue).average().getAsDouble();
+        }
+
+        /** El índice se guarda 0–1; la ficha lo muestra 0–100 con dos decimales. */
+        private static Double escalarCohesion(Double indice) {
+                return indice == null ? null : redondearDosDecimales(indice * 100);
         }
 
         private static Double redondearDosDecimales(Double valor) {

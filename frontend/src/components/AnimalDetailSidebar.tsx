@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { AnimalMapa } from '../api/animalesApi';
 import { getAnimalById, type AnimalResponse } from '../api/animalesApi';
-import { severidadParaAnimal, volvioAlGrupo, type AlertaResponse } from '../api/alertaApi';
+import { alertasVigentes, severidadParaAnimal, volvioAlGrupo, type AlertaResponse } from '../api/alertaApi';
 import AlertNotificationCard from './AlertNotificationCard';
 import { useAuthStore } from '../store/authStore';
 
@@ -53,16 +53,17 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
   };
 
   const animalName = animalMapa.identificador || `Animal #${animalMapa.id}`;
-  const hasAlertas = animalMapa.alertasAnimal.length > 0;
+  // Las alertas resueltas siguen listadas, pero ya no tiñen el estado del animal (igual que su pin).
+  const alertasPendientes = alertasVigentes(animalMapa.alertasAnimal);
   
   // Status dot color
   let statusColor = '#38A169'; // Green (ACTIVO)
   if (animalMapa.sinDatosRecientes) {
     statusColor = '#718096'; // Gray
-  } else if (hasAlertas) {
+  } else if (alertasPendientes.length > 0) {
     // If it has alerts, pick color based on max severity
     // Un aislamiento del que el animal ya volvió es solo un aviso, como en su pin.
-    if (animalMapa.alertasAnimal.some(a => severidadParaAnimal(a, animalMapa.id) === 'ALTA'
+    if (alertasPendientes.some(a => severidadParaAnimal(a, animalMapa.id) === 'ALTA'
       || (a.tipo !== 'CELO' && !volvioAlGrupo(a, animalMapa.id)))) {
       statusColor = '#E53E3E'; // Red
     } else {

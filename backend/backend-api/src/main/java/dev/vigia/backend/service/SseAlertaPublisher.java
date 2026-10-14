@@ -10,6 +10,7 @@ import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.EstablecimientoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -37,7 +38,15 @@ public class SseAlertaPublisher {
 
     private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
+    private final EstablecimientoRepository establecimientoRepository;
+
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
+
+    /** Solo los miembros activos del establecimiento reciben sus alertas en tiempo real. */
+    public boolean puedeSuscribirse(String email, Long establecimientoId) {
+        return establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(email).stream()
+                .anyMatch(e -> e.getId().equals(establecimientoId));
+    }
 
     public SseEmitter registrarClienteSse(Long establecimientoId, Long lastEventId) {
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
@@ -148,9 +157,9 @@ public class SseAlertaPublisher {
     }
 
     /**
-     * Animales de una alerta AISLAMIENTO_SOCIAL. El worker los manda en el evento (sus filas todavía no
-     * están commiteadas); los eventos de cambio de estado y el reenvío por lastEventId no los traen y se
-     * leen de la base.
+     * Animales de una alerta AISLAMIENTO_SOCIAL. El worker los manda en el evento (ya armados, así no
+     * se relee la base por cada evento); los eventos de cambio de estado y el reenvío por lastEventId no
+     * los traen y se leen de la base.
      */
     List<AnimalAisladoResponse> animalesAislados(Long alertaId, DisparadorAlerta disparador,
             List<AnimalAisladoResponse> delEvento) {

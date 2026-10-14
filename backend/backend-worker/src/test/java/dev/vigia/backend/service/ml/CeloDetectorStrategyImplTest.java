@@ -2,7 +2,6 @@ package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.client.MlCeloClient;
-import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.CeloPredictResponseDTO;
 import dev.vigia.backend.model.Alerta;
@@ -25,7 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -61,7 +60,7 @@ class CeloDetectorStrategyImplTest {
     private EstadoReproductivoRepository estadoReproductivoRepository;
 
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private PublicadorDeAlertas publicadorDeAlertas;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
@@ -78,7 +77,7 @@ class CeloDetectorStrategyImplTest {
                 telemetriaRepository,
                 alertaRepository,
                 estadoReproductivoRepository,
-                rabbitTemplate);
+                publicadorDeAlertas);
     }
 
     private Telemetria crearTelemetria(Animal animal, Double lat, Double lon, Integer moveState, EstadoInferencia estado) {
@@ -101,7 +100,7 @@ class CeloDetectorStrategyImplTest {
         celoDetectorStrategy.process(Collections.emptyList(), "corr-empty");
 
         mockServer.verify();
-        verifyNoInteractions(telemetriaRepository, alertaRepository, estadoReproductivoRepository, rabbitTemplate);
+        verifyNoInteractions(telemetriaRepository, alertaRepository, estadoReproductivoRepository, publicadorDeAlertas);
     }
 
     @Test
@@ -132,7 +131,7 @@ class CeloDetectorStrategyImplTest {
 
         verify(alertaRepository, never()).save(any());
         verify(estadoReproductivoRepository, never()).save(any());
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(publicadorDeAlertas, never()).publicar(any());
     }
 
     @Test
@@ -167,7 +166,7 @@ class CeloDetectorStrategyImplTest {
 
         verify(alertaRepository, never()).save(any());
         verify(estadoReproductivoRepository, never()).save(any());
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(publicadorDeAlertas, never()).publicar(any());
     }
 
     @Test
@@ -252,7 +251,7 @@ class CeloDetectorStrategyImplTest {
 
         // 4. Verificar publicación del evento en RabbitMQ
         ArgumentCaptor<AlertaEventDTO> eventCaptor = ArgumentCaptor.forClass(AlertaEventDTO.class);
-        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""), eventCaptor.capture());
+        verify(publicadorDeAlertas).publicar(eventCaptor.capture());
         AlertaEventDTO eventoPublicado = eventCaptor.getValue();
 
         assertEquals(999L, eventoPublicado.getId());

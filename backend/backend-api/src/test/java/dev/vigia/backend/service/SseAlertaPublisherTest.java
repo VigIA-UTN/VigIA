@@ -21,6 +21,7 @@ import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.EstablecimientoRepository;
 
 @ExtendWith(MockitoExtension.class)
 class SseAlertaPublisherTest {
@@ -36,6 +37,9 @@ class SseAlertaPublisherTest {
 
     @Mock
     private AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
+
+    @Mock
+    private EstablecimientoRepository establecimientoRepository;
 
     @InjectMocks
     private SseAlertaPublisher publisher;
