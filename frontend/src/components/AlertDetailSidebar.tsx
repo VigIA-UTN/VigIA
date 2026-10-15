@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { AlertaResponse, AlertaDetalleResponse, AnimalAislado, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
 import { updateAlertaEstado, getAlertaDetalle, esAnestro, esAislamiento, estadoAislado } from '../api/alertaApi';
 import { formatMinutos } from '../utils/fechas';
@@ -45,6 +45,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const { rol } = useAuthStore();
   const { selectedId } = useEstablecimientoStore();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [verTodosAislados, setVerTodosAislados] = useState(false);
 
   // Ventana optima de inseminacion con countdown en tiempo real.
@@ -190,6 +191,9 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   
   const caravanaText = detalle?.animalCaravanaOficial ? detalle.animalCaravanaOficial : alerta.animalId;
   const animalName = detalle?.animalAlias || 'Vaca';
+  // Link a la ficha, salvo que el panel ya esté abierto dentro de la ficha de este animal
+  const fichaAnimal = `/animales/${alerta.animalId}`;
+  const enFichaDelAnimal = pathname === fichaAnimal || pathname.startsWith(`${fichaAnimal}/`);
 
   const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
   const isSanitaria = disparador.includes('SALUD') || disparador.includes('SANITARI');
@@ -300,6 +304,20 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           <div style={{ minWidth: 0 }}>
             <h2 className="m-0 fw-bold text-break" style={{ color: '#1E3A5F' }}>{isAislamiento ? tituloAislamiento : animalName}</h2>
             <p className="m-0 text-muted fs-6">{isAislamiento ? detAisl?.nombreLote ?? 'Aislamiento social' : `#${caravanaText}`}</p>
+            {/* Aislamiento ya linkea a cada animal desde su lista */}
+            {!isAislamiento && !enFichaDelAnimal && (
+              <button
+                type="button"
+                className="btn btn-link p-0 border-0 mt-1 d-inline-flex align-items-center gap-1"
+                style={{ fontSize: '0.85rem', color: '#1E3A5F', textDecoration: 'none', fontWeight: 600 }}
+                onClick={() => {
+                  handleClose();
+                  navigate(fichaAnimal);
+                }}
+              >
+                Ver ficha del animal <i className="bi bi-arrow-right"></i>
+              </button>
+            )}
           </div>
           {sevHeader ? (
             <SeveridadBadge severidad={sevHeader} />

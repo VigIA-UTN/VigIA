@@ -64,7 +64,9 @@
     margin: 0 auto 18px;
 }
 
-.dash-kpi-chip {
+/* Tarjetas KPI: mismo estilo en Centro de mando (.dash-kpi-chip) y Salud (.dash-salud-kpi) */
+.dash-kpi-chip,
+.dash-salud-kpi {
     background: #ffffff;
     border-radius: 10px;
     border: 1px solid #E2E8F0;
@@ -76,22 +78,27 @@
     cursor: default;
 }
 
-.dash-kpi-chip-label {
-    font-size: 0.8rem;
+.dash-kpi-chip-label,
+.dash-salud-kpi-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: #64748B;
-    font-weight: 500;
 }
 
-.dash-kpi-chip-val {
-    font-size: 2.4rem;
-    font-weight: 400;
+.dash-kpi-chip-val,
+.dash-salud-kpi-val {
+    font-size: 2.2rem;
+    font-weight: 600;
     line-height: 1.1;
     color: #1A3558;
     letter-spacing: -0.02em;
 }
 
-.dash-kpi-chip-sub {
-    font-size: 0.82rem;
+.dash-kpi-chip-sub,
+.dash-salud-kpi-sub {
+    font-size: 0.8rem;
     color: #64748B;
     font-weight: 500;
     margin-top: 2px;
@@ -354,6 +361,7 @@
 .dash-ventana-bar-optima   { background: #8CC63F; }
 .dash-ventana-bar-venciendo { background: #ECC94B; }
 .dash-ventana-bar-critica  { background: #E53E3E; }
+.dash-ventana-bar-futura   { background: #CBD5E1; }
 
 .dash-ventana-restante {
     font-size: 0.9rem;
@@ -651,8 +659,9 @@
         grid-template-columns: 1fr 1fr;
     }
 
-    .dash-kpi-chip-val {
-        font-size: 2rem;
+    .dash-kpi-chip-val,
+    .dash-salud-kpi-val {
+        font-size: 1.9rem;
     }
 }
 
@@ -1053,41 +1062,10 @@
     margin: 0 auto 18px;
 }
 
-.dash-salud-kpi {
-    background: #fff;
-    border-radius: 10px;
-    border: 1px solid #E2E8F0;
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-}
-
-.dash-salud-kpi-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #94A3B8;
-}
-
-.dash-salud-kpi-val {
-    font-size: 2rem;
-    font-weight: 600;
-    color: #1A3558;
-    line-height: 1.1;
-}
-
+/* Estilo base de las tarjetas: compartido con .dash-kpi-chip (arriba de todo) */
 .dash-salud-kpi-val.dash-salud-kpi-warn   { color: #D69E2E; }
 .dash-salud-kpi-val.dash-salud-kpi-danger { color: #E53E3E; }
 .dash-salud-kpi-val.dash-salud-kpi-muted  { color: #94A3B8; }
-
-.dash-salud-kpi-sub {
-    font-size: 0.8rem;
-    color: #64748B;
-    font-weight: 500;
-}
 
 /* ── Grids de contenido ────────────────────────────────────────── */
 .dash-salud-main-grid {
@@ -1514,10 +1492,10 @@
 }
 
 .dash-salud-interv-note {
-    font-size: 0.68rem;
-    color: #CBD5E1;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #64748B;
     margin-bottom: 10px;
-    font-style: italic;
 }
 
 .dash-salud-interv-row {

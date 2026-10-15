@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/purity, react-hooks/set-state-in-effect */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Spinner, Alert, OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -19,6 +19,8 @@ import { getAnimalesMapa } from '../api/animalesApi';
 import type { AnimalMapa } from '../api/animalesApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { determinarIcono } from '../utils/animalPins';
+import AlertDetailSidebar from '../components/AlertDetailSidebar';
+import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import './DashboardPage.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -42,6 +44,7 @@ const GRUPOS_PESO = [
     { key: 'pierde', label: 'Pierde' },
 ] as const;
 const REVISAR_MAX = 5;              // filas por sub-sección en "Animales a revisar"
+const CELOS_MAX = 3;                // filas de celos con ventana abierta en "Embudo reproductivo"
 
 const TIPO_INTERVENCION_LABEL: Record<IntervencionResponse['tipo'], string> = {
     TRATAMIENTO: 'Tratamiento',
@@ -285,11 +288,21 @@ function TrendChart({ datos, semanas, tipos }: {
     );
 }
 
+type DashTab = 'mando' | 'ejecutivo' | 'salud';
+
 export default function DashboardPage() {
     const selectedId = useEstablecimientoStore(s => s.selectedId);
     const navigate = useNavigate();
 
-    const [activeTab, setActiveTab] = useState<'mando' | 'ejecutivo' | 'salud'>('mando');
+    // La pestaña vive en la URL (?tab=salud): al volver con "atrás" desde otra página se restaura.
+    // `replace` para que cambiar de pestaña no agregue entradas al historial.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabParam = searchParams.get('tab');
+    const activeTab: DashTab = tabParam === 'salud' || tabParam === 'ejecutivo' ? tabParam : 'mando';
+    const setActiveTab = (tab: DashTab) => setSearchParams(prev => {
+        if (tab === 'mando') prev.delete('tab'); else prev.set('tab', tab);
+        return prev;
+    }, { replace: true });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [loteFilter, setLoteFilter] = useState<number | 'todos'>('todos');
@@ -314,6 +327,10 @@ export default function DashboardPage() {
 
     // Pesadas del establecimiento (null si no se pudieron cargar)
     const [pesos, setPesos] = useState<RegistroPesoResponse[] | null>([]);
+
+    // Alerta abierta en el panel de detalle, y la que se está interviniendo
+    const [alertaAbierta, setAlertaAbierta] = useState<AlertaResponse | null>(null);
+    const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
 
     const fetchDashboard = useCallback(async () => {
         if (!selectedId) return;
@@ -636,10 +653,6 @@ export default function DashboardPage() {
         alertasFiltradas.filter(a => a.tipo === 'SALUD' && horasTranscurridas(a.tsGeneracion) > 24).length,
         [alertasFiltradas]);
 
-    const kpiEnCalibracion = useMemo(() =>
-        animalesFiltrados.filter(a => a.estadoActual !== 'INACTIVO' && a.enCalibracion).length,
-        [animalesFiltrados]);
-
     // ── Salud tab: Alertas de salud sin atender (todas las pendientes, la más vieja primero) ──
     const alertasSaludSinAtender = useMemo(() =>
         alertasFiltradas
@@ -848,10 +861,11 @@ export default function DashboardPage() {
     const kpiVentanasAbiertas = ventanaItems.length;
     const kpiBajoObservacion = animalesARevisar.length;
     const kpiCobertura = cobertura.pct;
-    const kpiVentanasSubtexto = (() => {
-        const urgentes = ventanaItems.filter(v => v.ventana.tiempoRestanteSegundos / 3600 <= 3);
-        return urgentes.length > 0 ? `${urgentes.length} por vencer en < 3h` : 'sin urgencia inmediata';
-    })();
+    // Solo ventanas ya abiertas: en las FUTURAS el tiempo restante es hasta que abren, no hasta que vencen
+    const ventanasUrgentes = ventanaItems.filter(
+        v => v.ventana.estado === 'ACTIVA' && v.ventana.tiempoRestanteSegundos / 3600 <= 3
+    ).length;
+    const kpiVentanasSubtexto = ventanasUrgentes > 0 ? `${ventanasUrgentes} por vencer en < 3h` : 'sin urgencia inmediata';
     const kpiObsSubtexto = (() => {
         const sinRevision = animalesARevisar.filter(a => !a.estadoSalud || a.estadoSalud === 'ENFERMO').length;
         return sinRevision > 0 ? `${sinRevision} enfermos` : 'en observación';
@@ -1142,9 +1156,11 @@ export default function DashboardPage() {
                         <span className="dash-salud-kpi-sub">&gt; 24 h desde la alerta</span>
                     </div>
                     <div className="dash-salud-kpi">
-                        <span className="dash-salud-kpi-label">En calibración</span>
-                        <span className="dash-salud-kpi-val dash-salud-kpi-muted">{kpiEnCalibracion}</span>
-                        <span className="dash-salud-kpi-sub">sin monitoreo de salud</span>
+                        <span className="dash-salud-kpi-label">Celos sin atender</span>
+                        <span className={`dash-salud-kpi-val ${ventanasUrgentes > 0 ? 'dash-salud-kpi-danger' : ''}`}>
+                            {ventanaItems.length}
+                        </span>
+                        <span className="dash-salud-kpi-sub">{kpiVentanasSubtexto}</span>
                     </div>
                 </div>
 
@@ -1160,6 +1176,42 @@ export default function DashboardPage() {
                             </p>
 
                         </div>
+
+                        {/* Celos con ventana abierta: lo más urgente del rodeo reproductivo, primero */}
+                        <div className="dash-salud-revisar-section">
+                            <span className="dash-salud-revisar-seclabel">Celos con ventana abierta</span>
+                            {ventanaItems.length === 0 ? (
+                                <p className="dash-no-items" style={{ margin: '6px 0' }}>
+                                    <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
+                                    {' '}Sin celos con ventana abierta
+                                </p>
+                            ) : (
+                                ventanaItems.slice(0, CELOS_MAX).map(({ alerta, animal, ventana }) => {
+                                    const isFutura = ventana.estado === 'FUTURA';
+                                    const vc = isFutura ? 'futura' : ventanaClass(ventana.tiempoRestanteSegundos);
+                                    const restante = formatHorasRestantes(ventana.tiempoRestanteSegundos).replace(' restantes', '');
+                                    return (
+                                        <div
+                                            key={alerta.id}
+                                            className="dash-salud-revisar-row"
+                                            onClick={() => setAlertaAbierta(alerta)}
+                                        >
+                                            <span className={`dash-sev-dot dash-ventana-bar-${vc}`} />
+                                            <span className="dash-salud-revisar-nombre">{nombreAnimal(animal)}</span>
+                                            <span className={`dash-salud-revisar-tiempo ${vc === 'critica' ? 'dash-salud-revisar-dias-urgente' : ''}`}>
+                                                {isFutura ? `abre en ${restante}` : `cierra en ${restante}`}
+                                            </span>
+                                        </div>
+                                    );
+                                })
+                            )}
+                            {ventanaItems.length > CELOS_MAX && (
+                                <button className="dash-ver-todas-btn" onClick={() => setActiveTab('mando')}>
+                                    +{ventanaItems.length - CELOS_MAX} más — ver en Centro de mando
+                                </button>
+                            )}
+                        </div>
+                        <div className="dash-salud-revisar-divider" />
 
                         {embudoExcepciones.totalRepro === 0 ? (
                             <p className="dash-no-items">Sin animales reproductivos registrados</p>
@@ -1287,7 +1339,7 @@ export default function DashboardPage() {
                                         <div
                                             key={alerta.id}
                                             className="dash-salud-revisar-row"
-                                            onClick={() => animal && navigate(`/animales/${animal.id}`)}
+                                            onClick={() => setAlertaAbierta(alerta)}
                                         >
                                             <span className={`dash-sev-dot ${sevDot}`} />
                                             <span className="dash-salud-revisar-nombre">{nombreAnimal(animal)}</span>
@@ -1789,6 +1841,31 @@ export default function DashboardPage() {
                 <Alert variant="danger" style={{ borderRadius: 10, maxWidth: 1280, margin: '0 auto 16px' }}>
                     <i className="bi bi-exclamation-triangle me-2" />{error}
                 </Alert>
+            )}
+
+            {/* Detalle de alerta (desde "Animales a revisar"), igual que en la página de Alertas */}
+            {alertaAbierta && (
+                <AlertDetailSidebar
+                    alerta={alertaAbierta}
+                    mode="fixed"
+                    onClose={() => setAlertaAbierta(null)}
+                    onActionComplete={(alertaId, nuevoEstado) => {
+                        setAlertasPendientes(prev => prev.filter(a => a.id !== alertaId));
+                        setAlertasRecientes(prev => prev.map(a => (a.id === alertaId ? { ...a, estado: nuevoEstado } : a)));
+                    }}
+                    onOpenIntervencion={() => setIntervencionAlerta(alertaAbierta)}
+                />
+            )}
+            {intervencionAlerta && (
+                <IntervencionFormPanel
+                    alerta={intervencionAlerta}
+                    mode="fixed"
+                    onClose={() => setIntervencionAlerta(null)}
+                    onSuccess={() => {
+                        setIntervencionAlerta(null);
+                        fetchDashboard();
+                    }}
+                />
             )}
 
             {/* ── TAB: Resumen ejecutivo ───────────────────────────────────── */}
