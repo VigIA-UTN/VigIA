@@ -297,8 +297,7 @@ public class DataInitializer implements CommandLineRunner {
                 null, hoyDt.minusDays(42));
         sembrarInseminacionDesdeIntervencion(demoRepro, vet, hoyDt.minusDays(40));
         sembrarRevisionConEstadoSalud(demoRepro, vet, TipoEstadoSalud.EN_OBSERVACION, hoyDt.minusDays(20));
-        sembrarEstadoReproductivo(demoRepro, TipoReproductivo.GESTANTE, OrigenEstado.MANUAL, vet,
-                null, hoyDt.minusDays(9));
+        sembrarGestante(demoRepro, vet, LocalDate.now().minusDays(40), hoyDt.minusDays(9));
 
         log.info("[DataInitializer] ✅ Animal VIGIA-ARG-009 con historial reproductivo de demo "
                 + "(parto, vacía, celo ml, inseminación, gestante) + una revisión veterinaria con estado de salud.");
@@ -341,6 +340,25 @@ public class DataInitializer implements CommandLineRunner {
                 + "VIGIA-ARG-011 CONFIRMADA + estado ANESTRO, VIGIA-ARG-012 sin alerta (la genera el detector).",
                 umbralAnestro);
 
+        // ── Acto 7: Partos esperados (demo del dashboard de Salud y reproducción) ──
+        // Gestantes con fecha de inseminación (parto esperado = IA + 283 días). Un lote de
+        // IATF del mismo día concentra 3 partos en una fecha; el resto se reparte en los
+        // próximos meses y una queda con la fecha vencida (posible parto sin registrar).
+        // Como la preñez se confirma ~35 d post-IA, los partos solo caen en los próximos ~8 meses.
+        String[] nombresGestantes = { "Aurora", "Canela", "Estrella", "Luna", "Morena",
+                "Paloma", "Nube", "Frutilla", "Rosa" };
+        int[] diasDesdeIa = { 250, 250, 250, 247, 200, 200, 140, 90, 290 };
+        for (int i = 0; i < diasDesdeIa.length; i++) {
+            int num = 13 + i;
+            Animal gestante = crearAnimal(est, lote1, String.format("%d%03d", num, num), nombresGestantes[i], "Angus",
+                    LocalDate.of(2019, 10, 1), String.format("VIGIA-ARG-%03d", num), caravanaRepository, animalRepository);
+            LocalDate ia = LocalDate.now().minusDays(diasDesdeIa[i]);
+            sembrarGestante(gestante, vet, ia, ia.plusDays(35).atTime(10, 0));
+        }
+
+        log.info("[DataInitializer] ✅ {} gestantes de demo (VIGIA-ARG-013..{}) para el gráfico de partos esperados.",
+                diasDesdeIa.length, String.format("%03d", 12 + diasDesdeIa.length));
+
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
         log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");
@@ -361,6 +379,18 @@ public class DataInitializer implements CommandLineRunner {
         e.setOrigen(origen);
         e.setUsuarioRegistrador(usuario);
         e.setFechaUltParto(fechaUltParto);
+        e.setFechaRegistro(fechaRegistro);
+        estadoReproductivoRepository.save(e);
+    }
+
+    /** GESTANTE con la fecha de IA: el parto esperado del dashboard sale del último estado. */
+    private void sembrarGestante(Animal animal, Usuario vet, LocalDate fechaInseminacion, LocalDateTime fechaRegistro) {
+        EstadoReproductivo e = new EstadoReproductivo();
+        e.setAnimal(animal);
+        e.setEstado(TipoReproductivo.GESTANTE);
+        e.setOrigen(OrigenEstado.MANUAL);
+        e.setUsuarioRegistrador(vet);
+        e.setFechaUltInseminacion(fechaInseminacion);
         e.setFechaRegistro(fechaRegistro);
         estadoReproductivoRepository.save(e);
     }

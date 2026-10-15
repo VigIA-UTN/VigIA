@@ -57,6 +57,20 @@ function nombreAnimal(a: AnimalResponse | null | undefined): string {
     return a.alias || a.idCaravanaOficial || `#${a.id}`;
 }
 
+// Fecha de parto esperada en hora local (evita el corrimiento de día al parsear 'YYYY-MM-DD' como UTC)
+function fechaPartoEsperada(fechaInseminacion: string): Date {
+    const [y, m, d] = fechaInseminacion.slice(0, 10).split('-').map(Number);
+    return new Date(y, m - 1, d + DIAS_GESTACION);
+}
+
+// Tooltip de partos: encabezado + hasta 5 nombres
+function tooltipPartos(header: string, animales: AnimalResponse[]): string {
+    const MAX_SHOW = 5;
+    const lineas = animales.slice(0, MAX_SHOW).map(a => `• ${nombreAnimal(a)}`);
+    if (animales.length > MAX_SHOW) lineas.push(`• …y ${animales.length - MAX_SHOW} más`);
+    return [header, ...lineas].join('\n');
+}
+
 function formatHoras(horas: number): string {
     if (horas < 1) return `${Math.round(horas * 60)}min`;
     if (horas < 24) return `${Math.floor(horas)}h`;
@@ -269,6 +283,7 @@ export default function DashboardPage() {
     const [error, setError] = useState<string | null>(null);
     const [loteFilter, setLoteFilter] = useState<number | 'todos'>('todos');
     const [periodoDias, setPeriodoDias] = useState(PERIODO_DEFAULT_DIAS);
+    const [partosVista, setPartosVista] = useState<'semanas' | 'anio'>('semanas');
 
     // Raw data
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
@@ -692,6 +707,29 @@ export default function DashboardPage() {
         ).length;
 
         return { semanas, sinFecha, vencidos, total: gestantesConFecha.length + sinFecha };
+    }, [animalesFiltrados]);
+
+    // ── Salud tab: Partos esperados — vista anual (estilo GitHub) ────────────
+    const partosAnio = useMemo(() => {
+        const porDia = new Map<string, AnimalResponse[]>();
+        animalesFiltrados
+            .filter(a => a.estadoActual !== 'INACTIVO' && a.estadoReproductivo === 'GESTANTE' && a.fechaUltimaInseminacion)
+            .forEach(a => {
+                const key = fechaPartoEsperada(a.fechaUltimaInseminacion!).toDateString();
+                porDia.set(key, [...(porDia.get(key) ?? []), a]);
+            });
+
+        // 53 columnas (semanas) × 7 filas (lun..dom), arrancando el lunes de esta semana
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        const lunes = hoy.getDate() - ((hoy.getDay() + 6) % 7);
+        const dias = Array.from({ length: 53 * 7 }, (_, i) => {
+            const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), lunes + i);
+            return { fecha, animales: porDia.get(fecha.toDateString()) ?? [], pasado: fecha < hoy };
+        });
+        const maxDia = Math.max(...dias.map(d => d.animales.length), 1);
+
+        return { dias, maxDia };
     }, [animalesFiltrados]);
 
 
@@ -1299,32 +1337,75 @@ export default function DashboardPage() {
                 <div className="dash-salud-mid-grid">
 
                     {/* ── IZQUIERDA: Partos esperados ──────────────────────── */}
-                    <div className="dash-card">
+                    <div className="dash-card dash-partos-card">
                         <div className="dash-card-header">
                             <p className="dash-card-title">
                                 <i className="bi bi-calendar2-event-fill" />
                                 Partos esperados
                             </p>
-
+                            <div className="dash-lote-filter">
+                                <i className="bi bi-calendar3" style={{ fontSize: '0.7rem' }} />
+                                <select
+                                    className="dash-lote-select"
+                                    value={partosVista}
+                                    onChange={e => setPartosVista(e.target.value as 'semanas' | 'anio')}
+                                    aria-label="Vista de partos esperados"
+                                >
+                                    <option value="semanas">Próximas 12 semanas</option>
+                                    <option value="anio">Próximo año</option>
+                                </select>
+                            </div>
                         </div>
 
                         {partosEsperados.total === 0 ? (
                             <p className="dash-no-items">Sin animales gestantes registrados</p>
                         ) : (
                             <>
+                                {partosVista === 'anio' ? (
+                                    // Dos mitades de ~6 meses: lado a lado en PC, apiladas en celular
+                                    <div className="dash-partos-anio">
+                                        {[0, 27].map(desde => {
+                                            const semanas = Array.from({ length: Math.min(27, 53 - desde) }, (_, k) => desde + k);
+                                            return (
+                                                <div key={desde} className="dash-partos-anio-mitad">
+                                                    <div className="dash-partos-anio-meses">
+                                                        {semanas.map(w => {
+                                                            const primero = partosAnio.dias.slice(w * 7, w * 7 + 7).find(d => d.fecha.getDate() === 1);
+                                                            return (
+                                                                <span key={w}>
+                                                                    {primero?.fecha.toLocaleDateString('es-AR', { month: 'short' })}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div className="dash-partos-anio-grid">
+                                                        {partosAnio.dias.slice(desde * 7, (desde + semanas.length) * 7).map(d => {
+                                                            const n = d.animales.length;
+                                                            const nivel = n === 0 ? 0 : Math.ceil((n / partosAnio.maxDia) * 4);
+                                                            const fecha = d.fecha.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                                                            return (
+                                                                <div
+                                                                    key={d.fecha.toDateString()}
+                                                                    className={`dash-partos-cell ${d.pasado ? 'dash-partos-cell-off' : `dash-partos-cell-n${nivel}`}`}
+                                                                    title={d.pasado ? undefined : n === 0 ? fecha
+                                                                        : tooltipPartos(`📅 ${fecha} — ${n} parto${n > 1 ? 's' : ''} esperado${n > 1 ? 's' : ''}`, d.animales)}
+                                                                    onClick={n > 0 ? () => verListaAnimales(d.animales) : undefined}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
                                 <div className="dash-partos-chart">
                                     {partosEsperados.semanas.map((sem, i) => (
                                         <div key={i} className={`dash-partos-bar-col ${sem.count > 0 ? 'dash-partos-bar-col-active' : ''}`}
-                                            title={sem.count === 0 ? '' : (() => {
-                                                const MAX_SHOW = 5;
-                                                const nombres = sem.animales.map(a => nombreAnimal(a));
-                                                const header = `📅 Semana ${sem.label} — ${sem.count} parto${sem.count > 1 ? 's' : ''} esperado${sem.count > 1 ? 's' : ''}`;
-                                                if (nombres.length <= MAX_SHOW) {
-                                                    return `${header}\n${nombres.map(n => `• ${n}`).join('\n')}`;
-                                                }
-                                                const resto = nombres.length - MAX_SHOW;
-                                                return `${header}\n${nombres.slice(0, MAX_SHOW).map(n => `• ${n}`).join('\n')}\n• …y ${resto} más`;
-                                            })()}
+                                            title={sem.count === 0 ? '' : tooltipPartos(
+                                                `📅 Semana ${sem.label} — ${sem.count} parto${sem.count > 1 ? 's' : ''} esperado${sem.count > 1 ? 's' : ''}`,
+                                                sem.animales
+                                            )}
                                         >
                                             <div className="dash-partos-bar-track">
                                                 <div
@@ -1342,8 +1423,9 @@ export default function DashboardPage() {
 
                                     ))}
                                 </div>
+                                )}
                                 <div className="dash-partos-sub">
-                                    Por semana, próximas 12 semanas
+                                    {partosVista === 'anio' ? 'Por día, próximos 12 meses · tocá un día para ver las vacas' : 'Por semana, próximas 12 semanas'}
                                     {partosEsperados.sinFecha > 0 && (
                                         <span className="dash-partos-subfecha">
                                             {' '}· {partosEsperados.sinFecha} sin fecha de inseminación
