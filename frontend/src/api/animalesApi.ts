@@ -315,6 +315,12 @@ export async function getHistorialPesos(animalId: number): Promise<RegistroPesoR
   return response.data;
 }
 
+/** Todas las pesadas de los animales del establecimiento, la más reciente primero. */
+export async function getPesosEstablecimiento(establecimientoId: number): Promise<RegistroPesoResponse[]> {
+  const response = await axiosClient.get<RegistroPesoResponse[]>(`/establecimientos/${establecimientoId}/pesos`);
+  return response.data;
+}
+
 export async function registrarPeso(
   animalId: number,
   data: RegistroPesoRequest

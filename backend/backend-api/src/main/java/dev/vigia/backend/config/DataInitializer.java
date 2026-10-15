@@ -374,23 +374,26 @@ public class DataInitializer implements CommandLineRunner {
         //   008: la pesada de hace 12 días queda a < 14 días de la última → se usa la de hace 50
         //   Aurora: pesadas de hace > 120 días → fuera del cálculo; Canela: una sola pesada
         //   el resto de las gestantes sin pesar → cobertura 13 de 21 (62 %)
-        sembrarPesadas(vaca1, new double[][] { { 95, 412 }, { 60, 431 }, { 25, 452 } });
-        sembrarPesadas(vaca2, new double[][] { { 60, 380 }, { 20, 405 } });
+        // Variación "vs. hace 90 d": vaca1/2/4/5, 009 y 012 tienen además pesadas de invierno
+        // (hace 95–160 días, ~0,1–0,2 kg/día). Hace 90 días el ADPV era 0,18 (7 animales) y hoy
+        // 0,45 → ▲ 0,27. Esas pesadas viejas no cambian el ADPV de hoy.
+        sembrarPesadas(vaca1, new double[][] { { 150, 400 }, { 95, 412 }, { 60, 431 }, { 25, 452 } });
+        sembrarPesadas(vaca2, new double[][] { { 150, 362 }, { 100, 371 }, { 60, 380 }, { 20, 405 } });
         sembrarPesadas(vaca3, new double[][] { { 75, 445 }, { 35, 447 } });
-        sembrarPesadas(vaca4, new double[][] { { 70, 455 }, { 28, 478 } });
-        sembrarPesadas(vaca5, new double[][] { { 64, 330 }, { 30, 352 } });
+        sembrarPesadas(vaca4, new double[][] { { 160, 440 }, { 110, 449 }, { 70, 455 }, { 28, 478 } });
+        sembrarPesadas(vaca5, new double[][] { { 155, 318 }, { 105, 325 }, { 64, 330 }, { 30, 352 } });
         sembrarPesadas(demoConPerfil, new double[][] { { 40, 468 }, { 3, 449 } });
         sembrarPesadas(demoSinPerfil, new double[][] { { 45, 410 }, { 10, 396 } });
         sembrarPesadas(demoSinTelemetria, new double[][] { { 50, 400 }, { 12, 420 }, { 5, 418 } });
-        sembrarPesadas(demoRepro, new double[][] { { 50, 470 }, { 15, 488 } });
+        sembrarPesadas(demoRepro, new double[][] { { 140, 455 }, { 100, 462 }, { 50, 470 }, { 15, 488 } });
         sembrarPesadas(anestroPendiente, new double[][] { { 90, 432 }, { 45, 434 } });
         sembrarPesadas(anestroConfirmado, new double[][] { { 70, 420 }, { 30, 422 } });
-        sembrarPesadas(anestroCandidato, new double[][] { { 80, 440 }, { 40, 460 } });
+        sembrarPesadas(anestroCandidato, new double[][] { { 150, 428 }, { 95, 433 }, { 80, 440 }, { 40, 460 } });
         sembrarPesadas(gestantes.get(0), new double[][] { { 200, 430 }, { 150, 445 } });
         sembrarPesadas(gestantes.get(1), new double[][] { { 20, 455 } });
 
         log.info("[DataInitializer] ✅ Pesadas de demo: 7 animales ganando, 3 estables, 2 perdiendo peso "
-                + "(VIGIA-ARG-006/007), cobertura 13 de 21 en los últimos 90 días.");
+                + "(VIGIA-ARG-006/007), cobertura 13 de 21 en los últimos 90 días, ▲ vs. hace 90 días.");
 
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");

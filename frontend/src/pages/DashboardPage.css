@@ -1590,6 +1590,56 @@
     color: #CBD5E1;
 }
 
+.dash-salud-completitud.dash-salud-peso-cobertura-baja {
+    color: #D69E2E;
+}
+
+/* Card en columna: la línea de cobertura queda abajo y el número ocupa el alto libre */
+.dash-peso-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-peso-card .dash-salud-completitud {
+    margin-top: auto;
+}
+
+.dash-peso-headline {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 14px;
+}
+
+.dash-peso-headline .dash-salud-kpi-val {
+    font-size: 3.2rem;
+    line-height: 1;
+    margin: 4px 0 2px;
+}
+
+.dash-peso-help {
+    cursor: help;
+    font-size: 0.8rem;
+}
+
+.dash-peso-unidad {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #64748B;
+}
+
+.dash-peso-variacion {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.dash-peso-variacion-sube { color: #38A169; }
+.dash-peso-variacion-baja { color: #E53E3E; }
+
+.dash-peso-gana    { background: #38A169; } /* Verde oscuro */
+.dash-peso-estable { background: #CBD5E1; } /* Gris */
+.dash-peso-pierde  { background: #E53E3E; } /* Rojo */
+
 /* ── Responsive ────────────────────────────────────────────────── */
 @media (max-width: 900px) {
     .dash-salud-kpi-row {
