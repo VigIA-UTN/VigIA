@@ -2115,7 +2115,7 @@ export default function DashboardPage() {
                         <div className="dash-card-header">
                             <p className="dash-card-title">
                                 <i className="bi bi-wifi" />
-                                ¿Puedo confiar en el monitoreo?
+                                Estado del monitoreo
                             </p>
                         </div>
 
