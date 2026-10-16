@@ -25,6 +25,7 @@ import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
+import dev.vigia.backend.service.SseAlertaPublisher;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -63,6 +65,8 @@ class AlertaControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+    @Autowired
+    private SseAlertaPublisher sseAlertaPublisher;
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
@@ -1162,6 +1166,22 @@ class AlertaControllerTest {
                 .param("establecimientoId", establecimientoId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(request().asyncStarted());
+    }
+
+    @Test
+    @DisplayName("Stream SSE: el heartbeat le llega al cliente como comentario, para que el proxy no corte el stream")
+    void streamAlertas_heartbeat_llegaComoComentario() throws Exception {
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        sseAlertaPublisher.enviarHeartbeat();
+
+        assertThat(result.getResponse().getContentAsString()).contains(":ping");
+        result.getRequest().getAsyncContext().complete();
     }
 
     @Test
