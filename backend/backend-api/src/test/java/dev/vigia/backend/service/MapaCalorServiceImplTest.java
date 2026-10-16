@@ -108,7 +108,7 @@ class MapaCalorServiceImplTest {
     void sinFiltros() {
         usuarioProductor();
         Animal a1 = animal(1L, establecimiento);
-        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
+        when(telemetriaRepository.findConAnimalByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA))
                 .thenReturn(List.of(telemetria(a1, -34.0, -59.0)));
         when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
 
@@ -128,7 +128,7 @@ class MapaCalorServiceImplTest {
         Animal a1 = animal(1L, establecimiento);
         // El animal no tiene rodeo, por lo que hace un fallback a consultar el establecimiento
         when(animalRepository.findById(1L)).thenReturn(Optional.of(a1));
-        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
+        when(telemetriaRepository.findConAnimalByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA))
                 .thenReturn(List.of(telemetria(a1, -34.0, -59.0)));
         when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
 
@@ -160,7 +160,7 @@ class MapaCalorServiceImplTest {
         GeoAnalyzeRequestDTO request = requestEnviadoAMl();
         assertThat(request.getHistorial7d()).extracting("animalId").containsExactly("1", "2");
         assertThat(request.getAnimalIds()).isNull();
-        verify(telemetriaRepository, never()).findByEstablecimientoAndFechaHoraBetween(any(), any(), any(), any());
+        verify(telemetriaRepository, never()).findConAnimalByEstablecimientoAndFechaHoraBetween(any(), any(), any());
     }
 
     @Test
@@ -183,7 +183,7 @@ class MapaCalorServiceImplTest {
         Animal a1 = animal(1L, establecimiento);
         Telemetria huerfana = telemetria(a1, -34.5, -59.5);
         huerfana.getCaravana().setAnimal(null);
-        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
+        when(telemetriaRepository.findConAnimalByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA))
                 .thenReturn(List.of(telemetria(a1, -34.0, -59.0), huerfana));
         when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
 
@@ -229,7 +229,7 @@ class MapaCalorServiceImplTest {
     void umbralDelEstablecimientoEnRequest() {
         usuarioProductor();
         Animal a1 = animal(1L, establecimiento);
-        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
+        when(telemetriaRepository.findConAnimalByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA))
                 .thenReturn(List.of(telemetria(a1, -34.0, -59.0)));
         when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
 
@@ -245,7 +245,7 @@ class MapaCalorServiceImplTest {
         usuarioProductor();
         establecimiento.setUmbralAislamientoM(null);
         Animal a1 = animal(1L, establecimiento);
-        when(telemetriaRepository.findByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA, null))
+        when(telemetriaRepository.findConAnimalByEstablecimientoAndFechaHoraBetween(ESTABLECIMIENTO_ID, DESDE, HASTA))
                 .thenReturn(List.of(telemetria(a1, -34.0, -59.0)));
         when(mlGeoClient.analyze(any())).thenReturn(new GeoAnalyzeResponseDTO());
 

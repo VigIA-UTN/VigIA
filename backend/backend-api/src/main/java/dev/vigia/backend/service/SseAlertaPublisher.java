@@ -48,6 +48,8 @@ public class SseAlertaPublisher {
                 .anyMatch(e -> e.getId().equals(establecimientoId));
     }
 
+    // La transacción termina al devolver el emitter: el stream abierto no retiene una conexión a la base.
+    @Transactional(readOnly = true)
     public SseEmitter registrarClienteSse(Long establecimientoId, Long lastEventId) {
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
 

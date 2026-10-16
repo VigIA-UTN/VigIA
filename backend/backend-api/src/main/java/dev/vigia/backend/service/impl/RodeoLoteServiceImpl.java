@@ -3,6 +3,7 @@ package dev.vigia.backend.service.impl;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import dev.vigia.backend.dto.RodeoLoteRequest;
 import dev.vigia.backend.dto.RodeoLoteResponse;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class RodeoLoteServiceImpl implements RodeoLoteService {
 
         private final RodeoLoteRepository rodeoLoteRepository;

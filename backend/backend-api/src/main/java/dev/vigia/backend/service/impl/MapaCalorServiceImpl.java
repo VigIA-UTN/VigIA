@@ -95,11 +95,11 @@ public class MapaCalorServiceImpl implements MapaCalorService {
                                                 establecimientoId, desde, hasta, animalIds);
                         } else {
                                 telemetriaList = telemetriaRepository
-                                                .findByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta, null);
+                                                .findConAnimalByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta);
                         }
                 } else {
                         telemetriaList = telemetriaRepository
-                                        .findByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta, null);
+                                        .findConAnimalByEstablecimientoAndFechaHoraBetween(establecimientoId, desde, hasta);
                 }
 
                 List<CoordenadaGPSDTO> coordenadas = telemetriaList.stream()

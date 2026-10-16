@@ -282,6 +282,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public void desactivarAnimal(Long animalId, String emailProductor) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
@@ -553,6 +554,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public EstadoReproductivoResponse registrarEstadoReproductivo(Long animalId, String emailProductor,
                         EstadoReproductivoRequest request) {
@@ -631,6 +633,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public EstadoReproductivoResponse editarEstadoReproductivo(Long animalId, Long estadoId, String emailProductor,
                         EstadoReproductivoRequest request) {
@@ -695,6 +698,9 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
+        // Sin @Transactional a propósito: procesarCargaMasiva marca su transacción rollback-only cuando hay
+        // filas con error y devuelve la lista de errores; una transacción externa lo convertiría en un 500
+        // (UnexpectedRollbackException).
         @Override
         @SuppressWarnings("null")
         public CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, Long establecimientoId,
