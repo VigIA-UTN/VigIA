@@ -147,7 +147,7 @@ class IngestaControllerTest {
     @DisplayName("Caravana sin animal asociado, ignora")
     void sinAnimalAsociado_ignorado() {
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.empty());
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.empty());
 
         ResponseEntity<String> response = controller.receiveUplink(payloadCon(1));
 
@@ -161,7 +161,7 @@ class IngestaControllerTest {
     void frameCounterDuplicado_ignoradoPorIdempotencia() {
         caravana.setUltimoFrameCounter(5);
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
 
         ResponseEntity<String> response = controller.receiveUplink(payloadCon(5));
 
@@ -176,7 +176,7 @@ class IngestaControllerTest {
     void frameCounterNuevo_procesaYActualizaContador() {
         caravana.setUltimoFrameCounter(5);
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
 
         ResponseEntity<String> response = controller.receiveUplink(payloadCon(6));
@@ -195,7 +195,7 @@ class IngestaControllerTest {
     void frameCounterMenorAlUltimo_llegadaFueraDeOrden_ignorado() {
         caravana.setUltimoFrameCounter(5);
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
 
         ResponseEntity<String> response = controller.receiveUplink(payloadCon(3));
 
@@ -208,7 +208,7 @@ class IngestaControllerTest {
     @DisplayName("Reintento de TTN con el mismo f_cnt luego de un procesamiento exitoso, se descarta en el segundo envío")
     void reintentoConMismoFCnt_segundoEnvioSeDescarta() {
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
 
         ResponseEntity<String> primeraRespuesta = controller.receiveUplink(payloadCon(6));
@@ -230,7 +230,7 @@ class IngestaControllerTest {
     void sinFrameCounterPrevio_procesaYGuardaContador() {
         caravana.setUltimoFrameCounter(null);
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
 
         ResponseEntity<String> response = controller.receiveUplink(payloadCon(1));
@@ -247,7 +247,7 @@ class IngestaControllerTest {
     @DisplayName("Sin decoded_payload, ignora sin tocar telemetria ni el contador")
     void sinDecodedPayload_ignorado() {
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
 
         TTNWebhookRequestDTO.EndDeviceIds endDeviceIds = new TTNWebhookRequestDTO.EndDeviceIds();
         endDeviceIds.setDevEui(DEV_EUI);
@@ -266,7 +266,7 @@ class IngestaControllerTest {
     @DisplayName("Posición procesada: publica evento de telemetría en RabbitMQ y dispara verificación de geocerca")
     void posicionProcesada_publicaRabbitYVerificaGeocerca() {
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
 
         ResponseEntity<String> response = controller.receiveUplink(payloadCon(1));
@@ -290,7 +290,7 @@ class IngestaControllerTest {
     @DisplayName("Heartbeat sin telemetría previa, crea fila nueva sin coordenadas con batería y moveState")
     void heartbeatSinTelemetriaPrevia_creaFilaNueva() {
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
 
         ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, "75%", 0));
@@ -322,7 +322,7 @@ class IngestaControllerTest {
         previa.setBateria(90.0);
 
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.of(previa));
 
         ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, "60%", 1));
@@ -350,7 +350,7 @@ class IngestaControllerTest {
         previa.setBateria(90.0);
 
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.of(previa));
 
         ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, "no-numerico", 1));
@@ -364,7 +364,7 @@ class IngestaControllerTest {
     @DisplayName("Heartbeat con batería, escribe bateria y ultimaSenial en la Caravana")
     void heartbeatConBateria_actualizaCaravana() {
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.empty());
 
         ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, "75%", 0));
@@ -386,7 +386,7 @@ class IngestaControllerTest {
         previa.setBateria(90.0);
 
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana)).thenReturn(Optional.of(previa));
 
         ResponseEntity<String> response = controller.receiveUplink(heartbeatCon(1, null, 1));
@@ -405,7 +405,7 @@ class IngestaControllerTest {
 
     private void stubCaravanaConAnimal() {
         when(caravanaRepository.findByDevEui(DEV_EUI)).thenReturn(Optional.of(caravana));
-        when(animalRepository.findByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
+        when(animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId())).thenReturn(Optional.of(animal));
         lenient().when(telemetriaRepository.findFirstByCaravanaOrderByFechaHoraDesc(caravana))
                 .thenReturn(Optional.empty());
     }

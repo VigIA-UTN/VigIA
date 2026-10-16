@@ -35,4 +35,8 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
     boolean existsByAliasAndEstablecimientoId(String alias, Long establecimientoId);
 
     Optional<Animal> findByCaravanaId(Long caravanaId);
+
+    /** Webhook de ingesta: el geofence lee el lote y la caravana del animal en otra transacción. */
+    @EntityGraph(attributePaths = { "rodeoLote", "caravana" })
+    Optional<Animal> findConLoteYCaravanaByCaravanaId(Long caravanaId);
 }
