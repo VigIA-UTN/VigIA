@@ -34,6 +34,10 @@ public interface TelemetriaRepository extends JpaRepository<Telemetria, Long> {
 
         Optional<Telemetria> findFirstByCaravanaOrderByFechaHoraDesc(Caravana caravana);
 
+        /** Primer dato de la caravana desde {@code desde}: donde empieza la primera calibración de salud. */
+        Optional<Telemetria> findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(
+                        Caravana caravana, LocalDateTime desde);
+
         List<Telemetria> findByCaravanaAndFechaHoraBetweenOrderByFechaHoraAsc(
                         Caravana caravana, LocalDateTime desde, LocalDateTime hasta);
 
