@@ -1,13 +1,16 @@
 /* eslint-disable react-hooks/purity, react-hooks/set-state-in-effect */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Spinner, Alert } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { Spinner, Alert, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-import { getAnimales, getIntervencionesEstablecimiento, ESTADO_REPRODUCTIVO_LABEL } from '../api/animalesApi';
-import type { AnimalResponse, IntervencionResponse } from '../api/animalesApi';
+import { getAnimales, getIntervencionesEstablecimiento, getPesosEstablecimiento, ESTADO_REPRODUCTIVO_LABEL } from '../api/animalesApi';
+import type { AnimalResponse, IntervencionResponse, RegistroPesoResponse } from '../api/animalesApi';
+import {
+    calcularGananciaPeso, ADPV_PIERDE, COBERTURA_BAJA_PCT, DIAS_COBERTURA, DIAS_COMPARACION, DIAS_PESADA_VIGENTE,
+} from '../utils/gananciaPeso';
 import { getAlertas, getVentanaInseminacion, esAnestro, tieneDatoDesactualizado, textoAccionRecomendada } from '../api/alertaApi';
 import type { AlertaResponse, VentanaInseminacionResponse } from '../api/alertaApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
@@ -16,6 +19,8 @@ import { getAnimalesMapa } from '../api/animalesApi';
 import type { AnimalMapa } from '../api/animalesApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { determinarIcono } from '../utils/animalPins';
+import AlertDetailSidebar from '../components/AlertDetailSidebar';
+import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import './DashboardPage.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -30,7 +35,16 @@ const ESTADOS_ABIERTOS = new Set(['VACIA', 'CELO', 'POSIBLE_CELO', 'INSEMINADA',
 const PERIODOS_DIAS = [7, 30, 90];  // opciones del selector de período (Salud y Resumen ejecutivo)
 const PERIODO_DEFAULT_DIAS = 30;
 const DIA_MS = 24 * 60 * 60 * 1000;
+
+// Card "Ganancia de peso"
+const ADPV_AYUDA = 'ADPV: aumento diario de peso vivo, en kg por animal por día.';
+const GRUPOS_PESO = [
+    { key: 'gana', label: 'Gana' },
+    { key: 'estable', label: 'Estable' },
+    { key: 'pierde', label: 'Pierde' },
+] as const;
 const REVISAR_MAX = 5;              // filas por sub-sección en "Animales a revisar"
+const CELOS_MAX = 3;                // filas de celos con ventana abierta en "Embudo reproductivo"
 
 const TIPO_INTERVENCION_LABEL: Record<IntervencionResponse['tipo'], string> = {
     TRATAMIENTO: 'Tratamiento',
@@ -55,6 +69,20 @@ function esReproductiva(a: AnimalResponse): boolean {
 function nombreAnimal(a: AnimalResponse | null | undefined): string {
     if (!a) return '—';
     return a.alias || a.idCaravanaOficial || `#${a.id}`;
+}
+
+// Fecha de parto esperada en hora local (evita el corrimiento de día al parsear 'YYYY-MM-DD' como UTC)
+function fechaPartoEsperada(fechaInseminacion: string): Date {
+    const [y, m, d] = fechaInseminacion.slice(0, 10).split('-').map(Number);
+    return new Date(y, m - 1, d + DIAS_GESTACION);
+}
+
+// Tooltip de partos: encabezado + hasta 5 nombres
+function tooltipPartos(header: string, animales: AnimalResponse[]): string {
+    const MAX_SHOW = 5;
+    const lineas = animales.slice(0, MAX_SHOW).map(a => `• ${nombreAnimal(a)}`);
+    if (animales.length > MAX_SHOW) lineas.push(`• …y ${animales.length - MAX_SHOW} más`);
+    return [header, ...lineas].join('\n');
 }
 
 function formatHoras(horas: number): string {
@@ -260,15 +288,26 @@ function TrendChart({ datos, semanas, tipos }: {
     );
 }
 
+type DashTab = 'mando' | 'ejecutivo' | 'salud';
+
 export default function DashboardPage() {
     const selectedId = useEstablecimientoStore(s => s.selectedId);
     const navigate = useNavigate();
 
-    const [activeTab, setActiveTab] = useState<'mando' | 'ejecutivo' | 'salud'>('mando');
+    // La pestaña vive en la URL (?tab=salud): al volver con "atrás" desde otra página se restaura.
+    // `replace` para que cambiar de pestaña no agregue entradas al historial.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabParam = searchParams.get('tab');
+    const activeTab: DashTab = tabParam === 'salud' || tabParam === 'ejecutivo' ? tabParam : 'mando';
+    const setActiveTab = (tab: DashTab) => setSearchParams(prev => {
+        if (tab === 'mando') prev.delete('tab'); else prev.set('tab', tab);
+        return prev;
+    }, { replace: true });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [loteFilter, setLoteFilter] = useState<number | 'todos'>('todos');
     const [periodoDias, setPeriodoDias] = useState(PERIODO_DEFAULT_DIAS);
+    const [partosVista, setPartosVista] = useState<'semanas' | 'anio'>('semanas');
 
     // Raw data
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
@@ -286,12 +325,19 @@ export default function DashboardPage() {
     // Intervenciones del establecimiento (null si no se pudieron cargar)
     const [intervenciones, setIntervenciones] = useState<IntervencionResponse[] | null>([]);
 
+    // Pesadas del establecimiento (null si no se pudieron cargar)
+    const [pesos, setPesos] = useState<RegistroPesoResponse[] | null>([]);
+
+    // Alerta abierta en el panel de detalle, y la que se está interviniendo
+    const [alertaAbierta, setAlertaAbierta] = useState<AlertaResponse | null>(null);
+    const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
+
     const fetchDashboard = useCallback(async () => {
         if (!selectedId) return;
         setLoading(true);
         setError(null);
         try {
-            const [anim, pendientes, celoArchivadas, rodeosData, mapaData, confirmadas, descartadas, interv] = await Promise.all([
+            const [anim, pendientes, celoArchivadas, rodeosData, mapaData, confirmadas, descartadas, interv, pesosData] = await Promise.all([
                 getAnimales(selectedId),
                 getAlertas(selectedId, undefined, undefined, 'PENDIENTE'),
                 getAlertas(selectedId, 'CELO', undefined, 'ARCHIVADA'),
@@ -301,9 +347,11 @@ export default function DashboardPage() {
                 getAlertas(selectedId, undefined, undefined, 'DESCARTADA'),
                 // Si falla, el resto del dashboard sigue funcionando.
                 getIntervencionesEstablecimiento(selectedId).catch(() => null),
+                getPesosEstablecimiento(selectedId).catch(() => null),
             ]);
             setAnimales(anim);
             setIntervenciones(interv);
+            setPesos(pesosData);
             setAlertasPendientes(pendientes);
             setAlertasArchivadasCelo(celoArchivadas);
             setRodeos(rodeosData.filter(r => r.activo));
@@ -605,10 +653,6 @@ export default function DashboardPage() {
         alertasFiltradas.filter(a => a.tipo === 'SALUD' && horasTranscurridas(a.tsGeneracion) > 24).length,
         [alertasFiltradas]);
 
-    const kpiEnCalibracion = useMemo(() =>
-        animalesFiltrados.filter(a => a.estadoActual !== 'INACTIVO' && a.enCalibracion).length,
-        [animalesFiltrados]);
-
     // ── Salud tab: Alertas de salud sin atender (todas las pendientes, la más vieja primero) ──
     const alertasSaludSinAtender = useMemo(() =>
         alertasFiltradas
@@ -692,6 +736,29 @@ export default function DashboardPage() {
         ).length;
 
         return { semanas, sinFecha, vencidos, total: gestantesConFecha.length + sinFecha };
+    }, [animalesFiltrados]);
+
+    // ── Salud tab: Partos esperados — vista anual (estilo GitHub) ────────────
+    const partosAnio = useMemo(() => {
+        const porDia = new Map<string, AnimalResponse[]>();
+        animalesFiltrados
+            .filter(a => a.estadoActual !== 'INACTIVO' && a.estadoReproductivo === 'GESTANTE' && a.fechaUltimaInseminacion)
+            .forEach(a => {
+                const key = fechaPartoEsperada(a.fechaUltimaInseminacion!).toDateString();
+                porDia.set(key, [...(porDia.get(key) ?? []), a]);
+            });
+
+        // 53 columnas (semanas) × 7 filas (lun..dom), arrancando el lunes de esta semana
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        const lunes = hoy.getDate() - ((hoy.getDay() + 6) % 7);
+        const dias = Array.from({ length: 53 * 7 }, (_, i) => {
+            const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), lunes + i);
+            return { fecha, animales: porDia.get(fecha.toDateString()) ?? [], pasado: fecha < hoy };
+        });
+        const maxDia = Math.max(...dias.map(d => d.animales.length), 1);
+
+        return { dias, maxDia };
     }, [animalesFiltrados]);
 
 
@@ -780,19 +847,25 @@ export default function DashboardPage() {
         return { masReciente, ranking };
     }, [animalesFiltrados, intervenciones, ultimaIntervPorAnimal]);
 
-    // Abre el listado de animales filtrado por estos ids
-    const verListaAnimales = (lista: AnimalResponse[]) =>
-        navigate(`/animales?ids=${lista.map(a => a.id).join(',')}`);
+    // ── Salud tab: Ganancia de peso (null si no se pudieron cargar las pesadas) ──
+    const gananciaPeso = useMemo(() =>
+        pesos && calcularGananciaPeso(animalesFiltrados, pesos),
+        [animalesFiltrados, pesos]);
+
+    // Abre el listado de animales filtrado por estos ids; `motivo` se muestra en el chip del filtro
+    const verListaAnimales = (lista: AnimalResponse[], motivo: string) =>
+        navigate(`/animales?${new URLSearchParams({ ids: lista.map(a => a.id).join(','), motivo })}`);
 
     // ── KPIs de header ────────────────────────────────────────────────────────
     const kpiAlertasPendientes = alertasFiltradas.length;
     const kpiVentanasAbiertas = ventanaItems.length;
     const kpiBajoObservacion = animalesARevisar.length;
     const kpiCobertura = cobertura.pct;
-    const kpiVentanasSubtexto = (() => {
-        const urgentes = ventanaItems.filter(v => v.ventana.tiempoRestanteSegundos / 3600 <= 3);
-        return urgentes.length > 0 ? `${urgentes.length} por vencer en < 3h` : 'sin urgencia inmediata';
-    })();
+    // Solo ventanas ya abiertas: en las FUTURAS el tiempo restante es hasta que abren, no hasta que vencen
+    const ventanasUrgentes = ventanaItems.filter(
+        v => v.ventana.estado === 'ACTIVA' && v.ventana.tiempoRestanteSegundos / 3600 <= 3
+    ).length;
+    const kpiVentanasSubtexto = ventanasUrgentes > 0 ? `${ventanasUrgentes} por vencer en < 3h` : 'sin urgencia inmediata';
     const kpiObsSubtexto = (() => {
         const sinRevision = animalesARevisar.filter(a => !a.estadoSalud || a.estadoSalud === 'ENFERMO').length;
         return sinRevision > 0 ? `${sinRevision} enfermos` : 'en observación';
@@ -1083,9 +1156,11 @@ export default function DashboardPage() {
                         <span className="dash-salud-kpi-sub">&gt; 24 h desde la alerta</span>
                     </div>
                     <div className="dash-salud-kpi">
-                        <span className="dash-salud-kpi-label">En calibración</span>
-                        <span className="dash-salud-kpi-val dash-salud-kpi-muted">{kpiEnCalibracion}</span>
-                        <span className="dash-salud-kpi-sub">sin monitoreo de salud</span>
+                        <span className="dash-salud-kpi-label">Celos sin atender</span>
+                        <span className={`dash-salud-kpi-val ${ventanasUrgentes > 0 ? 'dash-salud-kpi-danger' : ''}`}>
+                            {ventanaItems.length}
+                        </span>
+                        <span className="dash-salud-kpi-sub">{kpiVentanasSubtexto}</span>
                     </div>
                 </div>
 
@@ -1101,6 +1176,42 @@ export default function DashboardPage() {
                             </p>
 
                         </div>
+
+                        {/* Celos con ventana abierta: lo más urgente del rodeo reproductivo, primero */}
+                        <div className="dash-salud-revisar-section">
+                            <span className="dash-salud-revisar-seclabel">Celos con ventana abierta</span>
+                            {ventanaItems.length === 0 ? (
+                                <p className="dash-no-items" style={{ margin: '6px 0' }}>
+                                    <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
+                                    {' '}Sin celos con ventana abierta
+                                </p>
+                            ) : (
+                                ventanaItems.slice(0, CELOS_MAX).map(({ alerta, animal, ventana }) => {
+                                    const isFutura = ventana.estado === 'FUTURA';
+                                    const vc = isFutura ? 'futura' : ventanaClass(ventana.tiempoRestanteSegundos);
+                                    const restante = formatHorasRestantes(ventana.tiempoRestanteSegundos).replace(' restantes', '');
+                                    return (
+                                        <div
+                                            key={alerta.id}
+                                            className="dash-salud-revisar-row"
+                                            onClick={() => setAlertaAbierta(alerta)}
+                                        >
+                                            <span className={`dash-sev-dot dash-ventana-bar-${vc}`} />
+                                            <span className="dash-salud-revisar-nombre">{nombreAnimal(animal)}</span>
+                                            <span className={`dash-salud-revisar-tiempo ${vc === 'critica' ? 'dash-salud-revisar-dias-urgente' : ''}`}>
+                                                {isFutura ? `abre en ${restante}` : `cierra en ${restante}`}
+                                            </span>
+                                        </div>
+                                    );
+                                })
+                            )}
+                            {ventanaItems.length > CELOS_MAX && (
+                                <button className="dash-ver-todas-btn" onClick={() => setActiveTab('mando')}>
+                                    +{ventanaItems.length - CELOS_MAX} más — ver en Centro de mando
+                                </button>
+                            )}
+                        </div>
+                        <div className="dash-salud-revisar-divider" />
 
                         {embudoExcepciones.totalRepro === 0 ? (
                             <p className="dash-no-items">Sin animales reproductivos registrados</p>
@@ -1146,7 +1257,7 @@ export default function DashboardPage() {
                                             {embudoExcepciones.vaciasLargo.length > 0 && (
                                                 <button
                                                     className="dash-ver-todas-btn"
-                                                    onClick={() => verListaAnimales(embudoExcepciones.vaciasLargo)}
+                                                    onClick={() => verListaAnimales(embudoExcepciones.vaciasLargo, `Vacías con > ${DIAS_ABIERTOS_URGENTE} días abiertos`)}
                                                 >
                                                     — ver lista
                                                 </button>
@@ -1164,7 +1275,7 @@ export default function DashboardPage() {
                                             {embudoExcepciones.inseminadasSinDiag.length > 0 && (
                                                 <button
                                                     className="dash-ver-todas-btn"
-                                                    onClick={() => verListaAnimales(embudoExcepciones.inseminadasSinDiag)}
+                                                    onClick={() => verListaAnimales(embudoExcepciones.inseminadasSinDiag, `Inseminadas sin diagnóstico > ${INSEMINADA_DIAS_DIAG} d`)}
                                                 >
                                                     — ver lista
                                                 </button>
@@ -1182,7 +1293,7 @@ export default function DashboardPage() {
                                             {embudoExcepciones.anestroSinInterv.length > 0 && (
                                                 <button
                                                     className="dash-ver-todas-btn"
-                                                    onClick={() => verListaAnimales(embudoExcepciones.anestroSinInterv)}
+                                                    onClick={() => verListaAnimales(embudoExcepciones.anestroSinInterv, 'Anestro con alerta sin intervención')}
                                                 >
                                                     — ver lista
                                                 </button>
@@ -1228,7 +1339,7 @@ export default function DashboardPage() {
                                         <div
                                             key={alerta.id}
                                             className="dash-salud-revisar-row"
-                                            onClick={() => animal && navigate(`/animales/${animal.id}`)}
+                                            onClick={() => setAlertaAbierta(alerta)}
                                         >
                                             <span className={`dash-sev-dot ${sevDot}`} />
                                             <span className="dash-salud-revisar-nombre">{nombreAnimal(animal)}</span>
@@ -1299,32 +1410,75 @@ export default function DashboardPage() {
                 <div className="dash-salud-mid-grid">
 
                     {/* ── IZQUIERDA: Partos esperados ──────────────────────── */}
-                    <div className="dash-card">
+                    <div className="dash-card dash-partos-card">
                         <div className="dash-card-header">
                             <p className="dash-card-title">
                                 <i className="bi bi-calendar2-event-fill" />
                                 Partos esperados
                             </p>
-
+                            <div className="dash-lote-filter">
+                                <i className="bi bi-calendar3" style={{ fontSize: '0.7rem' }} />
+                                <select
+                                    className="dash-lote-select"
+                                    value={partosVista}
+                                    onChange={e => setPartosVista(e.target.value as 'semanas' | 'anio')}
+                                    aria-label="Vista de partos esperados"
+                                >
+                                    <option value="semanas">Próximas 12 semanas</option>
+                                    <option value="anio">Próximo año</option>
+                                </select>
+                            </div>
                         </div>
 
                         {partosEsperados.total === 0 ? (
                             <p className="dash-no-items">Sin animales gestantes registrados</p>
                         ) : (
                             <>
+                                {partosVista === 'anio' ? (
+                                    // Dos mitades de ~6 meses: lado a lado en PC, apiladas en celular
+                                    <div className="dash-partos-anio">
+                                        {[0, 27].map(desde => {
+                                            const semanas = Array.from({ length: Math.min(27, 53 - desde) }, (_, k) => desde + k);
+                                            return (
+                                                <div key={desde} className="dash-partos-anio-mitad">
+                                                    <div className="dash-partos-anio-meses">
+                                                        {semanas.map(w => {
+                                                            const primero = partosAnio.dias.slice(w * 7, w * 7 + 7).find(d => d.fecha.getDate() === 1);
+                                                            return (
+                                                                <span key={w}>
+                                                                    {primero?.fecha.toLocaleDateString('es-AR', { month: 'short' })}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div className="dash-partos-anio-grid">
+                                                        {partosAnio.dias.slice(desde * 7, (desde + semanas.length) * 7).map(d => {
+                                                            const n = d.animales.length;
+                                                            const nivel = n === 0 ? 0 : Math.ceil((n / partosAnio.maxDia) * 4);
+                                                            const fecha = d.fecha.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                                                            return (
+                                                                <div
+                                                                    key={d.fecha.toDateString()}
+                                                                    className={`dash-partos-cell ${d.pasado ? 'dash-partos-cell-off' : `dash-partos-cell-n${nivel}`}`}
+                                                                    title={d.pasado ? undefined : n === 0 ? fecha
+                                                                        : tooltipPartos(`📅 ${fecha} — ${n} parto${n > 1 ? 's' : ''} esperado${n > 1 ? 's' : ''}`, d.animales)}
+                                                                    onClick={n > 0 ? () => verListaAnimales(d.animales, `Parto esperado el ${fecha}`) : undefined}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
                                 <div className="dash-partos-chart">
                                     {partosEsperados.semanas.map((sem, i) => (
                                         <div key={i} className={`dash-partos-bar-col ${sem.count > 0 ? 'dash-partos-bar-col-active' : ''}`}
-                                            title={sem.count === 0 ? '' : (() => {
-                                                const MAX_SHOW = 5;
-                                                const nombres = sem.animales.map(a => nombreAnimal(a));
-                                                const header = `📅 Semana ${sem.label} — ${sem.count} parto${sem.count > 1 ? 's' : ''} esperado${sem.count > 1 ? 's' : ''}`;
-                                                if (nombres.length <= MAX_SHOW) {
-                                                    return `${header}\n${nombres.map(n => `• ${n}`).join('\n')}`;
-                                                }
-                                                const resto = nombres.length - MAX_SHOW;
-                                                return `${header}\n${nombres.slice(0, MAX_SHOW).map(n => `• ${n}`).join('\n')}\n• …y ${resto} más`;
-                                            })()}
+                                            title={sem.count === 0 ? '' : tooltipPartos(
+                                                `📅 Semana ${sem.label} — ${sem.count} parto${sem.count > 1 ? 's' : ''} esperado${sem.count > 1 ? 's' : ''}`,
+                                                sem.animales
+                                            )}
                                         >
                                             <div className="dash-partos-bar-track">
                                                 <div
@@ -1342,8 +1496,9 @@ export default function DashboardPage() {
 
                                     ))}
                                 </div>
+                                )}
                                 <div className="dash-partos-sub">
-                                    Por semana, próximas 12 semanas
+                                    {partosVista === 'anio' ? 'Por día, próximos 12 meses · tocá un día para ver las vacas' : 'Por semana, próximas 12 semanas'}
                                     {partosEsperados.sinFecha > 0 && (
                                         <span className="dash-partos-subfecha">
                                             {' '}· {partosEsperados.sinFecha} sin fecha de inseminación
@@ -1503,7 +1658,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* ── Ganancia de peso (Idea 17) ────────────────────────── */}
-                    <div className="dash-card">
+                    <div className="dash-card dash-peso-card">
                         <div className="dash-card-header">
                             <p className="dash-card-title">
                                 <i className="bi bi-graph-up-arrow" />
@@ -1511,16 +1666,70 @@ export default function DashboardPage() {
                             </p>
 
                         </div>
-                        {/* TODO: implementar cuando exista endpoint GET /pesos?establecimientoId={id} */}
-                        <div className="dash-salud-peso-empty">
-                            <i className="bi bi-rulers" style={{ fontSize: '1.6rem', color: '#CBD5E1' }} />
-                            <span className="dash-salud-peso-empty-text">
-                                Disponible cuando haya pesadas cargadas
-                            </span>
-                            <span className="dash-salud-peso-empty-sub">
-                                Solo si hay ≥ 2 pesadas · se oculta si la cobertura es baja
-                            </span>
-                        </div>
+                        {gananciaPeso === null ? (
+                            <p className="dash-no-items">No se pudieron cargar las pesadas</p>
+                        ) : (
+                            <>
+                                {gananciaPeso.adpvMediana === null ? (
+                                    <p className="dash-no-items">
+                                        Sin pesadas suficientes (2 por animal, la última en los últimos {DIAS_PESADA_VIGENTE} d)
+                                    </p>
+                                ) : (
+                                    <>
+                                        <div className="dash-peso-headline">
+                                            <span className="dash-salud-kpi-label">
+                                                ADPV{' '}
+                                                <OverlayTrigger placement="top" trigger={['hover', 'focus']} overlay={<Tooltip>{ADPV_AYUDA}</Tooltip>}>
+                                                    <i className="bi bi-question-circle dash-peso-help" tabIndex={0} aria-label={ADPV_AYUDA} />
+                                                </OverlayTrigger>
+                                            </span>
+                                            <span className="dash-salud-kpi-val">
+                                                {gananciaPeso.adpvMediana.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                <span className="dash-peso-unidad"> kg/día</span>
+                                            </span>
+                                            {gananciaPeso.variacion !== null && (
+                                                <span className={`dash-peso-variacion ${gananciaPeso.variacion >= 0 ? 'dash-peso-variacion-sube' : 'dash-peso-variacion-baja'}`}>
+                                                    {gananciaPeso.variacion >= 0 ? '▲' : '▼'}{' '}
+                                                    {Math.abs(gananciaPeso.variacion).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    {' '}vs. hace {DIAS_COMPARACION} d
+                                                </span>
+                                            )}
+                                            <span className="dash-salud-kpi-sub">
+                                                mediana · {gananciaPeso.n} {gananciaPeso.n === 1 ? 'animal' : 'animales'} con ≥ 2 pesadas
+                                            </span>
+                                        </div>
+
+                                        <div className="dash-embudo-bar-wrap">
+                                            {GRUPOS_PESO.map(g => gananciaPeso[g.key].length > 0 && (
+                                                <div
+                                                    key={g.key}
+                                                    className={`dash-embudo-seg dash-peso-${g.key}`}
+                                                    style={{ flex: gananciaPeso[g.key].length }}
+                                                    title={`${g.label}: ${gananciaPeso[g.key].length}`}
+                                                />
+                                            ))}
+                                        </div>
+                                        <div className="dash-embudo-legend">
+                                            {GRUPOS_PESO.map(g => (
+                                                <span key={g.key} className="dash-embudo-leg-item">
+                                                    <span className={`dash-dot dash-peso-${g.key}`} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%' }} />
+                                                    {g.label} {gananciaPeso[g.key].length}
+                                                    {g.key === 'pierde' && gananciaPeso.pierde.length > 0 && (
+                                                        <button className="dash-ver-todas-btn" onClick={() => verListaAnimales(gananciaPeso.pierde, `Pierden peso (ADPV < ${ADPV_PIERDE.toLocaleString('es-AR')} kg/día)`)}>
+                                                            — ver lista
+                                                        </button>
+                                                    )}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                                <div className={`dash-salud-completitud ${gananciaPeso.cobertura.total > 0 && gananciaPeso.cobertura.pct < COBERTURA_BAJA_PCT ? 'dash-salud-peso-cobertura-baja' : ''}`}>
+                                    Cobertura: {gananciaPeso.cobertura.pct} % pesados en los últimos {DIAS_COBERTURA} d
+                                    {' '}({gananciaPeso.cobertura.pesados} de {gananciaPeso.cobertura.total})
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </>
@@ -1632,6 +1841,31 @@ export default function DashboardPage() {
                 <Alert variant="danger" style={{ borderRadius: 10, maxWidth: 1280, margin: '0 auto 16px' }}>
                     <i className="bi bi-exclamation-triangle me-2" />{error}
                 </Alert>
+            )}
+
+            {/* Detalle de alerta (desde "Animales a revisar"), igual que en la página de Alertas */}
+            {alertaAbierta && (
+                <AlertDetailSidebar
+                    alerta={alertaAbierta}
+                    mode="fixed"
+                    onClose={() => setAlertaAbierta(null)}
+                    onActionComplete={(alertaId, nuevoEstado) => {
+                        setAlertasPendientes(prev => prev.filter(a => a.id !== alertaId));
+                        setAlertasRecientes(prev => prev.map(a => (a.id === alertaId ? { ...a, estado: nuevoEstado } : a)));
+                    }}
+                    onOpenIntervencion={() => setIntervencionAlerta(alertaAbierta)}
+                />
+            )}
+            {intervencionAlerta && (
+                <IntervencionFormPanel
+                    alerta={intervencionAlerta}
+                    mode="fixed"
+                    onClose={() => setIntervencionAlerta(null)}
+                    onSuccess={() => {
+                        setIntervencionAlerta(null);
+                        fetchDashboard();
+                    }}
+                />
             )}
 
             {/* ── TAB: Resumen ejecutivo ───────────────────────────────────── */}
@@ -1881,7 +2115,7 @@ export default function DashboardPage() {
                         <div className="dash-card-header">
                             <p className="dash-card-title">
                                 <i className="bi bi-wifi" />
-                                ¿Puedo confiar en el monitoreo?
+                                Estado del monitoreo
                             </p>
                         </div>
 

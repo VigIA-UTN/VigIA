@@ -64,7 +64,9 @@
     margin: 0 auto 18px;
 }
 
-.dash-kpi-chip {
+/* Tarjetas KPI: mismo estilo en Centro de mando (.dash-kpi-chip) y Salud (.dash-salud-kpi) */
+.dash-kpi-chip,
+.dash-salud-kpi {
     background: #ffffff;
     border-radius: 10px;
     border: 1px solid #E2E8F0;
@@ -76,22 +78,27 @@
     cursor: default;
 }
 
-.dash-kpi-chip-label {
-    font-size: 0.8rem;
+.dash-kpi-chip-label,
+.dash-salud-kpi-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: #64748B;
-    font-weight: 500;
 }
 
-.dash-kpi-chip-val {
-    font-size: 2.4rem;
-    font-weight: 400;
+.dash-kpi-chip-val,
+.dash-salud-kpi-val {
+    font-size: 2.2rem;
+    font-weight: 600;
     line-height: 1.1;
     color: #1A3558;
     letter-spacing: -0.02em;
 }
 
-.dash-kpi-chip-sub {
-    font-size: 0.82rem;
+.dash-kpi-chip-sub,
+.dash-salud-kpi-sub {
+    font-size: 0.8rem;
     color: #64748B;
     font-weight: 500;
     margin-top: 2px;
@@ -354,6 +361,7 @@
 .dash-ventana-bar-optima   { background: #8CC63F; }
 .dash-ventana-bar-venciendo { background: #ECC94B; }
 .dash-ventana-bar-critica  { background: #E53E3E; }
+.dash-ventana-bar-futura   { background: #CBD5E1; }
 
 .dash-ventana-restante {
     font-size: 0.9rem;
@@ -651,8 +659,9 @@
         grid-template-columns: 1fr 1fr;
     }
 
-    .dash-kpi-chip-val {
-        font-size: 2rem;
+    .dash-kpi-chip-val,
+    .dash-salud-kpi-val {
+        font-size: 1.9rem;
     }
 }
 
@@ -1053,41 +1062,10 @@
     margin: 0 auto 18px;
 }
 
-.dash-salud-kpi {
-    background: #fff;
-    border-radius: 10px;
-    border: 1px solid #E2E8F0;
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-}
-
-.dash-salud-kpi-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #94A3B8;
-}
-
-.dash-salud-kpi-val {
-    font-size: 2rem;
-    font-weight: 600;
-    color: #1A3558;
-    line-height: 1.1;
-}
-
+/* Estilo base de las tarjetas: compartido con .dash-kpi-chip (arriba de todo) */
 .dash-salud-kpi-val.dash-salud-kpi-warn   { color: #D69E2E; }
 .dash-salud-kpi-val.dash-salud-kpi-danger { color: #E53E3E; }
 .dash-salud-kpi-val.dash-salud-kpi-muted  { color: #94A3B8; }
-
-.dash-salud-kpi-sub {
-    font-size: 0.8rem;
-    color: #64748B;
-    font-weight: 500;
-}
 
 /* ── Grids de contenido ────────────────────────────────────────── */
 .dash-salud-main-grid {
@@ -1100,10 +1078,15 @@
 
 .dash-salud-mid-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 2.8fr) minmax(300px, 1fr);
+  /* Partos necesita ancho para el calendario anual */
     gap: 16px;
     max-width: 1280px;
-    margin: 0 auto 0;
+    margin: 0 auto 16px;
+}
+
+.dash-salud-mid-grid .dash-card {
+    padding-bottom: 12px;
 }
 
 /* ── Separador "debajo del pliegue" ────────────────────────────── */
@@ -1264,12 +1247,19 @@
 
 /* ── Sparkline mini ────────────────────────────────────────────── */
 /* ── Partos esperados — bar chart ──────────────────────────────── */
+/* La card es columna: el gráfico ocupa el alto libre y el texto queda abajo */
+.dash-partos-card {
+    display: flex;
+    flex-direction: column;
+}
+
 .dash-partos-chart {
     display: flex;
     align-items: flex-end;
     gap: 4px;
-    height: 90px;
-    margin: 16px 0 10px;
+    flex: 1;
+    min-height: 90px;
+    margin: 16px 0 4px;
 }
 
 .dash-partos-bar-col {
@@ -1330,6 +1320,58 @@
     overflow: hidden;
     max-width: 100%;
     margin-top: 2px;
+}
+
+/* ── Partos esperados — vista anual (estilo GitHub) ────────────── */
+.dash-partos-anio {
+    display: flex;
+    flex: 1;
+    gap: 12px;
+    margin: 4px 0;
+}
+
+/* Las filas se estiran para ocupar el alto libre de la card (mín. 10px) */
+.dash-partos-anio-mitad {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-partos-anio-meses,
+.dash-partos-anio-grid {
+    display: grid;
+    grid-template-columns: repeat(27, 1fr);
+    gap: 2px;
+}
+
+.dash-partos-anio-meses span {
+    font-size: 0.6rem;
+    color: #94A3B8;
+    white-space: nowrap;
+    height: 14px;
+}
+
+.dash-partos-anio-grid {
+    flex: 1;
+    grid-template-rows: repeat(7, minmax(10px, 1fr));
+    grid-auto-flow: column;
+}
+
+.dash-partos-cell {
+    border-radius: 2px;
+}
+
+.dash-partos-cell-off { background: transparent; }
+.dash-partos-cell-n0 { background: #F1F5F9; }
+.dash-partos-cell-n1 { background: #BFD0E6; cursor: help; }
+.dash-partos-cell-n2 { background: #7E9DC4; cursor: help; }
+.dash-partos-cell-n3 { background: #3E6596; cursor: help; }
+.dash-partos-cell-n4 { background: #1A3558; cursor: help; }
+.dash-partos-cell:not(.dash-partos-cell-n0):not(.dash-partos-cell-off):hover { outline: 2px solid #2d5a9e; }
+
+@media (max-width: 600px) {
+    .dash-partos-anio { flex-direction: column; }
 }
 
 .dash-partos-sub {
@@ -1450,10 +1492,10 @@
 }
 
 .dash-salud-interv-note {
-    font-size: 0.68rem;
-    color: #CBD5E1;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #64748B;
     margin-bottom: 10px;
-    font-style: italic;
 }
 
 .dash-salud-interv-row {
@@ -1525,6 +1567,56 @@
     font-size: 0.72rem;
     color: #CBD5E1;
 }
+
+.dash-salud-completitud.dash-salud-peso-cobertura-baja {
+    color: #D69E2E;
+}
+
+/* Card en columna: la línea de cobertura queda abajo y el número ocupa el alto libre */
+.dash-peso-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-peso-card .dash-salud-completitud {
+    margin-top: auto;
+}
+
+.dash-peso-headline {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 14px;
+}
+
+.dash-peso-headline .dash-salud-kpi-val {
+    font-size: 3.2rem;
+    line-height: 1;
+    margin: 4px 0 2px;
+}
+
+.dash-peso-help {
+    cursor: help;
+    font-size: 0.8rem;
+}
+
+.dash-peso-unidad {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #64748B;
+}
+
+.dash-peso-variacion {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.dash-peso-variacion-sube { color: #38A169; }
+.dash-peso-variacion-baja { color: #E53E3E; }
+
+.dash-peso-gana    { background: #38A169; } /* Verde oscuro */
+.dash-peso-estable { background: #CBD5E1; } /* Gris */
+.dash-peso-pierde  { background: #E53E3E; } /* Rojo */
 
 /* ── Responsive ────────────────────────────────────────────────── */
 @media (max-width: 900px) {

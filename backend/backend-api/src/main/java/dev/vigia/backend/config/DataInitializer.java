@@ -14,6 +14,7 @@ import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.PerfilReferenciaRepository;
 import dev.vigia.backend.repository.RegistroCohesionRepository;
+import dev.vigia.backend.repository.RegistroPesoRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
@@ -34,6 +35,7 @@ import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.RegistroPeso;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.TipoEstadoSalud;
 import dev.vigia.backend.model.TipoIntervencion;
@@ -75,6 +77,7 @@ public class DataInitializer implements CommandLineRunner {
     private final CaravanaRepository caravanaRepository;
     private final TelemetriaRepository telemetriaRepository;
     private final RegistroCohesionRepository registroCohesionRepository;
+    private final RegistroPesoRepository registroPesoRepository;
     private final PerfilReferenciaRepository perfilReferenciaRepository;
     private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
     private final PasswordEncoder passwordEncoder;
@@ -99,6 +102,7 @@ public class DataInitializer implements CommandLineRunner {
         // Generados por los jobs del worker; referencian a animales sin ON DELETE CASCADE.
         registroCohesionRepository.deleteAll();
         perfilReferenciaRepository.deleteAll();
+        registroPesoRepository.deleteAll();
         invitacionRepository.deleteAll();
         animalRepository.deleteAll();
         caravanaRepository.deleteAll();
@@ -297,8 +301,7 @@ public class DataInitializer implements CommandLineRunner {
                 null, hoyDt.minusDays(42));
         sembrarInseminacionDesdeIntervencion(demoRepro, vet, hoyDt.minusDays(40));
         sembrarRevisionConEstadoSalud(demoRepro, vet, TipoEstadoSalud.EN_OBSERVACION, hoyDt.minusDays(20));
-        sembrarEstadoReproductivo(demoRepro, TipoReproductivo.GESTANTE, OrigenEstado.MANUAL, vet,
-                null, hoyDt.minusDays(9));
+        sembrarGestante(demoRepro, vet, LocalDate.now().minusDays(40), hoyDt.minusDays(9));
 
         log.info("[DataInitializer] ✅ Animal VIGIA-ARG-009 con historial reproductivo de demo "
                 + "(parto, vacía, celo ml, inseminación, gestante) + una revisión veterinaria con estado de salud.");
@@ -341,6 +344,57 @@ public class DataInitializer implements CommandLineRunner {
                 + "VIGIA-ARG-011 CONFIRMADA + estado ANESTRO, VIGIA-ARG-012 sin alerta (la genera el detector).",
                 umbralAnestro);
 
+        // ── Acto 7: Partos esperados (demo del dashboard de Salud y reproducción) ──
+        // Gestantes con fecha de inseminación (parto esperado = IA + 283 días). Un lote de
+        // IATF del mismo día concentra 3 partos en una fecha; el resto se reparte en los
+        // próximos meses y una queda con la fecha vencida (posible parto sin registrar).
+        // Como la preñez se confirma ~35 d post-IA, los partos solo caen en los próximos ~8 meses.
+        String[] nombresGestantes = { "Aurora", "Canela", "Estrella", "Luna", "Morena",
+                "Paloma", "Nube", "Frutilla", "Rosa" };
+        int[] diasDesdeIa = { 250, 250, 250, 247, 200, 200, 140, 90, 290 };
+        List<Animal> gestantes = new ArrayList<>();
+        for (int i = 0; i < diasDesdeIa.length; i++) {
+            int num = 13 + i;
+            Animal gestante = crearAnimal(est, lote1, String.format("%d%03d", num, num), nombresGestantes[i], "Angus",
+                    LocalDate.of(2019, 10, 1), String.format("VIGIA-ARG-%03d", num), caravanaRepository, animalRepository);
+            LocalDate ia = LocalDate.now().minusDays(diasDesdeIa[i]);
+            sembrarGestante(gestante, vet, ia, ia.plusDays(35).atTime(10, 0));
+            gestantes.add(gestante);
+        }
+
+        log.info("[DataInitializer] ✅ {} gestantes de demo (VIGIA-ARG-013..{}) para el gráfico de partos esperados.",
+                diasDesdeIa.length, String.format("%03d", 12 + diasDesdeIa.length));
+
+        // ── Acto 8: Pesadas (demo de la card "Ganancia de peso") ──────────────
+        // Pares {días atrás, kg}. La card calcula la ganancia diaria (ADPV) con las dos últimas
+        // pesadas separadas por ≥ 14 días, y la cobertura con las pesadas de los últimos 90 días.
+        //   gana (~0,4–0,65 kg/día): vaca1, vaca2, vaca4, vaca5, 008, 009, 012
+        //   estable (~0,05):         vaca3, 010, 011
+        //   pierde (~-0,4/-0,5):     006 (alerta de salud ALTA, postración) y 007 (cojera)
+        //   008: la pesada de hace 12 días queda a < 14 días de la última → se usa la de hace 50
+        //   Aurora: pesadas de hace > 120 días → fuera del cálculo; Canela: una sola pesada
+        //   el resto de las gestantes sin pesar → cobertura 13 de 21 (62 %)
+        // Variación "vs. hace 90 d": vaca1/2/4/5, 009 y 012 tienen además pesadas de invierno
+        // (hace 95–160 días, ~0,1–0,2 kg/día). Hace 90 días el ADPV era 0,18 (7 animales) y hoy
+        // 0,45 → ▲ 0,27. Esas pesadas viejas no cambian el ADPV de hoy.
+        sembrarPesadas(vaca1, new double[][] { { 150, 400 }, { 95, 412 }, { 60, 431 }, { 25, 452 } });
+        sembrarPesadas(vaca2, new double[][] { { 150, 362 }, { 100, 371 }, { 60, 380 }, { 20, 405 } });
+        sembrarPesadas(vaca3, new double[][] { { 75, 445 }, { 35, 447 } });
+        sembrarPesadas(vaca4, new double[][] { { 160, 440 }, { 110, 449 }, { 70, 455 }, { 28, 478 } });
+        sembrarPesadas(vaca5, new double[][] { { 155, 318 }, { 105, 325 }, { 64, 330 }, { 30, 352 } });
+        sembrarPesadas(demoConPerfil, new double[][] { { 40, 468 }, { 3, 449 } });
+        sembrarPesadas(demoSinPerfil, new double[][] { { 45, 410 }, { 10, 396 } });
+        sembrarPesadas(demoSinTelemetria, new double[][] { { 50, 400 }, { 12, 420 }, { 5, 418 } });
+        sembrarPesadas(demoRepro, new double[][] { { 140, 455 }, { 100, 462 }, { 50, 470 }, { 15, 488 } });
+        sembrarPesadas(anestroPendiente, new double[][] { { 90, 432 }, { 45, 434 } });
+        sembrarPesadas(anestroConfirmado, new double[][] { { 70, 420 }, { 30, 422 } });
+        sembrarPesadas(anestroCandidato, new double[][] { { 150, 428 }, { 95, 433 }, { 80, 440 }, { 40, 460 } });
+        sembrarPesadas(gestantes.get(0), new double[][] { { 200, 430 }, { 150, 445 } });
+        sembrarPesadas(gestantes.get(1), new double[][] { { 20, 455 } });
+
+        log.info("[DataInitializer] ✅ Pesadas de demo: 7 animales ganando, 3 estables, 2 perdiendo peso "
+                + "(VIGIA-ARG-006/007), cobertura 13 de 21 en los últimos 90 días, ▲ vs. hace 90 días.");
+
         log.info("[DataInitializer] Usuarios disponibles para pruebas:");
         log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
         log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");
@@ -361,6 +415,31 @@ public class DataInitializer implements CommandLineRunner {
         e.setOrigen(origen);
         e.setUsuarioRegistrador(usuario);
         e.setFechaUltParto(fechaUltParto);
+        e.setFechaRegistro(fechaRegistro);
+        estadoReproductivoRepository.save(e);
+    }
+
+    /** Pesadas de demo: cada par es {días atrás, kg}. */
+    private void sembrarPesadas(Animal animal, double[][] pesadas) {
+        for (double[] p : pesadas) {
+            RegistroPeso r = new RegistroPeso();
+            r.setAnimal(animal);
+            r.setFecha(LocalDate.now().minusDays((long) p[0]));
+            r.setValorKg(p[1]);
+            r.setUnidad("kg");
+            r.setFechaRegistro(r.getFecha().atTime(9, 0));
+            registroPesoRepository.save(r);
+        }
+    }
+
+    /** GESTANTE con la fecha de IA: el parto esperado del dashboard sale del último estado. */
+    private void sembrarGestante(Animal animal, Usuario vet, LocalDate fechaInseminacion, LocalDateTime fechaRegistro) {
+        EstadoReproductivo e = new EstadoReproductivo();
+        e.setAnimal(animal);
+        e.setEstado(TipoReproductivo.GESTANTE);
+        e.setOrigen(OrigenEstado.MANUAL);
+        e.setUsuarioRegistrador(vet);
+        e.setFechaUltInseminacion(fechaInseminacion);
         e.setFechaRegistro(fechaRegistro);
         estadoReproductivoRepository.save(e);
     }

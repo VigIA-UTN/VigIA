@@ -9,12 +9,14 @@ import dev.vigia.backend.dto.ConfigAnestroResponse;
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.dto.EstablecimientoResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
+import dev.vigia.backend.dto.RegistroPesoResponse;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
+import dev.vigia.backend.repository.RegistroPesoRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -42,6 +44,7 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
 
     private final EstablecimientoRepository establecimientoRepository;
     private final IntervencionRepository intervencionRepository;
+    private final RegistroPesoRepository registroPesoRepository;
     private final UsuarioRepository usuarioRepository;
 
     public EstablecimientoResponse createEstablecimiento(EstablecimientoRequest request) {
@@ -148,6 +151,21 @@ public class EstablecimientoServiceImpl implements EstablecimientoService {
                 .fechaHora(intervencion.getFechaHora())
                 .tipo(intervencion.getTipo())
                 .build();
+    }
+
+    @Override
+    public List<RegistroPesoResponse> obtenerPesos(String emailUsuario, Long establecimientoId) {
+        findPerteneciente(establecimientoId, emailUsuario);
+        return registroPesoRepository.findByAnimalEstablecimientoIdOrderByFechaDescIdDesc(establecimientoId).stream()
+                .map(p -> RegistroPesoResponse.builder()
+                        .id(p.getId())
+                        .animalId(p.getAnimal().getId())
+                        .fecha(p.getFecha())
+                        .valorKg(p.getValorKg())
+                        .unidad(p.getUnidad())
+                        .fechaRegistro(p.getFechaRegistro())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     // ── Configuración de anestro ──────────────────────────────────────────────

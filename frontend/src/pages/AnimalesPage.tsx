@@ -50,7 +50,7 @@ export default function AnimalesPage() {
         searchParams.get('tab') === 'salud' ? 'salud' : 'general'
     );
     const [searchTerm, setSearchTerm] = useState('');
-    // Filtros que llegan desde el dashboard: ?rodeo=<id> (resumen ejecutivo) e ?ids=1,2,3 (listas de excepciones).
+    // Filtros que llegan desde el dashboard: ?rodeo=<id> (resumen ejecutivo) e ?ids=1,2,3&motivo=... (listas de excepciones).
     const rodeoFiltro = Number(searchParams.get('rodeo')) || null;
     const idsParam = searchParams.get('ids');
     const idsFiltro = idsParam ? new Set(idsParam.split(',').map(Number).filter(Boolean)) : null;
@@ -494,7 +494,7 @@ export default function AnimalesPage() {
                                 onClick={() => setSearchParams({})}
                                 title="Quitar filtro"
                             >
-                                Lista del dashboard ({idsFiltro.size})
+                                {searchParams.get('motivo') || 'Lista del dashboard'} ({idsFiltro.size})
                                 <i className="bi bi-x-lg ms-1" />
                             </Button>
                         )}

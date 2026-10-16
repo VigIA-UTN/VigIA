@@ -51,7 +51,7 @@ function NavScroll() {
 
     const getDashboardRoute = () => {
         if (isAdmin) return '/establecimientos';
-        return '/mapa';
+        return '/dashboard';
     };
 
     const establecimientoSelector = !isAdmin && activeEstablecimientos.length > 0 && (
@@ -150,9 +150,6 @@ function NavScroll() {
                         </>
                     ) : (
                         <>
-                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/dashboard')}>
-                                <i className="bi bi-speedometer2 me-2" />Dashboard
-                            </button>
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/mapa')}>
                                 <i className="bi bi-map me-2" />Mapa
                             </button>
@@ -322,7 +319,7 @@ function NavScroll() {
                                 </>
                             ) : (
                                 <>
-                                    <Nav.Link as={Link} to="/dashboard" className="mx-2 fw-semibold">Dashboard</Nav.Link>
+                                    <Nav.Link as={Link} to="/mapa" className="mx-2 fw-semibold">Mapa</Nav.Link>
                                     <Nav.Link as={Link} to="/alertas" className="mx-2 fw-semibold">Alertas</Nav.Link>
                                     <Nav.Link as={Link} to="/invitaciones" className="mx-2 fw-semibold">Invitaciones</Nav.Link>
                                 </>
