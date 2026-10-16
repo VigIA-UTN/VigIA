@@ -80,6 +80,7 @@ import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
+import dev.vigia.backend.repository.PerfilReferenciaRepository;
 import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.repository.CaravanaRepository;
@@ -105,6 +106,7 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstadoReproductivoRepository estadoReproductivoRepository;
         private final IntervencionRepository intervencionRepository;
         private final TelemetriaRepository telemetriaRepository;
+        private final PerfilReferenciaRepository perfilReferenciaRepository;
         private final EstadoSaludRepository estadoSaludRepository;
         private final RegistroPesoRepository registroPesoRepository;
         private final CaravanaRepository caravanaRepository;
@@ -345,44 +347,34 @@ public class AnimalServiceImpl implements AnimalService {
                 return animales.stream().map(this::mapToResponse).toList();
         }
 
-        private void calcularCalibracion(Animal animal, AnimalResponse.AnimalResponseBuilder builder) {
-                LocalDate fechaBase = animal.getFechaAlta();
-                if (fechaBase != null) {
-                        if (animal.getCaravana() != null && animal.getCaravana().getFechaAsignacion() != null) {
-                                if (animal.getCaravana().getFechaAsignacion().isAfter(fechaBase)) {
-                                        fechaBase = animal.getCaravana().getFechaAsignacion();
-                                }
-                        }
-                        LocalDate finCalibracion = fechaBase.plusDays(calibracionDias);
-                        LocalDate hoy = LocalDate.now();
-                        if (!hoy.isAfter(finCalibracion)) {
-                                builder.enCalibracion(true);
-                                builder.diasRestantesCalibracion((int) ChronoUnit.DAYS.between(hoy, finCalibracion));
-                        } else {
-                                builder.enCalibracion(false);
-                                builder.diasRestantesCalibracion(0);
-                        }
-                }
+        private record Calibracion(boolean enCurso, int diasRestantes) {
         }
 
-        private void calcularCalibracionMapa(Animal animal, AnimalMapaResponse.AnimalMapaResponseBuilder builder) {
-                LocalDate fechaBase = animal.getFechaAlta();
-                if (fechaBase != null) {
-                        if (animal.getCaravana() != null && animal.getCaravana().getFechaAsignacion() != null) {
-                                if (animal.getCaravana().getFechaAsignacion().isAfter(fechaBase)) {
-                                        fechaBase = animal.getCaravana().getFechaAsignacion();
-                                }
-                        }
-                        LocalDate finCalibracion = fechaBase.plusDays(calibracionDias);
-                        LocalDate hoy = LocalDate.now();
-                        if (!hoy.isAfter(finCalibracion)) {
-                                builder.enCalibracion(true);
-                                builder.diasRestantesCalibracion((int) ChronoUnit.DAYS.between(hoy, finCalibracion));
-                        } else {
-                                builder.enCalibracion(false);
-                                builder.diasRestantesCalibracion(0);
-                        }
+        /**
+         * Misma regla que SaludDetectorStrategyImpl en el worker: el animal calibra hasta tener perfil de salud,
+         * con los primeros N días de datos de su caravana desde el día en que se le asignó. Null si no tiene
+         * perfil ni caravana: no hay calibración que mostrar.
+         */
+        private Calibracion calibracion(Animal animal) {
+                if (perfilReferenciaRepository.existsByAnimal(animal)) {
+                        return new Calibracion(false, 0);
                 }
+                Caravana caravana = animal.getCaravana();
+                if (caravana == null) {
+                        return null;
+                }
+                LocalDateTime desdeAsignacion = caravana.getFechaAsignacion() != null
+                                ? caravana.getFechaAsignacion().atStartOfDay()
+                                : LocalDate.EPOCH.atStartOfDay();
+                return telemetriaRepository
+                                .findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(caravana, desdeAsignacion)
+                                .map(primerDato -> {
+                                        LocalDate fin = primerDato.getFechaHora().plusDays(calibracionDias).toLocalDate();
+                                        // 0 también si ya pasó y el worker todavía no armó el perfil: "finaliza hoy"
+                                        return new Calibracion(true,
+                                                        (int) Math.max(0, ChronoUnit.DAYS.between(LocalDate.now(), fin)));
+                                })
+                                .orElse(new Calibracion(true, calibracionDias));
         }
 
         private AnimalResponse mapToResponse(Animal animal) {
@@ -425,7 +417,11 @@ public class AnimalServiceImpl implements AnimalService {
                                         .caravanaBateria(c.getBateria());
                 }
 
-                calcularCalibracion(animal, builder);
+                Calibracion calibracion = calibracion(animal);
+                if (calibracion != null) {
+                        builder.enCalibracion(calibracion.enCurso())
+                                        .diasRestantesCalibracion(calibracion.diasRestantes());
+                }
                 return builder.build();
         }
 
@@ -525,7 +521,11 @@ public class AnimalServiceImpl implements AnimalService {
                         AnimalMapaResponse.AnimalMapaResponseBuilder builder = AnimalMapaResponse.builder()
                                         .id(animal.getId())
                                         .identificador(animal.getIdCaravanaOficial());
-                        calcularCalibracionMapa(animal, builder);
+                        Calibracion calibracion = calibracion(animal);
+                        if (calibracion != null) {
+                                builder.enCalibracion(calibracion.enCurso())
+                                                .diasRestantesCalibracion(calibracion.diasRestantes());
+                        }
 
                         if (animal.getCaravana() != null) {
                                 Optional<Telemetria> ultimaPos = telemetriaRepository
