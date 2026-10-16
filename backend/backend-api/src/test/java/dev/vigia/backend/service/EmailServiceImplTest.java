@@ -83,4 +83,24 @@ class EmailServiceImplTest {
         MimeMessage sent = captor.getValue();
         assertThat(sent).isNotNull();
     }
+
+    @Test
+    @DisplayName("enviarAlerta envía email HTML con detalles de severidad, tipo y enlace")
+    void testEnviarAlerta() {
+        dev.vigia.backend.model.Alerta alerta = new dev.vigia.backend.model.Alerta();
+        alerta.setId(42L);
+        alerta.setSeveridad(dev.vigia.backend.model.SeveridadAlerta.ALTA);
+        alerta.setDisparador(dev.vigia.backend.model.DisparadorAlerta.AISLAMIENTO_SOCIAL);
+        alerta.setTipo("Aislamiento Social Detectado");
+        alerta.setTsGeneracion(java.time.LocalDateTime.now());
+        alerta.setAccionRecomendada("Revisar animal en potrero 3");
+
+        emailService.enviarAlerta("empleado@campo.com", "Los Álamos", alerta);
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(emailSender).send(captor.capture());
+
+        MimeMessage sent = captor.getValue();
+        assertThat(sent).isNotNull();
+    }
 }

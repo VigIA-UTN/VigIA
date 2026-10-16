@@ -41,6 +41,12 @@ class SseAlertaPublisherTest {
     @Mock
     private EstablecimientoRepository establecimientoRepository;
 
+    @Mock
+    private dev.vigia.backend.repository.UsuarioRepository usuarioRepository;
+
+    @Mock
+    private EmailService emailService;
+
     @InjectMocks
     private SseAlertaPublisher publisher;
 

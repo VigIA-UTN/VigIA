@@ -9,6 +9,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
+import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.service.EmailService;
 
 import java.io.IOException;
@@ -29,7 +30,7 @@ public class EmailServiceImpl implements EmailService {
     @Value("${app.mail.from:no-reply@vigia.dev}")
     private String mailFrom;
 
-    @Value("${app.mail.logo-url:}")
+    @Value("${app.mail.logo-url}")
     private String customLogoUrl;
 
     private final Map<String, String> templateCache = new ConcurrentHashMap<>();
@@ -112,6 +113,74 @@ public class EmailServiceImpl implements EmailService {
                 "ESTABLECIMIENTO", HtmlUtils.htmlEscape(establecimientoNombre),
                 "ROL", HtmlUtils.htmlEscape(rol),
                 "LINK", HtmlUtils.htmlEscape(link)));
+
+        sendEmail(to, subject, plainText, html);
+    }
+
+    @Override
+    public void enviarAlerta(String to, String establecimientoNombre, Alerta alerta) {
+        dev.vigia.backend.model.SeveridadAlerta severidad = alerta.getSeveridad() != null
+                ? alerta.getSeveridad()
+                : dev.vigia.backend.model.SeveridadAlerta.MEDIA;
+
+        String colorSeveridad;
+        String bgSeveridad;
+        switch (severidad) {
+            case ALTA -> {
+                colorSeveridad = "#DC2626";
+                bgSeveridad = "#FEE2E2";
+            }
+            case MEDIA -> {
+                colorSeveridad = "#EA580C";
+                bgSeveridad = "#FFEDD5";
+            }
+            case BAJA -> {
+                colorSeveridad = "#2563EB";
+                bgSeveridad = "#EFF6FF";
+            }
+            default -> {
+                colorSeveridad = "#1E3A5F";
+                bgSeveridad = "#F1F5F9";
+            }
+        }
+
+        String tipoAlerta = alerta.getTipo() != null && !alerta.getTipo().isBlank()
+                ? alerta.getTipo()
+                : (alerta.getDisparador() != null ? alerta.getDisparador().name().replace('_', ' ') : "Alerta general");
+
+        String fechaHora = alerta.getTsGeneracion() != null
+                ? alerta.getTsGeneracion().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                : "Reciente";
+
+        String accionRecomendada = alerta.getAccionRecomendada() != null && !alerta.getAccionRecomendada().isBlank()
+                ? alerta.getAccionRecomendada()
+                : "Verifica el estado en el mapa y tablero de control.";
+
+        String subject = "Alerta " + severidad.name() + " en VigIA: " + tipoAlerta;
+        String link = frontendUrl + "/alertas";
+
+        String plainText = "Hola,\n\n"
+                + "Se ha detectado una situación que requiere tu atención en el establecimiento: "
+                + establecimientoNombre + ".\n\n"
+                + "Tipo de evento: " + tipoAlerta + "\n"
+                + "Severidad: " + severidad.name() + "\n"
+                + "Fecha: " + fechaHora + "\n"
+                + "Acción sugerida: " + accionRecomendada + "\n\n"
+                + "Por favor iniciá sesión en tu cuenta de VigIA para ver la alerta:\n"
+                + link + "\n\n"
+                + "Saludos,\nEl equipo de VigIA.";
+
+        Map<String, String> variables = new HashMap<>();
+        variables.put("ESTABLECIMIENTO", HtmlUtils.htmlEscape(establecimientoNombre));
+        variables.put("SEVERIDAD", HtmlUtils.htmlEscape(severidad.name()));
+        variables.put("COLOR_SEVERIDAD", colorSeveridad);
+        variables.put("BG_SEVERIDAD", bgSeveridad);
+        variables.put("TIPO", HtmlUtils.htmlEscape(tipoAlerta));
+        variables.put("FECHA", HtmlUtils.htmlEscape(fechaHora));
+        variables.put("ACCION_RECOMENDADA", HtmlUtils.htmlEscape(accionRecomendada));
+        variables.put("LINK", HtmlUtils.htmlEscape(link));
+
+        String html = loadTemplate("alerta.html", variables);
 
         sendEmail(to, subject, plainText, html);
     }
