@@ -1,0 +1,32 @@
+# Modo prueba de carga (ver loadtest/README.md). Se usa junto con el compose normal:
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.carga.yml up -d
+services:
+  backend-api:
+    environment:
+      # prod y no dev: DataInitializer borraría la semilla de carga en cada arranque de la API.
+      - SPRING_PROFILES_ACTIVE=prod
+      # Métricas de Hikari para loadtest/observar.py. Solo en este override; Railway no cambia.
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics
+
+  backend-worker:
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics
+      # Los horarios de Railway (celo y salud los define allá; geo y anestro no, así que valen los del código). Van
+      # los cuatro porque el compose base pone valores locales.
+      - VIGIA_BATCH_CELO_RATE=21600000
+      - VIGIA_BATCH_SALUD_RATE=21600000
+      - VIGIA_BATCH_GEO_RATE=900000
+      - "VIGIA_BATCH_ANESTRO_CRON=0 0 2 * * *"
+
+  k6:
+    image: grafana/k6:1.8.1
+    # Perfil propio: no arranca con "up", solo con "run --rm k6 ...".
+    profiles: [ carga ]
+    volumes:
+      - ../loadtest:/scripts
+    working_dir: /scripts
+    environment:
+      - API_URL=http://backend-api:8080/api/v1
+      - WORKER_URL=http://backend-worker:8081
+      - TTN_API_KEY=${TTN_WEBHOOK_API_KEY:-apiKey}

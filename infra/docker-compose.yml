@@ -85,6 +85,8 @@ services:
       - VIGIA_BATCH_CELO_RATE=${VIGIA_BATCH_CELO_RATE:-60000}
       - VIGIA_BATCH_SALUD_RATE=${VIGIA_BATCH_SALUD_RATE:-60000}
       - VIGIA_BATCH_GEO_RATE=${VIGIA_BATCH_GEO_RATE:-900000}
+      # Local: anestro cada minuto, para que la demo (Acto 6 de DataInitializer) muestre la alerta enseguida.
+      # Producción no define la variable y usa el default del código: todos los días a las 2 AM.
       - "VIGIA_BATCH_ANESTRO_CRON=${VIGIA_BATCH_ANESTRO_CRON:-0 * * * * *}"
       - VIGIA_BATCH_ANESTRO_SILENCIO_DIAS=${VIGIA_BATCH_ANESTRO_SILENCIO_DIAS:-21}
       - VIGIA_SALUD_CALIBRACION_DIAS=${VIGIA_SALUD_CALIBRACION_DIAS:-7}
