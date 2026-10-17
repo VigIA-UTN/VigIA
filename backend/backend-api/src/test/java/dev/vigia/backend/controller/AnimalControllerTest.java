@@ -783,6 +783,82 @@ class AnimalControllerTest {
         }
 
         // =========================================================================
+        // Badge de calibración: misma regla que SaludDetectorStrategyImpl (calibra
+        // hasta tener perfil, con los primeros 7 días de datos de su caravana)
+        // =========================================================================
+
+        @SuppressWarnings("null")
+        private Animal animalConCaravana(String nombre, LocalDate fechaAlta, LocalDate fechaAsignacion, String devEui)
+                        throws Exception {
+                Animal animal = animalRepository.findById(crearAnimal(nombre, establecimientoId, rodeoLoteId))
+                                .orElseThrow();
+                animal.setFechaAlta(fechaAlta);
+                if (devEui != null) {
+                        Caravana caravana = new Caravana();
+                        caravana.setCodigo("C-" + devEui);
+                        caravana.setActivo(true);
+                        caravana.setDevEui(devEui);
+                        caravana.setFechaAsignacion(fechaAsignacion);
+                        animal.setCaravana(caravanaRepository.save(caravana));
+                }
+                return animalRepository.save(animal);
+        }
+
+        private void telemetriaEn(Animal animal, LocalDateTime fechaHora) {
+                Telemetria t = new Telemetria();
+                t.setCaravana(animal.getCaravana());
+                t.setFechaHora(fechaHora);
+                t.setLatitud(-34.1);
+                t.setLongitud(-58.1);
+                telemetriaRepository.save(t);
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id} - Alta de hace años y primer dato de hace 3 días: sigue en calibración")
+        void getAnimalById_altaViejaConDatosRecientes_sigueEnCalibracion() throws Exception {
+                Animal animal = animalConCaravana("Vaca Vieja", LocalDate.now().minusYears(3),
+                                LocalDate.now().minusDays(10), "DEV-CAL-001");
+                telemetriaEn(animal, LocalDateTime.now().minusDays(3));
+                telemetriaEn(animal, LocalDateTime.now().minusHours(1));
+
+                mockMvc.perform(get("/api/v1/animales/" + animal.getId())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.enCalibracion").value(true))
+                                .andExpect(jsonPath("$.diasRestantesCalibracion").value(4));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/mapa - Badge de calibración: con perfil, sin datos, con datos, sin caravana")
+        void getPosicionesMapa_badgeDeCalibracion_mismaReglaQueSalud() throws Exception {
+                Animal calibrado = animalConCaravana("Calibrada", LocalDate.now(), LocalDate.now(), "DEV-CAL-002");
+                PerfilReferencia perfil = new PerfilReferencia();
+                perfil.setAnimal(calibrado);
+                perfil.setPerfilJson("{}");
+                perfil.setFechaCalculo(LocalDateTime.now());
+                perfilReferenciaRepository.save(perfil);
+
+                Animal sinDatos = animalConCaravana("Sin Datos", null, LocalDate.now(), "DEV-CAL-003");
+                Animal conDatos = animalConCaravana("Con Datos", LocalDate.now().minusYears(3), null, "DEV-CAL-004");
+                telemetriaEn(conDatos, LocalDateTime.now().minusDays(3));
+                Animal sinCaravana = animalConCaravana("Sin Caravana", LocalDate.now(), null, null);
+
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[?(@.id == " + calibrado.getId() + ")].enCalibracion").value(false))
+                                .andExpect(jsonPath("$[?(@.id == " + sinDatos.getId() + ")].enCalibracion").value(true))
+                                .andExpect(jsonPath("$[?(@.id == " + sinDatos.getId() + ")].diasRestantesCalibracion")
+                                                .value(7))
+                                .andExpect(jsonPath("$[?(@.id == " + conDatos.getId() + ")].enCalibracion").value(true))
+                                .andExpect(jsonPath("$[?(@.id == " + conDatos.getId() + ")].diasRestantesCalibracion")
+                                                .value(4))
+                                .andExpect(jsonPath("$[?(@.id == " + sinCaravana.getId() + ")].enCalibracion")
+                                                .value((Object) null));
+        }
+
+        // =========================================================================
         // DELETE /api/v1/animales/{id}
         // =========================================================================
 

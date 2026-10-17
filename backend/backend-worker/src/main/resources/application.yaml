@@ -13,7 +13,17 @@ spring:
       enabled: false
     jdbc:
       initialize-schema: always
+  task:
+    scheduling:
+      pool:
+        # Un hilo por tarea programada (celo, salud, geo, anestro, archivador): con uno solo, una corrida larga
+        # frenaba a las demás. Una misma tarea nunca corre dos veces a la vez, y celo, salud y geo corren de a uno
+        # entre sí (ver BatchScheduler).
+        size: 5
   jpa:
+    # Sin Open Session in View: el webhook de TTN retendría la conexión durante todo el request, también
+    # mientras publica en RabbitMQ; si el broker se traba, esas esperas agotan el pool (como pasó en la API).
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:
@@ -48,8 +58,9 @@ vigia:
     celo-rate: ${VIGIA_BATCH_CELO_RATE:60000}
     salud-rate: ${VIGIA_BATCH_SALUD_RATE:60000}
     geo-rate: ${VIGIA_BATCH_GEO_RATE:900000}
-    # Detector de anestro (cron de Spring: seg min hora día mes día-semana).
-    anestro-cron: "${VIGIA_BATCH_ANESTRO_CRON:0 * * * * *}"
+    # Detector de anestro (cron de Spring: seg min hora día mes día-semana), en hora argentina. Por defecto a las
+    # 2 AM: es lo que corre en Railway, que no define la variable.
+    anestro-cron: "${VIGIA_BATCH_ANESTRO_CRON:0 0 2 * * *}"
     anestro-silencio-dias: ${VIGIA_BATCH_ANESTRO_SILENCIO_DIAS:21}
   geo:
     # Ventana de posiciones (en horas) que se envía a ml-geo en cada análisis.

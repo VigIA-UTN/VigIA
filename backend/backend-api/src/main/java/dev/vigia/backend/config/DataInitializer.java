@@ -92,7 +92,7 @@ public class DataInitializer implements CommandLineRunner {
             jdbcTemplate.execute("SET vigia.bypass_immutable_triggers = 'true'");
         } catch (Exception ignored) {
         }
-        telemetriaRepository.deleteAll();
+        telemetriaRepository.deleteAllInBatch();
         intervencionRepository.deleteAll();
         diagnosticoRepository.deleteAll();
         alertaAnimalAisladoRepository.deleteAll();

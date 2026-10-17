@@ -18,6 +18,8 @@ spring:
     username: sa
     password:
   jpa:
+    # Igual que en main: este archivo reemplaza al application.yaml de main en los tests.
+    open-in-view: false
     hibernate:
       ddl-auto: create-drop
     properties:

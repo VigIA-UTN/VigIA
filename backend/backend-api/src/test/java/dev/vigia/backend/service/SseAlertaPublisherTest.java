@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.model.Alerta;
@@ -43,6 +44,17 @@ class SseAlertaPublisherTest {
 
     @InjectMocks
     private SseAlertaPublisher publisher;
+
+    @Test
+    void heartbeat_clienteQueYaSeFue_loSacaDeLaLista() {
+        publisher.registrarClienteSse(1L, null);
+        SseEmitter cerrado = publisher.registrarClienteSse(1L, null);
+        cerrado.complete(); // enviarle a un emitter terminado falla, igual que a un cliente que cortó la conexión
+
+        publisher.enviarHeartbeat();
+
+        assertThat(publisher.clientesConectados(1L)).isEqualTo(1);
+    }
 
     @Test
     void aislamiento_conListaEnElEvento_usaEsaLista() {

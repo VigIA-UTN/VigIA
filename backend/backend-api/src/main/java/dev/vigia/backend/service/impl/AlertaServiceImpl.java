@@ -92,6 +92,7 @@ public class AlertaServiceImpl implements AlertaService {
         private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
         @Override
+        @Transactional(readOnly = true)
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
                         String severidad, EstadoAlerta estado) {
                 usuarioRepository.findByEmail(emailUsuario)
@@ -130,6 +131,7 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         @Override
+        @Transactional(readOnly = true)
         public List<AlertaResponse> listarAlertasCelo(
                         String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
 
@@ -157,6 +159,7 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         @Override
+        @Transactional(readOnly = true)
         public List<AlertaResponse> listarAlertasSalud(
                         String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
 

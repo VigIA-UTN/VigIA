@@ -100,7 +100,8 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      + "AND a.estado = 'PENDIENTE' ORDER BY CASE WHEN a.severidad = 'ALTA' THEN 1 WHEN a.severidad = 'MEDIA' THEN 2 ELSE 3 END ASC")
        List<Alerta> alertasAnimalActivas(@Param("animalId") Long animalId);
 
-       Optional<Alerta> findFirstByAnimal_IdAndTipoOrderByTsGeneracionDesc(Long animalId, String tipo);
+       /** Detector de anestro: las alertas de un tipo de todo el establecimiento en una consulta, la más nueva primero. */
+       List<Alerta> findByAnimal_Establecimiento_IdAndTipoOrderByTsGeneracionDesc(Long establecimientoId, String tipo);
 
        @Query("SELECT a FROM Alerta a " +
                      "WHERE a.animal.id = :animalId " +
