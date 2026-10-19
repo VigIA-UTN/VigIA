@@ -6,11 +6,14 @@ import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
+import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -41,11 +44,20 @@ public class SseAlertaPublisher {
 
     private final EstablecimientoRepository establecimientoRepository;
 
+    private final UsuarioRepository usuarioRepository;
+
+    private final EmailService emailService;
+
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     /**
-     * Railway corta los streams que pasan 5 min sin mandar datos (hay reportes de cortes al minuto). El comentario
-     * SSE mantiene vivo el stream sin que el navegador lo vea, y si el envío falla es que el cliente ya se fue: se
+     * Solo los miembros activos del establecimiento reciben sus alertas en tiempo
+     * real.
+     *
+     * Railway corta los streams que pasan 5 min sin mandar datos (hay reportes de
+     * cortes al minuto). El comentario
+     * SSE mantiene vivo el stream sin que el navegador lo vea, y si el envío falla
+     * es que el cliente ya se fue: se
      * lo saca de la lista en vez de esperar al timeout del emitter.
      */
     @Scheduled(fixedRate = 20_000)
@@ -65,13 +77,17 @@ public class SseAlertaPublisher {
         return list == null ? 0 : list.size();
     }
 
-    /** Solo los miembros activos del establecimiento reciben sus alertas en tiempo real. */
+    /**
+     * Solo los miembros activos del establecimiento reciben sus alertas en tiempo
+     * real.
+     */
     public boolean puedeSuscribirse(String email, Long establecimientoId) {
         return establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(email).stream()
                 .anyMatch(e -> e.getId().equals(establecimientoId));
     }
 
-    // La transacción termina al devolver el emitter: el stream abierto no retiene una conexión a la base.
+    // La transacción termina al devolver el emitter: el stream abierto no retiene
+    // una conexión a la base.
     @Transactional(readOnly = true)
     public SseEmitter registrarClienteSse(Long establecimientoId, Long lastEventId) {
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
@@ -179,11 +195,23 @@ public class SseAlertaPublisher {
                 list.remove(emitter);
             }
         }
+
+        List<Usuario> usuarios = usuarioRepository.findEmpleadosByEstablecimientoId(establecimientoId);
+        Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
+        Alerta alerta = alertaRepository.findById(alertaEvent.getId())
+                .orElseThrow(() -> new RuntimeException("Alerta no encontrada"));
+
+        for (Usuario usuario : usuarios) {
+            emailService.enviarAlerta(usuario.getEmail(), establecimiento.getNombre(), alerta);
+        }
     }
 
     /**
-     * Animales de una alerta AISLAMIENTO_SOCIAL. El worker los manda en el evento (ya armados, así no
-     * se relee la base por cada evento); los eventos de cambio de estado y el reenvío por lastEventId no
+     * Animales de una alerta AISLAMIENTO_SOCIAL. El worker los manda en el evento
+     * (ya armados, así no
+     * se relee la base por cada evento); los eventos de cambio de estado y el
+     * reenvío por lastEventId no
      * los traen y se leen de la base.
      */
     List<AnimalAisladoResponse> animalesAislados(Long alertaId, DisparadorAlerta disparador,

@@ -70,3 +70,5 @@ app:
   frontend-url: http://localhost:5173
   oauth2:
     redirect-uri: http://localhost:5173/oauth2/callback
+  mail:
+    logo-url: ${MAIL_LOGO_URL:https://lh3.googleusercontent.com/d/1Xc2wYPMidzyNZEoA9zGhSlOr1lzOwCZ4}
