@@ -83,6 +83,11 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      DisparadorAlerta disparador,
                      LocalDateTime tsGeneracion);
 
+       boolean existsByAnimalAndTipoAndTsGeneracionAfter(
+                     Animal animal,
+                     String tipo,
+                     LocalDateTime tsGeneracion);
+
        Optional<Alerta> findFirstByAnimalAndDisparadorAndTsGeneracionAfterOrderByTsGeneracionDesc(
                      Animal animal,
                      DisparadorAlerta disparador,

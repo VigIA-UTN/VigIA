@@ -171,9 +171,14 @@ def obtener_posicion_inicial(device_id):
 
 # Estado inicial de los animales: se resuelve contra el backend, no
 # hardcodeado (ver obtener_posicion_inicial()).
+device_ids = [f"VIGIA-ARG-{i:03d}" for i in range(1, NUM_ANIMALES + 1)]
+extra_devices = [d.strip() for d in os.getenv("EXTRA_DEVICE_IDS", "").split(",") if d.strip()]
+for d in extra_devices:
+    if d not in device_ids:
+        device_ids.append(d)
+
 animales = {}
-for i in range(1, NUM_ANIMALES + 1):
-    device_id = f"VIGIA-ARG-{i:03d}"
+for device_id in device_ids:
     lat_ini, lon_ini, bateria_ini = obtener_posicion_inicial(device_id)
     animales[device_id] = {
         "lat": lat_ini,

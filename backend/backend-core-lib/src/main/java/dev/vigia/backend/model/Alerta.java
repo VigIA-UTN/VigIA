@@ -29,6 +29,7 @@ import lombok.Setter;
 public class Alerta {
 
     public static final String TIPO_ANESTRO = "Anestro Detectado";
+    public static final String TIPO_CELO = "Celo Detectado";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

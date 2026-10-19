@@ -113,6 +113,11 @@ def generar_payload(estado):
     estado["lat"] += speed * math.cos(estado["heading"])
     estado["lon"] += speed * math.sin(estado["heading"])
 
+    # f_cnt incremental: el backend tiene idempotencia por frame counter.
+    # Sin él, el worker responde 200 pero descarta todos los paquetes
+    # silenciosamente (fCnt=0 <= ultimoFrameCounter ya guardado).
+    estado["f_cnt"] = estado.get("f_cnt", 90000) + 1
+
     # Generamos el formato TTN v3 Webhook
     return {
         "end_device_ids": {
@@ -120,6 +125,7 @@ def generar_payload(estado):
         },
         "uplink_message": {
             "received_at": datetime.now(timezone.utc).isoformat(),
+            "f_cnt": estado["f_cnt"],
             "decoded_payload": {
                 "type": "GNSSPosition",
                 "latitude": round(estado["lat"], 6),

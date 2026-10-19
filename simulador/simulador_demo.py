@@ -3,6 +3,28 @@ simulador_demo.py — variante de simulador.py pensada para la DEMO del MVP
 (Sprints 1-4: Acceso y Autenticación, Gestión del Rodeo, Detección
 Reproductiva/Alertas de celo, Dashboard y Mapa).
 
+Acto 1 (Paso 1.6) — Caravanas libres vinculadas a nuevas vacas:
+
+Cuando Pedro vincula una caravana VIGIA-LIBRE-XXX a una vaquillona nueva
+(ej. #301) en la UI, esa caravana pasa del estado DISPONIBLE al estado
+EN_USO/ASIGNADA en la base de datos. Este simulador detecta ese cambio
+automáticamente (cada INTERVALO_DESCUBRIMIENTO_SEGUNDOS, default 30s) sin
+necesidad de reiniciarlo:
+
+1. Al arrancar, si EXTRA_DEVICE_IDS está definida, incorpora esas caravanas
+   de inmediato al loop. Esto cubre el caso en que el operador ya sabe cuáles
+   se van a vincular y las preconfigura (flujo original).
+
+2. Cada INTERVALO_DESCUBRIMIENTO_SEGUNDOS, consulta el backend via
+   GET /api/v1/caravanas?estado=EN_USO para detectar caravanas VIGIA-LIBRE-*
+   que fueron vinculadas en vivo durante la demo y aún no están en el loop.
+   Si encuentra alguna nueva, la incorpora al estado de animales y empieza a
+   mandarle telemetría desde el siguiente ciclo.
+
+Esto permite hacer el paso 1.6 de la demo (vincular caravana desde la UI)
+y ver al animal aparecer en el mapa en segundos, sin tocar el .env ni
+reiniciar ningún proceso.
+
 Historial de este archivo (para quien lea esto en el futuro): hasta la
 versión anterior, este script inyectaba al arrancar 288 puntos de historial
 de celo (24hs) para FORZAR_CELO_DEVICE_ID antes de empezar el loop en vivo.
@@ -109,6 +131,12 @@ NUM_ANIMALES = int(os.getenv("NUM_ANIMALES", 5))
 # ningún impacto en la confianza del modelo.
 INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 5))
 
+# Cada cuántos segundos se consulta el backend para descubrir caravanas
+# VIGIA-LIBRE-* que fueron vinculadas a nuevas vacas durante la demo (Acto 1,
+# paso 1.6). Default 30s: suficientemente corto para que el animal aparezca
+# en el mapa dentro del próximo ciclo del simulador tras la vinculación.
+INTERVALO_DESCUBRIMIENTO_SEGUNDOS = int(os.getenv("INTERVALO_DESCUBRIMIENTO_SEGUNDOS", 30))
+
 # Escala de movimiento que "ve" el modelo de celo por paquete: un tick de 5
 # minutos (300s), igual que ml-training/celo/generate_dataset.py. FIJO, no
 # confundir con INTERVALO_SEGUNDOS de arriba — ver punto 5 del docstring
@@ -167,6 +195,11 @@ EXCLUIR_DEL_LOOP_EN_VIVO = {"VIGIA-ARG-003"}
 # arranque de la demo.
 TIMEOUT_ULTIMA_POSICION_SEGUNDOS = 3
 
+# Prefijo de device_id de caravanas libres que se monitorean para descubrimiento
+# dinámico (Acto 1, paso 1.6). Solo se incorporan al loop las que tienen este
+# prefijo y fueron vinculadas en vivo.
+PREFIJO_CARAVANAS_LIBRES = "VIGIA-LIBRE-"
+
 
 def obtener_posicion_inicial(device_id):
     """
@@ -201,9 +234,14 @@ def obtener_posicion_inicial(device_id):
 
 # Estado inicial de los animales: se resuelve contra el backend, no
 # hardcodeado (ver obtener_posicion_inicial()).
+device_ids = [f"VIGIA-ARG-{i:03d}" for i in range(1, NUM_ANIMALES + 1)]
+extra_devices = [d.strip() for d in os.getenv("EXTRA_DEVICE_IDS", "").split(",") if d.strip()]
+for d in extra_devices:
+    if d not in device_ids:
+        device_ids.append(d)
+
 animales = {}
-for i in range(1, NUM_ANIMALES + 1):
-    device_id = f"VIGIA-ARG-{i:03d}"
+for device_id in device_ids:
     lat_ini, lon_ini, bateria_ini = obtener_posicion_inicial(device_id)
     animales[device_id] = {
         "lat": lat_ini,
@@ -211,6 +249,63 @@ for i in range(1, NUM_ANIMALES + 1):
         "bateria": bateria_ini,
         "heading": random.uniform(0, 2 * math.pi),
     }
+
+# Timestamp del último descubrimiento de caravanas libres vinculadas en vivo.
+# Se inicializa en 0 para que la primera consulta ocurra al arrancar el loop.
+_ultimo_descubrimiento = 0.0
+
+
+def descubrir_caravanas_nuevas():
+    """
+    Consulta el backend para detectar caravanas con prefijo VIGIA-LIBRE-* que
+    fueron vinculadas a nuevas vacas durante la demo (estado != DISPONIBLE) y
+    aún no están en el loop de telemetría. Las incorpora a 'animales' con
+    posición inicial obtenida del backend (o fallback random).
+
+    Esto implementa el Acto 1 (Paso 1.6) de la hoja de ruta: tan pronto como
+    Pedro vincula una caravana libre a una vaquillona en la UI, el simulador
+    la detecta y empieza a mandarle telemetría, haciéndola aparecer en el mapa.
+    """
+    global _ultimo_descubrimiento
+    ahora = time.time()
+    if ahora - _ultimo_descubrimiento < INTERVALO_DESCUBRIMIENTO_SEGUNDOS:
+        return
+    _ultimo_descubrimiento = ahora
+
+    base_url = API_URL.rsplit("/api/v1/", 1)[0]
+    # Consultamos caravanas en estado EN_USO (vinculadas a un animal)
+    url = f"{base_url}/api/v1/caravanas?estado=EN_USO&size=50"
+    try:
+        resp = requests.get(url, timeout=TIMEOUT_ULTIMA_POSICION_SEGUNDOS)
+        if resp.status_code != 200:
+            return
+        data = resp.json()
+        # La respuesta puede ser un Page (con 'content') o una lista directa
+        items = data.get("content", data) if isinstance(data, dict) else data
+        for item in items:
+            dev_eui = item.get("devEui") or item.get("dev_eui") or ""
+            if not dev_eui.startswith(PREFIJO_CARAVANAS_LIBRES):
+                continue
+            if dev_eui in animales:
+                continue  # ya está en el loop
+            if dev_eui in EXCLUIR_DEL_LOOP_EN_VIVO:
+                continue
+            # ¡Caravana nueva vinculada en vivo! La incorporamos.
+            lat_ini, lon_ini, bateria_ini = obtener_posicion_inicial(dev_eui)
+            animales[dev_eui] = {
+                "lat": lat_ini,
+                "lon": lon_ini,
+                "bateria": bateria_ini,
+                "heading": random.uniform(0, 2 * math.pi),
+            }
+            print(f"[ACTO 1] Caravana {dev_eui} vinculada a nueva vaca detectada — "
+                  f"incorporada al loop de telemetría. "
+                  f"Aparecerá en el mapa en el próximo ciclo.")
+    except Exception as e:
+        # Silencioso: si el endpoint no existe o hay error de conexión, no
+        # interrumpimos la demo — simplemente no descubrimos nuevas caravanas
+        # en este ciclo y lo reintentamos en el siguiente.
+        print(f"AVISO descubrimiento: {e}")
 
 
 def generar_payload(device_id, estado):
@@ -254,6 +349,11 @@ def generar_payload(device_id, estado):
     estado["lat"] += speed * math.cos(estado["heading"])
     estado["lon"] += speed * math.sin(estado["heading"])
 
+    # f_cnt incremental: el backend tiene idempotencia por frame counter.
+    # Sin él, el worker responde 200 pero descarta todos los paquetes
+    # silenciosamente (fCnt=0 <= ultimoFrameCounter ya guardado).
+    estado["f_cnt"] = estado.get("f_cnt", 0) + 1
+
     # Generamos el formato TTN v3 Webhook
     return {
         "end_device_ids": {
@@ -261,6 +361,7 @@ def generar_payload(device_id, estado):
         },
         "uplink_message": {
             "received_at": datetime.now(timezone.utc).isoformat(),
+            "f_cnt": estado["f_cnt"],
             "decoded_payload": {
                 "type": "GNSSPosition",
                 "latitude": round(estado["lat"], 6),
@@ -289,7 +390,9 @@ def main():
     if EXCLUIR_DEL_LOOP_EN_VIVO:
         print(f"Excluidos del loop en vivo (quedan con su telemetría sembrada, sin actualizar): "
               f"{sorted(EXCLUIR_DEL_LOOP_EN_VIVO)}")
-
+    print(f"[ACTO 1] Descubrimiento de caravanas libres vinculadas en vivo: "
+          f"cada {INTERVALO_DESCUBRIMIENTO_SEGUNDOS}s (prefijo '{PREFIJO_CARAVANAS_LIBRES}'). "
+          f"No hace falta reiniciar el simulador al vincular una caravana desde la UI.")
     print(f"\n[{datetime.now().isoformat()}] Sin inyección de historial al arrancar. "
           f"El job batch de celo corre cada 60s: apenas este loop mande los primeros puntos "
           f"de {FORZAR_CELO_DEVICE_ID}, la alerta debería aparecer en el dashboard dentro del "
@@ -297,17 +400,26 @@ def main():
 
     while True:
         inicio_ciclo = time.time()
+
+        # Acto 1 (Paso 1.6): descubrimiento de caravanas libres vinculadas en vivo.
+        # Es una consulta silenciosa: si falla, no interrumpe el loop principal.
+        descubrir_caravanas_nuevas()
+
         exitos = 0
         errores = 0
 
-        print(f"--- Iniciando ciclo de envío ({datetime.now().isoformat()}) ---")
-        
+        print(f"--- Iniciando ciclo de envío ({datetime.now().isoformat()}) "
+              f"— {len(animales)} dispositivos activos ---")
+
         headers = {}
         api_key = os.getenv("TTN_WEBHOOK_API_KEY")
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
 
-        for device_id, estado in animales.items():
+        # Iteramos sobre una copia de items() porque descubrir_caravanas_nuevas()
+        # puede modificar 'animales' mientras corremos (aunque en la práctica no lo
+        # hace durante el mismo ciclo, es una buena práctica defensiva).
+        for device_id, estado in list(animales.items()):
             if device_id in EXCLUIR_DEL_LOOP_EN_VIVO:
                 continue  # ver comentario de EXCLUIR_DEL_LOOP_EN_VIVO más arriba
             payload = generar_payload(device_id, estado)

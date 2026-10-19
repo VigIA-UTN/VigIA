@@ -11,7 +11,7 @@ import java.time.Duration;
 final class MlClientes {
 
     private static final Duration TIMEOUT_CONEXION = Duration.ofSeconds(2);
-    private static final Duration TIMEOUT_LECTURA = Duration.ofSeconds(4);
+    private static final Duration TIMEOUT_LECTURA = Duration.ofSeconds(10);
 
     private MlClientes() {
     }

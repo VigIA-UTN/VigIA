@@ -113,8 +113,8 @@ class CeloDetectorStrategyImplTest {
         Telemetria t2 = crearTelemetria(animal, -34.1, -60.1, 4, EstadoInferencia.COMPLETADO);
         List<Telemetria> lista = List.of(t1, t2);
 
-        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(
-                eq(animal), eq(DisparadorAlerta.CELO), any(LocalDateTime.class)))
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
                 .thenReturn(true);
 
         celoDetectorStrategy.process(lista, "corr-cooldown");
@@ -143,8 +143,8 @@ class CeloDetectorStrategyImplTest {
         Telemetria t = crearTelemetria(animal, -34.5, -58.5, 2, EstadoInferencia.PENDIENTE);
         List<Telemetria> lista = List.of(t);
 
-        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(
-                eq(animal), eq(DisparadorAlerta.CELO), any(LocalDateTime.class)))
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
                 .thenReturn(false);
 
         CeloPredictResponseDTO predictResponse = CeloPredictResponseDTO.builder()
@@ -185,8 +185,8 @@ class CeloDetectorStrategyImplTest {
         Telemetria t = crearTelemetria(animal, -34.6, -58.4, 4, EstadoInferencia.PENDIENTE);
         List<Telemetria> lista = List.of(t);
 
-        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(
-                eq(animal), eq(DisparadorAlerta.CELO), any(LocalDateTime.class)))
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
                 .thenReturn(false);
 
         when(alertaRepository.save(any(Alerta.class))).thenAnswer(inv -> {
@@ -272,8 +272,8 @@ class CeloDetectorStrategyImplTest {
         Telemetria t = crearTelemetria(animal, -34.6, -58.4, 4, EstadoInferencia.PENDIENTE);
         List<Telemetria> lista = List.of(t);
 
-        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(
-                eq(animal), eq(DisparadorAlerta.CELO), any(LocalDateTime.class)))
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
                 .thenReturn(false);
 
         when(alertaRepository.save(any(Alerta.class))).thenAnswer(inv -> {
@@ -319,8 +319,8 @@ class CeloDetectorStrategyImplTest {
 
         List<Telemetria> lista = List.of(tValida1, tSinLat, tSinLon, tSinMoveState, tValida2);
 
-        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(
-                eq(animal), eq(DisparadorAlerta.CELO), any(LocalDateTime.class)))
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
                 .thenReturn(false);
 
         CeloPredictResponseDTO predictResponse = CeloPredictResponseDTO.builder()
@@ -348,8 +348,8 @@ class CeloDetectorStrategyImplTest {
         Telemetria t = crearTelemetria(animal, -34.0, -60.0, 3, EstadoInferencia.PENDIENTE);
         List<Telemetria> lista = List.of(t);
 
-        when(alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(
-                eq(animal), eq(DisparadorAlerta.CELO), any(LocalDateTime.class)))
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
                 .thenReturn(false);
 
         mockServer.expect(requestTo("http://localhost:8000/api/internal/ml/celo/predict"))
@@ -374,5 +374,42 @@ class CeloDetectorStrategyImplTest {
 
         assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferenciaCelo());
         verify(telemetriaRepository).saveAll(lista);
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void testProcess_alertaAnestroPrevia_noBloqueaInferenciaDeCelo() throws Exception {
+        Animal animal = new Animal();
+        animal.setId(99L);
+
+        Telemetria t = crearTelemetria(animal, -34.6, -58.4, 4, EstadoInferencia.PENDIENTE);
+        List<Telemetria> lista = List.of(t);
+
+        // No existe alerta previa de CELO (aunque pudiera existir de Anestro con DisparadorAlerta.CELO)
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
+                .thenReturn(false);
+
+        when(alertaRepository.save(any(Alerta.class))).thenAnswer(inv -> {
+            Alerta a = inv.getArgument(0);
+            a.setId(999L);
+            return a;
+        });
+
+        CeloPredictResponseDTO predictResponse = CeloPredictResponseDTO.builder()
+                .eventoCelo(true)
+                .confianzaModelo(0.92f)
+                .ventanaOptimaHoras(12)
+                .build();
+
+        mockServer.expect(requestTo("http://localhost:8000/api/internal/ml/celo/predict"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess(objectMapper.writeValueAsString(predictResponse), MediaType.APPLICATION_JSON));
+
+        celoDetectorStrategy.process(lista, "corr-anestro-no-bloquea");
+
+        mockServer.verify();
+        verify(alertaRepository).save(any(Alerta.class));
+        verify(publicadorDeAlertas).publicar(any());
     }
 }

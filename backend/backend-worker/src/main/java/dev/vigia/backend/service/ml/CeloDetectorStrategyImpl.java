@@ -63,9 +63,9 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
         @SuppressWarnings("null")
         private void procesar(List<Telemetria> telemetriaList, String correlationId) {
                 Animal animal = telemetriaList.get(0).getCaravana().getAnimal();
-                if (animal != null && alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(animal,
-                                DisparadorAlerta.CELO, java.time.LocalDateTime.now().minusHours(24))) {
-                        log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente (últimas 24hs).",
+                if (animal != null && alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(animal,
+                                Alerta.TIPO_CELO, java.time.LocalDateTime.now().minusHours(24))) {
+                        log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente de celo (últimas 24hs).",
                                         animal.getId());
                         List<Telemetria> pendientes = telemetriaList.stream()
                                         .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
@@ -92,7 +92,7 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
 
                         Alerta alerta = new Alerta();
                         alerta.setAnimal(animal);
-                        alerta.setTipo("Celo Detectado");
+                        alerta.setTipo(Alerta.TIPO_CELO);
                         alerta.setSeveridad(SeveridadAlerta.ALTA);
                         alerta.setTsGeneracion(java.time.LocalDateTime.now());
                         alerta.setDisparador(DisparadorAlerta.CELO);
