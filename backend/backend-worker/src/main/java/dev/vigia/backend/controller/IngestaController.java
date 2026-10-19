@@ -76,7 +76,7 @@ public class IngestaController {
         }
 
         Caravana caravana = caravanaOpt.get();
-        Optional<Animal> animalOpt = animalRepository.findByCaravanaId(caravana.getId());
+        Optional<Animal> animalOpt = animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId());
         if (animalOpt.isEmpty()) {
             log.warn("Webhook TTN recibido para devEui {} que no está asociado a ningún animal.", devEui);
             return ResponseEntity.ok("Ignorado: Sin animal asociado");

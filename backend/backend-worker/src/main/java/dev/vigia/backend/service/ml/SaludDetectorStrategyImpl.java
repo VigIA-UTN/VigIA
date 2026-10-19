@@ -100,46 +100,52 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
             return;
         }
 
-        LocalDate fechaBase = animal.getFechaAlta();
-        if (fechaBase == null) {
-            log.warn("Animal {} sin fecha de alta, no se puede calcular su ventana de calibración (RF03).",
-                    animal.getId());
-            marcarCompletados(telemetriaList);
-            return;
-        }
-
-        if (animal.getCaravana() != null && animal.getCaravana().getFechaAsignacion() != null) {
-            if (animal.getCaravana().getFechaAsignacion().isAfter(fechaBase)) {
-                fechaBase = animal.getCaravana().getFechaAsignacion();
-            }
-        }
-
-        LocalDateTime finCalibracionInicial = fechaBase.atStartOfDay().plusDays(calibracionDias);
-        if (ahora.isBefore(finCalibracionInicial)) {
-            log.info("Animal {} todavía en período de calibración (RF03, termina {}). No se generan predicciones.",
-                    animal.getId(), finCalibracionInicial);
-            marcarCompletados(telemetriaList);
-            return;
-        }
-
         Optional<PerfilReferencia> perfilExistente = perfilReferenciaRepository.findByAnimal(animal);
-        boolean necesitaPerfilNuevo = perfilExistente.isEmpty()
-                || perfilExistente.get().getFechaCalculo().isBefore(ahora.minusDays(recalibracionDias));
 
         PerfilReferencia perfilReferencia;
-        if (necesitaPerfilNuevo) {
-            perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana, fechaBase, ahora,
-                    correlationId);
-            if (perfilReferencia == null) {
-                // Todavía no hay suficiente telemetría para armar una
-                // ventana de calibración completa (ej. el dispositivo
-                // tuvo caídas). Se reintenta en el próximo ciclo del
-                // batch, no es un error.
+        if (perfilExistente.isEmpty()) {
+            // Primera calibración: los primeros N días de datos del animal, sin importar cuándo se dio de
+            // alta (decidido 2026-10-16, reemplaza los "7 días desde el alta" de RF03). Se cuenta desde el
+            // día en que se le asignó la caravana, para no usar datos de un animal anterior que la tuvo.
+            LocalDateTime desdeAsignacion = caravana.getFechaAsignacion() != null
+                    ? caravana.getFechaAsignacion().atStartOfDay()
+                    : LocalDate.EPOCH.atStartOfDay(); // sin fecha de asignación: el primer dato de la caravana
+            Optional<Telemetria> primerDato = telemetriaRepository
+                    .findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(caravana, desdeAsignacion);
+            if (primerDato.isEmpty()) {
+                log.info("Animal {} en calibración: su caravana no tiene datos desde {}.", animal.getId(),
+                        desdeAsignacion);
                 marcarCompletados(telemetriaList);
                 return;
             }
+            LocalDateTime inicio = primerDato.get().getFechaHora();
+            LocalDateTime fin = inicio.plusDays(calibracionDias);
+            if (ahora.isBefore(fin)) {
+                log.info("Animal {} en calibración: primer dato {}, termina {}. No se generan predicciones.",
+                        animal.getId(), inicio, fin);
+                marcarCompletados(telemetriaList);
+                return;
+            }
+            perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana, inicio, fin, ahora,
+                    correlationId);
+        } else if (perfilExistente.get().getFechaCalculo().isBefore(ahora.minusDays(recalibracionDias))) {
+            // Recalibración periódica: los últimos N días "recientes",
+            // para que el perfil se adapte a cambios legítimos de
+            // comportamiento con el tiempo (ver discusión de deriva del
+            // perfil).
+            perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana,
+                    ahora.minusDays(calibracionDias), ahora, ahora, correlationId);
         } else {
             perfilReferencia = perfilExistente.get();
+        }
+
+        if (perfilReferencia == null) {
+            // Todavía no hay suficiente telemetría para armar una
+            // ventana de calibración completa (ej. el dispositivo
+            // tuvo caídas). Se reintenta en el próximo ciclo del
+            // batch, no es un error.
+            marcarCompletados(telemetriaList);
+            return;
         }
 
         Map<String, Object> perfil = deserializarPerfil(perfilReferencia.getPerfilJson());
@@ -196,24 +202,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
 
     @SuppressWarnings("null")
     private PerfilReferencia calcularYPersistirPerfil(Animal animal, Optional<PerfilReferencia> perfilExistente,
-            Caravana caravana, LocalDate fechaBase, LocalDateTime ahora, String correlationId) {
+            Caravana caravana, LocalDateTime desde, LocalDateTime hasta, LocalDateTime ahora, String correlationId) {
         boolean esPrimerCalculo = perfilExistente.isEmpty();
-
-        LocalDateTime desde;
-        LocalDateTime hasta;
-        if (esPrimerCalculo) {
-            // Primera calibración: los 7 días originales desde el alta
-            // del animal (RF03).
-            desde = fechaBase.atStartOfDay();
-            hasta = desde.plusDays(calibracionDias);
-        } else {
-            // Recalibración periódica: los últimos N días "recientes",
-            // para que el perfil se adapte a cambios legítimos de
-            // comportamiento con el tiempo (ver discusión de deriva del
-            // perfil).
-            hasta = ahora;
-            desde = ahora.minusDays(calibracionDias);
-        }
 
         List<Telemetria> calibracion = telemetriaRepository
                 .findByCaravanaAndFechaHoraBetweenOrderByFechaHoraAsc(caravana, desde, hasta);
@@ -233,8 +223,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
                         .build())
                 .collect(Collectors.toList());
 
-        log.info("Calculando perfil de salud para animal {} ({} puntos, primera calibración: {}, correlationId: {})",
-                animal.getId(), puntos.size(), esPrimerCalculo, correlationId);
+        log.info("Calculando perfil de salud para animal {} ({} puntos de [{}, {}), primera calibración: {}, correlationId: {})",
+                animal.getId(), puntos.size(), desde, hasta, esPrimerCalculo, correlationId);
 
         PerfilCalibracionResponseDTO response = mlSaludClient.calcularPerfil(
                 PerfilCalibracionRequestDTO.builder().calibracion(puntos).build(), correlationId);

@@ -18,6 +18,9 @@ spring:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:vigia}
     username: ${DB_USER:vigia_user}
     password: ${DB_PASSWORD:vigia_dev_password}
+    hikari:
+      # Loguea el stack de quien retenga una conexión más de 20 s. Solo diagnóstico.
+      leak-detection-threshold: 20000
   batch:
     jdbc:
       initialize-schema: always
@@ -25,6 +28,9 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
   jpa:
+    # Sin Open Session in View: la sesión (y su conexión) dura lo que la transacción del service, no todo
+    # el request. Con OSIV, cada stream SSE abierto retenía una conexión hasta 30 min y agotaba el pool.
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:

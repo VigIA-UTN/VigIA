@@ -7,6 +7,7 @@ import dev.vigia.backend.dto.ConfigAnestroResponse;
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.dto.EstablecimientoResponse;
 import dev.vigia.backend.dto.IntervencionResponse;
+import dev.vigia.backend.dto.RegistroPesoResponse;
 
 import java.util.List;
 
@@ -24,6 +25,8 @@ public interface EstablecimientoService {
     EstablecimientoResponse activarEstablecimiento(Long id);
 
     List<IntervencionResponse> obtenerIntervenciones(String emailUsuario, Long establecimientoId);
+
+    List<RegistroPesoResponse> obtenerPesos(String emailUsuario, Long establecimientoId);
 
     /**
      * Consulta los parámetros de anestro de un establecimiento.

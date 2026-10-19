@@ -12,4 +12,6 @@ import dev.vigia.backend.model.PerfilReferencia;
 public interface PerfilReferenciaRepository extends JpaRepository<PerfilReferencia, Long> {
 
     Optional<PerfilReferencia> findByAnimal(Animal animal);
+
+    boolean existsByAnimal(Animal animal);
 }

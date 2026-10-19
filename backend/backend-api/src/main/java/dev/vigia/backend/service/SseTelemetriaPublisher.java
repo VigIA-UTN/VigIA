@@ -4,6 +4,7 @@ import dev.vigia.backend.dto.ml.TelemetriaEventDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -40,6 +41,24 @@ public class SseTelemetriaPublisher {
         });
 
         return emitter;
+    }
+
+    /** Mismo heartbeat que {@link SseAlertaPublisher#enviarHeartbeat()} (ahí está el porqué). */
+    @Scheduled(fixedRate = 20_000)
+    public void enviarHeartbeat() {
+        emitters.values().forEach(list -> list.forEach(emitter -> {
+            try {
+                emitter.send(SseEmitter.event().comment("ping"));
+            } catch (Exception e) {
+                list.remove(emitter);
+            }
+        }));
+    }
+
+    /** Para tests. */
+    int clientesConectados(Long establecimientoId) {
+        CopyOnWriteArrayList<SseEmitter> list = emitters.get(establecimientoId);
+        return list == null ? 0 : list.size();
     }
 
     @RabbitListener(queues = "#{telemetriaQueue.name}")

@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -53,11 +54,35 @@ public class SseAlertaPublisher {
      * Solo los miembros activos del establecimiento reciben sus alertas en tiempo
      * real.
      */
+     * Railway corta los streams que pasan 5 min sin mandar datos (hay reportes de cortes al minuto). El comentario
+     * SSE mantiene vivo el stream sin que el navegador lo vea, y si el envío falla es que el cliente ya se fue: se
+     * lo saca de la lista en vez de esperar al timeout del emitter.
+     */
+    @Scheduled(fixedRate = 20_000)
+    public void enviarHeartbeat() {
+        emitters.values().forEach(list -> list.forEach(emitter -> {
+            try {
+                emitter.send(SseEmitter.event().comment("ping"));
+            } catch (Exception e) {
+                list.remove(emitter);
+            }
+        }));
+    }
+
+    /** Para tests. */
+    int clientesConectados(Long establecimientoId) {
+        CopyOnWriteArrayList<SseEmitter> list = emitters.get(establecimientoId);
+        return list == null ? 0 : list.size();
+    }
+
+    /** Solo los miembros activos del establecimiento reciben sus alertas en tiempo real. */
     public boolean puedeSuscribirse(String email, Long establecimientoId) {
         return establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(email).stream()
                 .anyMatch(e -> e.getId().equals(establecimientoId));
     }
 
+    // La transacción termina al devolver el emitter: el stream abierto no retiene una conexión a la base.
+    @Transactional(readOnly = true)
     public SseEmitter registrarClienteSse(Long establecimientoId, Long lastEventId) {
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
 

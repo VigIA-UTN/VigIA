@@ -145,6 +145,22 @@ public class EstablecimientoController {
         }
     }
 
+    /**
+     * GET /api/v1/establecimientos/{id}/pesos
+     * <p>
+     * Lista todas las pesadas de los animales del establecimiento, la más reciente primero.
+     * Alimenta la card "Ganancia de peso" del dashboard.
+     */
+    @GetMapping("{id}/pesos")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> obtenerPesos(@PathVariable Long id, Authentication authentication) {
+        try {
+            return ResponseEntity.ok(establecimientoService.obtenerPesos(authentication.getName(), id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al obtener pesadas: " + e.getMessage());
+        }
+    }
+
     // ── Configuración de anestro ──────────────────────────────────────────────
 
     /**

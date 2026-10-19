@@ -10,6 +10,7 @@ import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.RegistroPeso;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
@@ -19,6 +20,7 @@ import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
+import dev.vigia.backend.repository.RegistroPesoRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,6 +79,9 @@ class EstablecimientoControllerTest {
     private AlertaRepository alertaRepository;
 
     @Autowired
+    private RegistroPesoRepository registroPesoRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -101,6 +106,7 @@ class EstablecimientoControllerTest {
         intervencionRepository.deleteAll();
         alertaRepository.deleteAll();
         estadoReproductivoRepository.deleteAll();
+        registroPesoRepository.deleteAll();
         animalRepository.deleteAll();
         rodeoLoteRepository.deleteAll();
         invitacionRepository.deleteAll();
@@ -519,6 +525,99 @@ class EstablecimientoControllerTest {
         mockMvc.perform(get("/api/v1/establecimientos/99999/intervenciones")
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ── Tests para GET /{id}/pesos ──────────────────────────────────────────────
+
+    @SuppressWarnings("null")
+    private Animal crearAnimalEn(Establecimiento est, String alias) {
+        RodeoLote rodeo = new RodeoLote(est);
+        rodeo.setNombre("Rodeo " + alias);
+        rodeo = rodeoLoteRepository.save(rodeo);
+        Animal animal = new Animal(est, rodeo);
+        animal.setAlias(alias);
+        return animalRepository.save(animal);
+    }
+
+    private void crearPeso(Animal animal, LocalDate fecha, double kg) {
+        RegistroPeso p = new RegistroPeso();
+        p.setAnimal(animal);
+        p.setFecha(fecha);
+        p.setValorKg(kg);
+        p.setUnidad("kg");
+        p.setFechaRegistro(fecha.atStartOfDay());
+        registroPesoRepository.save(p);
+    }
+
+    @Test
+    @DisplayName("GET /{id}/pesos - Productor obtiene lista vacía cuando no hay pesadas")
+    void obtenerPesos_sinDatos_retornaListaVacia() throws Exception {
+        mockMvc.perform(get("/api/v1/establecimientos/" + establecimientoId + "/pesos")
+                .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /{id}/pesos - Retorna las pesadas de todos los animales, la más reciente primero")
+    @SuppressWarnings("null")
+    void obtenerPesos_conDatos_retornaPesadasOrdenadas() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        Animal lola = crearAnimalEn(est, "Lola");
+        Animal pinta = crearAnimalEn(est, "Pinta");
+        LocalDate hoy = LocalDate.now();
+        crearPeso(lola, hoy.minusDays(60), 400.0);
+        crearPeso(pinta, hoy.minusDays(10), 352.5);
+        crearPeso(lola, hoy.minusDays(30), 418.0);
+
+        mockMvc.perform(get("/api/v1/establecimientos/" + establecimientoId + "/pesos")
+                .header("Authorization", "Bearer " + vetToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].animalId").value(pinta.getId()))
+                .andExpect(jsonPath("$[0].valorKg").value(352.5))
+                .andExpect(jsonPath("$[0].fecha").value(hoy.minusDays(10).toString()))
+                .andExpect(jsonPath("$[1].fecha").value(hoy.minusDays(30).toString()))
+                .andExpect(jsonPath("$[2].fecha").value(hoy.minusDays(60).toString()));
+    }
+
+    @Test
+    @DisplayName("GET /{id}/pesos - No incluye pesadas de animales de otro establecimiento")
+    @SuppressWarnings("null")
+    void obtenerPesos_otroEstablecimiento_noSeIncluye() throws Exception {
+        Establecimiento est = establecimientoRepository.findById(establecimientoId).orElseThrow();
+        crearPeso(crearAnimalEn(est, "Propia"), LocalDate.now().minusDays(5), 380.0);
+
+        Establecimiento otro = new Establecimiento();
+        otro.setNombre("Otro Establecimiento");
+        otro.setLatitud(-35.0);
+        otro.setLongitud(-59.0);
+        otro.setActivo(true);
+        otro.setFechaAlta(LocalDate.now());
+        otro.setEmpleados(new ArrayList<>());
+        otro = establecimientoRepository.save(otro);
+        crearPeso(crearAnimalEn(otro, "Ajena"), LocalDate.now().minusDays(5), 500.0);
+
+        mockMvc.perform(get("/api/v1/establecimientos/" + establecimientoId + "/pesos")
+                .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].valorKg").value(380.0));
+    }
+
+    @Test
+    @DisplayName("GET /{id}/pesos - Usuario que no pertenece al establecimiento recibe error")
+    void obtenerPesos_usuarioNoPerteneceAlEstablecimiento_retornaError() throws Exception {
+        mockMvc.perform(get("/api/v1/establecimientos/" + establecimientoId + "/pesos")
+                .header("Authorization", "Bearer " + otroProductorToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /{id}/pesos - Sin autenticación retorna 401")
+    void obtenerPesos_sinToken_retorna401() throws Exception {
+        mockMvc.perform(get("/api/v1/establecimientos/" + establecimientoId + "/pesos"))
+                .andExpect(status().isUnauthorized());
     }
 }
 

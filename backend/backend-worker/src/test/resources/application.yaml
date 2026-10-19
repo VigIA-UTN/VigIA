@@ -7,6 +7,8 @@ spring:
     username: sa
     password:
   jpa:
+    # Igual que en main: este archivo reemplaza al application.yaml de main en los tests.
+    open-in-view: false
     hibernate:
       ddl-auto: create-drop
     properties:
@@ -14,6 +16,10 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
+  # Igual que en main (este archivo lo reemplaza en los tests): los jobs los lanza BatchScheduler, no el arranque.
+  batch:
+    job:
+      enabled: false
   mail:
     host: localhost
     port: 1025

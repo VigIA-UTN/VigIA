@@ -7,13 +7,13 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.model.Alerta;
@@ -49,6 +50,8 @@ class AnestroDetectorServiceTest {
     private AlertaRepository alertaRepository;
     @Mock
     private PublicadorDeAlertas publicadorDeAlertas;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     @InjectMocks
     private AnestroDetectorService service;
@@ -71,7 +74,7 @@ class AnestroDetectorServiceTest {
         animal.setFechaNacimiento(LocalDate.now().minusYears(5));
 
         when(establecimientoRepository.findAll()).thenReturn(List.of(est));
-        when(animalRepository.findByEstablecimientoIdInAndEstadoActualNot(List.of(1L), EstadoAnimal.INACTIVO))
+        when(animalRepository.findConEstadosByEstablecimientoIdAndEstadoActualNot(1L, EstadoAnimal.INACTIVO))
                 .thenReturn(List.of(animal));
         lenient().when(alertaRepository.save(any(Alerta.class))).thenAnswer(i -> i.getArgument(0));
     }
@@ -94,14 +97,29 @@ class AnestroDetectorServiceTest {
     }
 
     @SuppressWarnings("null")
-    private void ultimaAlertaAnestro(EstadoAlerta estado, int diasDesdeResolucion) {
+    private static Alerta alertaAnestro(Animal deAnimal, EstadoAlerta estado, int diasDesdeResolucion) {
         Alerta a = new Alerta();
-        a.setAnimal(animal);
+        a.setAnimal(deAnimal);
         a.setTipo(Alerta.TIPO_ANESTRO);
         a.setEstado(estado);
         a.setTsConfirmacion(estado == EstadoAlerta.PENDIENTE ? null : LocalDateTime.now().minusDays(diasDesdeResolucion));
-        when(alertaRepository.findFirstByAnimal_IdAndTipoOrderByTsGeneracionDesc(10L, Alerta.TIPO_ANESTRO))
-                .thenReturn(Optional.of(a));
+        return a;
+    }
+
+    @SuppressWarnings("null")
+    private void ultimaAlertaAnestro(EstadoAlerta estado, int diasDesdeResolucion) {
+        when(alertaRepository.findByAnimal_Establecimiento_IdAndTipoOrderByTsGeneracionDesc(1L, Alerta.TIPO_ANESTRO))
+                .thenReturn(List.of(alertaAnestro(animal, estado, diasDesdeResolucion)));
+    }
+
+    @SuppressWarnings("null")
+    private static Animal vacaDe(Establecimiento est, long id, EstadoReproductivo... estados) {
+        Animal a = new Animal();
+        a.setId(id);
+        a.setEstablecimiento(est);
+        a.setFechaNacimiento(LocalDate.now().minusYears(5));
+        a.setEstadosReproductivos(List.of(estados));
+        return a;
     }
 
     @Test
@@ -228,5 +246,64 @@ class AnestroDetectorServiceTest {
         service.detectarAnestro();
 
         verify(alertaRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void unEstablecimientoQueFalla_noFrenaALosDemas_yCadaUnoTieneSuTransaccion() {
+        // Con 25.000 animales en una sola transacción la corrida no terminaba (OutOfMemoryError tras 12 min)
+        // y cualquier error deshacía todo: ahora cada establecimiento confirma o se deshace por su cuenta.
+        Establecimiento otro = new Establecimiento();
+        otro.setId(2L);
+        otro.setDiasDeteccionAnestro(45);
+        otro.setSeveridadAnestro(SeveridadAlerta.MEDIA);
+        Animal delOtro = vacaDe(otro, 20L, estado(TipoReproductivo.VACIA, 100, 100, null));
+        when(establecimientoRepository.findAll()).thenReturn(List.of(animal.getEstablecimiento(), otro));
+        when(animalRepository.findConEstadosByEstablecimientoIdAndEstadoActualNot(1L, EstadoAnimal.INACTIVO))
+                .thenThrow(new IllegalStateException("falló la consulta"));
+        when(animalRepository.findConEstadosByEstablecimientoIdAndEstadoActualNot(2L, EstadoAnimal.INACTIVO))
+                .thenReturn(List.of(delOtro));
+
+        service.detectarAnestro();
+
+        ArgumentCaptor<Alerta> captor = ArgumentCaptor.forClass(Alerta.class);
+        verify(alertaRepository).save(captor.capture());
+        assertEquals(20L, captor.getValue().getAnimal().getId());
+        verify(transactionManager, times(2)).getTransaction(any());
+        verify(transactionManager).rollback(any());
+        verify(transactionManager).commit(any());
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void buscaLasAlertasDeAnestroUnaVezPorEstablecimiento_noUnaPorAnimal() {
+        historial(estado(TipoReproductivo.CELO, 10, null, null));
+        Animal otra = vacaDe(animal.getEstablecimiento(), 11L, estado(TipoReproductivo.CELO, 10, null, null));
+        when(animalRepository.findConEstadosByEstablecimientoIdAndEstadoActualNot(1L, EstadoAnimal.INACTIVO))
+                .thenReturn(List.of(animal, otra));
+
+        service.detectarAnestro();
+
+        verify(alertaRepository, times(1))
+                .findByAnimal_Establecimiento_IdAndTipoOrderByTsGeneracionDesc(1L, Alerta.TIPO_ANESTRO);
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void usaLaAlertaMasNuevaDeCadaAnimal_DeLasDelEstablecimiento() {
+        historial(estado(TipoReproductivo.VACIA, 100, 100, null));
+        Animal otra = vacaDe(animal.getEstablecimiento(), 11L);
+        // Como las devuelve el repositorio: de todo el establecimiento, la más nueva primero.
+        when(alertaRepository.findByAnimal_Establecimiento_IdAndTipoOrderByTsGeneracionDesc(1L, Alerta.TIPO_ANESTRO))
+                .thenReturn(List.of(
+                        alertaAnestro(otra, EstadoAlerta.PENDIENTE, 0),
+                        alertaAnestro(animal, EstadoAlerta.DESCARTADA, 30),
+                        alertaAnestro(animal, EstadoAlerta.PENDIENTE, 0)));
+
+        service.detectarAnestro();
+
+        // La más nueva de este animal se descartó hace 30 días, fuera del silencio: vuelve a alertar. No la
+        // silencian ni la pendiente de otro animal ni una pendiente más vieja del mismo.
+        verify(alertaRepository).save(any(Alerta.class));
     }
 }
