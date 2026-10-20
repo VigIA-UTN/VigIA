@@ -103,6 +103,27 @@ public class DataInitializer implements CommandLineRunner {
         private static final double LAT_CENTRO = -34.943317;
         private static final double LON_CENTRO = -59.225728;
 
+        // Donde pasta el rodeo del Lote Principal al arrancar. La ultima posicion de cada vaca
+        // con datos recientes cae dentro de este circulo (~40 m de radio): ml-geo une a los
+        // animales a <= 100 m y, si quedaran dispersos, marcaria aislados a todos (H0026).
+        // simulador.py continua desde estas posiciones y mantiene al rodeo junto.
+        private static final double LAT_RODEO = LAT_CENTRO - 0.0004;
+        private static final double LON_RODEO = LON_CENTRO + 0.0004;
+        private static final double RADIO_RODEO = 0.00035;
+
+        // Acto 4: la #208 termina su historial apartada del rodeo y sin transmitir hace un rato. ml-geo
+        // solo mira animales con posicion de los ultimos 30 min (contra el dato mas nuevo, que el seed
+        // deja ~3 min antes del arranque): con 35 min no la ve hasta que simulador_salud.py vuelve a
+        // mandar, y en ese momento ya cuenta como "fuera del grupo" el tramo sembrado.
+        private static final int MINUTOS_SIN_DATOS_MARGARITA = 35;
+        private static final double METROS_MARGARITA_AL_RODEO = 180;
+
+        // Dias de historial de las vacas que reciben telemetria en vivo durante la demo (rodeo vivo,
+        // celo y fuga): menos que vigia.salud.calibracion-dias (7), asi el job de salud las ve "en
+        // calibracion" (log INFO) en vez de pedir un perfil que ml-salud rechaza (ERROR cada minuto en
+        // la consola) o de predecir sobre un perfil que no se parece al pastoreo del simulador.
+        private static final int DIAS_EN_CALIBRACION = 6;
+
         @Override
         @SuppressWarnings("null")
         public void run(String... args) {
@@ -139,7 +160,7 @@ public class DataInitializer implements CommandLineRunner {
                                 Rol.PENDIENTE);
                 usuarioRepository.saveAll(List.of(admin, productor, campero, vet, pendiente));
 
-                // Establecimiento principal (coords = simulador_demo.py)
+                // Establecimiento principal (coords = simulador.py)
                 Establecimiento estP = new Establecimiento();
                 estP.setNombre("Tambo La Esperanza");
                 estP.setLatitud(LAT_CENTRO);
@@ -175,21 +196,27 @@ public class DataInitializer implements CommandLineRunner {
                 crearPerimetroPrincipal(estP, lotePrincipal);
 
                 LocalDateTime ahora = LocalDateTime.now();
+                // Semilla fija: mismas posiciones en el rodeo en cada arranque.
+                Random rndRodeo = new Random(7L);
 
                 // Vaca 1: id oficial 104, La Vaca Lola, compatible simulador
                 Animal vaca1 = crearAnimal(estP, lotePrincipal, "104", "La Vaca Lola", "Holando",
                                 LocalDate.of(2020, 1, 1), "VIGIA-ARG-001", LocalDate.now().minusDays(45));
-                sembrarHistorialCelo(vaca1.getCaravana());
+                sembrarHistorialCelo(vaca1.getCaravana(), posicionEnRodeo(rndRodeo));
                 sembrarEstadoReproductivo(vaca1, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
                                 LocalDate.now().minusDays(15), ahora.minusDays(15));
 
-                // Vaca 2: id oficial 208, Margarita, compatible simulador
+                // Vaca 2: id oficial 208, Margarita. Acto 4: 8 dias a 5 min (calibracion de salud
+                // completa) con la caida de actividad en las ultimas 24 hs, apartada al oeste del rodeo;
+                // ver sembrarHistorialMargarita y MINUTOS_SIN_DATOS_MARGARITA.
                 Animal vaca2 = crearAnimal(estP, lotePrincipal, "208", "Margarita", "Jersey",
                                 LocalDate.of(2021, 5, 10), "VIGIA-ARG-002", LocalDate.now().minusDays(45));
                 sembrarEstadoReproductivo(vaca2, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
                                 LocalDate.now().minusDays(15), ahora.minusDays(15));
-                crearTelemetria(vaca2.getCaravana(), LAT_CENTRO + 0.001, LON_CENTRO - 0.001, 76.0,
-                                ahora.minusMinutes(6));
+                double[] apartada = { LAT_RODEO, LON_RODEO - METROS_MARGARITA_AL_RODEO
+                                / (111_320 * Math.cos(Math.toRadians(LAT_RODEO))) };
+                sembrarHistorialMargarita(vaca2.getCaravana(), apartada,
+                                ahora.minusMinutes(MINUTOS_SIN_DATOS_MARGARITA));
 
                 // Vaca 3: ultima telem >1h -> "sin datos recientes" H0012
                 Animal vaca3 = crearAnimal(estP, lotePrincipal, "33333", "Renegrida", "Brangus",
@@ -204,8 +231,8 @@ public class DataInitializer implements CommandLineRunner {
                 // Vaca 5: bateria baja 14% (H0043)
                 Animal vaca5 = crearAnimal(estP, lotePrincipal, "55555", "Pinta", "Jersey",
                                 LocalDate.of(2022, 1, 10), "VIGIA-ARG-005", LocalDate.now().minusDays(45));
-                crearTelemetria(vaca5.getCaravana(), LAT_CENTRO + 0.002, LON_CENTRO + 0.002, 14.0,
-                                ahora.minusMinutes(8));
+                double[] posVaca5 = posicionEnRodeo(rndRodeo);
+                crearTelemetria(vaca5.getCaravana(), posVaca5[0], posVaca5[1], 14.0, ahora.minusMinutes(8));
 
                 // Vaca 6: bateria 18% + demo sanitaria (>24h para el worker)
                 Animal vaca6 = crearAnimal(estP, lotePrincipal, "60006", "Demo Salud con perfil", "Angus",
@@ -321,72 +348,69 @@ public class DataInitializer implements CommandLineRunner {
                 log.info("[DataInitializer] 5 caravanas DISPONIBLE (VIGIA-LIBRE-301..305).");
 
                 // Telemetria reciente + historial de pastoreo
+                // Las vacas con datos de los ultimos minutos terminan su historial en el rodeo (ver
+                // LAT_RODEO); las de "sin datos recientes" (3, 4, 6, 11) quedan donde estaban.
                 LocalDateTime ahoraPastoreo = LocalDateTime.now();
-                sembrarHistorialPastoreo(vaca2.getCaravana(), LAT_CENTRO + 0.001, LON_CENTRO - 0.001, 79.0, 7,
-                                ahoraPastoreo.minusMinutes(21));
                 sembrarHistorialPastoreo(vaca3.getCaravana(), LAT_CENTRO, LON_CENTRO, 48.0, 7,
-                                ahoraPastoreo.minusHours(2));
+                                ahoraPastoreo.minusHours(2), null);
                 sembrarHistorialPastoreo(vaca4.getCaravana(), LAT_CENTRO - 0.002, LON_CENTRO + 0.001, 41.0, 7,
-                                ahoraPastoreo.minusHours(9));
+                                ahoraPastoreo.minusHours(9), null);
                 sembrarHistorialPastoreo(vaca5.getCaravana(), LAT_CENTRO + 0.002, LON_CENTRO + 0.002, 17.0, 7,
-                                ahoraPastoreo.minusMinutes(22));
-                sembrarHistorialPastoreo(vaca1.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO - 0.001, 92.0, 6,
-                                ahoraPastoreo.minusHours(24).minusMinutes(15));
+                                ahoraPastoreo.minusMinutes(22), posVaca5);
+                // Termina antes de que empiece el historial de celo de 24 hs, que ya cae en el rodeo.
+                // 5 + 1 dias: ver DIAS_EN_CALIBRACION.
+                sembrarHistorialPastoreo(vaca1.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO - 0.001, 92.0,
+                                DIAS_EN_CALIBRACION - 1, ahoraPastoreo.minusHours(24).minusMinutes(15), null);
 
+                // Las gestantes incluyen al rodeo vivo de simulador.py (015-026) y a las vacas de la
+                // fuga (013-014): ver DIAS_EN_CALIBRACION.
                 Random rndPastoreo = new Random(42L);
                 for (Animal g : gestantes) {
                         double latOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
                         double lonOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
-                        crearTelemetria(g.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
+                        double[] enRodeo = posicionEnRodeo(rndRodeo);
+                        crearTelemetria(g.getCaravana(), enRodeo[0], enRodeo[1],
                                         60.0 + rndPastoreo.nextDouble() * 30,
                                         ahora.minusMinutes(5 + rndPastoreo.nextInt(20)));
                         sembrarHistorialPastoreo(g.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
-                                        60.0 + rndPastoreo.nextDouble() * 30, 7,
-                                        ahoraPastoreo.minusMinutes(10 + rndPastoreo.nextInt(30)));
+                                        60.0 + rndPastoreo.nextDouble() * 30, DIAS_EN_CALIBRACION,
+                                        ahoraPastoreo.minusMinutes(10 + rndPastoreo.nextInt(30)), enRodeo);
                 }
                 for (Animal ins : inseminadas) {
                         double latOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
                         double lonOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
-                        crearTelemetria(ins.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
+                        double[] enRodeo = posicionEnRodeo(rndRodeo);
+                        crearTelemetria(ins.getCaravana(), enRodeo[0], enRodeo[1],
                                         55.0 + rndPastoreo.nextDouble() * 35,
                                         ahora.minusMinutes(3 + rndPastoreo.nextInt(15)));
                         sembrarHistorialPastoreo(ins.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
                                         55.0 + rndPastoreo.nextDouble() * 35, 7,
-                                        ahoraPastoreo.minusMinutes(8 + rndPastoreo.nextInt(20)));
+                                        ahoraPastoreo.minusMinutes(8 + rndPastoreo.nextInt(20)), enRodeo);
                 }
                 for (Animal v : vacias) {
                         double latOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
                         double lonOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
-                        crearTelemetria(v.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
+                        double[] enRodeo = posicionEnRodeo(rndRodeo);
+                        crearTelemetria(v.getCaravana(), enRodeo[0], enRodeo[1],
                                         50.0 + rndPastoreo.nextDouble() * 40,
                                         ahora.minusMinutes(4 + rndPastoreo.nextInt(18)));
                         sembrarHistorialPastoreo(v.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
                                         50.0 + rndPastoreo.nextDouble() * 40, 7,
-                                        ahoraPastoreo.minusMinutes(7 + rndPastoreo.nextInt(25)));
+                                        ahoraPastoreo.minusMinutes(7 + rndPastoreo.nextInt(25)), enRodeo);
                 }
-                crearTelemetria(anestroPendiente.getCaravana(), LAT_CENTRO - 0.003, LON_CENTRO + 0.003, 72.0,
-                                ahora.minusMinutes(10));
+                crearTelemetriaEnRodeo(anestroPendiente, rndRodeo, 72.0, ahora.minusMinutes(10));
                 crearTelemetria(anestroConfirmado.getCaravana(), LAT_CENTRO + 0.003, LON_CENTRO - 0.003, 68.0,
                                 ahora.minusHours(26));
-                crearTelemetria(anestroCandidato.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO + 0.002, 81.0,
-                                ahora.minusMinutes(7));
+                crearTelemetriaEnRodeo(anestroCandidato, rndRodeo, 81.0, ahora.minusMinutes(7));
 
-                // Telemetría reciente dentro del potrero principal (batería > 60%, 3-10 min)
-                // para no distorsionar el dashboard
-                crearTelemetria(vaca7.getCaravana(), LAT_CENTRO + 0.0015, LON_CENTRO + 0.0010, 78.0,
-                                ahora.minusMinutes(4));
-                crearTelemetria(vaca8.getCaravana(), LAT_CENTRO - 0.0012, LON_CENTRO - 0.0015, 82.0,
-                                ahora.minusMinutes(6));
-                crearTelemetria(vaca9.getCaravana(), LAT_CENTRO + 0.0020, LON_CENTRO - 0.0008, 75.0,
-                                ahora.minusMinutes(5));
-                crearTelemetria(gestanteSinIa1.getCaravana(), LAT_CENTRO - 0.0018, LON_CENTRO + 0.0012, 70.0,
-                                ahora.minusMinutes(8));
-                crearTelemetria(gestanteSinIa2.getCaravana(), LAT_CENTRO + 0.0008, LON_CENTRO - 0.0020, 74.0,
-                                ahora.minusMinutes(7));
-                crearTelemetria(vacaCalib1.getCaravana(), LAT_CENTRO - 0.0005, LON_CENTRO - 0.0005, 90.0,
-                                ahora.minusMinutes(3));
-                crearTelemetria(vacaCalib2.getCaravana(), LAT_CENTRO + 0.0007, LON_CENTRO + 0.0018, 88.0,
-                                ahora.minusMinutes(5));
+                // Telemetría reciente en el rodeo (batería > 60%, 3-10 min) para no distorsionar el dashboard
+                crearTelemetriaEnRodeo(vaca7, rndRodeo, 78.0, ahora.minusMinutes(4));
+                crearTelemetriaEnRodeo(vaca8, rndRodeo, 82.0, ahora.minusMinutes(6));
+                crearTelemetriaEnRodeo(vaca9, rndRodeo, 75.0, ahora.minusMinutes(5));
+                crearTelemetriaEnRodeo(gestanteSinIa1, rndRodeo, 70.0, ahora.minusMinutes(8));
+                crearTelemetriaEnRodeo(gestanteSinIa2, rndRodeo, 74.0, ahora.minusMinutes(7));
+                crearTelemetriaEnRodeo(vacaCalib1, rndRodeo, 90.0, ahora.minusMinutes(3));
+                crearTelemetriaEnRodeo(vacaCalib2, rndRodeo, 88.0, ahora.minusMinutes(5));
 
                 log.info("[DataInitializer] Telemetria y pastoreo cargados (H0025).");
 
@@ -970,7 +994,8 @@ public class DataInitializer implements CommandLineRunner {
         // Historial de celo (24 h, patron de alta actividad -- compatible simulador)
         // =========================================================================
 
-        private void sembrarHistorialCelo(Caravana caravana) {
+        /** destino: donde termina el historial (en el rodeo), sin saltos; ver anclarFinal. */
+        private void sembrarHistorialCelo(Caravana caravana, double[] destino) {
                 final int SAMPLES = 288;
                 final int TICK_S = 300;
                 final double SPEED_BASE = 0.000018;
@@ -984,23 +1009,28 @@ public class DataInitializer implements CommandLineRunner {
                 double lat = LAT_CENTRO - 0.001;
                 double lon = LON_CENTRO - 0.001;
                 double heading = rnd.nextDouble() * 2 * Math.PI;
-                double bateria = 88.0;
-                LocalDateTime ultimaFecha = LocalDateTime.now().minusMinutes(3);
-
-                for (int i = SAMPLES; i >= 1; i--) {
-                        LocalDateTime fecha = ultimaFecha.minusSeconds((long) (i - 1) * TICK_S);
+                double[][] posiciones = new double[SAMPLES][];
+                for (int i = 0; i < SAMPLES; i++) {
                         double speedMult = MULT_MIN + rnd.nextDouble() * (MULT_MAX - MULT_MIN);
                         heading += rnd.nextGaussian() * TURN_STD;
                         double speed = SPEED_BASE * speedMult;
                         lat += speed * Math.cos(heading);
                         lon += speed * Math.sin(heading);
+                        posiciones[i] = new double[] { lat, lon };
+                }
+                anclarFinal(posiciones, destino);
+
+                double bateria = 88.0;
+                LocalDateTime ultimaFecha = LocalDateTime.now().minusMinutes(3);
+                for (int i = 0; i < SAMPLES; i++) {
+                        LocalDateTime fecha = ultimaFecha.minusSeconds((long) (SAMPLES - 1 - i) * TICK_S);
                         bateria -= 0.01;
                         int moveState = MS_MIN + rnd.nextInt(MS_MAX - MS_MIN + 1);
                         Telemetria t = new Telemetria();
                         t.setCaravana(caravana);
                         t.setFechaHora(fecha);
-                        t.setLatitud(lat);
-                        t.setLongitud(lon);
+                        t.setLatitud(posiciones[i][0]);
+                        t.setLongitud(posiciones[i][1]);
                         t.setMoveState(moveState);
                         t.setBateria(bateria);
                         t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
@@ -1010,46 +1040,81 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         // =========================================================================
+        // Historial de #208 Margarita (Acto 4: desvio sanitario)
+        // =========================================================================
+
+        /**
+         * 8 dias a 5 min (2304 filas), la cadencia que espera ml-salud: los primeros 7 son la
+         * calibracion del perfil (RF03, >= 2016 puntos; SaludDetectorStrategyImpl calibra con los 7
+         * dias desde el primer dato) y las ultimas 24 hs (288 puntos, la ventana que evalua) traen la
+         * caida de ~40 % de actividad: moveState 1-3 en vez de 2-5 (media 2.0 contra 3.5). Validado
+         * contra ml-salud con estas mismas filas: 24 hs normales no alertan y estas alertan con severidad
+         * MEDIA; contra ml-celo, P(celo) ~0.1. Todo queda COMPLETADO: la alerta sale recien cuando
+         * simulador_salud.py manda los primeros puntos PENDIENTES (Acto 4, Paso 4.1).
+         * El historial termina en destino, apartada del rodeo: su ultima hora ya cuenta como "fuera del
+         * grupo" para ml-geo, que alerta a los 15 min seguidos afuera. No hay caminata al final de la
+         * ventana: alejarse ~150 m dentro de las 24 hs evaluadas le suma tanto desplazamiento que
+         * ml-salud deja de ver la caida (verificado en Docker).
+         * Semilla fija para que la prediccion sea la misma en cada arranque.
+         */
+        private void sembrarHistorialMargarita(Caravana caravana, double[] destino, LocalDateTime ultimaFecha) {
+                final int TICK_S = 300;
+                final int MUESTRAS = 8 * 288;
+                final int MUESTRAS_ENFERMA = 288;
+
+                Random rnd = new Random(208L);
+                double[][] posiciones = caminataPastoreo(rnd, LAT_CENTRO + 0.001, LON_CENTRO - 0.001, MUESTRAS,
+                                PASO_PASTOREO_15_MIN * TICK_S / 900);
+                anclarFinal(posiciones, destino);
+
+                double bateria = 79.0;
+                List<Telemetria> historial = new ArrayList<>(MUESTRAS);
+                for (int i = 0; i < MUESTRAS; i++) {
+                        boolean enferma = i >= MUESTRAS - MUESTRAS_ENFERMA;
+                        bateria = Math.max(5.0, bateria - 0.002);
+                        Telemetria t = new Telemetria();
+                        t.setCaravana(caravana);
+                        t.setFechaHora(ultimaFecha.minusSeconds((long) (MUESTRAS - 1 - i) * TICK_S));
+                        t.setLatitud(posiciones[i][0]);
+                        t.setLongitud(posiciones[i][1]);
+                        t.setMoveState(enferma ? 1 + rnd.nextInt(3) : 2 + rnd.nextInt(4));
+                        t.setBateria(bateria);
+                        t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+                        t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+                        historial.add(t);
+                }
+                telemetriaRepository.saveAll(historial);
+        }
+
+        // =========================================================================
         // Historial de pastoreo (mapa de calor H0025)
         // =========================================================================
 
+        private static final double PASO_PASTOREO_15_MIN = 0.000054;
+
+        /** destino: donde termina el historial (en el rodeo); null = donde lo deje la caminata. */
         private void sembrarHistorialPastoreo(Caravana caravana, double latInicial, double lonInicial,
-                        double bateriaInicial, int dias, LocalDateTime ultimaFecha) {
+                        double bateriaInicial, int dias, LocalDateTime ultimaFecha, double[] destino) {
                 final int TICK_S = 900;
-                final double PASO = 0.000054;
-                final double TURN_STD = 0.9;
-                final double PROB_AGUADA = 0.12;
-                final double RADIO = 0.004;
-                final double AGUADA_LAT = -34.9440;
-                final double AGUADA_LON = -59.2250;
                 final int MS_MIN = 2;
                 final int MS_MAX = 5;
 
                 Random rnd = new Random();
-                double lat = latInicial;
-                double lon = lonInicial;
-                double heading = rnd.nextDouble() * 2 * Math.PI;
-                double bateria = bateriaInicial;
                 int muestras = (int) ((long) dias * 24 * 3600 / TICK_S);
-                List<Telemetria> historial = new ArrayList<>(muestras);
+                double[][] posiciones = caminataPastoreo(rnd, latInicial, lonInicial, muestras, PASO_PASTOREO_15_MIN);
+                if (destino != null) {
+                        anclarFinal(posiciones, destino);
+                }
 
-                for (int i = muestras; i >= 1; i--) {
-                        LocalDateTime fecha = ultimaFecha.minusSeconds((long) (i - 1) * TICK_S);
-                        double dLat = AGUADA_LAT - lat;
-                        double dLon = AGUADA_LON - lon;
-                        if (Math.hypot(dLat, dLon) > RADIO || rnd.nextDouble() < PROB_AGUADA) {
-                                heading = Math.atan2(dLon, dLat);
-                        } else {
-                                heading += rnd.nextGaussian() * TURN_STD;
-                        }
-                        lat += PASO * Math.cos(heading);
-                        lon += PASO * Math.sin(heading);
+                double bateria = bateriaInicial;
+                List<Telemetria> historial = new ArrayList<>(muestras);
+                for (int i = 0; i < muestras; i++) {
                         bateria = Math.max(5.0, bateria - 0.005);
                         Telemetria t = new Telemetria();
                         t.setCaravana(caravana);
-                        t.setFechaHora(fecha);
-                        t.setLatitud(lat);
-                        t.setLongitud(lon);
+                        t.setFechaHora(ultimaFecha.minusSeconds((long) (muestras - 1 - i) * TICK_S));
+                        t.setLatitud(posiciones[i][0]);
+                        t.setLongitud(posiciones[i][1]);
                         t.setMoveState(MS_MIN + rnd.nextInt(MS_MAX - MS_MIN + 1));
                         t.setBateria(bateria);
                         t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
@@ -1057,6 +1122,63 @@ public class DataInitializer implements CommandLineRunner {
                         historial.add(t);
                 }
                 telemetriaRepository.saveAll(historial);
+        }
+
+        /** Pastoreo alrededor de la aguada: paso fijo, rumbo aleatorio y vuelta a la aguada si se aleja. */
+        private static double[][] caminataPastoreo(Random rnd, double latInicial, double lonInicial, int muestras,
+                        double paso) {
+                final double TURN_STD = 0.9;
+                final double PROB_AGUADA = 0.12;
+                final double RADIO = 0.004;
+                final double AGUADA_LAT = -34.9440;
+                final double AGUADA_LON = -59.2250;
+
+                double lat = latInicial;
+                double lon = lonInicial;
+                double heading = rnd.nextDouble() * 2 * Math.PI;
+                double[][] posiciones = new double[muestras][];
+                for (int i = 0; i < muestras; i++) {
+                        double dLat = AGUADA_LAT - lat;
+                        double dLon = AGUADA_LON - lon;
+                        if (Math.hypot(dLat, dLon) > RADIO || rnd.nextDouble() < PROB_AGUADA) {
+                                heading = Math.atan2(dLon, dLat);
+                        } else {
+                                heading += rnd.nextGaussian() * TURN_STD;
+                        }
+                        lat += paso * Math.cos(heading);
+                        lon += paso * Math.sin(heading);
+                        posiciones[i] = new double[] { lat, lon };
+                }
+                return posiciones;
+        }
+
+        /**
+         * Corre la caminata para que termine exactamente en destino, repartiendo la diferencia en
+         * partes iguales entre todos los pasos: la forma del recorrido (y el mapa de calor) casi no
+         * cambia y no aparece ningun salto entre filas consecutivas, que ml-celo leeria como un
+         * desplazamiento anomalo (celo falso).
+         */
+        private static void anclarFinal(double[][] posiciones, double[] destino) {
+                int n = posiciones.length;
+                double dLat = destino[0] - posiciones[n - 1][0];
+                double dLon = destino[1] - posiciones[n - 1][1];
+                for (int i = 0; i < n; i++) {
+                        double f = (i + 1) / (double) n;
+                        posiciones[i][0] += dLat * f;
+                        posiciones[i][1] += dLon * f;
+                }
+        }
+
+        /** Punto al azar dentro del circulo del rodeo (LAT_RODEO, RADIO_RODEO), uniforme en area. */
+        private static double[] posicionEnRodeo(Random rnd) {
+                double r = RADIO_RODEO * Math.sqrt(rnd.nextDouble());
+                double ang = rnd.nextDouble() * 2 * Math.PI;
+                return new double[] { LAT_RODEO + r * Math.cos(ang), LON_RODEO + r * Math.sin(ang) };
+        }
+
+        private void crearTelemetriaEnRodeo(Animal animal, Random rnd, double bateria, LocalDateTime fechaHora) {
+                double[] pos = posicionEnRodeo(rnd);
+                crearTelemetria(animal.getCaravana(), pos[0], pos[1], bateria, fechaHora);
         }
 
         // =========================================================================
