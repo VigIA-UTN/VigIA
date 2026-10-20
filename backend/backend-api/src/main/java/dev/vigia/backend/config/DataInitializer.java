@@ -1,32 +1,14 @@
 package dev.vigia.backend.config;
 
-import dev.vigia.backend.model.Establecimiento;
-import dev.vigia.backend.model.Rol;
-import dev.vigia.backend.model.Telemetria;
-import dev.vigia.backend.model.RodeoLote;
-import dev.vigia.backend.model.Usuario;
-import dev.vigia.backend.model.Empleado;
-import dev.vigia.backend.repository.AnimalRepository;
-import dev.vigia.backend.repository.EstablecimientoRepository;
-import dev.vigia.backend.repository.EstadoReproductivoRepository;
-import dev.vigia.backend.repository.EstadoSaludRepository;
-import dev.vigia.backend.repository.InvitacionRepository;
-import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
-import dev.vigia.backend.repository.PerfilReferenciaRepository;
-import dev.vigia.backend.repository.RegistroCohesionRepository;
-import dev.vigia.backend.repository.RegistroPesoRepository;
-import dev.vigia.backend.repository.RodeoLoteRepository;
-import dev.vigia.backend.repository.TelemetriaRepository;
-import dev.vigia.backend.repository.UsuarioRepository;
-import dev.vigia.backend.repository.CaravanaRepository;
-import dev.vigia.backend.repository.AlertaRepository;
-import dev.vigia.backend.repository.IntervencionRepository;
-import dev.vigia.backend.repository.DiagnosticoRepository;
-import dev.vigia.backend.model.Animal;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.model.Alerta;
-import dev.vigia.backend.model.Diagnostico;
+import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
+import dev.vigia.backend.model.Diagnostico;
 import dev.vigia.backend.model.DisparadorAlerta;
+import dev.vigia.backend.model.Empleado;
+import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoInferencia;
@@ -35,21 +17,49 @@ import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.Perimetro;
+import dev.vigia.backend.model.RegistroCohesion;
 import dev.vigia.backend.model.RegistroPeso;
+import dev.vigia.backend.model.RodeoLote;
+import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
+import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.model.TipoEstadoSalud;
 import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
-import dev.vigia.backend.dto.SerieComparativaSnapshot;
+import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
+import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.CaravanaRepository;
+import dev.vigia.backend.repository.DiagnosticoRepository;
+import dev.vigia.backend.repository.EstablecimientoRepository;
+import dev.vigia.backend.repository.EstadoReproductivoRepository;
+import dev.vigia.backend.repository.EstadoSaludRepository;
+import dev.vigia.backend.repository.IntervencionRepository;
+import dev.vigia.backend.repository.InvitacionRepository;
+import dev.vigia.backend.repository.PerfilReferenciaRepository;
+import dev.vigia.backend.repository.PerimetroRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
+import dev.vigia.backend.repository.RegistroPesoRepository;
+import dev.vigia.backend.repository.RodeoLoteRepository;
+import dev.vigia.backend.repository.TelemetriaRepository;
+import dev.vigia.backend.repository.UsuarioRepository;
+import dev.vigia.backend.util.GeometryUtils;
 import dev.vigia.backend.util.SerieComparativaBuilder;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LinearRing;
+import org.locationtech.jts.geom.Polygon;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -58,763 +68,1057 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+/**
+ * Datos de prueba para desarrollo y para la demo E2E (Sprint 10): limpia la base
+ * y la vuelve a sembrar en cada arranque. Solo corre con el perfil "dev"; nunca
+ * con "prod" (el default de la app).
+ */
 @Slf4j
 @Component
 @Profile("dev")
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
-    private final UsuarioRepository usuarioRepository;
-    private final EstablecimientoRepository establecimientoRepository;
-    private final InvitacionRepository invitacionRepository;
-    private final AnimalRepository animalRepository;
-    private final RodeoLoteRepository rodeoLoteRepository;
-    private final EstadoReproductivoRepository estadoReproductivoRepository;
-    private final EstadoSaludRepository estadoSaludRepository;
-    private final AlertaRepository alertaRepository;
-    private final IntervencionRepository intervencionRepository;
-    private final DiagnosticoRepository diagnosticoRepository;
-    private final CaravanaRepository caravanaRepository;
-    private final TelemetriaRepository telemetriaRepository;
-    private final RegistroCohesionRepository registroCohesionRepository;
-    private final RegistroPesoRepository registroPesoRepository;
-    private final PerfilReferenciaRepository perfilReferenciaRepository;
-    private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final ObjectMapper objectMapper;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
-
-    @Override
-    @SuppressWarnings("null")
-    public void run(String... args) {
-        log.info("[DataInitializer] Limpiando la base de datos para entorno de desarrollo...");
-        try {
-            jdbcTemplate.execute("SET vigia.bypass_immutable_triggers = 'true'");
-        } catch (Exception ignored) {
-        }
-        telemetriaRepository.deleteAllInBatch();
-        intervencionRepository.deleteAll();
-        diagnosticoRepository.deleteAll();
-        alertaAnimalAisladoRepository.deleteAll();
-        alertaRepository.deleteAll();
-        estadoReproductivoRepository.deleteAll();
-        estadoSaludRepository.deleteAll();
-        // Generados por los jobs del worker; referencian a animales sin ON DELETE CASCADE.
-        registroCohesionRepository.deleteAll();
-        perfilReferenciaRepository.deleteAll();
-        registroPesoRepository.deleteAll();
-        invitacionRepository.deleteAll();
-        animalRepository.deleteAll();
-        caravanaRepository.deleteAll();
-        rodeoLoteRepository.deleteAll();
-        establecimientoRepository.deleteAll();
-        usuarioRepository.deleteAll();
-
-        // ── Acto 1: Usuarios y roles ──────────────────────────────────────
-        Usuario admin = buildUsuario("Admin", "VigIA", "admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
-        Usuario productor = buildUsuario("Juan", "Productor", "productor@vigia.dev", "productor123", Rol.PRODUCTOR);
-        Usuario campero = buildUsuario("Carlos", "Campero", "campero@vigia.dev", "campero123", Rol.CAMPERO);
-        Usuario vet = buildUsuario("Laura", "Vet", "veterinario@vigia.dev", "vet123", Rol.VETERINARIO);
-        Usuario pendiente = buildUsuario("Nuevo", "Usuario", "pendiente@vigia.dev", "pendiente123", Rol.PENDIENTE);
-
-        List<Usuario> usuarios = List.of(admin, productor, campero, vet, pendiente);
-        usuarioRepository.saveAll(usuarios);
-
-        Establecimiento est = new Establecimiento();
-        est.setNombre("Estancia La Aurora");
-        est.setLatitud(-34.943317);
-        est.setLongitud(-59.225728);
-        est.setActivo(true);
-        est.setFechaAlta(LocalDate.now());
-        establecimientoRepository.save(est);
-
-        // Vinculamos a los TRES roles operativos con el establecimiento
-        // (antes solo se vinculaba al productor — campero y vet quedaban sin acceso al rodeo).
-        // ADMINISTRADOR no se vincula: es un rol global sin Empleado asociado.
-        Empleado vinculoProductor = new Empleado(est, productor);
-        Empleado vinculoCampero = new Empleado(est, campero);
-        Empleado vinculoVet = new Empleado(est, vet);
-        est.getEmpleados().add(vinculoProductor);
-        est.getEmpleados().add(vinculoCampero);
-        est.getEmpleados().add(vinculoVet);
-        establecimientoRepository.save(est);
-
-        // ── Acto 2: Rodeo ──────────────────────────────────────────────────
-        RodeoLote lote1 = new RodeoLote(est);
-        lote1.setNombre("Rodeo 01");
-        lote1.setActivo(true);
-        rodeoLoteRepository.save(lote1);
-
-        // Rodeo 02 intencionalmente vacío → se usa en la demo de H0005 (carga por CSV)
-        RodeoLote lote2 = new RodeoLote(est);
-        lote2.setNombre("Rodeo 02");
-        lote2.setActivo(true);
-        rodeoLoteRepository.save(lote2);
-
-        log.info("[DataInitializer] ✅ {} usuarios creados.", usuarios.size());
-        log.info("[DataInitializer] ✅ Establecimiento 'Estancia La Aurora' creado con Productor, Campero y Veterinario vinculados.");
-        log.info("[DataInitializer] ✅ Rodeos de prueba creados: 'Rodeo 01' y 'Rodeo 02'.");
-
-        Animal vaca1 = crearAnimal(est, lote1, "12345", "La Vaca Lola", "Angus",
-                LocalDate.of(2020, 1, 1), "VIGIA-ARG-001", caravanaRepository, animalRepository);
-
-        Animal vaca2 = crearAnimal(est, lote1, "67890", "Margarita", "Hereford",
-                LocalDate.of(2021, 5, 10), "VIGIA-ARG-002", caravanaRepository, animalRepository);
-        vaca2.setFechaAlta(LocalDate.now().minusDays(7));
-        animalRepository.save(vaca2);
-
-        // vaca3: también en lote1; recibirá telemetría vieja (> 15 min) para mostrar
-        // el indicador "sin datos recientes" en el mapa (H0012). El alias es neutro
-        // porque el nombre se ve en el listado público.
-        Animal vaca3 = crearAnimal(est, lote1, "33333", "Renegrida", "Brangus",
-                LocalDate.of(2022, 3, 15), "VIGIA-ARG-003", caravanaRepository, animalRepository);
-
-        Animal vaca4 = crearAnimal(est, lote1, "44444", "Blanca", "Holando",
-                LocalDate.of(2021, 8, 20), "VIGIA-ARG-004", caravanaRepository, animalRepository);
-
-        Animal vaca5 = crearAnimal(est, lote1, "55555", "Pinta", "Jersey",
-                LocalDate.of(2022, 1, 10), "VIGIA-ARG-005", caravanaRepository, animalRepository);
-
-        log.info("[DataInitializer] ✅ 5 animales operativos en Rodeo 01 (+ 3 de demo de alertas sanitarias en el Acto 4) "
-                + "— Rodeo 02 vacío (reservado para demo CSV H0005).");
-
-        // ── Acto 3: Dashboard / mapa ──────────────────────────────────────
-        // Posiciones recientes para que el mapa se vea poblado desde el arranque.
-        // vaca1 (forzada a celo en la demo, ver simulador/simulador_demo.py) recibe
-        // acá su historial completo de 24hs con patrón de celo, en vez de un
-        // único punto reciente: así el simulador no tiene que inyectarlo al
-        // arrancar, y solo necesita mandar un puñado de puntos nuevos en vivo
-        // para que el próximo ciclo del job de celo (corre cada 60s, ver
-        // BatchScheduler) evalúe la ventana completa —ya con forma de celo—
-        // y dispare la alerta casi de inmediato.
-        sembrarHistorialCelo(vaca1.getCaravana(), telemetriaRepository);
-        crearTelemetria(vaca2.getCaravana(), -34.9448, -59.2241, 76.0, LocalDateTime.now().minusMinutes(6), telemetriaRepository);
-        crearTelemetria(vaca4.getCaravana(), -34.9421, -59.2279, 91.0, LocalDateTime.now().minusMinutes(2), telemetriaRepository);
-        crearTelemetria(vaca5.getCaravana(), -34.9455, -59.2260, 64.0, LocalDateTime.now().minusMinutes(10), telemetriaRepository);
-
-        // vaca3 se deja con una única transmisión de hace 1 hora (> 15 min)
-        // para disparar el indicador "sin datos recientes" en el mapa (H0012).
-        crearTelemetria(vaca3.getCaravana(), -34.943317, -59.225728, 45.0, LocalDateTime.now().minusHours(1), telemetriaRepository);
-
-        // Historial de pastoreo de 7 días para el mapa de calor (H0025): sin esto
-        // el rango por defecto del mapa (7 días) se alimenta de un solo animal con
-        // 24hs y de cuatro puntos sueltos, y tanto el heatmap como el filtro por
-        // rodeo quedan vacíos. Cada historial termina un tick ANTES de la posición
-        // reciente de arriba, para no alterar los indicadores del Acto 3.
-        LocalDateTime ahoraPastoreo = LocalDateTime.now();
-        sembrarHistorialPastoreo(vaca2.getCaravana(), -34.9448, -59.2241, 79.0, 7, ahoraPastoreo.minusMinutes(21), telemetriaRepository);
-        sembrarHistorialPastoreo(vaca4.getCaravana(), -34.9421, -59.2279, 94.0, 7, ahoraPastoreo.minusMinutes(17), telemetriaRepository);
-        sembrarHistorialPastoreo(vaca5.getCaravana(), -34.9455, -59.2260, 67.0, 7, ahoraPastoreo.minusMinutes(25), telemetriaRepository);
-        sembrarHistorialPastoreo(vaca3.getCaravana(), -34.943317, -59.225728, 48.0, 7, ahoraPastoreo.minusMinutes(75), telemetriaRepository);
-        // vaca1 completa los 6 días previos a su ventana de celo (que arranca en -24hs).
-        sembrarHistorialPastoreo(vaca1.getCaravana(), -34.9430, -59.2255, 92.0, 6, ahoraPastoreo.minusHours(24).minusMinutes(15), telemetriaRepository);
-
-        log.info("[DataInitializer] ✅ Telemetría cargada — 3 animales con posición reciente, "
-                + "vaca1 con 24hs de historial en patrón de celo, 1 en estado 'sin datos recientes', "
-                + "y 7 días de historial de pastoreo en los 5 animales para el mapa de calor.");
-
-        // ── Acto 4: Alertas sanitarias (demo de la vista de detalle sanitario) ──
-        // El detalle sanitario del endpoint /api/v1/alertas/{id} devuelve un
-        // snapshot congelado de la serie comparativa (alertas.serie_comparativa_json)
-        // que en producción arma el worker con SerieComparativaBuilder. Acá se
-        // usa el MISMO builder con ventanas/perfiles sintéticos para cubrir los
-        // estados que la maqueta del frontend contempla:
-        //   6a  serie completa (perfil + telemetría)  -> gráfico con ambas barras
-        //   7   sin perfil de referencia               -> solo barra "actual" + aviso
-        //   8   sin telemetría en la ventana           -> aviso "sin datos"
-        //   6b  además una CONFIRMADA (estado no accionable + lista en la ficha)
-        //
-        // Estas alertas viven en ANIMALES DEDICADOS (VIGIA-ARG-006/007/008), NO
-        // en vaca1..vaca5, para no chocar con el simulador:
-        //   - vaca1 (VIGIA-ARG-001) es el animal de la demo de CELO.
-        //   - vaca2 (VIGIA-ARG-002) es el FORZAR_SALUD_DEVICE_ID del simulador:
-        //     debe quedar limpio para que el worker le genere su alerta real.
-        //   - el simulador por defecto solo maneja NUM_ANIMALES=5, así que las
-        //     vacas 006/008 no reciben telemetría en vivo.
-        // Aún así se fechan > 24 h atrás: si alguien sube NUM_ANIMALES, el
-        // cooldown de 24 h del worker (SaludDetectorStrategyImpl.process) no se
-        // dispara con datos de demo viejos.
-        LocalDateTime ahora = LocalDateTime.now();
-
-        Animal demoConPerfil = crearAnimal(est, lote1, "60006", "Demo Salud — con perfil", "Angus",
-                LocalDate.of(2021, 1, 1), "VIGIA-ARG-006", caravanaRepository, animalRepository);
-        Animal demoSinPerfil = crearAnimal(est, lote1, "70007", "Demo Salud — sin perfil", "Hereford",
-                LocalDate.of(2021, 6, 1), "VIGIA-ARG-007", caravanaRepository, animalRepository);
-        Animal demoSinTelemetria = crearAnimal(est, lote1, "80008", "Demo Salud — sin telemetría", "Brangus",
-                LocalDate.of(2021, 9, 1), "VIGIA-ARG-008", caravanaRepository, animalRepository);
-
-        Map<String, Object> perfilNormal = perfilDemo(
-                new double[] { 6.2, 5.4, 4.1, 5.0 }, new double[] { 0.8, 0.7, 0.6, 0.7 },
-                new double[] { 11.5, 9.0, 7.2, 9.5 }, new double[] { 2.1, 1.8, 1.5, 1.9 });
-
-        // 6a — ALTA, PENDIENTE (hace ~2 días): actividad y desplazamiento muy
-        // por debajo del perfil (postración) -> barras "actual" rojas.
-        crearAlertaSanitaria(demoConPerfil, SeveridadAlerta.ALTA, EstadoAlerta.PENDIENTE, 0.93f,
-                "Problema severo postrante o complicación de parto",
-                ventanaSanitaria(demoConPerfil.getCaravana(), ahora.minusDays(2), 2, 0.00001),
-                perfilNormal, ahora.minusDays(9), null, null);
-
-        // 6b — ALTA, CONFIRMADA hace ~4 días: hiperactividad sostenida por
-        // encima del perfil. Estado no accionable + el animal queda con 2 alertas.
-        Alerta saludConfirmada = crearAlertaSanitaria(demoConPerfil, SeveridadAlerta.ALTA, EstadoAlerta.CONFIRMADA, 0.88f,
-                "Problema severo postrante o complicación de parto",
-                ventanaSanitaria(demoConPerfil.getCaravana(), ahora.minusDays(4), 9, 0.00009),
-                perfilNormal, ahora.minusDays(9), ahora.minusDays(4).plusHours(2), vet);
-        // Diagnóstico inicial + control: historial clínico y página de Diagnósticos con datos.
-        sembrarDiagnostico(saludConfirmada, vet, "Cuadro febril compatible con neumonía",
-                "Oxitetraciclina LA 20 mg/kg IM, dosis única. Controlar temperatura en 48 h.",
-                ahora.minusDays(4).plusHours(3));
-        sembrarDiagnostico(saludConfirmada, vet, "Control a las 48 h: evolución favorable",
-                "Sin nueva medicación. Mantener en potrero cercano hasta el alta.",
-                ahora.minusDays(2).plusHours(3));
-
-        // 7 — MEDIA, PENDIENTE (hace ~2 días), SIN perfil (animal recién
-        // calibrado): el gráfico muestra solo el comportamiento actual + nota.
-        crearAlertaSanitaria(demoSinPerfil, SeveridadAlerta.MEDIA, EstadoAlerta.PENDIENTE, 0.78f,
-                "Enfermedad moderada / Cojera clínica",
-                ventanaSanitaria(demoSinPerfil.getCaravana(), ahora.minusDays(2).minusHours(8), 3, 0.00002),
-                null, null, null, null);
-
-        // 8 — BAJA, PENDIENTE (hace ~2 días), SIN telemetría en la ventana:
-        // el gráfico muestra el aviso "no hay telemetría suficiente".
-        crearAlertaSanitaria(demoSinTelemetria, SeveridadAlerta.BAJA, EstadoAlerta.PENDIENTE, 0.61f,
-                "Enfermedad leve / Inicio",
-                new ArrayList<>(), null, null, null, null);
-
-        log.info("[DataInitializer] ✅ 3 animales de demo (VIGIA-ARG-006/007/008) con 4 alertas sanitarias "
-                + "fechadas > 24 h atrás. vaca1..vaca5 quedan libres para el simulador (celo y salud).");
-
-        // ── Acto 5: Historial reproductivo (demo de la sección de la ficha del animal) ──
-        // Animal dedicado (VIGIA-ARG-009) para no chocar con el simulador. El historial
-        // sale íntegro de estados_reproductivos; la inseminación y la revisión veterinaria
-        // se siembran por el mismo camino que produce intervenirAlerta: la intervención
-        // (acto) + el EstadoReproductivo / EstadoSalud que ese acto genera.
-        Animal demoRepro = crearAnimal(est, lote1, "90009", "Demo Historial Reproductivo", "Angus",
-                LocalDate.of(2020, 6, 1), "VIGIA-ARG-009", caravanaRepository, animalRepository);
-        LocalDateTime hoyDt = LocalDateTime.now();
-
-        sembrarEstadoReproductivo(demoRepro, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                LocalDate.now().minusMonths(8), hoyDt.minusMonths(8));
-        sembrarEstadoReproductivo(demoRepro, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA, productor,
-                null, hoyDt.minusMonths(6));
-        sembrarEstadoReproductivo(demoRepro, TipoReproductivo.POSIBLE_CELO, OrigenEstado.AUTOMATICO, null,
-                null, hoyDt.minusDays(42));
-        sembrarInseminacionDesdeIntervencion(demoRepro, vet, hoyDt.minusDays(40));
-        sembrarRevisionConEstadoSalud(demoRepro, vet, TipoEstadoSalud.EN_OBSERVACION, hoyDt.minusDays(20));
-        sembrarGestante(demoRepro, vet, LocalDate.now().minusDays(40), hoyDt.minusDays(9));
-
-        log.info("[DataInitializer] ✅ Animal VIGIA-ARG-009 con historial reproductivo de demo "
-                + "(parto, vacía, celo ml, inseminación, gestante) + una revisión veterinaria con estado de salud.");
-
-        // ── Acto 6: Anestro (demo de la alerta de anestro) ─────────────────────
-        // Animales dedicados (VIGIA-ARG-010/011/012). Las alertas se siembran igual que
-        // las genera AnestroDetectorService (tipo "Anestro Detectado", disparador CELO,
-        // sin ventana de inseminación) con el umbral del establecimiento (45 días por defecto).
-        int umbralAnestro = est.getDiasDeteccionAnestro();
-
-        // 010 — PENDIENTE: tarjeta del sidebar, detalle, dashboard, tabla y línea de tiempo.
-        Animal anestroPendiente = crearAnimal(est, lote1, "10010", "Demo Anestro — pendiente", "Angus",
-                LocalDate.of(2019, 9, 1), "VIGIA-ARG-010", caravanaRepository, animalRepository);
-        sembrarEstadoReproductivo(anestroPendiente, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                LocalDate.now().minusDays(120), hoyDt.minusDays(120));
-        sembrarAlertaAnestro(est, anestroPendiente, EstadoAlerta.PENDIENTE, 119, hoyDt.minusDays(1), null, null);
-
-        // 011 — CONFIRMADA: queda en estado ANESTRO (como al confirmar desde la UI),
-        // así el detector no la vuelve a alertar y la línea de tiempo muestra alerta + estado.
-        Animal anestroConfirmado = crearAnimal(est, lote1, "11011", "Demo Anestro — confirmado", "Hereford",
-                LocalDate.of(2020, 2, 1), "VIGIA-ARG-011", caravanaRepository, animalRepository);
-        sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                LocalDate.now().minusDays(150), hoyDt.minusDays(150));
-        sembrarAlertaAnestro(est, anestroConfirmado, EstadoAlerta.CONFIRMADA, 138, hoyDt.minusDays(12),
-                hoyDt.minusDays(10), vet);
-        sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.ANESTRO, OrigenEstado.MANUAL, vet,
-                LocalDate.now().minusDays(150), hoyDt.minusDays(10));
-
-        // 012 — SIN ALERTA pero califica (parto hace 90 días; la VACIA posterior no reinicia
-        // el conteo): la primera corrida del detector le genera la alerta en vivo por SSE.
-        // Para no esperar a las 2 AM: correr el worker con --vigia.batch.anestro-cron="0 * * * * *".
-        Animal anestroCandidato = crearAnimal(est, lote1, "12012", "Demo Anestro — sin alerta", "Brangus",
-                LocalDate.of(2020, 4, 1), "VIGIA-ARG-012", caravanaRepository, animalRepository);
-        sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                LocalDate.now().minusDays(90), hoyDt.minusDays(90));
-        sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA, productor,
-                null, hoyDt.minusDays(30));
-
-        log.info("[DataInitializer] ✅ Demo de anestro (umbral {} días): VIGIA-ARG-010 alerta PENDIENTE, "
-                + "VIGIA-ARG-011 CONFIRMADA + estado ANESTRO, VIGIA-ARG-012 sin alerta (la genera el detector).",
-                umbralAnestro);
-
-        // ── Acto 7: Partos esperados (demo del dashboard de Salud y reproducción) ──
-        // Gestantes con fecha de inseminación (parto esperado = IA + 283 días). Un lote de
-        // IATF del mismo día concentra 3 partos en una fecha; el resto se reparte en los
-        // próximos meses y una queda con la fecha vencida (posible parto sin registrar).
-        // Como la preñez se confirma ~35 d post-IA, los partos solo caen en los próximos ~8 meses.
-        String[] nombresGestantes = { "Aurora", "Canela", "Estrella", "Luna", "Morena",
-                "Paloma", "Nube", "Frutilla", "Rosa" };
-        int[] diasDesdeIa = { 250, 250, 250, 247, 200, 200, 140, 90, 290 };
-        List<Animal> gestantes = new ArrayList<>();
-        for (int i = 0; i < diasDesdeIa.length; i++) {
-            int num = 13 + i;
-            Animal gestante = crearAnimal(est, lote1, String.format("%d%03d", num, num), nombresGestantes[i], "Angus",
-                    LocalDate.of(2019, 10, 1), String.format("VIGIA-ARG-%03d", num), caravanaRepository, animalRepository);
-            LocalDate ia = LocalDate.now().minusDays(diasDesdeIa[i]);
-            sembrarGestante(gestante, vet, ia, ia.plusDays(35).atTime(10, 0));
-            gestantes.add(gestante);
-        }
-
-        log.info("[DataInitializer] ✅ {} gestantes de demo (VIGIA-ARG-013..{}) para el gráfico de partos esperados.",
-                diasDesdeIa.length, String.format("%03d", 12 + diasDesdeIa.length));
-
-        // ── Acto 8: Pesadas (demo de la card "Ganancia de peso") ──────────────
-        // Pares {días atrás, kg}. La card calcula la ganancia diaria (ADPV) con las dos últimas
-        // pesadas separadas por ≥ 14 días, y la cobertura con las pesadas de los últimos 90 días.
-        //   gana (~0,4–0,65 kg/día): vaca1, vaca2, vaca4, vaca5, 008, 009, 012
-        //   estable (~0,05):         vaca3, 010, 011
-        //   pierde (~-0,4/-0,5):     006 (alerta de salud ALTA, postración) y 007 (cojera)
-        //   008: la pesada de hace 12 días queda a < 14 días de la última → se usa la de hace 50
-        //   Aurora: pesadas de hace > 120 días → fuera del cálculo; Canela: una sola pesada
-        //   el resto de las gestantes sin pesar → cobertura 13 de 21 (62 %)
-        // Variación "vs. hace 90 d": vaca1/2/4/5, 009 y 012 tienen además pesadas de invierno
-        // (hace 95–160 días, ~0,1–0,2 kg/día). Hace 90 días el ADPV era 0,18 (7 animales) y hoy
-        // 0,45 → ▲ 0,27. Esas pesadas viejas no cambian el ADPV de hoy.
-        sembrarPesadas(vaca1, new double[][] { { 150, 400 }, { 95, 412 }, { 60, 431 }, { 25, 452 } });
-        sembrarPesadas(vaca2, new double[][] { { 150, 362 }, { 100, 371 }, { 60, 380 }, { 20, 405 } });
-        sembrarPesadas(vaca3, new double[][] { { 75, 445 }, { 35, 447 } });
-        sembrarPesadas(vaca4, new double[][] { { 160, 440 }, { 110, 449 }, { 70, 455 }, { 28, 478 } });
-        sembrarPesadas(vaca5, new double[][] { { 155, 318 }, { 105, 325 }, { 64, 330 }, { 30, 352 } });
-        sembrarPesadas(demoConPerfil, new double[][] { { 40, 468 }, { 3, 449 } });
-        sembrarPesadas(demoSinPerfil, new double[][] { { 45, 410 }, { 10, 396 } });
-        sembrarPesadas(demoSinTelemetria, new double[][] { { 50, 400 }, { 12, 420 }, { 5, 418 } });
-        sembrarPesadas(demoRepro, new double[][] { { 140, 455 }, { 100, 462 }, { 50, 470 }, { 15, 488 } });
-        sembrarPesadas(anestroPendiente, new double[][] { { 90, 432 }, { 45, 434 } });
-        sembrarPesadas(anestroConfirmado, new double[][] { { 70, 420 }, { 30, 422 } });
-        sembrarPesadas(anestroCandidato, new double[][] { { 150, 428 }, { 95, 433 }, { 80, 440 }, { 40, 460 } });
-        sembrarPesadas(gestantes.get(0), new double[][] { { 200, 430 }, { 150, 445 } });
-        sembrarPesadas(gestantes.get(1), new double[][] { { 20, 455 } });
-
-        log.info("[DataInitializer] ✅ Pesadas de demo: 7 animales ganando, 3 estables, 2 perdiendo peso "
-                + "(VIGIA-ARG-006/007), cobertura 13 de 21 en los últimos 90 días, ▲ vs. hace 90 días.");
-
-        log.info("[DataInitializer] Usuarios disponibles para pruebas:");
-        log.info("  admin@vigia.dev        / admin123      → ADMINISTRADOR");
-        log.info("  productor@vigia.dev    / productor123  → PRODUCTOR");
-        log.info("  campero@vigia.dev      / campero123    → CAMPERO");
-        log.info("  veterinario@vigia.dev  / vet123        → VETERINARIO");
-        log.info("  pendiente@vigia.dev    / pendiente123  → PENDIENTE");
-    }
-
-    // ---------------------------------------------------------------------------
-    // Helpers del Acto 5 — historial reproductivo / de salud de demo.
-    // ---------------------------------------------------------------------------
-
-    private void sembrarEstadoReproductivo(Animal animal, TipoReproductivo estado, OrigenEstado origen,
-                                           Usuario usuario, LocalDate fechaUltParto, LocalDateTime fechaRegistro) {
-        EstadoReproductivo e = new EstadoReproductivo();
-        e.setAnimal(animal);
-        e.setEstado(estado);
-        e.setOrigen(origen);
-        e.setUsuarioRegistrador(usuario);
-        e.setFechaUltParto(fechaUltParto);
-        e.setFechaRegistro(fechaRegistro);
-        estadoReproductivoRepository.save(e);
-    }
-
-    /** Pesadas de demo: cada par es {días atrás, kg}. */
-    private void sembrarPesadas(Animal animal, double[][] pesadas) {
-        for (double[] p : pesadas) {
-            RegistroPeso r = new RegistroPeso();
-            r.setAnimal(animal);
-            r.setFecha(LocalDate.now().minusDays((long) p[0]));
-            r.setValorKg(p[1]);
-            r.setUnidad("kg");
-            r.setFechaRegistro(r.getFecha().atTime(9, 0));
-            registroPesoRepository.save(r);
-        }
-    }
-
-    /** GESTANTE con la fecha de IA: el parto esperado del dashboard sale del último estado. */
-    private void sembrarGestante(Animal animal, Usuario vet, LocalDate fechaInseminacion, LocalDateTime fechaRegistro) {
-        EstadoReproductivo e = new EstadoReproductivo();
-        e.setAnimal(animal);
-        e.setEstado(TipoReproductivo.GESTANTE);
-        e.setOrigen(OrigenEstado.MANUAL);
-        e.setUsuarioRegistrador(vet);
-        e.setFechaUltInseminacion(fechaInseminacion);
-        e.setFechaRegistro(fechaRegistro);
-        estadoReproductivoRepository.save(e);
-    }
-
-    private void sembrarInseminacionDesdeIntervencion(Animal animal, Usuario interventor, LocalDateTime fechaHora) {
-        Alerta alerta = new Alerta();
-        alerta.setAnimal(animal);
-        alerta.setTipo("Celo Detectado");
-        alerta.setDisparador(DisparadorAlerta.CELO);
-        alerta.setSeveridad(SeveridadAlerta.ALTA);
-        alerta.setEstado(EstadoAlerta.CONFIRMADA);
-        alerta.setTsGeneracion(fechaHora.minusHours(8));
-        alerta.setTsConfirmacion(fechaHora.minusHours(6));
-        alerta.setUsuarioConfirmacion(interventor);
-        alerta.setValorUmbral(0.5);
-        alerta.setValorDetectado(0.9);
-        alerta.setConfianzaModelo(0.9f);
-        alerta.setVentanaInicioIns(fechaHora.minusHours(2));
-        alerta.setVentanaFinIns(fechaHora.plusHours(10));
-        alertaRepository.save(alerta);
-
-        Intervencion intervencion = new Intervencion();
-        intervencion.setAlerta(alerta);
-        intervencion.setAnimal(animal);
-        intervencion.setInterventor(interventor);
-        intervencion.setDescripcion("IATF — inseminación a tiempo fijo");
-        intervencion.setFechaHora(fechaHora);
-        intervencion.setTipo(TipoIntervencion.INSEMINACION);
-        intervencionRepository.save(intervencion);
-
-        EstadoReproductivo estado = new EstadoReproductivo();
-        estado.setAnimal(animal);
-        estado.setUsuarioRegistrador(interventor);
-        estado.setEstado(TipoReproductivo.INSEMINADA);
-        estado.setFechaUltInseminacion(fechaHora.toLocalDate());
-        estado.setOrigen(OrigenEstado.MANUAL);
-        estado.setFechaRegistro(fechaHora);
-        estadoReproductivoRepository.save(estado);
-    }
-
-    /** Alerta de anestro con los mismos campos y textos que AnestroDetectorService.generarAlertaAnestro. */
-    private void sembrarAlertaAnestro(Establecimiento est, Animal animal, EstadoAlerta estado, long diasSinCiclo,
-                                      LocalDateTime tsGeneracion, LocalDateTime tsConfirmacion, Usuario usuario) {
-        Alerta alerta = new Alerta();
-        alerta.setAnimal(animal);
-        alerta.setTipo(Alerta.TIPO_ANESTRO);
-        alerta.setDisparador(DisparadorAlerta.CELO);
-        alerta.setSeveridad(est.getSeveridadAnestro());
-        alerta.setEstado(estado);
-        alerta.setTsGeneracion(tsGeneracion);
-        alerta.setValorUmbral((double) est.getDiasDeteccionAnestro());
-        alerta.setValorDetectado((double) diasSinCiclo);
-        alerta.setAccionRecomendada("Se recomienda revisión veterinaria. El animal lleva "
-                + diasSinCiclo + " días sin ciclo registrado.");
-        alerta.setPosibleCausa("Anestro prolongado (>" + est.getDiasDeteccionAnestro() + " días)");
-        alerta.setTsConfirmacion(tsConfirmacion);
-        alerta.setUsuarioConfirmacion(usuario);
-        alertaRepository.save(alerta);
-    }
-
-    private void sembrarRevisionConEstadoSalud(Animal animal, Usuario vet, TipoEstadoSalud estadoSalud,
-                                               LocalDateTime fechaHora) {
-        String notas = "Revisión clínica: leve cojera en miembro posterior, se deja en observación.";
-
-        Alerta alerta = new Alerta();
-        alerta.setAnimal(animal);
-        alerta.setTipo("SALUD");
-        alerta.setDisparador(DisparadorAlerta.SALUD);
-        alerta.setSeveridad(SeveridadAlerta.MEDIA);
-        alerta.setEstado(EstadoAlerta.CONFIRMADA);
-        alerta.setTsGeneracion(fechaHora.minusDays(1));
-        alerta.setTsConfirmacion(fechaHora.minusHours(3));
-        alerta.setUsuarioConfirmacion(vet);
-        alerta.setValorUmbral(0.5);
-        alerta.setValorDetectado(0.7);
-        alerta.setConfianzaModelo(0.7f);
-        alertaRepository.save(alerta);
-
-        Intervencion intervencion = new Intervencion();
-        intervencion.setAlerta(alerta);
-        intervencion.setAnimal(animal);
-        intervencion.setInterventor(vet);
-        intervencion.setDescripcion(notas);
-        intervencion.setFechaHora(fechaHora);
-        intervencion.setTipo(TipoIntervencion.REVISION_VETERINARIA);
-        intervencionRepository.save(intervencion);
-
-        EstadoSalud es = new EstadoSalud();
-        es.setAnimal(animal);
-        es.setUsuarioVeterinario(vet);
-        es.setFechaRevision(fechaHora.toLocalDate());
-        es.setEstado(estadoSalud);
-        es.setDiagnosticoNotas(notas);
-        es.setOrigen(OrigenEstado.MANUAL);
-        es.setFechaRegistro(fechaHora);
-        estadoSaludRepository.save(es);
-    }
-
-    private Usuario buildUsuario(String nombre, String apellido, String email, String password, Rol rol) {
-        Usuario u = new Usuario();
-        u.setNombre(nombre);
-        u.setApellido(apellido);
-        u.setEmail(email);
-        u.setPasswordHash(passwordEncoder.encode(password));
-        u.setRol(rol);
-        u.setActivo(true);
-        u.setFechaAlta(LocalDate.now());
-        return u;
-    }
-
-    private Animal crearAnimal(Establecimiento est, RodeoLote lote, String idOficial, String alias, String raza,
-                                LocalDate fechaNacimiento, String codigoCaravana,
-                                CaravanaRepository caravanaRepository, AnimalRepository animalRepository) {
-        Animal a = new Animal(est, lote);
-        a.setIdCaravanaOficial(idOficial);
-        a.setAlias(alias);
-        a.setEstadoActual(EstadoAnimal.ACTIVO);
-        a.setFechaNacimiento(fechaNacimiento);
-        // OJO: confirmá que el setter se llama así en tu modelo Animal —
-        // si no existe (o se llama distinto), comentá esta línea.
-        // a.setRaza(raza);
-
-        Caravana caravana = new Caravana();
-        caravana.setCodigo(codigoCaravana);
-        caravana.setDevEui(codigoCaravana);
-        caravana.setActivo(true);
-        caravana.setEstablecimiento(est);
-        caravana.setEstadoSensor(EstadoSensor.VINCULADO);
-        caravanaRepository.save(caravana);
-
-        a.setCaravana(caravana);
-        animalRepository.save(a);
-        return a;
-    }
-
-    // ---------------------------------------------------------------------------
-    // Siembra las 288 filas (24hs, 1 cada 5 min) de historial de celo para la
-    // vaca forzada de la demo (VIGIA-ARG-001 por defecto en el simulador),
-    // con el mismo patron de "alta actividad sostenida y erratica" que antes
-    // generaba simulador_demo.py al arrancar (ver el docstring de ese
-    // archivo). Al persistirse aca, en el arranque del backend, el
-    // simulador de la demo ya no necesita mandar esos ~288 requests: solo
-    // arranca su loop en vivo y, apenas manda un puñado de puntos nuevos
-    // (quedan en estado PENDIENTE), el proximo ciclo del job de celo ya
-    // evalua una ventana de 24hs con forma de celo de punta a punta.
-    //
-    // Se marca EstadoInferencia.COMPLETADO (no PENDIENTE) porque esta
-    // telemetria sembrada no debe disparar por si sola el job de celo: el
-    // que la dispara es la primera telemetria PENDIENTE que llegue por
-    // /api/v1/ingesta/uplink (ver CeloBatchConfig.celoProcessor()).
-    //
-    // Escala fisica alineada con ml-training/celo/generate_dataset.py y con
-    // el simulador (simulador/simulador.py): SPEED_BASE = 0.000018 grados
-    // por tick de 5 min en pastoreo normal; en celo, generate_dataset.py
-    // multiplica la velocidad por 1.0 + intensidad*(2 a 3) -> hasta 4x.
-    // ---------------------------------------------------------------------------
-    private void sembrarHistorialCelo(Caravana caravana, TelemetriaRepository telemetriaRepository) {
-        final int SAMPLES_PER_DIA = 288;
-        final int TICK_HISTORIAL_SEGUNDOS = 300;
-        final double SPEED_BASE_DEG_POR_TICK_5MIN = 0.000018;
-        final double SPEED_MULT_CELO_MIN = 2.5;
-        final double SPEED_MULT_CELO_MAX = 4.0;
-        final double TURN_STD_CELO = 1.1;
-        final int MOVESTATE_ALTA_ACTIVIDAD_MIN = 7;
-        final int MOVESTATE_ALTA_ACTIVIDAD_MAX = 9;
-
-        Random rnd = new Random();
-        double lat = -34.9430;
-        double lon = -59.2255;
-        double heading = rnd.nextDouble() * 2 * Math.PI;
-        double bateria = 88.0;
-
-        // La ultima fila queda a unos minutos de "ahora" (igual que el resto
-        // de los animales del Acto 3), para que el mapa la siga mostrando
-        // como posicion reciente.
-        LocalDateTime ultimaFecha = LocalDateTime.now().minusMinutes(3);
-
-        for (int i = SAMPLES_PER_DIA; i >= 1; i--) {
-            LocalDateTime fecha = ultimaFecha.minusSeconds((long) (i - 1) * TICK_HISTORIAL_SEGUNDOS);
-            double speedMult = SPEED_MULT_CELO_MIN + rnd.nextDouble() * (SPEED_MULT_CELO_MAX - SPEED_MULT_CELO_MIN);
-            heading += rnd.nextGaussian() * TURN_STD_CELO;
-            double speed = SPEED_BASE_DEG_POR_TICK_5MIN * speedMult;
-            lat += speed * Math.cos(heading);
-            lon += speed * Math.sin(heading);
-            bateria -= 0.01;
-
-            int moveState = MOVESTATE_ALTA_ACTIVIDAD_MIN
-                    + rnd.nextInt(MOVESTATE_ALTA_ACTIVIDAD_MAX - MOVESTATE_ALTA_ACTIVIDAD_MIN + 1);
-
-            Telemetria t = new Telemetria();
-            t.setCaravana(caravana);
-            t.setFechaHora(fecha);
-            t.setLatitud(lat);
-            t.setLongitud(lon);
-            t.setMoveState(moveState);
-            t.setBateria(bateria);
-            t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
-            t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
-            telemetriaRepository.save(t);
-        }
-    }
-
-    // ---------------------------------------------------------------------------
-    // Historial de pastoreo para el mapa de calor (H0025).
-    //
-    // A diferencia de sembrarHistorialCelo, que reproduce el patrón de actividad
-    // que el modelo de celo tiene que detectar, acá solo importa DÓNDE estuvo el
-    // animal: una caminata aleatoria con atracción a la aguada, para que el mapa
-    // muestre zonas calientes (donde abreva el rodeo), zonas de uso medio y
-    // rincones poco visitados, que es lo que pide el criterio de aceptación.
-    //
-    // Un punto cada 15 min (no cada 5 como el historial de celo) alcanza de sobra
-    // para una grilla de 20x20 y mantiene el arranque liviano: ~672 filas por
-    // animal para 7 días. Se marca COMPLETADO para no disparar los jobs de ML.
-    // ---------------------------------------------------------------------------
-    private void sembrarHistorialPastoreo(Caravana caravana, double latInicial, double lonInicial,
-                                          double bateriaInicial, int dias, LocalDateTime ultimaFecha,
-                                          TelemetriaRepository telemetriaRepository) {
-        final int TICK_SEGUNDOS = 900;
-        final double PASO_DEG_POR_TICK = 0.000054;   // pastoreo normal en un tick de 15 min
-        final double TURN_STD = 0.9;
-        final double PROB_IR_A_LA_AGUADA = 0.12;
-        final double RADIO_POTRERO_DEG = 0.004;      // ~450 m alrededor de la aguada
-        final double AGUADA_LAT = -34.9440;
-        final double AGUADA_LON = -59.2250;
-        final int MOVESTATE_PASTOREO_MIN = 2;
-        final int MOVESTATE_PASTOREO_MAX = 5;
-
-        Random rnd = new Random();
-        double lat = latInicial;
-        double lon = lonInicial;
-        double heading = rnd.nextDouble() * 2 * Math.PI;
-        double bateria = bateriaInicial;
-
-        int muestras = (int) ((long) dias * 24 * 3600 / TICK_SEGUNDOS);
-        List<Telemetria> historial = new ArrayList<>(muestras);
-
-        for (int i = muestras; i >= 1; i--) {
-            LocalDateTime fecha = ultimaFecha.minusSeconds((long) (i - 1) * TICK_SEGUNDOS);
-
-            double dLat = AGUADA_LAT - lat;
-            double dLon = AGUADA_LON - lon;
-            boolean fueraDelPotrero = Math.hypot(dLat, dLon) > RADIO_POTRERO_DEG;
-            if (fueraDelPotrero || rnd.nextDouble() < PROB_IR_A_LA_AGUADA) {
-                heading = Math.atan2(dLon, dLat);    // rumbo hacia la aguada
-            } else {
-                heading += rnd.nextGaussian() * TURN_STD;
-            }
-
-            lat += PASO_DEG_POR_TICK * Math.cos(heading);
-            lon += PASO_DEG_POR_TICK * Math.sin(heading);
-            bateria = Math.max(5.0, bateria - 0.005);
-
-            Telemetria t = new Telemetria();
-            t.setCaravana(caravana);
-            t.setFechaHora(fecha);
-            t.setLatitud(lat);
-            t.setLongitud(lon);
-            t.setMoveState(MOVESTATE_PASTOREO_MIN
-                    + rnd.nextInt(MOVESTATE_PASTOREO_MAX - MOVESTATE_PASTOREO_MIN + 1));
-            t.setBateria(bateria);
-            t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
-            t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
-            historial.add(t);
+        private final UsuarioRepository usuarioRepository;
+        private final EstablecimientoRepository establecimientoRepository;
+        private final InvitacionRepository invitacionRepository;
+        private final AnimalRepository animalRepository;
+        private final RodeoLoteRepository rodeoLoteRepository;
+        private final EstadoReproductivoRepository estadoReproductivoRepository;
+        private final EstadoSaludRepository estadoSaludRepository;
+        private final AlertaRepository alertaRepository;
+        private final IntervencionRepository intervencionRepository;
+        private final DiagnosticoRepository diagnosticoRepository;
+        private final CaravanaRepository caravanaRepository;
+        private final TelemetriaRepository telemetriaRepository;
+        private final RegistroCohesionRepository registroCohesionRepository;
+        private final RegistroPesoRepository registroPesoRepository;
+        private final PerfilReferenciaRepository perfilReferenciaRepository;
+        private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
+        private final PerimetroRepository perimetroRepository;
+        private final PasswordEncoder passwordEncoder;
+        private final ObjectMapper objectMapper;
+        private final JdbcTemplate jdbcTemplate;
+
+        private static final double LAT_CENTRO = -34.943317;
+        private static final double LON_CENTRO = -59.225728;
+
+        @Override
+        @SuppressWarnings("null")
+        public void run(String... args) {
+                log.info("[DataInitializer] Iniciando seed de DEMO (Sprint 10 E2E)...");
+                try {
+                        jdbcTemplate.execute("SET vigia.bypass_immutable_triggers = 'true'");
+                } catch (Exception ignored) {
+                }
+
+                telemetriaRepository.deleteAllInBatch();
+                intervencionRepository.deleteAll();
+                diagnosticoRepository.deleteAll();
+                alertaAnimalAisladoRepository.deleteAll();
+                alertaRepository.deleteAll();
+                estadoReproductivoRepository.deleteAll();
+                estadoSaludRepository.deleteAll();
+                registroCohesionRepository.deleteAll();
+                perfilReferenciaRepository.deleteAll();
+                registroPesoRepository.deleteAll();
+                invitacionRepository.deleteAll();
+                animalRepository.deleteAll();
+                caravanaRepository.deleteAll();
+                rodeoLoteRepository.deleteAll();
+                establecimientoRepository.deleteAll();
+                usuarioRepository.deleteAll();
+
+                // Usuarios
+                Usuario admin = buildUsuario("Admin", "VigIA", "admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+                Usuario productor = buildUsuario("Juan", "Productor", "productor@vigia.dev", "productor123",
+                                Rol.PRODUCTOR);
+                Usuario campero = buildUsuario("Carlos", "Campero", "campero@vigia.dev", "campero123", Rol.CAMPERO);
+                Usuario vet = buildUsuario("Laura", "Vet", "veterinario@vigia.dev", "vet123", Rol.VETERINARIO);
+                Usuario pendiente = buildUsuario("Nuevo", "Usuario", "pendiente@vigia.dev", "pendiente123",
+                                Rol.PENDIENTE);
+                usuarioRepository.saveAll(List.of(admin, productor, campero, vet, pendiente));
+
+                // Establecimiento principal (coords = simulador_demo.py)
+                Establecimiento estP = new Establecimiento();
+                estP.setNombre("Tambo La Esperanza");
+                estP.setLatitud(LAT_CENTRO);
+                estP.setLongitud(LON_CENTRO);
+                estP.setActivo(true);
+                estP.setFechaAlta(LocalDate.now());
+                establecimientoRepository.save(estP);
+                estP.getEmpleados().add(new Empleado(estP, productor));
+                estP.getEmpleados().add(new Empleado(estP, campero));
+                estP.getEmpleados().add(new Empleado(estP, vet));
+                establecimientoRepository.save(estP);
+
+                // Segundo establecimiento (selector RNF03 -- productor en AMBOS)
+                Establecimiento estAurora = new Establecimiento();
+                estAurora.setNombre("Estancia La Aurora");
+                estAurora.setLatitud(-34.920000);
+                estAurora.setLongitud(-59.210000);
+                estAurora.setActivo(true);
+                estAurora.setFechaAlta(LocalDate.now());
+                establecimientoRepository.save(estAurora);
+                estAurora.getEmpleados().add(new Empleado(estAurora, productor));
+                establecimientoRepository.save(estAurora);
+
+                log.info("[DataInitializer] 2 establecimientos + 5 usuarios. Productor vinculado a ambos (RNF03).");
+
+                // Rodeos
+                RodeoLote lotePrincipal = new RodeoLote(estP);
+                lotePrincipal.setNombre("Lote Principal");
+                lotePrincipal.setActivo(true);
+                rodeoLoteRepository.save(lotePrincipal);
+
+                // Perimetro activo (H0027)
+                crearPerimetroPrincipal(estP, lotePrincipal);
+
+                LocalDateTime ahora = LocalDateTime.now();
+
+                // Vaca 1: id oficial 104, La Vaca Lola, compatible simulador
+                Animal vaca1 = crearAnimal(estP, lotePrincipal, "104", "La Vaca Lola", "Holando",
+                                LocalDate.of(2020, 1, 1), "VIGIA-ARG-001", LocalDate.now().minusDays(45));
+                sembrarHistorialCelo(vaca1.getCaravana());
+                sembrarEstadoReproductivo(vaca1, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(15), ahora.minusDays(15));
+
+                // Vaca 2: id oficial 208, Margarita, compatible simulador
+                Animal vaca2 = crearAnimal(estP, lotePrincipal, "208", "Margarita", "Jersey",
+                                LocalDate.of(2021, 5, 10), "VIGIA-ARG-002", LocalDate.now().minusDays(45));
+                sembrarEstadoReproductivo(vaca2, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(15), ahora.minusDays(15));
+                crearTelemetria(vaca2.getCaravana(), LAT_CENTRO + 0.001, LON_CENTRO - 0.001, 76.0,
+                                ahora.minusMinutes(6));
+
+                // Vaca 3: ultima telem >1h -> "sin datos recientes" H0012
+                Animal vaca3 = crearAnimal(estP, lotePrincipal, "33333", "Renegrida", "Brangus",
+                                LocalDate.of(2022, 3, 15), "VIGIA-ARG-003", LocalDate.now().minusDays(45));
+                crearTelemetria(vaca3.getCaravana(), LAT_CENTRO, LON_CENTRO, 45.0, ahora.minusHours(2));
+
+                // Vaca 4: ultima telem >8h -> "sin senal >6h" H0043
+                Animal vaca4 = crearAnimal(estP, lotePrincipal, "44444", "Doradita", "Angus",
+                                LocalDate.of(2021, 8, 20), "VIGIA-ARG-004", LocalDate.now().minusDays(45));
+                crearTelemetria(vaca4.getCaravana(), LAT_CENTRO - 0.002, LON_CENTRO + 0.001, 38.0, ahora.minusHours(9));
+
+                // Vaca 5: bateria baja 14% (H0043)
+                Animal vaca5 = crearAnimal(estP, lotePrincipal, "55555", "Pinta", "Jersey",
+                                LocalDate.of(2022, 1, 10), "VIGIA-ARG-005", LocalDate.now().minusDays(45));
+                crearTelemetria(vaca5.getCaravana(), LAT_CENTRO + 0.002, LON_CENTRO + 0.002, 14.0,
+                                ahora.minusMinutes(8));
+
+                // Vaca 6: bateria 18% + demo sanitaria (>24h para el worker)
+                Animal vaca6 = crearAnimal(estP, lotePrincipal, "60006", "Demo Salud con perfil", "Angus",
+                                LocalDate.of(2021, 1, 1), "VIGIA-ARG-006", LocalDate.now().minusDays(45));
+                crearTelemetria(vaca6.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO - 0.002, 18.0,
+                                ahora.minusHours(25));
+
+                // Vaca 7: demo sanitaria sin perfil
+                Animal vaca7 = crearAnimal(estP, lotePrincipal, "70007", "Demo Salud sin perfil", "Hereford",
+                                LocalDate.of(2021, 6, 1), "VIGIA-ARG-007", LocalDate.now().minusDays(45));
+
+                // Vaca 8: demo sanitaria sin telemetria en ventana
+                Animal vaca8 = crearAnimal(estP, lotePrincipal, "80008", "Demo Salud sin telemetria", "Brangus",
+                                LocalDate.of(2021, 9, 1), "VIGIA-ARG-008", LocalDate.now().minusDays(45));
+
+                // Vaca 9: demo historial reproductivo completo
+                Animal vaca9 = crearAnimal(estP, lotePrincipal, "90009", "Demo Historial Reproductivo", "Angus",
+                                LocalDate.of(2020, 6, 1), "VIGIA-ARG-009", LocalDate.now().minusDays(45));
+
+                // Vaca 10: anestro PENDIENTE
+                Animal anestroPendiente = crearAnimal(estP, lotePrincipal, "10010", "Demo Anestro pendiente", "Angus",
+                                LocalDate.of(2019, 9, 1), "VIGIA-ARG-010", LocalDate.now().minusDays(45));
+
+                // Vaca 11: anestro CONFIRMADO
+                Animal anestroConfirmado = crearAnimal(estP, lotePrincipal, "11011", "Demo Anestro confirmado",
+                                "Hereford",
+                                LocalDate.of(2020, 2, 1), "VIGIA-ARG-011", LocalDate.now().minusDays(45));
+
+                // Vaca 12: candidato anestro (sin alerta, detector la genera en vivo)
+                Animal anestroCandidato = crearAnimal(estP, lotePrincipal, "12012", "Demo Anestro sin alerta",
+                                "Brangus",
+                                LocalDate.of(2020, 4, 1), "VIGIA-ARG-012", LocalDate.now().minusDays(45));
+
+                // Vacas 13-27: GESTANTE (15 vacas, partos en proximas 12 semanas)
+                String[] nombresGestantes = {
+                                "Aurora", "Canela", "Estrella", "Luna", "Morena",
+                                "Paloma", "Nube", "Frutilla", "Rosa", "Violeta",
+                                "Celeste", "Magnolia", "Clavel", "Dalia", "Iris"
+                };
+                int[] diasDesdeIa = { 250, 250, 250, 247, 240, 235, 230, 225, 220, 215, 210, 205, 200, 200, 199 };
+                List<Animal> gestantes = new ArrayList<>();
+                for (int i = 0; i < diasDesdeIa.length; i++) {
+                        int num = 13 + i;
+                        Animal g = crearAnimal(estP, lotePrincipal,
+                                        String.format("%d%03d", num, num), nombresGestantes[i], "Holando",
+                                        LocalDate.of(2019, 10, 1),
+                                        String.format("VIGIA-ARG-%03d", num),
+                                        LocalDate.now().minusDays(45));
+                        LocalDate ia = LocalDate.now().minusDays(diasDesdeIa[i]);
+                        sembrarGestante(g, vet, ia, ia.plusDays(35).atTime(10, 0));
+                        gestantes.add(g);
+                }
+
+                // 2 gestantes sin fecha de IA (casos edge H0044)
+                Animal gestanteSinIa1 = crearAnimal(estP, lotePrincipal, "28028", "Pampa", "Angus",
+                                LocalDate.of(2020, 3, 1), "VIGIA-ARG-028", LocalDate.now().minusDays(45));
+                sembrarGestanteSinIa(gestanteSinIa1, vet, ahora.minusDays(60));
+                Animal gestanteSinIa2 = crearAnimal(estP, lotePrincipal, "29029", "Serena", "Jersey",
+                                LocalDate.of(2020, 5, 1), "VIGIA-ARG-029", LocalDate.now().minusDays(45));
+                sembrarGestanteSinIa(gestanteSinIa2, vet, ahora.minusDays(45));
+
+                // Vacas 30-35: INSEMINADA (6 vacas)
+                String[] nombresIns = { "Brisa", "Coral", "Duna", "Espiga", "Flora", "Gema" };
+                int[] diasIns = { 5, 10, 15, 20, 25, 3 };
+                List<Animal> inseminadas = new ArrayList<>();
+                for (int i = 0; i < 6; i++) {
+                        int num = 30 + i;
+                        Animal ins = crearAnimal(estP, lotePrincipal,
+                                        String.format("%d%03d", num, num), nombresIns[i], "Holando",
+                                        LocalDate.of(2020, 7, 1),
+                                        String.format("VIGIA-ARG-%03d", num),
+                                        LocalDate.now().minusDays(45));
+                        sembrarInseminada(ins, vet, LocalDate.now().minusDays(diasIns[i]).atTime(9, 0));
+                        inseminadas.add(ins);
+                }
+
+                // Vacas 36-39: VACIA con >95 dias parto abierto (alerta H0044)
+                String[] nombresVacias = { "Habana", "Ibiza", "Jade", "Kenya" };
+                int[] diasParto = { 110, 130, 100, 120 };
+                List<Animal> vacias = new ArrayList<>();
+                for (int i = 0; i < 4; i++) {
+                        int num = 36 + i;
+                        Animal vacia = crearAnimal(estP, lotePrincipal,
+                                        String.format("%d%03d", num, num), nombresVacias[i], "Angus",
+                                        LocalDate.of(2019, 12, 1),
+                                        String.format("VIGIA-ARG-%03d", num),
+                                        LocalDate.now().minusDays(45));
+                        sembrarEstadoReproductivo(vacia, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                        LocalDate.now().minusDays(diasParto[i]), ahora.minusDays(diasParto[i]));
+                        sembrarEstadoReproductivo(vacia, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA, productor,
+                                        null, ahora.minusDays(diasParto[i] - 14));
+                        vacias.add(vacia);
+                }
+
+                // 2 vacas en calibracion (fechaAlta hace 2 dias)
+                Animal vacaCalib1 = crearAnimal(estP, lotePrincipal, "40040", "Calibra-1", "Brangus",
+                                LocalDate.of(2023, 1, 15), "VIGIA-ARG-040", LocalDate.now().minusDays(2));
+                Animal vacaCalib2 = crearAnimal(estP, lotePrincipal, "41041", "Calibra-2", "Jersey",
+                                LocalDate.of(2023, 3, 20), "VIGIA-ARG-041", LocalDate.now().minusDays(2));
+
+                log.info("[DataInitializer] 41 vacas creadas en Lote Principal.");
+
+                // 5 caravanas DISPONIBLE para Lote Cuarentena (H0040/H0041)
+                for (int i = 301; i <= 305; i++) {
+                        Caravana libre = new Caravana();
+                        libre.setCodigo("VIGIA-LIBRE-" + i);
+                        libre.setDevEui("VIGIA-LIBRE-" + i);
+                        libre.setActivo(true);
+                        libre.setEstablecimiento(estP);
+                        libre.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                        caravanaRepository.save(libre);
+                }
+                log.info("[DataInitializer] 5 caravanas DISPONIBLE (VIGIA-LIBRE-301..305).");
+
+                // Telemetria reciente + historial de pastoreo
+                LocalDateTime ahoraPastoreo = LocalDateTime.now();
+                sembrarHistorialPastoreo(vaca2.getCaravana(), LAT_CENTRO + 0.001, LON_CENTRO - 0.001, 79.0, 7,
+                                ahoraPastoreo.minusMinutes(21));
+                sembrarHistorialPastoreo(vaca3.getCaravana(), LAT_CENTRO, LON_CENTRO, 48.0, 7,
+                                ahoraPastoreo.minusHours(2));
+                sembrarHistorialPastoreo(vaca4.getCaravana(), LAT_CENTRO - 0.002, LON_CENTRO + 0.001, 41.0, 7,
+                                ahoraPastoreo.minusHours(9));
+                sembrarHistorialPastoreo(vaca5.getCaravana(), LAT_CENTRO + 0.002, LON_CENTRO + 0.002, 17.0, 7,
+                                ahoraPastoreo.minusMinutes(22));
+                sembrarHistorialPastoreo(vaca1.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO - 0.001, 92.0, 6,
+                                ahoraPastoreo.minusHours(24).minusMinutes(15));
+
+                Random rndPastoreo = new Random(42L);
+                for (Animal g : gestantes) {
+                        double latOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
+                        double lonOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
+                        crearTelemetria(g.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
+                                        60.0 + rndPastoreo.nextDouble() * 30,
+                                        ahora.minusMinutes(5 + rndPastoreo.nextInt(20)));
+                        sembrarHistorialPastoreo(g.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
+                                        60.0 + rndPastoreo.nextDouble() * 30, 7,
+                                        ahoraPastoreo.minusMinutes(10 + rndPastoreo.nextInt(30)));
+                }
+                for (Animal ins : inseminadas) {
+                        double latOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
+                        double lonOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
+                        crearTelemetria(ins.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
+                                        55.0 + rndPastoreo.nextDouble() * 35,
+                                        ahora.minusMinutes(3 + rndPastoreo.nextInt(15)));
+                        sembrarHistorialPastoreo(ins.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
+                                        55.0 + rndPastoreo.nextDouble() * 35, 7,
+                                        ahoraPastoreo.minusMinutes(8 + rndPastoreo.nextInt(20)));
+                }
+                for (Animal v : vacias) {
+                        double latOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
+                        double lonOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
+                        crearTelemetria(v.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
+                                        50.0 + rndPastoreo.nextDouble() * 40,
+                                        ahora.minusMinutes(4 + rndPastoreo.nextInt(18)));
+                        sembrarHistorialPastoreo(v.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
+                                        50.0 + rndPastoreo.nextDouble() * 40, 7,
+                                        ahoraPastoreo.minusMinutes(7 + rndPastoreo.nextInt(25)));
+                }
+                crearTelemetria(anestroPendiente.getCaravana(), LAT_CENTRO - 0.003, LON_CENTRO + 0.003, 72.0,
+                                ahora.minusMinutes(10));
+                crearTelemetria(anestroConfirmado.getCaravana(), LAT_CENTRO + 0.003, LON_CENTRO - 0.003, 68.0,
+                                ahora.minusHours(26));
+                crearTelemetria(anestroCandidato.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO + 0.002, 81.0,
+                                ahora.minusMinutes(7));
+
+                // Telemetría reciente dentro del potrero principal (batería > 60%, 3-10 min)
+                // para no distorsionar el dashboard
+                crearTelemetria(vaca7.getCaravana(), LAT_CENTRO + 0.0015, LON_CENTRO + 0.0010, 78.0,
+                                ahora.minusMinutes(4));
+                crearTelemetria(vaca8.getCaravana(), LAT_CENTRO - 0.0012, LON_CENTRO - 0.0015, 82.0,
+                                ahora.minusMinutes(6));
+                crearTelemetria(vaca9.getCaravana(), LAT_CENTRO + 0.0020, LON_CENTRO - 0.0008, 75.0,
+                                ahora.minusMinutes(5));
+                crearTelemetria(gestanteSinIa1.getCaravana(), LAT_CENTRO - 0.0018, LON_CENTRO + 0.0012, 70.0,
+                                ahora.minusMinutes(8));
+                crearTelemetria(gestanteSinIa2.getCaravana(), LAT_CENTRO + 0.0008, LON_CENTRO - 0.0020, 74.0,
+                                ahora.minusMinutes(7));
+                crearTelemetria(vacaCalib1.getCaravana(), LAT_CENTRO - 0.0005, LON_CENTRO - 0.0005, 90.0,
+                                ahora.minusMinutes(3));
+                crearTelemetria(vacaCalib2.getCaravana(), LAT_CENTRO + 0.0007, LON_CENTRO + 0.0018, 88.0,
+                                ahora.minusMinutes(5));
+
+                log.info("[DataInitializer] Telemetria y pastoreo cargados (H0025).");
+
+                // Cohesion Social: 7 dias para las 40 vacas (H0026)
+                List<Animal> todos = new ArrayList<>();
+                todos.addAll(List.of(vaca1, vaca2, vaca3, vaca4, vaca5, vaca6, vaca7, vaca8, vaca9,
+                                anestroPendiente, anestroConfirmado, anestroCandidato));
+                todos.addAll(gestantes);
+                todos.add(gestanteSinIa1);
+                todos.add(gestanteSinIa2);
+                todos.addAll(inseminadas);
+                todos.addAll(vacias);
+                todos.add(vacaCalib1);
+                todos.add(vacaCalib2);
+
+                Random rndCohesion = new Random(1234L);
+                for (Animal animal : todos) {
+                        String cod = animal.getCaravana() != null ? animal.getCaravana().getCodigo() : "";
+                        boolean caida = (animal == vaca2 || "VIGIA-ARG-006".equals(cod));
+                        sembrarCohesion(animal, estP, 7, caida, rndCohesion);
+                }
+                log.info("[DataInitializer] Cohesion social 7 dias sembrada (H0026).");
+
+                // Alertas sanitarias con SerieComparativaBuilder
+                Map<String, Object> perfilNormal = perfilDemo(
+                                new double[] { 6.2, 5.4, 4.1, 5.0 }, new double[] { 0.8, 0.7, 0.6, 0.7 },
+                                new double[] { 11.5, 9.0, 7.2, 9.5 }, new double[] { 2.1, 1.8, 1.5, 1.9 });
+
+                crearAlertaSanitaria(vaca6, SeveridadAlerta.ALTA, EstadoAlerta.PENDIENTE, 0.93f,
+                                "Problema severo postrante o complicacion de parto",
+                                ventanaSanitaria(vaca6.getCaravana(), ahora.minusDays(2), 2, 0.00001),
+                                perfilNormal, ahora.minusDays(9), null, null);
+
+                Alerta saludConfirmada = crearAlertaSanitaria(vaca6, SeveridadAlerta.ALTA, EstadoAlerta.CONFIRMADA,
+                                0.88f,
+                                "Problema severo postrante o complicacion de parto",
+                                ventanaSanitaria(vaca6.getCaravana(), ahora.minusDays(4), 9, 0.00009),
+                                perfilNormal, ahora.minusDays(9), ahora.minusDays(4).plusHours(2), vet);
+                sembrarDiagnostico(saludConfirmada, vet, "Cuadro febril compatible con neumonia",
+                                "Oxitetraciclina LA 20 mg/kg IM, dosis unica. Controlar temperatura en 48 h.",
+                                ahora.minusDays(4).plusHours(3));
+                sembrarDiagnostico(saludConfirmada, vet, "Control a las 48 h: evolucion favorable",
+                                "Sin nueva medicacion. Mantener en potrero cercano hasta el alta.",
+                                ahora.minusDays(2).plusHours(3));
+
+                crearAlertaSanitaria(vaca7, SeveridadAlerta.MEDIA, EstadoAlerta.PENDIENTE, 0.78f,
+                                "Enfermedad moderada / Cojera clinica",
+                                ventanaSanitaria(vaca7.getCaravana(), ahora.minusDays(2).minusHours(8), 3, 0.00002),
+                                null, null, null, null);
+
+                crearAlertaSanitaria(vaca8, SeveridadAlerta.BAJA, EstadoAlerta.PENDIENTE, 0.61f,
+                                "Enfermedad leve / Inicio",
+                                new ArrayList<>(), null, null, null, null);
+
+                log.info("[DataInitializer] Alertas sanitarias sembradas (vaca6/7/8).");
+
+                // Historial reproductivo completo vaca9
+                sembrarEstadoReproductivo(vaca9, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusMonths(8), ahora.minusMonths(8));
+                sembrarEstadoReproductivo(vaca9, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA, productor,
+                                null, ahora.minusMonths(6));
+                sembrarEstadoReproductivo(vaca9, TipoReproductivo.POSIBLE_CELO, OrigenEstado.AUTOMATICO, null,
+                                null, ahora.minusDays(42));
+                sembrarInseminacionDesdeIntervencion(vaca9, vet, ahora.minusDays(40));
+                sembrarRevisionConEstadoSalud(vaca9, vet, TipoEstadoSalud.EN_OBSERVACION, ahora.minusDays(20));
+                sembrarGestante(vaca9, vet, LocalDate.now().minusDays(40), ahora.minusDays(9));
+
+                // Demo de Anestro (vacas 10/11/12)
+                int umbralAnestro = estP.getDiasDeteccionAnestro();
+                sembrarEstadoReproductivo(anestroPendiente, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(120), ahora.minusDays(120));
+                sembrarAlertaAnestro(estP, anestroPendiente, EstadoAlerta.PENDIENTE, 119, ahora.minusDays(1), null,
+                                null);
+
+                sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(150), ahora.minusDays(150));
+                sembrarAlertaAnestro(estP, anestroConfirmado, EstadoAlerta.CONFIRMADA, 138, ahora.minusDays(12),
+                                ahora.minusDays(10), vet);
+                sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.ANESTRO, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(150), ahora.minusDays(10));
+
+                sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(90), ahora.minusDays(90));
+                sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA,
+                                productor,
+                                null, ahora.minusDays(30));
+
+                log.info("[DataInitializer] Anestro (umbral {} d): 010 PENDIENTE, 011 CONFIRMADA, 012 candidato.",
+                                umbralAnestro);
+
+                // Pesadas (150 dias)
+                sembrarPesadas(vaca1, new double[][] { { 150, 400 }, { 95, 412 }, { 60, 431 }, { 25, 452 } });
+                sembrarPesadas(vaca2, new double[][] { { 150, 362 }, { 100, 371 }, { 60, 380 }, { 20, 405 } });
+                sembrarPesadas(vaca3, new double[][] { { 75, 445 }, { 35, 447 } });
+                sembrarPesadas(vaca4, new double[][] { { 140, 440 }, { 90, 449 }, { 50, 455 }, { 20, 448 } });
+                sembrarPesadas(vaca5, new double[][] { { 145, 318 }, { 95, 325 }, { 60, 330 }, { 22, 352 } });
+                sembrarPesadas(vaca6, new double[][] { { 40, 468 }, { 3, 449 } });
+                sembrarPesadas(vaca7, new double[][] { { 45, 410 }, { 10, 396 } });
+                sembrarPesadas(vaca8, new double[][] { { 50, 400 }, { 12, 420 }, { 5, 418 } });
+                sembrarPesadas(vaca9, new double[][] { { 140, 455 }, { 100, 462 }, { 50, 470 }, { 15, 488 } });
+                sembrarPesadas(anestroPendiente, new double[][] { { 90, 432 }, { 45, 434 } });
+                sembrarPesadas(anestroConfirmado, new double[][] { { 70, 420 }, { 30, 422 } });
+                sembrarPesadas(anestroCandidato,
+                                new double[][] { { 150, 428 }, { 95, 433 }, { 80, 440 }, { 40, 460 } });
+                sembrarPesadas(gestantes.get(0),
+                                new double[][] { { 145, 430 }, { 95, 441 }, { 55, 453 }, { 20, 469 } });
+                sembrarPesadas(gestantes.get(1),
+                                new double[][] { { 150, 382 }, { 100, 390 }, { 60, 398 }, { 18, 411 } });
+                sembrarPesadas(gestantes.get(2),
+                                new double[][] { { 140, 415 }, { 90, 425 }, { 50, 436 }, { 16, 448 } });
+                sembrarPesadas(gestantes.get(3),
+                                new double[][] { { 155, 398 }, { 105, 405 }, { 65, 413 }, { 22, 428 } });
+                sembrarPesadas(inseminadas.get(0), new double[][] { { 80, 365 }, { 40, 373 }, { 15, 388 } });
+                sembrarPesadas(inseminadas.get(1), new double[][] { { 90, 420 }, { 45, 427 }, { 12, 441 } });
+                sembrarPesadas(vacias.get(0), new double[][] { { 100, 455 }, { 55, 461 }, { 20, 475 } });
+                sembrarPesadas(vacias.get(1), new double[][] { { 110, 480 }, { 60, 487 }, { 25, 501 } });
+
+                log.info("[DataInitializer] Pesadas historicas cargadas.");
+
+                // Alertas historicas 8 semanas (H0044/H0045) - vaca1 y vaca2 limpias para
+                // simulador en vivo
+                sembrarAlertasHistoricas(estP, vaca3, vaca4, vaca5,
+                                gestantes, inseminadas, vacias, vet, campero, ahora);
+
+                log.info("[DataInitializer] Alertas historicas 8 semanas sembradas (H0044/H0045).");
+                log.info("[DataInitializer] SEED DEMO completado.");
+                log.info("  admin@vigia.dev        / admin123      -> ADMINISTRADOR");
+                log.info("  productor@vigia.dev    / productor123  -> PRODUCTOR (ambos establecimientos)");
+                log.info("  campero@vigia.dev      / campero123    -> CAMPERO");
+                log.info("  veterinario@vigia.dev  / vet123        -> VETERINARIO");
+                log.info("  pendiente@vigia.dev    / pendiente123  -> PENDIENTE");
         }
 
-        telemetriaRepository.saveAll(historial);
-    }
+        // =========================================================================
+        // Alertas historicas 8 semanas
+        // =========================================================================
 
-    private void crearTelemetria(Caravana caravana, double lat, double lon, double bateria,
-                                  LocalDateTime fechaHora, TelemetriaRepository telemetriaRepository) {
-        Telemetria t = new Telemetria();
-        t.setCaravana(caravana);
-        t.setFechaHora(fechaHora);
-        t.setLatitud(lat);
-        t.setLongitud(lon);
-        t.setBateria(bateria);
-        t.setMoveState(1);
-        t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
-        t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
-        telemetriaRepository.save(t);
-    }
+        private void sembrarAlertasHistoricas(Establecimiento est,
+                        Animal vaca3, Animal vaca4, Animal vaca5,
+                        List<Animal> gestantes, List<Animal> inseminadas, List<Animal> vacias,
+                        Usuario vet, Usuario campero, LocalDateTime ahora) {
 
-    // ---------------------------------------------------------------------------
-    // Helpers para las alertas sanitarias de demo (Acto 4).
-    // ---------------------------------------------------------------------------
+                // 3 alertas de celo con ventana VENCIDA (H0044 ventanas perdidas)
+                crearAlertaCelo(vaca3, ahora.minusDays(25), EstadoAlerta.VENCIDA, null, 6, 18, null);
+                crearAlertaCelo(vaca4, ahora.minusDays(20), EstadoAlerta.VENCIDA, null, 6, 18, null);
+                crearAlertaCelo(vacias.get(0), ahora.minusDays(22), EstadoAlerta.VENCIDA, null, 6, 18, null);
 
-    private Map<String, Object> perfilDemo(double[] moveStateMean, double[] moveStateStd,
-                                           double[] distanciaMean, double[] distanciaStd) {
-        Map<String, Object> perfil = new LinkedHashMap<>();
-        perfil.put("quarter_moveState_mean", toDoubleList(moveStateMean));
-        perfil.put("quarter_moveState_std", toDoubleList(moveStateStd));
-        perfil.put("quarter_distancia_mean", toDoubleList(distanciaMean));
-        perfil.put("quarter_distancia_std", toDoubleList(distanciaStd));
-        perfil.put("feature_version", "v1");
-        return perfil;
-    }
+                // Reincidencia celo en vacias.get(0) y vacias.get(1) (>=2 alertas ultimos 30
+                // dias, sin PENDIENTE ni vaca1/2)
+                crearAlertaCelo(vacias.get(0), ahora.minusDays(12), EstadoAlerta.VENCIDA, null, 6, 18, null);
+                crearAlertaCelo(vacias.get(1), ahora.minusDays(26), EstadoAlerta.CONFIRMADA,
+                                ahora.minusDays(25).plusHours(4), 6, 18, vet);
+                crearAlertaCelo(vacias.get(1), ahora.minusDays(7), EstadoAlerta.CONFIRMADA,
+                                ahora.minusDays(6).plusHours(2), 6, 18, campero);
 
-    private List<Double> toDoubleList(double[] arr) {
-        List<Double> list = new ArrayList<>(arr.length);
-        for (double d : arr) {
-            list.add(d);
-        }
-        return list;
-    }
+                // Reincidencia sanitaria en gestantes.get(0): 2 alertas en los ultimos 30 dias
+                // (atendidas, sin PENDIENTE > 24h)
+                crearAlertaSalud(gestantes.get(0), ahora.minusDays(29), EstadoAlerta.CONFIRMADA,
+                                ahora.minusDays(28).plusHours(5), SeveridadAlerta.MEDIA, vet);
+                crearAlertaSalud(gestantes.get(0), ahora.minusDays(10), EstadoAlerta.CONFIRMADA,
+                                ahora.minusDays(9).plusHours(3), SeveridadAlerta.BAJA, vet);
 
-    private List<Telemetria> ventanaSanitaria(Caravana caravana, LocalDateTime hasta, int moveState, double pasoLat) {
-        final int muestras = 288;
-        final int tickSegundos = 300;
-        List<Telemetria> puntos = new ArrayList<>(muestras);
-        double lat = -34.9430;
-        double lon = -59.2255;
-        for (int i = muestras - 1; i >= 0; i--) {
-            Telemetria t = new Telemetria();
-            t.setCaravana(caravana);
-            t.setFechaHora(hasta.minusSeconds((long) i * tickSegundos));
-            t.setMoveState(moveState);
-            t.setLatitud(lat);
-            t.setLongitud(lon);
-            t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
-            t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
-            puntos.add(t);
-            lat += pasoLat;
-        }
-        return puntos;
-    }
-
-    private void sembrarDiagnostico(Alerta alerta, Usuario vet, String diagnostico, String indicaciones,
-                                    LocalDateTime fecha) {
-        Diagnostico d = new Diagnostico();
-        d.setAlerta(alerta);
-        d.setAnimal(alerta.getAnimal());
-        d.setVeterinario(vet);
-        d.setDiagnostico(diagnostico);
-        d.setIndicaciones(indicaciones);
-        d.setFecha(fecha);
-        diagnosticoRepository.save(d);
-    }
-
-    private Alerta crearAlertaSanitaria(Animal animal, SeveridadAlerta severidad, EstadoAlerta estado,
-                                      float confianza, String posibleCausa, List<Telemetria> ventana,
-                                      Map<String, Object> perfil, LocalDateTime perfilCalculadoEn,
-                                      LocalDateTime tsConfirmacion, Usuario usuarioConfirmacion) {
-
-        LocalDateTime tsGeneracion = ventana.isEmpty()
-                ? LocalDateTime.now().minusHours(3)
-                : ventana.get(ventana.size() - 1).getFechaHora();
-
-        SerieComparativaSnapshot snapshot = SerieComparativaBuilder.build(
-                ventana, perfil, perfilCalculadoEn, severidad.name(), posibleCausa);
-
-        String serieJson;
-        try {
-            serieJson = objectMapper.writeValueAsString(snapshot);
-        } catch (Exception e) {
-            throw new IllegalStateException("No se pudo serializar la serie comparativa de demo", e);
+                // ~23 alertas distribuidas en 8 semanas con variacion de tiempo de atencion
+                crearAlertaCeloConAtencion(vaca5, ahora.minusDays(56), EstadoAlerta.CONFIRMADA, 3, vet);
+                crearAlertaSaludConAtencion(inseminadas.get(0), ahora.minusDays(52), EstadoAlerta.DESCARTADA, 12,
+                                campero);
+                crearAlertaPerimetro(vaca3, ahora.minusDays(49), EstadoAlerta.CONFIRMADA,
+                                ahora.minusDays(49).plusDays(2), vet);
+                crearAlertaCeloConAtencion(vaca4, ahora.minusDays(48), EstadoAlerta.CONFIRMADA, 5, vet);
+                crearAlertaSaludConAtencion(gestantes.get(1), ahora.minusDays(44), EstadoAlerta.CONFIRMADA, 10, vet);
+                crearAlertaPerimetro(vaca5, ahora.minusDays(40), EstadoAlerta.DESCARTADA, ahora.minusDays(36), campero);
+                crearAlertaCeloConAtencion(inseminadas.get(0), ahora.minusDays(35), EstadoAlerta.CONFIRMADA, 2,
+                                campero);
+                crearAlertaSaludConAtencion(gestantes.get(2), ahora.minusDays(34), EstadoAlerta.DESCARTADA, 18,
+                                campero);
+                crearAlertaPerimetro(vacias.get(2), ahora.minusDays(30), EstadoAlerta.CONFIRMADA, ahora.minusDays(29),
+                                vet);
+                crearAlertaCeloConAtencion(inseminadas.get(1), ahora.minusDays(28), EstadoAlerta.CONFIRMADA, 4, vet);
+                crearAlertaSaludConAtencion(vacias.get(2), ahora.minusDays(25), EstadoAlerta.DESCARTADA, 72, campero);
+                crearAlertaCeloConAtencion(gestantes.get(3), ahora.minusDays(21), EstadoAlerta.CONFIRMADA, 8, vet);
+                crearAlertaSaludConAtencion(gestantes.get(4), ahora.minusDays(20), EstadoAlerta.CONFIRMADA, 5, vet);
+                crearAlertaPerimetro(inseminadas.get(0), ahora.minusDays(18), EstadoAlerta.DESCARTADA,
+                                ahora.minusDays(14), campero);
+                crearAlertaCeloConAtencion(inseminadas.get(2), ahora.minusDays(16), EstadoAlerta.CONFIRMADA, 14, vet);
+                crearAlertaSaludConAtencion(vacias.get(3), ahora.minusDays(14), EstadoAlerta.DESCARTADA, 50, campero);
+                crearAlertaPerimetro(vaca3, ahora.minusDays(12), EstadoAlerta.CONFIRMADA, ahora.minusDays(11), vet);
+                crearAlertaCeloConAtencion(gestantes.get(5), ahora.minusDays(10), EstadoAlerta.CONFIRMADA, 2, vet);
+                crearAlertaSaludConAtencion(inseminadas.get(3), ahora.minusDays(8), EstadoAlerta.CONFIRMADA, 6, vet);
+                crearAlertaCeloConAtencion(vacias.get(3), ahora.minusDays(7), EstadoAlerta.CONFIRMADA, 20, campero);
+                crearAlertaPerimetro(vaca4, ahora.minusDays(45), EstadoAlerta.CONFIRMADA, ahora.minusDays(44), vet);
+                crearAlertaPerimetro(vaca5, ahora.minusDays(32), EstadoAlerta.DESCARTADA, ahora.minusDays(30), campero);
+                crearAlertaPerimetro(gestantes.get(0), ahora.minusDays(15), EstadoAlerta.CONFIRMADA,
+                                ahora.minusDays(14), vet);
         }
 
-        Alerta alerta = new Alerta();
-        alerta.setAnimal(animal);
-        alerta.setTipo("SALUD");
-        alerta.setDisparador(DisparadorAlerta.SALUD);
-        alerta.setSeveridad(severidad);
-        alerta.setEstado(estado);
-        alerta.setTsGeneracion(tsGeneracion);
-        alerta.setValorUmbral(0.5);
-        alerta.setValorDetectado((double) confianza);
-        alerta.setConfianzaModelo(confianza);
-        alerta.setDesvioDetectado(true);
-        alerta.setPosibleCausa(posibleCausa);
-        alerta.setSerieComparativaJson(serieJson);
-        if (tsConfirmacion != null) {
-            alerta.setTsConfirmacion(tsConfirmacion);
-            alerta.setUsuarioConfirmacion(usuarioConfirmacion);
+        // =========================================================================
+        // Perimetro geografico (H0027)
+        // =========================================================================
+
+        private void crearPerimetroPrincipal(Establecimiento est, RodeoLote lote) {
+                double delta = 0.0045;
+                GeometryFactory gf = GeometryUtils.getGeometryFactory();
+                Coordinate[] coords = {
+                                new Coordinate(LON_CENTRO - delta, LAT_CENTRO - delta),
+                                new Coordinate(LON_CENTRO + delta, LAT_CENTRO - delta),
+                                new Coordinate(LON_CENTRO + delta, LAT_CENTRO + delta),
+                                new Coordinate(LON_CENTRO - delta, LAT_CENTRO + delta),
+                                new Coordinate(LON_CENTRO - delta, LAT_CENTRO - delta)
+                };
+                LinearRing shell = gf.createLinearRing(coords);
+                Polygon area = gf.createPolygon(shell);
+                Perimetro p = new Perimetro(est, "Potrero Principal Demo",
+                                "Perimetro activo del lote de pastoreo principal (~500 m)", area);
+                p.configurarUmbral(BigDecimal.valueOf(50), false);
+                p.asignarLote(lote);
+                perimetroRepository.save(p);
         }
-        return alertaRepository.save(alerta);
-    }
+
+        // =========================================================================
+        // Cohesion Social (H0026)
+        // =========================================================================
+
+        private void sembrarCohesion(Animal animal, Establecimiento est, int dias,
+                        boolean curvaDescendente, Random rnd) {
+                int total = dias * 4; // 1 registro cada 6 horas
+                LocalDateTime inicio = LocalDateTime.now().minusDays(dias);
+                List<RegistroCohesion> registros = new ArrayList<>(total);
+                for (int i = 0; i < total; i++) {
+                        LocalDateTime fecha = inicio.plusHours((long) i * 6);
+                        double indice;
+                        if (curvaDescendente) {
+                                double progreso = (double) i / total;
+                                indice = 0.85 - progreso * 0.45 + rnd.nextGaussian() * 0.04;
+                        } else {
+                                indice = 0.75 + rnd.nextDouble() * 0.20 + rnd.nextGaussian() * 0.03;
+                        }
+                        indice = Math.max(0.0, Math.min(1.0, indice));
+                        long tiempoFuera = curvaDescendente ? (long) (i * 120 + rnd.nextInt(300))
+                                        : (long) rnd.nextInt(600);
+                        registros.add(RegistroCohesion.builder()
+                                        .animal(animal)
+                                        .establecimiento(est)
+                                        .fecha(fecha)
+                                        .indiceCohesion(indice)
+                                        .tiempoFueraGrupoS(tiempoFuera)
+                                        .distanciaCentroideM(5.0 + rnd.nextDouble() * 30)
+                                        .build());
+                }
+                registroCohesionRepository.saveAll(registros);
+        }
+
+        // =========================================================================
+        // Helpers de alertas
+        // =========================================================================
+
+        private void crearAlertaCelo(Animal animal, LocalDateTime tsGeneracion, EstadoAlerta estado,
+                        LocalDateTime tsConfirmacion, int horasInicioIns, int horasDuracionIns, Usuario confirmador) {
+                Alerta a = new Alerta();
+                a.setAnimal(animal);
+                a.setTipo("Celo Detectado");
+                a.setDisparador(DisparadorAlerta.CELO);
+                a.setSeveridad(SeveridadAlerta.ALTA);
+                a.setEstado(estado);
+                a.setTsGeneracion(tsGeneracion);
+                a.setValorUmbral(0.5);
+                a.setValorDetectado(0.87);
+                a.setConfianzaModelo(0.87f);
+                a.setVentanaInicioIns(tsGeneracion.plusHours(horasInicioIns));
+                a.setVentanaFinIns(tsGeneracion.plusHours(horasInicioIns + horasDuracionIns));
+                a.setTsConfirmacion(tsConfirmacion);
+                a.setUsuarioConfirmacion(confirmador);
+                alertaRepository.save(a);
+        }
+
+        private void crearAlertaSalud(Animal animal, LocalDateTime tsGeneracion, EstadoAlerta estado,
+                        LocalDateTime tsConfirmacion, SeveridadAlerta severidad, Usuario confirmador) {
+                Alerta a = new Alerta();
+                a.setAnimal(animal);
+                a.setTipo("SALUD");
+                a.setDisparador(DisparadorAlerta.SALUD);
+                a.setSeveridad(severidad);
+                a.setEstado(estado);
+                a.setTsGeneracion(tsGeneracion);
+                a.setValorUmbral(0.5);
+                a.setValorDetectado(0.72);
+                a.setConfianzaModelo(0.72f);
+                a.setTsConfirmacion(tsConfirmacion);
+                a.setUsuarioConfirmacion(confirmador);
+                a.setDesvioDetectado(true);
+                alertaRepository.save(a);
+        }
+
+        private void crearAlertaCeloConAtencion(Animal animal, LocalDateTime tsGeneracion,
+                        EstadoAlerta estado, int horasAtencion, Usuario confirmador) {
+                LocalDateTime tsConf = horasAtencion > 0 ? tsGeneracion.plusHours(horasAtencion) : null;
+                crearAlertaCelo(animal, tsGeneracion, estado, tsConf, 6, 18, confirmador);
+        }
+
+        private void crearAlertaSaludConAtencion(Animal animal, LocalDateTime tsGeneracion,
+                        EstadoAlerta estado, int horasAtencion, Usuario confirmador) {
+                LocalDateTime tsConf = horasAtencion > 0 ? tsGeneracion.plusHours(horasAtencion) : null;
+                crearAlertaSalud(animal, tsGeneracion, estado, tsConf, SeveridadAlerta.MEDIA, confirmador);
+        }
+
+        private void crearAlertaPerimetro(Animal animal, LocalDateTime tsGeneracion,
+                        EstadoAlerta estado, LocalDateTime tsConfirmacion, Usuario confirmador) {
+                Alerta a = new Alerta();
+                a.setAnimal(animal);
+                a.setTipo("Fuera de Perímetro");
+                a.setDisparador(DisparadorAlerta.FUERA_DE_PERIMETRO);
+                a.setSeveridad(SeveridadAlerta.ALTA);
+                a.setEstado(estado);
+                a.setTsGeneracion(tsGeneracion);
+                a.setLatitud(LAT_CENTRO + 0.006);
+                a.setLongitud(LON_CENTRO + 0.006);
+                a.setValorUmbral(1.0);
+                a.setValorDetectado(0.0);
+                a.setAccionRecomendada(
+                                "Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.");
+                a.setPosibleCausa("Animal fuera del perímetro asignado");
+                a.setTsConfirmacion(tsConfirmacion);
+                a.setUsuarioConfirmacion(confirmador);
+                alertaRepository.save(a);
+        }
+
+        // =========================================================================
+        // Helpers reproductivos
+        // =========================================================================
+
+        private void sembrarEstadoReproductivo(Animal animal, TipoReproductivo estado,
+                        OrigenEstado origen, Usuario usuario,
+                        LocalDate fechaUltParto, LocalDateTime fechaRegistro) {
+                EstadoReproductivo e = new EstadoReproductivo();
+                e.setAnimal(animal);
+                e.setEstado(estado);
+                e.setOrigen(origen);
+                e.setUsuarioRegistrador(usuario);
+                e.setFechaUltParto(fechaUltParto);
+                e.setFechaRegistro(fechaRegistro);
+                estadoReproductivoRepository.save(e);
+        }
+
+        private void sembrarGestante(Animal animal, Usuario vet,
+                        LocalDate fechaInseminacion, LocalDateTime fechaRegistro) {
+                EstadoReproductivo e = new EstadoReproductivo();
+                e.setAnimal(animal);
+                e.setEstado(TipoReproductivo.GESTANTE);
+                e.setOrigen(OrigenEstado.MANUAL);
+                e.setUsuarioRegistrador(vet);
+                e.setFechaUltInseminacion(fechaInseminacion);
+                e.setFechaRegistro(fechaRegistro);
+                estadoReproductivoRepository.save(e);
+        }
+
+        private void sembrarGestanteSinIa(Animal animal, Usuario vet, LocalDateTime fechaRegistro) {
+                EstadoReproductivo e = new EstadoReproductivo();
+                e.setAnimal(animal);
+                e.setEstado(TipoReproductivo.GESTANTE);
+                e.setOrigen(OrigenEstado.MANUAL);
+                e.setUsuarioRegistrador(vet);
+                e.setFechaRegistro(fechaRegistro);
+                estadoReproductivoRepository.save(e);
+        }
+
+        private void sembrarInseminada(Animal animal, Usuario interventor, LocalDateTime fechaHora) {
+                EstadoReproductivo e = new EstadoReproductivo();
+                e.setAnimal(animal);
+                e.setEstado(TipoReproductivo.INSEMINADA);
+                e.setOrigen(OrigenEstado.MANUAL);
+                e.setUsuarioRegistrador(interventor);
+                e.setFechaUltInseminacion(fechaHora.toLocalDate());
+                e.setFechaRegistro(fechaHora);
+                estadoReproductivoRepository.save(e);
+        }
+
+        private void sembrarInseminacionDesdeIntervencion(Animal animal, Usuario interventor,
+                        LocalDateTime fechaHora) {
+                Alerta alerta = new Alerta();
+                alerta.setAnimal(animal);
+                alerta.setTipo("Celo Detectado");
+                alerta.setDisparador(DisparadorAlerta.CELO);
+                alerta.setSeveridad(SeveridadAlerta.ALTA);
+                alerta.setEstado(EstadoAlerta.CONFIRMADA);
+                alerta.setTsGeneracion(fechaHora.minusHours(8));
+                alerta.setTsConfirmacion(fechaHora.minusHours(6));
+                alerta.setUsuarioConfirmacion(interventor);
+                alerta.setValorUmbral(0.5);
+                alerta.setValorDetectado(0.9);
+                alerta.setConfianzaModelo(0.9f);
+                alerta.setVentanaInicioIns(fechaHora.minusHours(2));
+                alerta.setVentanaFinIns(fechaHora.plusHours(10));
+                alertaRepository.save(alerta);
+
+                Intervencion intervencion = new Intervencion();
+                intervencion.setAlerta(alerta);
+                intervencion.setAnimal(animal);
+                intervencion.setInterventor(interventor);
+                intervencion.setDescripcion("IATF - inseminacion a tiempo fijo");
+                intervencion.setFechaHora(fechaHora);
+                intervencion.setTipo(TipoIntervencion.INSEMINACION);
+                intervencionRepository.save(intervencion);
+
+                EstadoReproductivo estado = new EstadoReproductivo();
+                estado.setAnimal(animal);
+                estado.setUsuarioRegistrador(interventor);
+                estado.setEstado(TipoReproductivo.INSEMINADA);
+                estado.setFechaUltInseminacion(fechaHora.toLocalDate());
+                estado.setOrigen(OrigenEstado.MANUAL);
+                estado.setFechaRegistro(fechaHora);
+                estadoReproductivoRepository.save(estado);
+        }
+
+        private void sembrarRevisionConEstadoSalud(Animal animal, Usuario vet,
+                        TipoEstadoSalud estadoSalud, LocalDateTime fechaHora) {
+                String notas = "Revision clinica: leve cojera en miembro posterior, se deja en observacion.";
+                Alerta alerta = new Alerta();
+                alerta.setAnimal(animal);
+                alerta.setTipo("SALUD");
+                alerta.setDisparador(DisparadorAlerta.SALUD);
+                alerta.setSeveridad(SeveridadAlerta.MEDIA);
+                alerta.setEstado(EstadoAlerta.CONFIRMADA);
+                alerta.setTsGeneracion(fechaHora.minusDays(1));
+                alerta.setTsConfirmacion(fechaHora.minusHours(3));
+                alerta.setUsuarioConfirmacion(vet);
+                alerta.setValorUmbral(0.5);
+                alerta.setValorDetectado(0.7);
+                alerta.setConfianzaModelo(0.7f);
+                alertaRepository.save(alerta);
+
+                Intervencion intervencion = new Intervencion();
+                intervencion.setAlerta(alerta);
+                intervencion.setAnimal(animal);
+                intervencion.setInterventor(vet);
+                intervencion.setDescripcion(notas);
+                intervencion.setFechaHora(fechaHora);
+                intervencion.setTipo(TipoIntervencion.REVISION_VETERINARIA);
+                intervencionRepository.save(intervencion);
+
+                EstadoSalud es = new EstadoSalud();
+                es.setAnimal(animal);
+                es.setUsuarioVeterinario(vet);
+                es.setFechaRevision(fechaHora.toLocalDate());
+                es.setEstado(estadoSalud);
+                es.setDiagnosticoNotas(notas);
+                es.setOrigen(OrigenEstado.MANUAL);
+                es.setFechaRegistro(fechaHora);
+                estadoSaludRepository.save(es);
+        }
+
+        private void sembrarAlertaAnestro(Establecimiento est, Animal animal, EstadoAlerta estado,
+                        long diasSinCiclo, LocalDateTime tsGeneracion, LocalDateTime tsConfirmacion, Usuario usuario) {
+                Alerta alerta = new Alerta();
+                alerta.setAnimal(animal);
+                alerta.setTipo(Alerta.TIPO_ANESTRO);
+                alerta.setDisparador(DisparadorAlerta.CELO);
+                alerta.setSeveridad(est.getSeveridadAnestro());
+                alerta.setEstado(estado);
+                alerta.setTsGeneracion(tsGeneracion);
+                alerta.setValorUmbral((double) est.getDiasDeteccionAnestro());
+                alerta.setValorDetectado((double) diasSinCiclo);
+                alerta.setAccionRecomendada("Se recomienda revision veterinaria. El animal lleva "
+                                + diasSinCiclo + " dias sin ciclo registrado.");
+                alerta.setPosibleCausa("Anestro prolongado (>" + est.getDiasDeteccionAnestro() + " dias)");
+                alerta.setTsConfirmacion(tsConfirmacion);
+                alerta.setUsuarioConfirmacion(usuario);
+                alertaRepository.save(alerta);
+        }
+
+        // =========================================================================
+        // Helpers de pesadas
+        // =========================================================================
+
+        private void sembrarPesadas(Animal animal, double[][] pesadas) {
+                for (double[] p : pesadas) {
+                        RegistroPeso r = new RegistroPeso();
+                        r.setAnimal(animal);
+                        r.setFecha(LocalDate.now().minusDays((long) p[0]));
+                        r.setValorKg(p[1]);
+                        r.setUnidad("kg");
+                        r.setFechaRegistro(r.getFecha().atTime(9, 0));
+                        registroPesoRepository.save(r);
+                }
+        }
+
+        // =========================================================================
+        // Helpers de alertas sanitarias (SerieComparativaBuilder)
+        // =========================================================================
+
+        private Alerta crearAlertaSanitaria(Animal animal, SeveridadAlerta severidad, EstadoAlerta estado,
+                        float confianza, String posibleCausa, List<Telemetria> ventana,
+                        Map<String, Object> perfil, LocalDateTime perfilCalculadoEn,
+                        LocalDateTime tsConfirmacion, Usuario usuarioConfirmacion) {
+
+                LocalDateTime tsGeneracion = ventana.isEmpty()
+                                ? LocalDateTime.now().minusHours(3)
+                                : ventana.get(ventana.size() - 1).getFechaHora();
+
+                SerieComparativaSnapshot snapshot = SerieComparativaBuilder.build(
+                                ventana, perfil, perfilCalculadoEn, severidad.name(), posibleCausa);
+
+                String serieJson;
+                try {
+                        serieJson = objectMapper.writeValueAsString(snapshot);
+                } catch (Exception e) {
+                        throw new IllegalStateException("No se pudo serializar la serie comparativa de demo", e);
+                }
+
+                Alerta alerta = new Alerta();
+                alerta.setAnimal(animal);
+                alerta.setTipo("SALUD");
+                alerta.setDisparador(DisparadorAlerta.SALUD);
+                alerta.setSeveridad(severidad);
+                alerta.setEstado(estado);
+                alerta.setTsGeneracion(tsGeneracion);
+                alerta.setValorUmbral(0.5);
+                alerta.setValorDetectado((double) confianza);
+                alerta.setConfianzaModelo(confianza);
+                alerta.setDesvioDetectado(true);
+                alerta.setPosibleCausa(posibleCausa);
+                alerta.setSerieComparativaJson(serieJson);
+                if (tsConfirmacion != null) {
+                        alerta.setTsConfirmacion(tsConfirmacion);
+                        alerta.setUsuarioConfirmacion(usuarioConfirmacion);
+                }
+                return alertaRepository.save(alerta);
+        }
+
+        private Map<String, Object> perfilDemo(double[] moveStateMean, double[] moveStateStd,
+                        double[] distanciaMean, double[] distanciaStd) {
+                Map<String, Object> perfil = new LinkedHashMap<>();
+                perfil.put("quarter_moveState_mean", toDoubleList(moveStateMean));
+                perfil.put("quarter_moveState_std", toDoubleList(moveStateStd));
+                perfil.put("quarter_distancia_mean", toDoubleList(distanciaMean));
+                perfil.put("quarter_distancia_std", toDoubleList(distanciaStd));
+                perfil.put("feature_version", "v1");
+                return perfil;
+        }
+
+        private List<Double> toDoubleList(double[] arr) {
+                List<Double> list = new ArrayList<>(arr.length);
+                for (double d : arr)
+                        list.add(d);
+                return list;
+        }
+
+        private List<Telemetria> ventanaSanitaria(Caravana caravana, LocalDateTime hasta,
+                        int moveState, double pasoLat) {
+                final int muestras = 288;
+                final int tickSegundos = 300;
+                List<Telemetria> puntos = new ArrayList<>(muestras);
+                double lat = LAT_CENTRO;
+                double lon = LON_CENTRO;
+                for (int i = muestras - 1; i >= 0; i--) {
+                        Telemetria t = new Telemetria();
+                        t.setCaravana(caravana);
+                        t.setFechaHora(hasta.minusSeconds((long) i * tickSegundos));
+                        t.setMoveState(moveState);
+                        t.setLatitud(lat);
+                        t.setLongitud(lon);
+                        t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+                        t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+                        puntos.add(t);
+                        lat += pasoLat;
+                }
+                return puntos;
+        }
+
+        private void sembrarDiagnostico(Alerta alerta, Usuario vet, String diagnostico,
+                        String indicaciones, LocalDateTime fecha) {
+                Diagnostico d = new Diagnostico();
+                d.setAlerta(alerta);
+                d.setAnimal(alerta.getAnimal());
+                d.setVeterinario(vet);
+                d.setDiagnostico(diagnostico);
+                d.setIndicaciones(indicaciones);
+                d.setFecha(fecha);
+                diagnosticoRepository.save(d);
+        }
+
+        // =========================================================================
+        // Historial de celo (24 h, patron de alta actividad -- compatible simulador)
+        // =========================================================================
+
+        private void sembrarHistorialCelo(Caravana caravana) {
+                final int SAMPLES = 288;
+                final int TICK_S = 300;
+                final double SPEED_BASE = 0.000018;
+                final double MULT_MIN = 2.5;
+                final double MULT_MAX = 4.0;
+                final double TURN_STD = 1.1;
+                final int MS_MIN = 7;
+                final int MS_MAX = 9;
+
+                Random rnd = new Random();
+                double lat = LAT_CENTRO - 0.001;
+                double lon = LON_CENTRO - 0.001;
+                double heading = rnd.nextDouble() * 2 * Math.PI;
+                double bateria = 88.0;
+                LocalDateTime ultimaFecha = LocalDateTime.now().minusMinutes(3);
+
+                for (int i = SAMPLES; i >= 1; i--) {
+                        LocalDateTime fecha = ultimaFecha.minusSeconds((long) (i - 1) * TICK_S);
+                        double speedMult = MULT_MIN + rnd.nextDouble() * (MULT_MAX - MULT_MIN);
+                        heading += rnd.nextGaussian() * TURN_STD;
+                        double speed = SPEED_BASE * speedMult;
+                        lat += speed * Math.cos(heading);
+                        lon += speed * Math.sin(heading);
+                        bateria -= 0.01;
+                        int moveState = MS_MIN + rnd.nextInt(MS_MAX - MS_MIN + 1);
+                        Telemetria t = new Telemetria();
+                        t.setCaravana(caravana);
+                        t.setFechaHora(fecha);
+                        t.setLatitud(lat);
+                        t.setLongitud(lon);
+                        t.setMoveState(moveState);
+                        t.setBateria(bateria);
+                        t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+                        t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+                        telemetriaRepository.save(t);
+                }
+        }
+
+        // =========================================================================
+        // Historial de pastoreo (mapa de calor H0025)
+        // =========================================================================
+
+        private void sembrarHistorialPastoreo(Caravana caravana, double latInicial, double lonInicial,
+                        double bateriaInicial, int dias, LocalDateTime ultimaFecha) {
+                final int TICK_S = 900;
+                final double PASO = 0.000054;
+                final double TURN_STD = 0.9;
+                final double PROB_AGUADA = 0.12;
+                final double RADIO = 0.004;
+                final double AGUADA_LAT = -34.9440;
+                final double AGUADA_LON = -59.2250;
+                final int MS_MIN = 2;
+                final int MS_MAX = 5;
+
+                Random rnd = new Random();
+                double lat = latInicial;
+                double lon = lonInicial;
+                double heading = rnd.nextDouble() * 2 * Math.PI;
+                double bateria = bateriaInicial;
+                int muestras = (int) ((long) dias * 24 * 3600 / TICK_S);
+                List<Telemetria> historial = new ArrayList<>(muestras);
+
+                for (int i = muestras; i >= 1; i--) {
+                        LocalDateTime fecha = ultimaFecha.minusSeconds((long) (i - 1) * TICK_S);
+                        double dLat = AGUADA_LAT - lat;
+                        double dLon = AGUADA_LON - lon;
+                        if (Math.hypot(dLat, dLon) > RADIO || rnd.nextDouble() < PROB_AGUADA) {
+                                heading = Math.atan2(dLon, dLat);
+                        } else {
+                                heading += rnd.nextGaussian() * TURN_STD;
+                        }
+                        lat += PASO * Math.cos(heading);
+                        lon += PASO * Math.sin(heading);
+                        bateria = Math.max(5.0, bateria - 0.005);
+                        Telemetria t = new Telemetria();
+                        t.setCaravana(caravana);
+                        t.setFechaHora(fecha);
+                        t.setLatitud(lat);
+                        t.setLongitud(lon);
+                        t.setMoveState(MS_MIN + rnd.nextInt(MS_MAX - MS_MIN + 1));
+                        t.setBateria(bateria);
+                        t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+                        t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+                        historial.add(t);
+                }
+                telemetriaRepository.saveAll(historial);
+        }
+
+        // =========================================================================
+        // Helper: telemetria puntual
+        // =========================================================================
+
+        private void crearTelemetria(Caravana caravana, double lat, double lon,
+                        double bateria, LocalDateTime fechaHora) {
+                Telemetria t = new Telemetria();
+                t.setCaravana(caravana);
+                t.setFechaHora(fechaHora);
+                t.setLatitud(lat);
+                t.setLongitud(lon);
+                t.setBateria(bateria);
+                t.setMoveState(1);
+                t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+                t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
+                telemetriaRepository.save(t);
+        }
+
+        // =========================================================================
+        // Helper: crear animal con caravana
+        // =========================================================================
+
+        private Animal crearAnimal(Establecimiento est, RodeoLote lote,
+                        String idOficial, String alias, String raza,
+                        LocalDate fechaNacimiento, String codigoCaravana, LocalDate fechaAlta) {
+
+                Caravana caravana = new Caravana();
+                caravana.setCodigo(codigoCaravana);
+                caravana.setDevEui(codigoCaravana);
+                caravana.setActivo(true);
+                caravana.setEstablecimiento(est);
+                caravana.setEstadoSensor(EstadoSensor.VINCULADO);
+                caravanaRepository.save(caravana);
+
+                Animal a = new Animal(est, lote);
+                a.setIdCaravanaOficial(idOficial);
+                a.setAlias(alias);
+                a.setRaza(raza);
+                a.setEstadoActual(EstadoAnimal.ACTIVO);
+                a.setFechaNacimiento(fechaNacimiento);
+                a.setFechaAlta(fechaAlta);
+                a.setCaravana(caravana);
+                animalRepository.save(a);
+                return a;
+        }
+
+        // =========================================================================
+        // Helper: crear usuario
+        // =========================================================================
+
+        private Usuario buildUsuario(String nombre, String apellido, String email,
+                        String password, Rol rol) {
+                Usuario u = new Usuario();
+                u.setNombre(nombre);
+                u.setApellido(apellido);
+                u.setEmail(email);
+                u.setPasswordHash(passwordEncoder.encode(password));
+                u.setRol(rol);
+                u.setActivo(true);
+                u.setFechaAlta(LocalDate.now());
+                return u;
+        }
 }
