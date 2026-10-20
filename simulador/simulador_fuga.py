@@ -8,7 +8,7 @@ cede el alambrado norte y dos vacas del Lote Principal se escapan juntas
 INSTRUCCIONES PARA EL PRESENTADOR (Acto 3, Pasos 3.2 a 3.4)
 ═══════════════════════════════════════════════════════════════════════════════
 
-1. Asegurarse de que el backend (perfil "dev") y simulador_demo.py ya estén
+1. Asegurarse de que el backend (perfil "dev") y simulador.py ya estén
    corriendo, y que Juan ya mostró el Mapa de Calor (Paso 3.1).
 
 2. Paso 3.2 — en la Consola Técnica, ejecutar:
@@ -37,7 +37,7 @@ DETALLE TÉCNICO
 
 - Vacas por defecto: VIGIA-ARG-013 (#13013 Aurora) y VIGIA-ARG-014 (#14014
   Canela), dos gestantes del Lote Principal que ningún otro simulador mueve
-  (simulador_demo.py las excluye vía FUGA_DEVICE_IDS).
+  (simulador.py las excluye vía FUGA_DEVICE_IDS).
   Se pueden cambiar con la variable de entorno FUGA_DEVICE_IDS, pero tienen
   que ser vacas de un lote con perímetro activo.
 - La geometría del perímetro está copiada de DataInitializer
@@ -117,8 +117,9 @@ def metros_fuera_del_alambrado(lat):
 
 
 def obtener_posicion_inicial(device_id):
-    """Continúa la última posición real que el backend tiene para la vaca (ver
-    el BUGFIX de simulador.py sobre los saltos de posición)."""
+    """Continúa la última posición real que el backend tiene para la vaca: un
+    salto de posición desconectado de la última fila real dispara celos falsos
+    (ver obtener_posicion_inicial en simulador.py)."""
     base_url = API_URL.rsplit("/api/v1/", 1)[0]
     url = f"{base_url}/api/v1/ingesta/ultima-posicion/{device_id}"
     try:
