@@ -12,12 +12,15 @@ Script en Python que emula el comportamiento de cientos de caravanas IoT transmi
 
 ## Configuración
 
-Las variables de entorno principales son:
-- `API_URL`: URL del webhook del backend (por defecto apunta al contenedor del `backend-worker`).
-- `NUM_ANIMALES`: Cantidad de caravanas a simular (default 200).
-- `INTERVALO_SEGUNDOS`: Frecuencia de envío de datos. Por defecto **300 segundos** (5 min, igual que la caravana real / dataset de entrenamiento) en `simulador.py` y en `simulador_normal.py` — no bajarlo ahí sin necesidad, aunque en estos dos scripts la distancia por paquete queda fija a esa escala así que bajarlo no rompe la calibración del modelo, solo acelera el ritmo. En `simulador_celo.py` el default es **5 segundos**, pensado para activarse puntualmente en una demo.
-- `FORZAR_CELO_DEVICE_ID`: device_id que siempre se simula en celo (default `VIGIA-ARG-001`).
-- `FORZAR_SALUD_DEVICE_ID`: device_id que siempre se simula con un desvío sanitario (default `VIGIA-ARG-002`, solo usado por `simulador.py`).
+Las variables de entorno (ver `.env.example`) son:
+- `API_URL`: URL del webhook del `backend-worker`.
+- `NUM_ANIMALES`: cantidad de caravanas correlativas (`VIGIA-ARG-001..NNN`) que simulan `simulador.py` y `simulador_demo.py` (default 5).
+- `EXTRA_DEVICE_IDS`: caravanas adicionales a simular, separadas por coma. En `simulador_demo.py` el default son las caravanas libres `VIGIA-LIBRE-301..305` (Acto 1).
+- `INTERVALO_SEGUNDOS`: segundos entre envíos. Si se define, pisa el default de `simulador.py` (300), `simulador_demo.py`, `simulador_celo.py` y `simulador_cohesion.py` (5). Para la demo **no** definirlo: con 300, el script de celo del Acto 2 tarda cinco minutos entre puntos. La distancia por paquete está fija a la escala de un tick de 5 min en todos los scripts, así que cambiarlo solo acelera o frena el ritmo, no rompe la calibración del modelo.
+- `TTN_WEBHOOK_API_KEY`: tiene que coincidir con la de `infra/.env`.
+- `FORZAR_CELO_DEVICE_ID`: vaca del escenario de celo (default `VIGIA-ARG-001`). `simulador_demo.py` nunca le manda telemetría.
+- `FORZAR_SALUD_DEVICE_ID`: vaca con desvío sanitario forzado en `simulador.py` (default `VIGIA-ARG-002`).
+- `FUGA_DEVICE_IDS`: vacas del Acto 3 (default `VIGIA-ARG-013,VIGIA-ARG-014`). `simulador_demo.py` nunca les manda telemetría.
 
 ## Ejecución
 
@@ -38,54 +41,85 @@ pip install -r requirements.txt
 py simulador.py
 ```
 
-## `simulador_normal.py` + `simulador_celo.py` — procesos separados para un backend ya desplegado
+## Demo E2E: `simulador_demo.py` de fondo + un script por acto
 
-Estos dos scripts reemplazan a `simulador_demo.py` para el caso de un backend
-desplegado (Railway u otro), con un objetivo puntual: poder dejar la manada
-"de fondo" corriendo con cadencia real durante períodos largos (incluso
-varios días), y activar el escenario de celo por separado, en el momento
-exacto en que se lo quiere mostrar — sin tener que reiniciar ni reconfigurar
-el proceso de fondo.
+El backend corre con el perfil `dev`: `DataInitializer` limpia la base y siembra
+los datos de la demo en cada arranque.
 
-- **`simulador_normal.py`**: manda telemetría con comportamiento orgánico
-  (sin nada forzado) para toda la manada, EXCEPTO `FORZAR_CELO_DEVICE_ID`
-  (reservado para `simulador_celo.py`) y `VIGIA-ARG-003` (reservado para el
-  indicador "sin datos recientes" del mapa, H0012 — sembrado por
-  `DataInitializer` y nunca actualizado). Pensado para dejarse corriendo
-  todo el tiempo, con cadencia real (`INTERVALO_SEGUNDOS=300` por defecto).
-- **`simulador_celo.py`**: proceso aparte, simula ÚNICAMENTE la vaca
-  forzada a celo. Se prende cuando se quiere mostrar la detección y se
-  apaga (Ctrl+C) después — no hace falta dejarlo corriendo el resto del
-  tiempo. Cadencia rápida por defecto (`INTERVALO_SEGUNDOS=5`) para que la
-  alerta aparezca a los pocos minutos de activarlo. Requiere que
-  `DataInitializer` ya haya sembrado el historial de celo de esa vaca (ver
-  arriba) — no lo inyecta él mismo.
-
-**Importante:** nunca corran `simulador_normal.py` y `simulador_celo.py` (o
-`simulador.py`/`simulador_demo.py`) al mismo tiempo apuntando al mismo
-device_id — dos procesos mandando telemetría para la misma vaca, cada uno
-con su propio estado en memoria, hacen que se vea "teletransportándose"
-entre dos trayectorias distintas.
+- **`simulador_demo.py`**: la manada de fondo. Manda pastoreo normal, sin
+  nada forzado, y queda corriendo toda la demo. Nunca manda telemetría para
+  `FORZAR_CELO_DEVICE_ID`, `FUGA_DEVICE_IDS` ni `VIGIA-ARG-003` (el seed le deja
+  una única transmisión vieja para el indicador "sin datos recientes" del
+  mapa, H0012). Para el Acto 1 (Paso 1.6) manda también las caravanas libres
+  `VIGIA-LIBRE-301..305`: el worker las ignora ("Sin animal asociado") hasta
+  que Pedro vincula una desde la UI, y desde el paquete siguiente se guarda su
+  telemetría y el animal aparece en el mapa, sin reiniciar nada.
+- **`simulador_celo.py`** (Acto 2): simula solo la vaca #104 en celo. Se
+  prende en el Paso 2.1 y se apaga con Ctrl+C al terminar el acto. Cada
+  corrida abre una sesión nueva, así que se puede repetir sin reiniciar el
+  backend; si el worker ignora un paquete, lo avisa en la consola con el motivo.
+  Ojo: si #104 ya tuvo una alerta de celo en las últimas 24 hs, el job no genera
+  otra hasta reiniciar el backend.
+- **`simulador_fuga.py`** (Acto 3): ver la sección siguiente.
 
 ```bash
-# Terminal 1 — queda corriendo de fondo
-py simulador_normal.py
+# Terminal 1 — queda corriendo toda la demo
+py simulador_demo.py
 
-# Terminal 2 — se prende solo cuando se va a mostrar la detección de celo
+# Terminal 2 — un script por acto, en el momento en que se lo muestra
 py simulador_celo.py
+py simulador_fuga.py
 ```
 
-### Importante si el backend queda desplegado con anticipación
+**Importante:** nunca corran dos scripts que manden telemetría para el mismo
+device_id (por ejemplo `simulador.py` y `simulador_demo.py` juntos): cada
+proceso tiene su propio estado en memoria y la vaca se ve
+"teletransportándose" entre dos trayectorias, lo que además puede disparar
+alertas de celo falsas.
+
+Para dejarlo corriendo varios días contra un backend desplegado, alcanza con
+`INTERVALO_SEGUNDOS=300` (cadencia de una caravana real).
+
+### Importante si el backend se levanta con anticipación
 
 El historial de celo que siembra `DataInitializer` tiene timestamps fijados
 en el momento del arranque del backend, y el job de celo siempre filtra
-"últimas 24hs desde ahora". Si pasan más de ~24hs entre que se desplegó el
+"últimas 24hs desde ahora". Si pasan más de ~24hs entre que se levantó el
 backend y se prende `simulador_celo.py`, ese historial ya salió de la
-ventana y la alerta va a tardar mucho más en aparecer (el script tendría
-que juntar de cero suficientes puntos en vivo). Para que la demo funcione
-como se espera ("prendo el simulador y a los pocos minutos aparece la
-alerta"), conviene reiniciar el backend (o re-disparar el
-`DataInitializer`) dentro de esa ventana de 24hs antes de la demo.
+ventana y la alerta va a tardar mucho más en aparecer. Conviene reiniciar el
+backend dentro de esa ventana de 24hs antes de la demo.
+
+## `simulador_fuga.py` — Acto 3: fuga por el alambrado norte
+
+Simula que cede el alambrado norte del "Potrero Principal Demo" y dos vacas
+(`FUGA_DEVICE_IDS`, por defecto `VIGIA-ARG-013` Aurora y `VIGIA-ARG-014`
+Canela) se escapan juntas. Arranca desde la última posición real de cada una,
+caminan hasta el mismo hueco del alambrado y lo cruzan en el mismo paquete
+(~15 paquetes en total). El worker verifica el perímetro en el mismo request
+de ingesta, así que las dos alertas `FUERA_DE_PERIMETRO` salen con segundos de
+diferencia y el panel de alertas las agrupa. Quedan pastando ~145 m afuera
+(la tolerancia del perímetro es 50 m) hasta que el presentador presiona
+Enter: ahí vuelven a entrar y el script termina solo.
+
+```bash
+py simulador_fuga.py              # cadencia de 3 s
+py simulador_fuga.py --intervalo 2
+```
+
+- Usa su propia cadencia (3 s, o `--intervalo`): **no** lee
+  `INTERVALO_SEGUNDOS`.
+- moveState se mantiene en 0-2 a propósito. Validado offline contra el modelo
+  de `ml-celo`: caminar cientos de metros con moveState 4-7 dispara un celo
+  falso en las vacas que se escapan (P > 0.943); con 0-2 queda en ~0.55-0.66.
+- `simulador_demo.py` excluye `FUGA_DEVICE_IDS`, así que se puede subir
+  `NUM_ANIMALES` sin que dos procesos muevan la misma vaca.
+- El worker no vuelve a alertar la salida de una vaca con una alerta de
+  perímetro ya atendida en las últimas 6 hs (`vigia.geofence.cooldown-hours`).
+  Si se ensaya, reiniciar el backend antes de la demo para que
+  `DataInitializer` resetee la base.
+- Si las vacas quedan afuera más que el período del job de geo
+  (`VIGIA_BATCH_GEO_RATE`, 15 min por defecto), además puede aparecer una
+  alerta de `AISLAMIENTO_SOCIAL` para las dos.
 
 ## `simulador_cohesion.py` — escenarios de cohesión y aislamiento
 
@@ -111,17 +145,3 @@ py simulador_cohesion.py --modo subgrupo
 ```
 
 Igual que con el resto, no correrlo al mismo tiempo que otro simulador que mande telemetría de los mismos device_id.
-
-## `simulador_demo.py` — variante anterior (un solo proceso, todavía funcional)
-
-Antes de separar en `simulador_normal.py` + `simulador_celo.py`, existía
-`simulador_demo.py`: un único proceso que hace las dos cosas a la vez
-(manda a toda la manada, y fuerza el patrón de celo para
-`FORZAR_CELO_DEVICE_ID` dentro del mismo loop). Sigue andando igual que
-antes si se prefiere un solo proceso en vez de dos, pero no da control
-sobre activar el escenario de celo en un momento distinto al de arrancar el
-resto de la manada.
-
-```bash
-py simulador_demo.py
-```
