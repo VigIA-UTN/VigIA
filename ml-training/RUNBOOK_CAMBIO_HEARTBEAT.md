@@ -76,8 +76,8 @@ python train_model.py --dataset-dir dataset --models-dir models --split-seed 42 
   `models/<run>/init<seed>/` a `ml-celo/app/models/`, releer
   `best_threshold_f1` de ese `run_summary.json` y actualizar
   `CELO_THRESHOLD` en `infra/.env.example` (línea con el comentario de
-  "Valor actual"), `infra/.env` local, y el comentario en
-  `simulador/simulador.py`.
+  "Valor actual"), `infra/.env` local, y el docstring y el banner de
+  `simulador/simulador_celo.py`.
 - **Salud**: `train_model.py` ya auto-exporta `init42` a
   `ml-salud/app/models/modelo_salud_rf.joblib` y copia
   `features_salud.py` — sin paso manual. No hay umbral configurable por

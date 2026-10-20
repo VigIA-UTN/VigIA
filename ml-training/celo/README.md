@@ -124,7 +124,7 @@ Para reproducir el entrenamiento, seguí estos pasos en tu terminal (estando den
    ```
    Después, releé `best_threshold_f1` de ese `run_summary.json` y
    actualizá `CELO_THRESHOLD` en `infra/.env.example` (y `infra/.env`
-   local, y el comentario en `simulador/simulador.py`).
+   local, y el docstring y el banner de `simulador/simulador_celo.py`).
 
 ## 6. Resultados de referencia
 

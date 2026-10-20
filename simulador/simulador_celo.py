@@ -7,7 +7,7 @@ el evento de celo de la vaca #104 "La Vaca Lola" (VIGIA-ARG-001) en vivo.
 INSTRUCCIONES PARA EL PRESENTADOR (Acto 2, Paso 2.1)
 ═══════════════════════════════════════════════════════════════════════════════
 
-1. Asegurarse de que el backend (perfil "dev") y el simulador_demo.py ya
+1. Asegurarse de que el backend (perfil "dev") y el simulador.py ya
    estén corriendo (Acto 1 completado).
 
 2. En la Consola Técnica, ejecutar:
@@ -40,7 +40,7 @@ DETALLE TÉCNICO
   completa de 24 hs —ya con forma de celo de punta a punta— y dispare la
   alerta (confianza por encima del umbral CELO_THRESHOLD, 0.943 en infra).
 - La vaca sale de FORZAR_CELO_DEVICE_ID (default VIGIA-ARG-001), la misma
-  variable con la que simulador_demo.py la excluye de su loop: nunca hay dos
+  variable con la que simulador.py la excluye de su loop: nunca hay dos
   procesos mandando para el mismo device_id.
 - Cada corrida abre una sesión OTAA nueva (session_key_id distinto) y arranca
   f_cnt en 1. Antes arrancaba siempre en 90001: en una segunda corrida sin
@@ -74,7 +74,7 @@ load_dotenv()
 
 API_URL = os.getenv("API_URL", "http://localhost:8081/api/v1/ingesta/uplink")
 
-# Vaca #104, "La Vaca Lola". Misma variable que usa simulador_demo.py para
+# Vaca #104, "La Vaca Lola". Misma variable que usa simulador.py para
 # excluirla de su loop, así los dos procesos nunca mandan para la misma vaca.
 DEVICE_ID = os.getenv("FORZAR_CELO_DEVICE_ID", "VIGIA-ARG-001")
 NOMBRE_VACA = "#104 — La Vaca Lola (Holando)" if DEVICE_ID == "VIGIA-ARG-001" else DEVICE_ID
@@ -107,7 +107,7 @@ def obtener_posicion_inicial():
     VIGIA-ARG-001 (sembrada por DataInitializer o dejada por una corrida
     anterior de este script), en vez de arrancar en un punto desconectado.
 
-    BUGFIX documentado en simulador.py: un salto de posición desconectado de
+    Un salto de posición desconectado de
     la última fila real dispara una alerta de celo falsa porque el job lee ese
     salto como un desplazamiento anómalo entre puntos consecutivos de la
     ventana de 24 hs.

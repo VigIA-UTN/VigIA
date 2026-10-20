@@ -1,156 +1,155 @@
+"""
+simulador.py — la manada "de fondo" durante la demo E2E (Sprint 10).
+
+Manda telemetría con comportamiento normal de pastoreo para el rodeo, sin
+ningún escenario forzado. Queda corriendo toda la demo; cada acto tiene su
+propio script que se prende en el momento justo:
+
+    Acto 2 (celo de la vaca #104)            -> simulador_celo.py
+    Acto 3 (fuga por el alambrado)           -> simulador_fuga.py
+    Acto 4 (salud y aislamiento de la #208)  -> simulador_salud.py
+
+Rodeo vivo: las vacas de RODEO_DEVICE_IDS (por defecto VIGIA-ARG-015..026,
+gestantes del Lote Principal sin ningún rol especial en la demo). El seed
+(DataInitializer) deja sus últimas posiciones juntas, en un círculo de ~40 m,
+y este script las mantiene juntas y en el lugar: cada vaca que se aleja más
+de RADIO_COHESION_M del centro de las posiciones con que arrancó el rodeo
+vuelve hacia él (un centro fijo; si siguiera al rodeo, el grupo entero se iría
+corriendo y se le acercaría a la #208 del Acto 4). Hace falta porque
+ml-geo arma el grupo con los animales a <= 100 m entre sí y solo mira los que
+transmitieron en los últimos 30 min: si el rodeo vivo se dispersara (un
+random walk de 2 m por paquete se abre ~150 m en 15 min), ml-geo marcaría
+aislados a todos y la alerta de aislamiento del Acto 4 no sería solo de la
+#208. Las vacas con un rol en el seed (004 "sin señal > 6 h", 005 batería
+baja, 006-012 demos de salud y anestro) quedan fuera a propósito.
+
+Reserva de identidades: este script NUNCA manda telemetría para las vacas que
+mueven esos scripts (FORZAR_CELO_DEVICE_ID, FUGA_DEVICE_IDS y
+FORZAR_SALUD_DEVICE_ID), ni para VIGIA-ARG-003 (ver EXCLUIR_DEL_LOOP_EN_VIVO),
+aunque se las agregue a RODEO_DEVICE_IDS. Si dos procesos mandaran para el
+mismo device_id, cada uno con su propio estado en memoria, la vaca se vería
+"teletransportándose" entre dos trayectorias — y el salto de posición puede
+disparar alertas de celo falsas.
+
+Acto 1 (Paso 1.6) — caravanas libres vinculadas en vivo:
+
+Las caravanas de EXTRA_DEVICE_IDS (por defecto VIGIA-LIBRE-301..305) se
+mandan desde el arranque. Mientras no están vinculadas a ninguna vaca, el
+worker contesta "Ignorado: Sin animal asociado" y no guarda nada. Apenas Pedro
+vincula una a la vaquillona #301 desde la UI, el siguiente paquete ya se
+guarda y el animal aparece en el mapa en el próximo ciclo, sin reiniciar este
+proceso ni tocar el .env. (Antes había un "descubrimiento" que consultaba
+GET /api/v1/caravanas contra el worker, pero ese endpoint vive en backend-api,
+se llama /api/v1/caravana y requiere sesión: nunca encontraba nada.)
+
+Notas técnicas:
+
+- La posición/batería inicial de cada animal se pide al backend
+  (GET /api/v1/ingesta/ultima-posicion/{deviceId}) para continuar la última
+  fila real, en vez de hardcodear coordenadas: un salto de posición
+  desconectado de la última fila real dispara alertas de celo falsas: el job
+  de celo lee el salto como un desplazamiento anómalo entre dos puntos
+  consecutivos de la ventana de 24 hs.
+- INTERVALO_SEGUNDOS (cadencia real de envío, default 5 s) y
+  TICK_MODELADO_SEGUNDOS (la magnitud de movimiento que "ve" el modelo por
+  paquete, fija en 300 s) están desacoplados a propósito. El modelo de celo
+  (ml-celo) no usa el timestamp como feature, solo moveState y la distancia
+  entre puntos consecutivos; por eso la distancia por paquete queda fija a la
+  escala de un tick de 5 min y bajar INTERVALO_SEGUNDOS solo acelera el ritmo,
+  sin romper la calibración del modelo. El timestamp que se manda es siempre
+  la hora real de envío.
+- Si se lo quiere dejar corriendo varios días contra un backend desplegado,
+  alcanza con INTERVALO_SEGUNDOS=300 (cadencia de una caravana real).
+- La vuelta al rodeo solo cambia el rumbo, no el largo del paso ni el
+  moveState: para ml-celo es el mismo pastoreo de siempre.
+- Cada corrida abre una sesión OTAA nueva (session_key_id distinto) y arranca
+  f_cnt en 1, así una segunda corrida sin reiniciar el backend no choca con la
+  idempotencia por fCnt del worker.
+"""
+
 import os
 import time
 import math
 import random
 import requests
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 # pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuración
-API_URL = os.getenv("API_URL", "http://localhost:8081/api/v1/ingesta/uplink") # Apunta al backend-worker (8081)
-NUM_ANIMALES = int(os.getenv("NUM_ANIMALES", 5)) # 5 vacas como solicitaste
+API_URL = os.getenv("API_URL", "http://localhost:8081/api/v1/ingesta/uplink")
 
-# IMPORTANTE: el modelo de celo (ml-training/celo/generate_dataset.py) se entrenó
-# con SAMPLES_PER_DAY=288, es decir UNA lectura cada 5 minutos (300s). La
-# distancia entre lecturas consecutivas es una feature más (moveState, distancia),
-# y el modelo la interpreta como "cuánto se desplazó el animal en 5 minutos".
-# Si el simulador manda lecturas más seguido (ej. cada 5s) y solo reescala la
-# distancia proporcionalmente al intervalo (como hacía antes esta constante),
-# cada tick individual queda representando un desplazamiento de solo 5 segundos
-# — 60 veces más chico que lo que el modelo aprendió a considerar "alta
-# actividad" — y la probabilidad de celo nunca cruza el umbral, sin importar
-# qué tan alto sea moveState. Se verificó empíricamente contra el modelo
-# entrenado (ml-celo/app/models/): con INTERVALO_SEGUNDOS=5 la confianza queda
-# ~0.02, con INTERVALO_SEGUNDOS=300 (5 min, igual que entrenamiento) sube a
-# ~0.8-0.97. Por eso el default pasa a ser 300s.
-INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 300))  # 5 minutos, igual que la caravana real / dataset de entrenamiento
+# Rodeo vivo (ver docstring). Lista separada por comas.
+RODEO_DEVICE_IDS = [d.strip() for d in os.getenv(
+    "RODEO_DEVICE_IDS",
+    ",".join(f"VIGIA-ARG-{i:03d}" for i in range(15, 27)),
+).split(",") if d.strip()]
 
-# Coordenadas iniciales: Establecimiento de Prueba (del DataInitializer), usadas
-# solo como fallback si el backend todavía no tiene ninguna fila para un
-# device_id (ver obtener_posicion_inicial()).
+# Distancia al centro del rodeo a partir de la cual una vaca vuelve hacia él.
+# Con 35 m, dos vacas quedan a menos de ~80 m: un solo grupo para ml-geo
+# (umbral de aislamiento de 100 m).
+RADIO_COHESION_M = 35.0
+
+# Cadencia real de envío (ritmo de la demo). No participa del cálculo de
+# distancia por paquete (ver TICK_MODELADO_SEGUNDOS).
+INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 5))
+
+# Escala de movimiento que "ve" el modelo de celo por paquete: un tick de 5
+# minutos (300s), igual que ml-training/celo/generate_dataset.py. FIJO, no
+# confundir con INTERVALO_SEGUNDOS.
+TICK_MODELADO_SEGUNDOS = 300
+
+# Fallback si el backend todavía no tiene ninguna fila para un device_id
+# (centro del establecimiento del seed demo).
 LAT_INICIAL = -34.943317
 LON_INICIAL = -59.225728
 
-# ---------------------------------------------------------------------------
-# Escala física de movimiento, alineada con generate_dataset.py:
-#   SPEED_BASE = 0.000018 grados POR TICK DE 5 MINUTOS (300s) en pastoreo normal.
-# Convertimos esa velocidad a grados/segundo y la aplicamos al intervalo real
-# de envío (INTERVALO_SEGUNDOS). Con INTERVALO_SEGUNDOS=300 esto da
-# directamente SPEED_BASE_DEG_POR_TICK_5MIN, tal cual la usa el dataset de
-# entrenamiento. Si se baja INTERVALO_SEGUNDOS para hacer pruebas más rápidas
-# de otras partes del sistema (mapa, dashboard, etc.), tené en cuenta que la
-# detección de celo/salud deja de ser confiable (ver comentario arriba). Para
-# una demo en vivo que sí necesita ir rápido sin perder esa confiabilidad,
-# ver simulador_demo.py (desacopla la escala de movimiento por paquete de la
-# frecuencia real de envío).
-# ---------------------------------------------------------------------------
+# Corral donde arrancan las caravanas libres (no tienen posición previa): juntas,
+# así las vaquillonas que se vinculen en vivo forman un grupo en su lote.
+LAT_CORRAL = LAT_INICIAL + 0.003
+LON_CORRAL = LON_INICIAL - 0.003
+
+# Escala física de pastoreo normal, alineada con generate_dataset.py: grados
+# POR TICK DE 5 MINUTOS, fija por paquete.
 SPEED_BASE_DEG_POR_TICK_5MIN = 0.000018
-SPEED_BASE_DEG_POR_SEG = SPEED_BASE_DEG_POR_TICK_5MIN / 300.0
-SPEED_BASE_DEG_POR_INTERVALO = SPEED_BASE_DEG_POR_SEG * INTERVALO_SEGUNDOS
+TURN_STD_BASE = 0.35  # rad por tick
 
-# En celo, generate_dataset.py multiplica la velocidad por 1.0 + intensidad*(2 a 3),
-# con intensidad≈1 en el pico → multiplicador de hasta ~4x.
-SPEED_MULT_CELO_MIN = 2.5
-SPEED_MULT_CELO_MAX = 4.0
-
-# ---------------------------------------------------------------------------
-# Random walk CORRELACIONADO (con rumbo/heading), igual que generate_dataset.py.
-# Antes generábamos lat_diff/lon_diff como dos componentes independientes con
-# random.uniform(-1,1) cada una. Eso hace que la magnitud del desplazamiento
-# por tick (lo que el modelo ve como "distancia") sea muy ruidosa: a veces las
-# componentes casi se cancelan, a veces se suman al máximo, así que la misma
-# "intensidad de celo" produce probabilidades muy dispares corrida a corrida
-# (medido: 0.27 a 0.93 con el generador viejo, promedio 0.74 — por debajo del
-# CELO_THRESHOLD=0.892 configurado en .env en ese momento la mayoría de las
-# veces; el valor actual de CELO_THRESHOLD es otro, ver infra/.env.example).
-# Usando un
-# rumbo que persiste entre ticks y un paso de magnitud fija (speed*cos/sin),
-# igual que en entrenamiento, la probabilidad queda estable en ~0.996-0.998.
-# ---------------------------------------------------------------------------
-TURN_STD_BASE = 0.35   # rad por tick, pastoreo normal (igual que generate_dataset.py)
-TURN_STD_CELO = 1.1    # trayectoria errática durante celo
-
-# ---------------------------------------------------------------------------
-# Patrón de desvío sanitario ("enferma"), alineado con
-# ml-training/salud/generate_dataset.py: severidad 3, tipo_alto=1
-# ("Inmovilidad" — enfermedad grave que postra al animal). Ese generador usa
-# speed_mult=0.1 (casi sin desplazamiento) y activity_base -= 0.80 (la
-# probabilidad de estar en reposo/rumia sube muchísimo), lo que en moveState
-# real se traduce en pasar casi todo el tiempo en MOVESTATE_REPOSO (0-1) con
-# desplazamientos mínimos. Se eligió el caso más severo (en vez de la cojera
-# leve de severidad 1) para que el desvío sea inequívoco en la demo: la
-# probabilidad de reposo pasa de ~35% (normal) a ~95%.
-# ---------------------------------------------------------------------------
-SPEED_MULT_SALUD_ENFERMO = 0.1
-TURN_STD_SALUD_ENFERMO = 0.15  # casi no gira: se queda quieta, no da vueltas
-PROB_REPOSO_ENFERMO = 0.95     # ver justificación arriba
-
-# moveState real de la caravana: 0-9 (ver generate_dataset.py)
-#   0-1 = reposo/rumia, 2-6 = pastoreo/caminata normal, 7-9 = alta actividad
+# moveState real de la caravana: 0-9
 MOVESTATE_REPOSO = (0, 1)
 MOVESTATE_NORMAL = (2, 6)
 MOVESTATE_ALTA_ACTIVIDAD = (7, 9)
 
-# ---------------------------------------------------------------------------
-# Animales con escenario forzado, para poder demostrar de punta a punta cada
-# tipo de alerta sin depender del azar. Configurables por env var para no
-# tener que tocar código si se quiere probar con otra caravana.
-#
-# IMPORTANTE (RF03 / SaludDetectorStrategyImpl): el modelo de salud compara
-# contra el perfil individual del animal, calculado sobre una ventana de
-# calibración de vigia.salud.calibracion-dias (7 por defecto) contada desde
-# `fecha_alta` — un campo que fija el backend al crear el animal, no algo que
-# este simulador controle. Si `fecha_alta` quedó seteada a "hoy" (por ejemplo
-# porque el DataInitializer resetea la DB en cada arranque), el backend NO va
-# a generar ninguna predicción de salud —sin importar qué tan clara sea la
-# telemetría enferma que mandemos— hasta que pasen esos 7 días reales. Para
-# poder demostrar la alerta el mismo día, VIGIA-ARG-002 se backdatea a
-# propósito en DataInitializer.java (fecha_alta = hoy - 10 días).
-# ---------------------------------------------------------------------------
+# Reservadas para los scripts de cada acto: este proceso nunca les manda telemetría.
 FORZAR_CELO_DEVICE_ID = os.getenv("FORZAR_CELO_DEVICE_ID", "VIGIA-ARG-001")
+FUGA_DEVICE_IDS = {d.strip() for d in os.getenv("FUGA_DEVICE_IDS", "VIGIA-ARG-013,VIGIA-ARG-014").split(",")
+                   if d.strip()}
 FORZAR_SALUD_DEVICE_ID = os.getenv("FORZAR_SALUD_DEVICE_ID", "VIGIA-ARG-002")
 
+# VIGIA-ARG-003 se deja fuera a propósito: el seed le pone una única
+# transmisión vieja (> 15 min) para mostrar el indicador "sin datos recientes"
+# del mapa (H0012). Si recibe telemetría nueva, ese detalle de la demo se pierde.
+EXCLUIR_DEL_LOOP_EN_VIVO = ({"VIGIA-ARG-003", FORZAR_CELO_DEVICE_ID, FORZAR_SALUD_DEVICE_ID}
+                            | FUGA_DEVICE_IDS)
 
-# ---------------------------------------------------------------------------
-# BUGFIX: la posición inicial de cada animal debe continuar la última
-# posición real que ya tiene en la base (ver DataInitializer.java), no un
-# punto random desconectado ni una copia hardcodeada de lo que DataInitializer
-# insertaba en algún momento del pasado. Antes cada animal arrancaba en
-# LAT_INICIAL/LON_INICIAL + offset random de hasta ±0.005° (~550m), sin
-# relación con la fila de telemetría que el DataInitializer ya insertó para
-# ese animal (ej: VIGIA-ARG-005 en -34.9455,-59.2260 hace 10 minutos).
-#
-# El job de celo arma la ventana de 24hs con TODA la telemetría de la
-# caravana ordenada por fecha —incluida esa fila sembrada por
-# DataInitializer— y ml-celo/app/main.py calcula la distancia entre puntos
-# CONSECUTIVOS de esa ventana sin normalizar por el tiempo real transcurrido
-# (ver DIST_SCALE_FACTOR en ml-celo/app/main.py). Un salto de ~500m entre la
-# fila sembrada y el primer paquete que manda el simulador se lee como un
-# desplazamiento ~100-500x mayor al de un tick normal —incluso con el
-# multiplicador de celo (hasta 4x)— y dispara una alerta de celo falsa en
-# CUALQUIER animal, sin importar cuál esté forzado. Así fue como la alerta
-# saltó en VIGIA-ARG-005 en vez de en VIGIA-ARG-001.
-#
-# Un dict hardcodeado (SEED_POSICIONES_DB) copiado a mano de
-# DataInitializer.java tenía el mismo problema un escalón más adelante:
-# quedaba desincronizado apenas alguien tocaba una de las dos fuentes, y
-# además dejó de tener sentido cuando DataInitializer empezó a sembrar 288
-# filas de historial de celo para VIGIA-ARG-001 (ver sembrarHistorialCelo())
-# en vez de una única fila — la "última posición real" de esa vaca depende
-# ahora de un random walk de 288 pasos, imposible de hardcodear a mano.
-#
-# Fix: pedirle al backend la última fila real de cada animal
-# (GET /api/v1/ingesta/ultima-posicion/{deviceId}, agregado en
-# IngestaController) y arrancar exactamente ahí, para que el primer paquete
-# en vivo sea una continuación real y no un teletransporte.
-# ---------------------------------------------------------------------------
+# Acto 1 (Paso 1.6): caravanas libres que Pedro puede vincular en vivo.
+EXTRA_DEVICE_IDS = [d.strip() for d in os.getenv(
+    "EXTRA_DEVICE_IDS",
+    "VIGIA-LIBRE-301,VIGIA-LIBRE-302,VIGIA-LIBRE-303,VIGIA-LIBRE-304,VIGIA-LIBRE-305",
+).split(",") if d.strip()]
+
+# Respuesta del worker para una caravana que existe pero no está vinculada.
+RESPUESTA_SIN_ANIMAL = "Ignorado: Sin animal asociado"
+
+# Timeout corto para la consulta de posición inicial: si el backend no
+# responde rápido, mejor arrancar con el fallback random que colgar el
+# arranque de la demo.
 TIMEOUT_ULTIMA_POSICION_SEGUNDOS = 3
 
 
-def obtener_posicion_inicial(device_id):
+def obtener_posicion_inicial(device_id, lat_fallback, lon_fallback, dispersion):
+    """Continúa la última posición/batería real que el backend ya tiene para
+    este device_id, en vez de arrancar en un punto desconectado."""
     base_url = API_URL.rsplit("/api/v1/", 1)[0]
     url = f"{base_url}/api/v1/ingesta/ultima-posicion/{device_id}"
     try:
@@ -163,82 +162,83 @@ def obtener_posicion_inicial(device_id):
 
     print(f"AVISO: {device_id} no tiene posición previa conocida en el backend; "
           f"arrancando en una posición random cerca del establecimiento.")
-    lat_ini = LAT_INICIAL + random.uniform(-0.005, 0.005)
-    lon_ini = LON_INICIAL + random.uniform(-0.005, 0.005)
+    lat_ini = lat_fallback + random.uniform(-dispersion, dispersion)
+    lon_ini = lon_fallback + random.uniform(-dispersion, dispersion)
     bateria_ini = random.uniform(80.0, 100.0)
     return lat_ini, lon_ini, bateria_ini
 
 
-# Estado inicial de los animales: se resuelve contra el backend, no
-# hardcodeado (ver obtener_posicion_inicial()).
-device_ids = [f"VIGIA-ARG-{i:03d}" for i in range(1, NUM_ANIMALES + 1)]
-extra_devices = [d.strip() for d in os.getenv("EXTRA_DEVICE_IDS", "").split(",") if d.strip()]
-for d in extra_devices:
-    if d not in device_ids:
-        device_ids.append(d)
-
 animales = {}
-for device_id in device_ids:
-    lat_ini, lon_ini, bateria_ini = obtener_posicion_inicial(device_id)
-    animales[device_id] = {
-        "lat": lat_ini,
-        "lon": lon_ini,
-        "bateria": bateria_ini,
-        "heading": random.uniform(0, 2 * math.pi),  # rumbo inicial, para el random walk correlacionado
-    }
+for grupo, ids, fallback in (
+    ("rodeo", RODEO_DEVICE_IDS, (LAT_INICIAL, LON_INICIAL, 0.005)),
+    ("libres", EXTRA_DEVICE_IDS, (LAT_CORRAL, LON_CORRAL, 0.0002)),
+):
+    for device_id in ids:
+        if device_id in EXCLUIR_DEL_LOOP_EN_VIVO or device_id in animales:
+            continue
+        lat_ini, lon_ini, bateria_ini = obtener_posicion_inicial(device_id, *fallback)
+        animales[device_id] = {
+            "grupo": grupo,
+            "lat": lat_ini,
+            "lon": lon_ini,
+            "bateria": bateria_ini,
+            "heading": random.uniform(0, 2 * math.pi),
+            "vinculada": None,  # None = todavía no se sabe; se aprende de la respuesta del worker
+        }
 
-def generar_payload(device_id, estado, f_cnt):
-    en_celo = device_id == FORZAR_CELO_DEVICE_ID
-    enferma = device_id == FORZAR_SALUD_DEVICE_ID
 
-    # Consumo de batería leve
+def centros_de_grupo():
+    """Centro (lat, lon) de cada grupo, con las posiciones del momento."""
+    posiciones = {}
+    for estado in animales.values():
+        posiciones.setdefault(estado["grupo"], []).append((estado["lat"], estado["lon"]))
+    return {g: (sum(p[0] for p in ps) / len(ps), sum(p[1] for p in ps) / len(ps))
+            for g, ps in posiciones.items()}
+
+
+def metros(lat1, lon1, lat2, lon2):
+    return math.hypot((lat2 - lat1) * 111_320, (lon2 - lon1) * 111_320 * math.cos(math.radians(lat1)))
+
+
+def generar_payload(device_id, estado, centro, sesion):
     estado["bateria"] -= random.uniform(0.01, 0.05)
     if estado["bateria"] < 0:
-        estado["bateria"] = 100.0 # Se cambió la caravana/batería
+        estado["bateria"] = 100.0
 
-    speed_mult = 1.0
-    turn_std = TURN_STD_BASE
-
-    if en_celo:
-        move_state = random.randint(*MOVESTATE_ALTA_ACTIVIDAD)  # siempre alta actividad (7-9)
-        speed_mult = random.uniform(SPEED_MULT_CELO_MIN, SPEED_MULT_CELO_MAX)
-        turn_std = TURN_STD_CELO
-    elif enferma:
-        # Casi siempre en reposo/rumia, con desplazamiento mínimo: ver
-        # justificación en el comentario de SPEED_MULT_SALUD_ENFERMO más arriba.
-        if random.random() < PROB_REPOSO_ENFERMO:
-            move_state = random.randint(*MOVESTATE_REPOSO)
-        else:
-            move_state = random.randint(*MOVESTATE_NORMAL)
-        speed_mult = SPEED_MULT_SALUD_ENFERMO
-        turn_std = TURN_STD_SALUD_ENFERMO
+    r = random.random()
+    if r < 0.35:
+        move_state = random.randint(*MOVESTATE_REPOSO)
+    elif r < 0.95:
+        move_state = random.randint(*MOVESTATE_NORMAL)
     else:
-        # Comportamiento normal por defecto: mayormente reposo/pastoreo, rara vez alta actividad
-        r = random.random()
-        if r < 0.35:
-            move_state = random.randint(*MOVESTATE_REPOSO)
-        elif r < 0.95:
-            move_state = random.randint(*MOVESTATE_NORMAL)
-        else:
-            move_state = random.randint(*MOVESTATE_ALTA_ACTIVIDAD)  # falso positivo ocasional
+        move_state = random.randint(*MOVESTATE_ALTA_ACTIVIDAD)  # pico ocasional, esperable
 
-    # Random walk correlacionado (rumbo persistente + paso de magnitud fija),
-    # igual que generate_dataset.py: evita que la distancia por tick quede
-    # tan ruidosa como con componentes lat/lon independientes (ver comentario
-    # de TURN_STD_BASE/TURN_STD_CELO más arriba).
-    estado["heading"] += random.gauss(0, 1) * turn_std
-    speed = SPEED_BASE_DEG_POR_INTERVALO * speed_mult
-    estado["lat"] += speed * math.cos(estado["heading"])
-    estado["lon"] += speed * math.sin(estado["heading"])
+    # Magnitud de paso fija a la escala de un tick de 5 min: no se re-escala
+    # según INTERVALO_SEGUNDOS (ver docstring). Lejos del centro de su grupo,
+    # la vaca vuelve hacia él (cohesión del rodeo, ver docstring).
+    if metros(estado["lat"], estado["lon"], *centro) > RADIO_COHESION_M:
+        estado["heading"] = (math.atan2(centro[1] - estado["lon"], centro[0] - estado["lat"])
+                             + random.gauss(0, TURN_STD_BASE))
+    else:
+        estado["heading"] += random.gauss(0, 1) * TURN_STD_BASE
+    estado["lat"] += SPEED_BASE_DEG_POR_TICK_5MIN * math.cos(estado["heading"])
+    estado["lon"] += SPEED_BASE_DEG_POR_TICK_5MIN * math.sin(estado["heading"])
 
-    # Generamos el formato TTN v3 Webhook
+    # f_cnt incremental: el backend tiene idempotencia por frame counter.
+    # Sin él, el worker responde 200 pero descarta todos los paquetes
+    # silenciosamente (fCnt=0 <= ultimoFrameCounter ya guardado). Arranca en 1
+    # porque cada corrida es una sesión nueva (session_key_id).
+    estado["f_cnt"] = estado.get("f_cnt", 0) + 1
+
+    # Formato TTN v3 Webhook
     return {
         "end_device_ids": {
             "dev_eui": device_id
         },
         "uplink_message": {
-            "f_cnt": f_cnt,
             "received_at": datetime.now(timezone.utc).isoformat(),
+            "f_cnt": estado["f_cnt"],
+            "session_key_id": sesion,
             "decoded_payload": {
                 "type": "GNSSPosition",
                 "latitude": round(estado["lat"], 6),
@@ -250,124 +250,59 @@ def generar_payload(device_id, estado, f_cnt):
     }
 
 
-def enviar(payload):
+def registrar_vinculacion(device_id, estado, respuesta):
+    """Acto 1: avisa cuando una caravana libre pasa de ignorada a aceptada."""
+    vinculada = respuesta != RESPUESTA_SIN_ANIMAL
+    if vinculada and estado["vinculada"] is False:
+        print(f"[ACTO 1] {device_id} fue vinculada a una vaca: el worker empezó a guardar "
+              f"su telemetría. Aparece en el mapa en este ciclo.")
+    estado["vinculada"] = vinculada
+    return vinculada
+
+
+def main():
+    print(f"Iniciando simulador DEMO (manada de fondo) para {len(animales)} caravanas.")
+    print(f"Rodeo vivo: {[d for d, e in animales.items() if e['grupo'] == 'rodeo']} "
+          f"(vuelven al centro a más de {RADIO_COHESION_M:g} m).")
+    print(f"Target API: {API_URL}")
+    print(f"Frecuencia de envío (real, ritmo de demo): {INTERVALO_SEGUNDOS} segundos.")
+    print(f"Escala de movimiento por paquete (fija): tick de {TICK_MODELADO_SEGUNDOS} segundos.")
+    print(f"Reservados para otros scripts o el seed (no se les manda telemetría acá): "
+          f"{sorted(EXCLUIR_DEL_LOOP_EN_VIVO)}")
+    print(f"[ACTO 1] Caravanas libres en el loop (el worker las ignora hasta que se vinculan): "
+          f"{[d for d in EXTRA_DEVICE_IDS if d in animales]}")
+    print(f"\n[{datetime.now().isoformat()}] Arrancando loop en vivo...\n")
+
     headers = {}
     api_key = os.getenv("TTN_WEBHOOK_API_KEY")
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    sesion = f"demo_{int(time.time())}"
+    # Fijo: con el centro del momento, el rodeo entero se iría corriendo (~60 m en 10 min).
+    hogares = centros_de_grupo()
 
-    try:
-        requests.post(API_URL, json=payload, headers=headers, timeout=2)
-        return True
-    except Exception:
-        return False
-
-
-def inyectar_historial_salud():
-    # El modelo de salud necesita DOS ventanas de telemetría real, distintas
-    # de la de celo (ver comentario grande más arriba sobre RF03):
-    #
-    #   1. Calibración (>= vigia.salud.calibracion-dias, 7 por defecto):
-    #      telemetría "sana" que el backend usa para calcular el perfil de
-    #      referencia individual (POST /api/internal/ml/salud/perfil). Acá
-    #      inyectamos 8 días de comportamiento normal para tener margen.
-    #   2. Ventana a evaluar (24hs / 288 puntos, POST .../predict): la que
-    #      tiene que verse anómala para que el desvío se detecte. Los
-    #      últimos 288 puntos de la calibración se generan directamente con
-    #      el patrón "enferma" (ver generar_payload), simulando que el
-    #      cuadro arrancó hace ~1 día.
-    #
-    # A diferencia del historial de celo (ver el comentario de
-    # sembrarHistorialCelo() en DataInitializer.java: ese sí se movió al
-    # backend), el historial de salud sigue inyectándose acá porque la
-    # vigilancia sanitaria no forma parte del alcance cubierto por el
-    # DataInitializer todavía.
-    #
-    # Esto solo produce una alerta si `fecha_alta` de este animal ya tiene
-    # >= calibracion-dias de antigüedad real (ver DataInitializer.java,
-    # donde VIGIA-ARG-002 se backdatea a propósito para poder demostrarlo
-    # el mismo día).
-    DIAS_CALIBRACION = 8
-    SAMPLES_PER_DIA = 288
-    TICK_HISTORIAL_SEGUNDOS = 300  # 5 minutos, igual que generate_dataset.py
-    TOTAL_TICKS = DIAS_CALIBRACION * SAMPLES_PER_DIA
-    TICKS_ENFERMA = SAMPLES_PER_DIA  # el último día del historial ya "enferma"
-
-    print(f"Inyectando {TOTAL_TICKS} puntos de historial ({DIAS_CALIBRACION} días, 1 cada 5 min) "
-          f"para {FORZAR_SALUD_DEVICE_ID}: {DIAS_CALIBRACION - 1} días de calibración sana + "
-          f"1 día de cuadro de enfermedad (inmovilidad)...")
-    estado = animales[FORZAR_SALUD_DEVICE_ID]
-    for i in range(TOTAL_TICKS, 0, -1):
-        past_time = datetime.now(timezone.utc) - timedelta(seconds=i * TICK_HISTORIAL_SEGUNDOS)
-        esta_enferma = i <= TICKS_ENFERMA
-
-        if esta_enferma:
-            if random.random() < PROB_REPOSO_ENFERMO:
-                move_state = random.randint(*MOVESTATE_REPOSO)
-            else:
-                move_state = random.randint(*MOVESTATE_NORMAL)
-            speed_mult = SPEED_MULT_SALUD_ENFERMO
-            turn_std = TURN_STD_SALUD_ENFERMO
-        else:
-            r = random.random()
-            if r < 0.35:
-                move_state = random.randint(*MOVESTATE_REPOSO)
-            elif r < 0.95:
-                move_state = random.randint(*MOVESTATE_NORMAL)
-            else:
-                move_state = random.randint(*MOVESTATE_ALTA_ACTIVIDAD)
-            speed_mult = 1.0
-            turn_std = TURN_STD_BASE
-
-        estado["heading"] += random.gauss(0, 1) * turn_std
-        speed = SPEED_BASE_DEG_POR_TICK_5MIN * speed_mult
-        estado["lat"] += speed * math.cos(estado["heading"])
-        estado["lon"] += speed * math.sin(estado["heading"])
-
-        payload = {
-            "end_device_ids": {
-            "dev_eui": device_id
-            },
-            "timestamp": past_time.replace(tzinfo=None).isoformat(),
-            "payload": {
-                "latitud": round(estado["lat"], 6),
-                "longitud": round(estado["lon"], 6),
-                "moveState": move_state,
-                "bateria": 100.0
-            }
-        }
-        enviar(payload)
-    print("Historial de salud inyectado exitosamente.")
-
-
-def main():
-    print(f"Iniciando simulador para {NUM_ANIMALES} animales en el Establecimiento de Prueba.")
-    print(f"Target API: {API_URL}")
-    print(f"Intervalo de envío: {INTERVALO_SEGUNDOS} segundos.")
-    print(f"Escenario forzado de celo: {FORZAR_CELO_DEVICE_ID} "
-          f"(historial de 24hs ya persistido por DataInitializer al arrancar el backend; "
-          f"este script ya no lo inyecta, ver sembrarHistorialCelo() en DataInitializer.java).")
-    print(f"Escenario forzado de desvío sanitario: {FORZAR_SALUD_DEVICE_ID}")
-
-    inyectar_historial_salud()
-    f_cnt = 1
     while True:
         inicio_ciclo = time.time()
         exitos = 0
+        sin_vincular = 0
         errores = 0
 
-        headers = {}
-        api_key = os.getenv("TTN_WEBHOOK_API_KEY")
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+        print(f"--- Iniciando ciclo de envío ({datetime.now().isoformat()}) ---")
 
-        print(f"\n--- Iniciando ciclo de envío ({datetime.now().isoformat()}) ---")
         for device_id, estado in animales.items():
-            payload = generar_payload(device_id, estado, f_cnt)
+            payload = generar_payload(device_id, estado, hogares[estado["grupo"]], sesion)
             try:
-                response = requests.post(API_URL, json=payload, timeout=5, headers=headers)
-                if response.status_code in [200, 201, 202]:
-                    exitos += 1
+                response = requests.post(API_URL, json=payload, headers=headers, timeout=5)
+                respuesta = response.text.strip()
+                if (response.status_code in [200, 201, 202] and respuesta.startswith("Ignorado")
+                        and respuesta != RESPUESTA_SIN_ANIMAL):
+                    errores += 1
+                    print(f"AVISO {device_id}: el worker NO guardó el paquete: {respuesta}")
+                elif response.status_code in [200, 201, 202]:
+                    if registrar_vinculacion(device_id, estado, respuesta):
+                        exitos += 1
+                    else:
+                        sin_vincular += 1
                 else:
                     errores += 1
                     print(f"Error {response.status_code}: {response.text}")
@@ -376,14 +311,14 @@ def main():
                 print(f"Excepción de conexión: {e}")
 
         tiempo_transcurrido = time.time() - inicio_ciclo
-        print(f"Ciclo completado en {tiempo_transcurrido:.2f}s. Éxitos: {exitos}, Errores: {errores}")
+        print(f"Ciclo completado en {tiempo_transcurrido:.2f}s. Éxitos: {exitos}, "
+              f"Caravanas sin vincular: {sin_vincular}, Errores: {errores}")
 
         tiempo_espera = INTERVALO_SEGUNDOS - tiempo_transcurrido
         if tiempo_espera > 0:
-            print(f"Esperando {tiempo_espera:.2f} segundos para el próximo ciclo...")
+            print(f"Esperando {tiempo_espera:.2f} segundos para el próximo ciclo...\n")
             time.sleep(tiempo_espera)
-        
-        f_cnt += 1
+
 
 if __name__ == "__main__":
     main()
