@@ -986,13 +986,20 @@
 
 @media (min-width: 640px) {
   .landing-team-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(6, 1fr);
   }
-}
 
-@media (min-width: 1024px) {
-  .landing-team-grid {
-    grid-template-columns: repeat(4, 1fr);
+  .landing-team-card {
+    grid-column: span 2;
+  }
+
+  /* Centrar los dos integrantes inferiores (grilla 3 y 2) */
+  .landing-team-card:nth-child(4) {
+    grid-column: 2 / span 2;
+  }
+
+  .landing-team-card:nth-child(5) {
+    grid-column: 4 / span 2;
   }
 }
 

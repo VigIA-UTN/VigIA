@@ -217,11 +217,11 @@ export default function LandingPage() {
   };
 
   const teamMembers = [
-    { name: 'Santiago Mendez', role: 'CEO', img: '/team/santiago-mendez.jpg' },
-    { name: 'Iñaki Joaquín Lorences', role: 'Técnico de Campo', img: '/team/inaki-lorences.jpg' },
-    { name: 'Julián Cardoso Landin', role: 'Técnico de Campo', img: '/team/julian-cardoso.jpg' },
-    { name: 'Matías Gabriel Jastrebow', role: 'Asesor Contable y Legal', img: '/team/matias-jastrebow.jpg' },
-    { name: 'Tomás Agustín Fabrizio', role: 'Asesor Contable y Legal', img: '/team/tomas-fabrizio.png' }
+    { name: 'Santiago Mendez', role: 'Project Manager', img: '/team/santiago-mendez.jpg' },
+    { name: 'Iñaki Joaquín Lorences', role: 'Scrum Master', img: '/team/inaki-lorences.jpg' },
+    { name: 'Julián Cardoso Landin', role: 'Product Owner', img: '/team/julian-cardoso.jpg' },
+    { name: 'Matías Gabriel Jastrebow', role: 'Líder Técnico', img: '/team/matias-jastrebow.jpg' },
+    { name: 'Tomás Agustín Fabrizio', role: 'Arquitecto de Software', img: '/team/tomas-fabrizio.png' }
   ];
 
   return (
