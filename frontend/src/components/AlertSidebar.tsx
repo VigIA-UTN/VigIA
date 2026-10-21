@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { aplicarAlertaEnLista, coincideFiltroTipo, combinarAlerta, getAlertas, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
-import { useAuthStore } from '../store/authStore';
+import { useAlertasStream } from '../hooks/useAlertasStream';
 import AlertDetailSidebar from './AlertDetailSidebar';
 import AlertNotificationCard from './AlertNotificationCard';
 import IntervencionFormPanel from './IntervencionFormPanel';
@@ -29,13 +29,9 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
   const [filtroTipo, setFiltroTipo] = useState<string | null>(null);
   const [filtroSeveridad, setFiltroSeveridad] = useState<string>('');
 
-  // Ref to track the highest received ID for Last-Event-ID recovery
-  const maxAlertaIdRef = useRef<number>(0);
-
   useEffect(() => {
     if (!selectedId) return;
     let isMounted = true;
-    let eventSource: EventSource | null = null;
 
     const init = async () => {
       setLoading(true);
@@ -43,73 +39,36 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
         const data = await getAlertas(selectedId, undefined, undefined, 'PENDIENTE');
         if (!isMounted) return;
         setAlertas(data);
-        if (data.length > 0) {
-          maxAlertaIdRef.current = Math.max(...data.map(a => a.id));
-        }
       } catch (error) {
         console.error("Error fetching alertas:", error);
       } finally {
         if (isMounted) setLoading(false);
       }
-
-      if (!isMounted) return;
-
-      // Setup SSE connection AFTER fetching initial data
-      const token = useAuthStore.getState().token;
-      const API_URL = import.meta.env.VITE_API_URL as string;
-      let sseUrl = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
-      if (token) {
-        sseUrl += `&token=${token}`;
-      }
-      if (maxAlertaIdRef.current > 0) {
-        sseUrl += `&lastEventId=${maxAlertaIdRef.current}`;
-      }
-
-      eventSource = new EventSource(sseUrl);
-      let reconectando = false;
-
-      eventSource.onmessage = (event) => {
-        if (!isMounted) return;
-        const newAlerta = JSON.parse(event.data) as AlertaResponse;
-        console.log("Alerta SSE recibida en sidebar:", newAlerta);
-
-        // Update max ID
-        if (newAlerta.id > maxAlertaIdRef.current) {
-          maxAlertaIdRef.current = newAlerta.id;
-        }
-
-        // El sidebar lista solo pendientes: una alerta resuelta sale de la lista
-        setAlertas((prev) => aplicarAlertaEnLista(prev, newAlerta, { tipo: '', severidad: '', estado: 'PENDIENTE' }));
-
-        // Si la alerta actualizada es la que estamos viendo en detalle, actualizamos el estado
-        setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? combinarAlerta(prev, newAlerta) : prev));
-      };
-
-      // Al reconectar se recarga la lista: el replay del backend solo trae alertas nuevas, no cambios.
-      eventSource.onopen = () => {
-        if (reconectando && isMounted) {
-          getAlertas(selectedId, undefined, undefined, 'PENDIENTE')
-            .then(data => { if (isMounted) setAlertas(data); })
-            .catch(error => console.error("Error recargando alertas:", error));
-        }
-        reconectando = false;
-      };
-
-      eventSource.onerror = (error) => {
-        reconectando = true;
-        console.error("SSE connection error in sidebar:", error);
-      };
     };
 
     init();
 
     return () => {
       isMounted = false;
-      if (eventSource) {
-        eventSource.close();
-      }
     };
   }, [selectedId]);
+
+  // La suscripción arranca junto con la carga inicial: lo que llegue mientras tanto ya no se pierde.
+  useAlertasStream(selectedId, (newAlerta) => {
+    console.log("Alerta SSE recibida en sidebar:", newAlerta);
+
+    // El sidebar lista solo pendientes: una alerta resuelta sale de la lista
+    setAlertas((prev) => aplicarAlertaEnLista(prev, newAlerta, { tipo: '', severidad: '', estado: 'PENDIENTE' }));
+
+    // Si la alerta actualizada es la que estamos viendo en detalle, actualizamos el estado
+    setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? combinarAlerta(prev, newAlerta) : prev));
+  }, () => {
+    // Al reconectar se recarga la lista: el replay del backend solo trae alertas nuevas, no cambios.
+    if (!selectedId) return;
+    getAlertas(selectedId, undefined, undefined, 'PENDIENTE')
+      .then(data => setAlertas(data))
+      .catch(error => console.error("Error recargando alertas:", error));
+  });
 
 
   const handleAlertClick = (alerta: AlertaResponse) => {

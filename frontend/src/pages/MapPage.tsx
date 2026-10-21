@@ -9,6 +9,7 @@ import AlertSidebar from '../components/AlertSidebar';
 import PerimetroSidebar from '../components/PerimetroSidebar';
 import { type AnimalMapa, getAnimalesMapa, getAnimales } from '../api/animalesApi';
 import { type AlertaResumenResponse, type AlertaResponse, aplicarAlertaEnAnimales, getResumenAlertas } from '../api/alertaApi';
+import { useAlertasStream } from '../hooks/useAlertasStream';
 import {
   getPerimetros,
   activarPerimetro,
@@ -226,48 +227,26 @@ export default function MapPage() {
 
     eventSourceTelemetria.onerror = (error) => {
       console.error('SSE Error de telemetría', error);
-      eventSourceTelemetria.close();
-    };
-
-    // Alertas SSE
-    let sseUrlAlertas = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
-    if (token) {
-      sseUrlAlertas += `&token=${token}`;
-    }
-    const eventSourceAlertas = new EventSource(sseUrlAlertas);
-
-    eventSourceAlertas.onmessage = async (event) => {
-      if (!isMounted) return;
-      try {
-        const newAlerta = JSON.parse(event.data) as AlertaResponse;
-
-        // Actualizar las alertas de cada animal al que le corresponde (en aislamiento, todos los listados)
-        setAnimales(prevAnimales => aplicarAlertaEnAnimales(prevAnimales, newAlerta));
-
-        // Los eventos salen recién cuando la alerta ya está commiteada: el resumen se puede pedir al instante.
-        try {
-          const resumenData = await getResumenAlertas(selectedId);
-          if (isMounted) setResumenAlertas(resumenData);
-        } catch (e) {
-          console.error('Error refrescando resumen de alertas', e);
-        }
-
-      } catch (error) {
-        console.error('Error parseando evento SSE de alertas', error);
-      }
-    };
-
-    eventSourceAlertas.onerror = (error) => {
-      console.error('SSE Error de alertas', error);
-      // eventSourceAlertas.close(); // No lo cerramos acá porque EventSource reintenta automáticamente
+      // No lo cerramos: EventSource reintenta solo; cerrarlo deja el mapa congelado hasta recargar
     };
 
     return () => {
       isMounted = false;
       eventSourceTelemetria.close();
-      eventSourceAlertas.close();
     };
   }, [selectedId]);
+
+  // Alertas SSE (conexión compartida con el sidebar y el detalle)
+  useAlertasStream(selectedId, (newAlerta) => {
+    // Actualizar las alertas de cada animal al que le corresponde (en aislamiento, todos los listados)
+    setAnimales(prevAnimales => aplicarAlertaEnAnimales(prevAnimales, newAlerta));
+
+    // Los eventos salen recién cuando la alerta ya está commiteada: el resumen se puede pedir al instante.
+    if (!selectedId) return;
+    getResumenAlertas(selectedId)
+      .then(resumenData => setResumenAlertas(resumenData))
+      .catch(e => console.error('Error refrescando resumen de alertas', e));
+  });
 
   const activeEstablecimiento = establecimientos.find(e => e.id === selectedId);
   const animalConPosicion = animales.find(a => a.latitud != null && a.longitud != null);
