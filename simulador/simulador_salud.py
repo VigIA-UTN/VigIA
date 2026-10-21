@@ -100,11 +100,11 @@ API_URL = os.getenv("API_URL", "http://localhost:8081/api/v1/ingesta/uplink")
 DEVICE_ID = os.getenv("FORZAR_SALUD_DEVICE_ID", "VIGIA-ARG-002")
 NOMBRE_VACA = "#208 — Margarita (Jersey)" if DEVICE_ID == "VIGIA-ARG-002" else DEVICE_ID
 
-# El rodeo vivo es el de simulador.py (misma variable y mismo default).
+# El rodeo vivo es el de simulador.py (misma variable y mismo default), sin la #208.
 RODEO_DEVICE_IDS = [d.strip() for d in os.getenv(
     "RODEO_DEVICE_IDS",
-    ",".join(f"VIGIA-ARG-{i:03d}" for i in range(15, 27)),
-).split(",") if d.strip()]
+    ",".join(f"VIGIA-ARG-{i:03d}" for i in range(3, 41)),
+).split(",") if d.strip() and d.strip() != DEVICE_ID]
 
 # ─── Seed (DataInitializer) ──────────────────────────────────────────────
 # Minutos entre el último dato sembrado de la #208 y el arranque del backend
@@ -114,7 +114,7 @@ MINUTOS_SIN_DATOS_SEED = 35
 MINUTOS_RELLENO_HASTA_ARRANQUE = 5
 TICK_SEED_MINUTOS = 5
 
-# ─── Perímetro "Potrero Principal Demo" (DataInitializer) ────────────────
+# ─── Perímetro "Potrero Principal" (DataInitializer) ────────────────
 LAT_CENTRO = -34.943317
 LON_CENTRO = -59.225728
 DELTA_PERIMETRO = 0.0045

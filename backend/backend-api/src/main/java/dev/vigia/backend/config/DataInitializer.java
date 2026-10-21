@@ -118,11 +118,20 @@ public class DataInitializer implements CommandLineRunner {
         private static final int MINUTOS_SIN_DATOS_MARGARITA = 35;
         private static final double METROS_MARGARITA_AL_RODEO = 180;
 
-        // Dias de historial de las vacas que reciben telemetria en vivo durante la demo (rodeo vivo,
-        // celo y fuga): menos que vigia.salud.calibracion-dias (7), asi el job de salud las ve "en
-        // calibracion" (log INFO) en vez de pedir un perfil que ml-salud rechaza (ERROR cada minuto en
-        // la consola) o de predecir sobre un perfil que no se parece al pastoreo del simulador.
-        private static final int DIAS_EN_CALIBRACION = 6;
+        // Dias de historial de la #104: menos que vigia.salud.calibracion-dias (7), asi el job de salud no
+        // le arma perfil. Con perfil, sus 24 hs de celo dan alerta de salud en el Acto 2 (validado contra
+        // ml-salud: 40 de 40).
+        private static final int DIAS_HISTORIAL_104 = 6;
+
+        // Historial del resto del rodeo: 8 dias a 5 min, los 7 primeros son la calibracion del perfil de
+        // salud (RF03, ver SaludDetectorStrategyImpl) y el ultimo, la ventana que evalua.
+        private static final int DIAS_HISTORIAL_RODEO = 8;
+        private static final int MUESTRAS_POR_DIA = 288;
+
+        // Pastoreo de simulador.py (generar_payload): grados por paso de 5 min, giro y radio de vuelta al centro.
+        private static final double PASO_SIMULADOR = 0.000018;
+        private static final double GIRO_SIMULADOR = 0.35;
+        private static final double RADIO_COHESION_M = 35.0;
 
         @Override
         @SuppressWarnings("null")
@@ -152,13 +161,11 @@ public class DataInitializer implements CommandLineRunner {
 
                 // Usuarios
                 Usuario admin = buildUsuario("Admin", "VigIA", "admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
-                Usuario productor = buildUsuario("Juan", "Productor", "productor@vigia.dev", "productor123",
+                Usuario productor = buildUsuario("Juan", "Martínez", "juan@laesperanza.com", "productor123",
                                 Rol.PRODUCTOR);
-                Usuario campero = buildUsuario("Carlos", "Campero", "campero@vigia.dev", "campero123", Rol.CAMPERO);
-                Usuario vet = buildUsuario("Laura", "Vet", "veterinario@vigia.dev", "vet123", Rol.VETERINARIO);
-                Usuario pendiente = buildUsuario("Nuevo", "Usuario", "pendiente@vigia.dev", "pendiente123",
-                                Rol.PENDIENTE);
-                usuarioRepository.saveAll(List.of(admin, productor, campero, vet, pendiente));
+                Usuario campero = buildUsuario("Carlos", "Gómez", "carlos@laesperanza.com", "campero123", Rol.CAMPERO);
+                Usuario vet = buildUsuario("Laura", "Benítez", "laura@vet.com", "vet123", Rol.VETERINARIO);
+                usuarioRepository.saveAll(List.of(admin, productor, campero, vet));
 
                 // Establecimiento principal (coords = simulador.py)
                 Establecimiento estP = new Establecimiento();
@@ -184,7 +191,7 @@ public class DataInitializer implements CommandLineRunner {
                 estAurora.getEmpleados().add(new Empleado(estAurora, productor));
                 establecimientoRepository.save(estAurora);
 
-                log.info("[DataInitializer] 2 establecimientos + 5 usuarios. Productor vinculado a ambos (RNF03).");
+                log.info("[DataInitializer] 2 establecimientos + 4 usuarios. Productor vinculado a ambos (RNF03).");
 
                 // Rodeos
                 RodeoLote lotePrincipal = new RodeoLote(estP);
@@ -222,44 +229,31 @@ public class DataInitializer implements CommandLineRunner {
                 sembrarHistorialMargarita(vaca2.getCaravana(), apartada,
                                 ahora.minusMinutes(MINUTOS_SIN_DATOS_MARGARITA));
 
-                // Vaca 3: ultima telem >1h -> "sin datos recientes" H0012
-                Animal vaca3 = crearAnimal(estP, lotePrincipal, "33333", "Renegrida", "Brangus",
+                // Vacas 3 a 8: paridas hace unas semanas.
+                Animal vaca3 = crearAnimal(estP, lotePrincipal, numeroManejo(3), "Renegrida", "Holando",
                                 LocalDate.of(2022, 3, 15), "VIGIA-ARG-003", LocalDate.now().minusDays(45));
                 sembrarPartoReciente(vaca3, vet, ahora, 20);
-                crearTelemetria(vaca3.getCaravana(), LAT_CENTRO, LON_CENTRO, 45.0, ahora.minusHours(2));
-
-                // Vaca 4: ultima telem >8h -> "sin senal >6h" H0043
-                Animal vaca4 = crearAnimal(estP, lotePrincipal, "44444", "Doradita", "Angus",
+                Animal vaca4 = crearAnimal(estP, lotePrincipal, numeroManejo(4), "Doradita", "Holando",
                                 LocalDate.of(2021, 8, 20), "VIGIA-ARG-004", LocalDate.now().minusDays(45));
                 sembrarPartoReciente(vaca4, vet, ahora, 25);
-                crearTelemetria(vaca4.getCaravana(), LAT_CENTRO - 0.002, LON_CENTRO + 0.001, 38.0, ahora.minusHours(9));
-
-                // Vaca 5: bateria baja 14% (H0043)
-                Animal vaca5 = crearAnimal(estP, lotePrincipal, "55555", "Pinta", "Jersey",
+                // La unica caravana con bateria baja (14 %): transmite normal, para el bloque "¿Puedo confiar en
+                // el monitoreo?" del dashboard (H0043).
+                Animal vaca5 = crearAnimal(estP, lotePrincipal, numeroManejo(5), "Pinta", "Jersey",
                                 LocalDate.of(2022, 1, 10), "VIGIA-ARG-005", LocalDate.now().minusDays(45));
                 sembrarPartoReciente(vaca5, vet, ahora, 30);
-                double[] posVaca5 = posicionEnRodeo(rndRodeo);
-                crearTelemetria(vaca5.getCaravana(), posVaca5[0], posVaca5[1], 14.0, ahora.minusMinutes(8));
-
-                // Vaca 6: bateria 18% + demo sanitaria (>24h para el worker)
-                Animal vaca6 = crearAnimal(estP, lotePrincipal, "60006", "Demo Salud con perfil", "Angus",
+                // Tuvo una neumonia hace 4 dias, ya diagnosticada y tratada (ver alertas sanitarias).
+                Animal vaca6 = crearAnimal(estP, lotePrincipal, numeroManejo(6), "Bonita", "Holando",
                                 LocalDate.of(2021, 1, 1), "VIGIA-ARG-006", LocalDate.now().minusDays(45));
                 sembrarPartoReciente(vaca6, vet, ahora, 18);
-                crearTelemetria(vaca6.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO - 0.002, 18.0,
-                                ahora.minusHours(25));
-
-                // Vaca 7: demo sanitaria sin perfil
-                Animal vaca7 = crearAnimal(estP, lotePrincipal, "70007", "Demo Salud sin perfil", "Hereford",
+                Animal vaca7 = crearAnimal(estP, lotePrincipal, numeroManejo(7), "Chola", "Jersey",
                                 LocalDate.of(2021, 6, 1), "VIGIA-ARG-007", LocalDate.now().minusDays(45));
                 sembrarPartoReciente(vaca7, vet, ahora, 22);
-
-                // Vaca 8: demo sanitaria sin telemetria en ventana
-                Animal vaca8 = crearAnimal(estP, lotePrincipal, "80008", "Demo Salud sin telemetria", "Brangus",
+                Animal vaca8 = crearAnimal(estP, lotePrincipal, numeroManejo(8), "Manchada", "Holando",
                                 LocalDate.of(2021, 9, 1), "VIGIA-ARG-008", LocalDate.now().minusDays(45));
                 sembrarPartoReciente(vaca8, vet, ahora, 28);
 
-                // Vaca 9: demo historial reproductivo completo
-                Animal vaca9 = crearAnimal(estP, lotePrincipal, "90009", "Demo Historial Reproductivo", "Angus",
+                // Vaca 9: historial reproductivo completo (parto, celo, inseminacion, revision y prenez)
+                Animal vaca9 = crearAnimal(estP, lotePrincipal, numeroManejo(9), "Perla", "Holando",
                                 LocalDate.of(2020, 6, 1), "VIGIA-ARG-009", LocalDate.now().minusDays(45));
                 sembrarEstadoReproductivo(vaca9, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
                                 LocalDate.now().minusMonths(8), ahora.minusMonths(8));
@@ -271,36 +265,23 @@ public class DataInitializer implements CommandLineRunner {
                 sembrarRevisionConEstadoSalud(vaca9, vet, TipoEstadoSalud.EN_OBSERVACION, ahora.minusDays(20));
                 sembrarGestante(vaca9, vet, LocalDate.now().minusDays(40), ahora.minusDays(9));
 
-                // Vaca 10: anestro PENDIENTE
-                Animal anestroPendiente = crearAnimal(estP, lotePrincipal, "10010", "Demo Anestro pendiente", "Angus",
+                // Vaca 10: la sugerencia de anestro del guion (H0030), pendiente de revision
+                Animal anestroPendiente = crearAnimal(estP, lotePrincipal, numeroManejo(10), "Negrita", "Holando",
                                 LocalDate.of(2019, 9, 1), "VIGIA-ARG-010", LocalDate.now().minusDays(45));
                 sembrarEstadoReproductivo(anestroPendiente, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
                                 LocalDate.now().minusDays(120), ahora.minusDays(120));
                 sembrarAlertaAnestro(estP, anestroPendiente, EstadoAlerta.PENDIENTE, 119, ahora.minusDays(1), null,
                                 null);
+                log.info("[DataInitializer] Anestro (umbral {} d): sugerencia pendiente para #{}.",
+                                estP.getDiasDeteccionAnestro(), anestroPendiente.getIdCaravanaOficial());
 
-                // Vaca 11: anestro CONFIRMADO
-                Animal anestroConfirmado = crearAnimal(estP, lotePrincipal, "11011", "Demo Anestro confirmado",
-                                "Hereford",
+                // Vacas 11 y 12: paridas hace unas semanas.
+                Animal vaca11 = crearAnimal(estP, lotePrincipal, numeroManejo(11), "Blanca", "Jersey",
                                 LocalDate.of(2020, 2, 1), "VIGIA-ARG-011", LocalDate.now().minusDays(45));
-                sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                                LocalDate.now().minusDays(150), ahora.minusDays(150));
-                sembrarAlertaAnestro(estP, anestroConfirmado, EstadoAlerta.CONFIRMADA, 138, ahora.minusDays(12),
-                                ahora.minusDays(10), vet);
-                sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.ANESTRO, OrigenEstado.MANUAL, vet,
-                                LocalDate.now().minusDays(150), ahora.minusDays(10));
-
-                // Vaca 12: candidato anestro (sin alerta, detector la genera en vivo)
-                Animal anestroCandidato = crearAnimal(estP, lotePrincipal, "12012", "Demo Anestro sin alerta",
-                                "Brangus",
+                sembrarPartoReciente(vaca11, vet, ahora, 26);
+                Animal vaca12 = crearAnimal(estP, lotePrincipal, numeroManejo(12), "Tosca", "Holando",
                                 LocalDate.of(2020, 4, 1), "VIGIA-ARG-012", LocalDate.now().minusDays(45));
-                sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                                LocalDate.now().minusDays(90), ahora.minusDays(90));
-                sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA,
-                                productor,
-                                null, ahora.minusDays(30));
-                log.info("[DataInitializer] Anestro (umbral {} d): 010 PENDIENTE, 011 CONFIRMADA, 012 candidato.",
-                                estP.getDiasDeteccionAnestro());
+                sembrarPartoReciente(vaca12, vet, ahora, 33);
 
                 // Vacas 13-27: GESTANTE (15 vacas, partos en proximas 12 semanas)
                 String[] nombresGestantes = {
@@ -313,7 +294,7 @@ public class DataInitializer implements CommandLineRunner {
                 for (int i = 0; i < diasDesdeIa.length; i++) {
                         int num = 13 + i;
                         Animal g = crearAnimal(estP, lotePrincipal,
-                                        String.format("%d%03d", num, num), nombresGestantes[i], "Holando",
+                                        numeroManejo(num), nombresGestantes[i], "Holando",
                                         LocalDate.of(2019, 10, 1),
                                         String.format("VIGIA-ARG-%03d", num),
                                         LocalDate.now().minusDays(45));
@@ -323,10 +304,10 @@ public class DataInitializer implements CommandLineRunner {
                 }
 
                 // 2 gestantes sin fecha de IA (casos edge H0044)
-                Animal gestanteSinIa1 = crearAnimal(estP, lotePrincipal, "28028", "Pampa", "Angus",
+                Animal gestanteSinIa1 = crearAnimal(estP, lotePrincipal, numeroManejo(28), "Pampa", "Holando",
                                 LocalDate.of(2020, 3, 1), "VIGIA-ARG-028", LocalDate.now().minusDays(45));
                 sembrarGestanteSinIa(gestanteSinIa1, vet, ahora.minusDays(60));
-                Animal gestanteSinIa2 = crearAnimal(estP, lotePrincipal, "29029", "Serena", "Jersey",
+                Animal gestanteSinIa2 = crearAnimal(estP, lotePrincipal, numeroManejo(29), "Serena", "Jersey",
                                 LocalDate.of(2020, 5, 1), "VIGIA-ARG-029", LocalDate.now().minusDays(45));
                 sembrarGestanteSinIa(gestanteSinIa2, vet, ahora.minusDays(45));
 
@@ -337,7 +318,7 @@ public class DataInitializer implements CommandLineRunner {
                 for (int i = 0; i < 6; i++) {
                         int num = 30 + i;
                         Animal ins = crearAnimal(estP, lotePrincipal,
-                                        String.format("%d%03d", num, num), nombresIns[i], "Holando",
+                                        numeroManejo(num), nombresIns[i], "Holando",
                                         LocalDate.of(2020, 7, 1),
                                         String.format("VIGIA-ARG-%03d", num),
                                         LocalDate.now().minusDays(45));
@@ -352,7 +333,7 @@ public class DataInitializer implements CommandLineRunner {
                 for (int i = 0; i < 4; i++) {
                         int num = 36 + i;
                         Animal vacia = crearAnimal(estP, lotePrincipal,
-                                        String.format("%d%03d", num, num), nombresVacias[i], "Angus",
+                                        numeroManejo(num), nombresVacias[i], "Holando",
                                         LocalDate.of(2019, 12, 1),
                                         String.format("VIGIA-ARG-%03d", num),
                                         LocalDate.now().minusDays(45));
@@ -378,15 +359,11 @@ public class DataInitializer implements CommandLineRunner {
                                         productor, LocalDate.now().minusDays(diasParto[i]), ahora.minusDays(3));
                 }
 
-                // 2 vacas en calibracion (fechaAlta hace 2 dias)
-                Animal vacaCalib1 = crearAnimal(estP, lotePrincipal, "40040", "Calibra-1", "Brangus",
-                                LocalDate.of(2023, 1, 15), "VIGIA-ARG-040", LocalDate.now().minusDays(2));
-                sembrarPartoReciente(vacaCalib1, vet, ahora, 15);
-                Animal vacaCalib2 = crearAnimal(estP, lotePrincipal, "41041", "Calibra-2", "Jersey",
-                                LocalDate.of(2023, 3, 20), "VIGIA-ARG-041", LocalDate.now().minusDays(2));
-                sembrarPartoReciente(vacaCalib2, vet, ahora, 17);
+                Animal vaca40 = crearAnimal(estP, lotePrincipal, numeroManejo(40), "Ramona", "Holando",
+                                LocalDate.of(2023, 1, 15), "VIGIA-ARG-040", LocalDate.now().minusDays(45));
+                sembrarPartoReciente(vaca40, vet, ahora, 15);
 
-                log.info("[DataInitializer] 41 vacas creadas en Lote Principal.");
+                log.info("[DataInitializer] 40 vacas creadas en Lote Principal.");
 
                 // 5 caravanas DISPONIBLE para Lote Cuarentena (H0040/H0041)
                 for (int i = 301; i <= 305; i++) {
@@ -400,90 +377,37 @@ public class DataInitializer implements CommandLineRunner {
                 }
                 log.info("[DataInitializer] 5 caravanas DISPONIBLE (VIGIA-LIBRE-301..305).");
 
-                // Telemetria reciente + historial de pastoreo
-                // Las vacas con datos de los ultimos minutos terminan su historial en el rodeo (ver
-                // LAT_RODEO); las de "sin datos recientes" (3, 4, 6, 11) quedan donde estaban.
-                LocalDateTime ahoraPastoreo = LocalDateTime.now();
-                sembrarHistorialPastoreo(vaca3.getCaravana(), LAT_CENTRO, LON_CENTRO, 48.0, 7,
-                                ahoraPastoreo.minusHours(2), null);
-                sembrarHistorialPastoreo(vaca4.getCaravana(), LAT_CENTRO - 0.002, LON_CENTRO + 0.001, 41.0, 7,
-                                ahoraPastoreo.minusHours(9), null);
-                sembrarHistorialPastoreo(vaca5.getCaravana(), LAT_CENTRO + 0.002, LON_CENTRO + 0.002, 17.0, 7,
-                                ahoraPastoreo.minusMinutes(22), posVaca5);
-                // Termina antes de que empiece el historial de celo de 24 hs, que ya cae en el rodeo.
-                // 5 + 1 dias: ver DIAS_EN_CALIBRACION.
-                sembrarHistorialPastoreo(vaca1.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO - 0.001, 92.0,
-                                DIAS_EN_CALIBRACION - 1, ahoraPastoreo.minusHours(24).minusMinutes(15), null);
-
-                // Las gestantes incluyen al rodeo vivo de simulador.py (015-026) y a las vacas de la
-                // fuga (013-014): ver DIAS_EN_CALIBRACION.
-                Random rndPastoreo = new Random(42L);
-                for (Animal g : gestantes) {
-                        double latOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
-                        double lonOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
-                        double[] enRodeo = posicionEnRodeo(rndRodeo);
-                        crearTelemetria(g.getCaravana(), enRodeo[0], enRodeo[1],
-                                        60.0 + rndPastoreo.nextDouble() * 30,
-                                        ahora.minusMinutes(5 + rndPastoreo.nextInt(20)));
-                        sembrarHistorialPastoreo(g.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
-                                        60.0 + rndPastoreo.nextDouble() * 30, DIAS_EN_CALIBRACION,
-                                        ahoraPastoreo.minusMinutes(10 + rndPastoreo.nextInt(30)), enRodeo);
-                }
-                for (Animal ins : inseminadas) {
-                        double latOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
-                        double lonOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
-                        double[] enRodeo = posicionEnRodeo(rndRodeo);
-                        crearTelemetria(ins.getCaravana(), enRodeo[0], enRodeo[1],
-                                        55.0 + rndPastoreo.nextDouble() * 35,
-                                        ahora.minusMinutes(3 + rndPastoreo.nextInt(15)));
-                        sembrarHistorialPastoreo(ins.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
-                                        55.0 + rndPastoreo.nextDouble() * 35, 7,
-                                        ahoraPastoreo.minusMinutes(8 + rndPastoreo.nextInt(20)), enRodeo);
-                }
-                for (Animal v : vacias) {
-                        double latOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
-                        double lonOff = (rndPastoreo.nextDouble() - 0.5) * 0.006;
-                        double[] enRodeo = posicionEnRodeo(rndRodeo);
-                        crearTelemetria(v.getCaravana(), enRodeo[0], enRodeo[1],
-                                        50.0 + rndPastoreo.nextDouble() * 40,
-                                        ahora.minusMinutes(4 + rndPastoreo.nextInt(18)));
-                        sembrarHistorialPastoreo(v.getCaravana(), LAT_CENTRO + latOff, LON_CENTRO + lonOff,
-                                        50.0 + rndPastoreo.nextDouble() * 40, 7,
-                                        ahoraPastoreo.minusMinutes(7 + rndPastoreo.nextInt(25)), enRodeo);
-                }
-                crearTelemetriaEnRodeo(anestroPendiente, rndRodeo, 72.0, ahora.minusMinutes(10));
-                crearTelemetria(anestroConfirmado.getCaravana(), LAT_CENTRO + 0.003, LON_CENTRO - 0.003, 68.0,
-                                ahora.minusHours(26));
-                crearTelemetriaEnRodeo(anestroCandidato, rndRodeo, 81.0, ahora.minusMinutes(7));
-
-                // Telemetría reciente en el rodeo (batería > 60%, 3-10 min) para no distorsionar el dashboard
-                crearTelemetriaEnRodeo(vaca7, rndRodeo, 78.0, ahora.minusMinutes(4));
-                crearTelemetriaEnRodeo(vaca8, rndRodeo, 82.0, ahora.minusMinutes(6));
-                crearTelemetriaEnRodeo(vaca9, rndRodeo, 75.0, ahora.minusMinutes(5));
-                crearTelemetriaEnRodeo(gestanteSinIa1, rndRodeo, 70.0, ahora.minusMinutes(8));
-                crearTelemetriaEnRodeo(gestanteSinIa2, rndRodeo, 74.0, ahora.minusMinutes(7));
-                crearTelemetriaEnRodeo(vacaCalib1, rndRodeo, 90.0, ahora.minusMinutes(3));
-                crearTelemetriaEnRodeo(vacaCalib2, rndRodeo, 88.0, ahora.minusMinutes(5));
-
-                log.info("[DataInitializer] Telemetria y pastoreo cargados (H0025).");
-
-                // Cohesion Social: 7 dias para las 40 vacas (H0026)
                 List<Animal> todos = new ArrayList<>();
                 todos.addAll(List.of(vaca1, vaca2, vaca3, vaca4, vaca5, vaca6, vaca7, vaca8, vaca9,
-                                anestroPendiente, anestroConfirmado, anestroCandidato));
+                                anestroPendiente, vaca11, vaca12));
                 todos.addAll(gestantes);
                 todos.add(gestanteSinIa1);
                 todos.add(gestanteSinIa2);
                 todos.addAll(inseminadas);
                 todos.addAll(vacias);
-                todos.add(vacaCalib1);
-                todos.add(vacaCalib2);
+                todos.add(vaca40);
 
+                // Telemetria: el rodeo pasta junto, con el mismo movimiento que simulador.py, y termina en el
+                // rodeo de hoy (ver sembrarHistorialRodeo). #104 y #208 tienen su propia historia para los
+                // actos 2 y 4.
+                // #104: dias de pastoreo y las ultimas 24 hs con patron de celo. Menos de 7 dias en total (ver
+                // DIAS_HISTORIAL_104): sin perfil de salud, que leeria esas 24 hs como un desvio.
+                sembrarHistorialPastoreo(vaca1.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO - 0.001, 92.0,
+                                DIAS_HISTORIAL_104 - 1, ahora.minusHours(24).minusMinutes(15), null);
+                for (Animal animal : todos) {
+                        if (animal == vaca1 || animal == vaca2) {
+                                continue;
+                        }
+                        int n = Integer.parseInt(animal.getCaravana().getCodigo().substring("VIGIA-ARG-".length()));
+                        double bateria = animal == vaca5 ? 14.0 : 62.0 + (n * 7) % 33;
+                        sembrarHistorialRodeo(animal.getCaravana(), n, bateria, ahora.minusSeconds(60 + (n * 13) % 180));
+                }
+                log.info("[DataInitializer] Telemetria y pastoreo cargados (H0025).");
+
+                // Cohesion Social: 7 dias para las 40 vacas (H0026)
                 Random rndCohesion = new Random(1234L);
                 for (Animal animal : todos) {
-                        String cod = animal.getCaravana() != null ? animal.getCaravana().getCodigo() : "";
-                        boolean caida = (animal == vaca2 || "VIGIA-ARG-006".equals(cod));
-                        sembrarCohesion(animal, estP, 7, caida, rndCohesion);
+                        sembrarCohesion(animal, estP, 7, animal == vaca2, rndCohesion);
                 }
                 log.info("[DataInitializer] Cohesion social 7 dias sembrada (H0026).");
 
@@ -491,11 +415,6 @@ public class DataInitializer implements CommandLineRunner {
                 Map<String, Object> perfilNormal = perfilDemo(
                                 new double[] { 6.2, 5.4, 4.1, 5.0 }, new double[] { 0.8, 0.7, 0.6, 0.7 },
                                 new double[] { 11.5, 9.0, 7.2, 9.5 }, new double[] { 2.1, 1.8, 1.5, 1.9 });
-
-                crearAlertaSanitaria(vaca6, SeveridadAlerta.ALTA, EstadoAlerta.PENDIENTE, 0.93f,
-                                "Problema severo postrante o complicacion de parto",
-                                ventanaSanitaria(vaca6.getCaravana(), ahora.minusDays(2), 2, 0.00001),
-                                perfilNormal, ahora.minusDays(9), null, null);
 
                 Alerta saludConfirmada = crearAlertaSanitaria(vaca6, SeveridadAlerta.ALTA, EstadoAlerta.CONFIRMADA,
                                 0.88f,
@@ -509,16 +428,8 @@ public class DataInitializer implements CommandLineRunner {
                                 "Sin nueva medicacion. Mantener en potrero cercano hasta el alta.",
                                 ahora.minusDays(2).plusHours(3));
 
-                crearAlertaSanitaria(vaca7, SeveridadAlerta.MEDIA, EstadoAlerta.PENDIENTE, 0.78f,
-                                "Enfermedad moderada / Cojera clinica",
-                                ventanaSanitaria(vaca7.getCaravana(), ahora.minusDays(2).minusHours(8), 3, 0.00002),
-                                null, null, null, null);
-
-                crearAlertaSanitaria(vaca8, SeveridadAlerta.BAJA, EstadoAlerta.PENDIENTE, 0.61f,
-                                "Enfermedad leve / Inicio",
-                                new ArrayList<>(), null, null, null, null);
-
-                log.info("[DataInitializer] Alertas sanitarias sembradas (vaca6/7/8).");
+                log.info("[DataInitializer] Alerta sanitaria historica sembrada (#{}, atendida).",
+                                vaca6.getIdCaravanaOficial());
 
                 // Pesadas (150 dias)
                 sembrarPesadas(vaca1, new double[][] { { 150, 400 }, { 95, 412 }, { 60, 431 }, { 25, 452 } });
@@ -531,8 +442,8 @@ public class DataInitializer implements CommandLineRunner {
                 sembrarPesadas(vaca8, new double[][] { { 50, 400 }, { 12, 420 }, { 5, 418 } });
                 sembrarPesadas(vaca9, new double[][] { { 140, 455 }, { 100, 462 }, { 50, 470 }, { 15, 488 } });
                 sembrarPesadas(anestroPendiente, new double[][] { { 90, 432 }, { 45, 434 } });
-                sembrarPesadas(anestroConfirmado, new double[][] { { 70, 420 }, { 30, 422 } });
-                sembrarPesadas(anestroCandidato,
+                sembrarPesadas(vaca11, new double[][] { { 70, 420 }, { 30, 422 } });
+                sembrarPesadas(vaca12,
                                 new double[][] { { 150, 428 }, { 95, 433 }, { 80, 440 }, { 40, 460 } });
                 sembrarPesadas(gestantes.get(0),
                                 new double[][] { { 145, 430 }, { 95, 441 }, { 55, 453 }, { 20, 469 } });
@@ -557,10 +468,9 @@ public class DataInitializer implements CommandLineRunner {
                 log.info("[DataInitializer] Alertas historicas 8 semanas sembradas (H0044/H0045).");
                 log.info("[DataInitializer] SEED DEMO completado.");
                 log.info("  admin@vigia.dev        / admin123      -> ADMINISTRADOR");
-                log.info("  productor@vigia.dev    / productor123  -> PRODUCTOR (ambos establecimientos)");
-                log.info("  campero@vigia.dev      / campero123    -> CAMPERO");
-                log.info("  veterinario@vigia.dev  / vet123        -> VETERINARIO");
-                log.info("  pendiente@vigia.dev    / pendiente123  -> PENDIENTE");
+                log.info("  juan@laesperanza.com   / productor123  -> PRODUCTOR (ambos establecimientos)");
+                log.info("  carlos@laesperanza.com / campero123    -> CAMPERO");
+                log.info("  laura@vet.com          / vet123        -> VETERINARIO");
         }
 
         // =========================================================================
@@ -641,7 +551,7 @@ public class DataInitializer implements CommandLineRunner {
                 };
                 LinearRing shell = gf.createLinearRing(coords);
                 Polygon area = gf.createPolygon(shell);
-                Perimetro p = new Perimetro(est, "Potrero Principal Demo",
+                Perimetro p = new Perimetro(est, "Potrero Principal",
                                 "Perimetro activo del lote de pastoreo principal (~500 m)", area);
                 p.configurarUmbral(BigDecimal.valueOf(50), false);
                 p.asignarLote(lote);
@@ -1152,6 +1062,86 @@ public class DataInitializer implements CommandLineRunner {
                 telemetriaRepository.saveAll(historial);
         }
 
+        /**
+         * Historia de una vaca del rodeo: DIAS_HISTORIAL_RODEO dias a 5 min con el mismo pastoreo que
+         * simulador.py (reparto de moveState, paso fijo, giro y vuelta al centro a mas de 35 m), para que el
+         * perfil de salud que arma el worker con estos datos no vea como desvio el pastoreo en vivo. Validado
+         * offline contra ml-salud: 0 alertas en 1200 ventanas (con el pastoreo anterior, moveState 2-5 y
+         * vuelta a la aguada, daba ~1 %). La actividad varia +-15 % entre dias, como en un animal real, y el
+         * centro del rodeo recorre el potrero en la semana (mapa de calor) hasta terminar en LAT_RODEO.
+         * El ultimo punto queda PENDIENTE de salud: en el primer ciclo despues del seed el worker arma el
+         * perfil y la vaca deja de figurar "en calibracion". Semilla por vaca: misma historia en cada arranque.
+         */
+        private void sembrarHistorialRodeo(Caravana caravana, int numero, double bateriaFinal,
+                        LocalDateTime ultimaFecha) {
+                final int tickSegundos = 300;
+                final int muestras = DIAS_HISTORIAL_RODEO * MUESTRAS_POR_DIA;
+
+                Random rnd = new Random(1000L + numero);
+                double[] actividadDia = new double[DIAS_HISTORIAL_RODEO];
+                for (int d = 0; d < actividadDia.length; d++) {
+                        actividadDia[d] = 0.85 + rnd.nextDouble() * 0.30;
+                }
+                double[] centro = centroDelRodeo(0, muestras);
+                double lat = centro[0];
+                double lon = centro[1];
+                double rumbo = rnd.nextDouble() * 2 * Math.PI;
+                double bateria = Math.min(100.0, bateriaFinal + muestras * 0.002);
+
+                List<Telemetria> historial = new ArrayList<>(muestras);
+                for (int i = 0; i < muestras; i++) {
+                        centro = centroDelRodeo(i, muestras);
+                        if (metros(lat, lon, centro[0], centro[1]) > RADIO_COHESION_M) {
+                                rumbo = Math.atan2(centro[1] - lon, centro[0] - lat) + rnd.nextGaussian() * GIRO_SIMULADOR;
+                        } else {
+                                rumbo += rnd.nextGaussian() * GIRO_SIMULADOR;
+                        }
+                        lat += PASO_SIMULADOR * Math.cos(rumbo);
+                        lon += PASO_SIMULADOR * Math.sin(rumbo);
+                        bateria = Math.max(bateriaFinal, bateria - 0.002);
+
+                        Telemetria t = new Telemetria();
+                        t.setCaravana(caravana);
+                        t.setFechaHora(ultimaFecha.minusSeconds((long) (muestras - 1 - i) * tickSegundos));
+                        t.setLatitud(lat);
+                        t.setLongitud(lon);
+                        t.setMoveState(moveStateSimulador(rnd, actividadDia[i / MUESTRAS_POR_DIA]));
+                        t.setBateria(bateria);
+                        t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
+                        t.setEstadoInferenciaSalud(i == muestras - 1 ? EstadoInferencia.PENDIENTE
+                                        : EstadoInferencia.COMPLETADO);
+                        historial.add(t);
+                }
+                telemetriaRepository.saveAll(historial);
+        }
+
+        /**
+         * Como simulador.py: 35 % reposo (0-1), 60 % normal (2-6) y 5 % picos (7-9). actividad mueve la parte
+         * de reposo para que un dia sea mas o menos activo que otro.
+         */
+        private static int moveStateSimulador(Random rnd, double actividad) {
+                double r = rnd.nextDouble();
+                if (r < Math.min(0.9, 0.35 / actividad)) {
+                        return rnd.nextInt(2);
+                }
+                if (r < 0.95) {
+                        return 2 + rnd.nextInt(5);
+                }
+                return 7 + rnd.nextInt(3);
+        }
+
+        /** Centro del rodeo en el paso i de n: una vuelta y media en espiral por el potrero hasta LAT_RODEO. */
+        private static double[] centroDelRodeo(int i, int n) {
+                double f = i / (double) n;
+                double angulo = 2 * Math.PI * f * 1.5;
+                double radio = 0.0025 * (1 - f);
+                return new double[] { LAT_RODEO + radio * Math.cos(angulo), LON_RODEO + radio * Math.sin(angulo) };
+        }
+
+        private static double metros(double lat1, double lon1, double lat2, double lon2) {
+                return Math.hypot((lat2 - lat1) * 111_320, (lon2 - lon1) * 111_320 * Math.cos(Math.toRadians(lat1)));
+        }
+
         /** Pastoreo alrededor de la aguada: paso fijo, rumbo aleatorio y vuelta a la aguada si se aleja. */
         private static double[][] caminataPastoreo(Random rnd, double latInicial, double lonInicial, int muestras,
                         double paso) {
@@ -1204,32 +1194,17 @@ public class DataInitializer implements CommandLineRunner {
                 return new double[] { LAT_RODEO + r * Math.cos(ang), LON_RODEO + r * Math.sin(ang) };
         }
 
-        private void crearTelemetriaEnRodeo(Animal animal, Random rnd, double bateria, LocalDateTime fechaHora) {
-                double[] pos = posicionEnRodeo(rnd);
-                crearTelemetria(animal.getCaravana(), pos[0], pos[1], bateria, fechaHora);
-        }
-
-        // =========================================================================
-        // Helper: telemetria puntual
-        // =========================================================================
-
-        private void crearTelemetria(Caravana caravana, double lat, double lon,
-                        double bateria, LocalDateTime fechaHora) {
-                Telemetria t = new Telemetria();
-                t.setCaravana(caravana);
-                t.setFechaHora(fechaHora);
-                t.setLatitud(lat);
-                t.setLongitud(lon);
-                t.setBateria(bateria);
-                t.setMoveState(1);
-                t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO);
-                t.setEstadoInferenciaSalud(EstadoInferencia.COMPLETADO);
-                telemetriaRepository.save(t);
-        }
-
         // =========================================================================
         // Helper: crear animal con caravana
         // =========================================================================
+
+        /**
+         * Numero de caravana oficial de 3 cifras para la vaca VIGIA-ARG-{n}: salteado para que no parezca
+         * correlativo y sin pisar los del guion (#104, #208 y las vaquillonas #301 a #305).
+         */
+        private static String numeroManejo(int n) {
+                return String.valueOf(100 + (n * 37) % 900);
+        }
 
         private Animal crearAnimal(Establecimiento est, RodeoLote lote,
                         String idOficial, String alias, String raza,

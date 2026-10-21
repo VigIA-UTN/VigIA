@@ -9,24 +9,24 @@ propio script que se prende en el momento justo:
     Acto 3 (fuga por el alambrado)           -> simulador_fuga.py
     Acto 4 (salud y aislamiento de la #208)  -> simulador_salud.py
 
-Rodeo vivo: las vacas de RODEO_DEVICE_IDS (por defecto VIGIA-ARG-015..026,
-gestantes del Lote Principal sin ningún rol especial en la demo). El seed
-(DataInitializer) deja sus últimas posiciones juntas, en un círculo de ~40 m,
-y este script las mantiene juntas y en el lugar: cada vaca que se aleja más
-de RADIO_COHESION_M del centro de las posiciones con que arrancó el rodeo
-vuelve hacia él (un centro fijo; si siguiera al rodeo, el grupo entero se iría
-corriendo y se le acercaría a la #208 del Acto 4). Hace falta porque
-ml-geo arma el grupo con los animales a <= 100 m entre sí y solo mira los que
-transmitieron en los últimos 30 min: si el rodeo vivo se dispersara (un
-random walk de 2 m por paquete se abre ~150 m en 15 min), ml-geo marcaría
-aislados a todos y la alerta de aislamiento del Acto 4 no sería solo de la
-#208. Las vacas con un rol en el seed (004 "sin señal > 6 h", 005 batería
-baja, 006-012 demos de salud y anestro) quedan fuera a propósito.
+Rodeo vivo: las vacas de RODEO_DEVICE_IDS (por defecto todo el Lote Principal,
+VIGIA-ARG-003..040, menos las que mueven los scripts de cada acto). El seed
+(DataInitializer) les deja 8 días de historia con este mismo pastoreo, así el
+perfil de salud que arma el worker no ve el pastoreo en vivo como un desvío, y
+termina con el rodeo junto, en un círculo de ~40 m. Este script las mantiene
+juntas y en el lugar: cada vaca que se aleja más de RADIO_COHESION_M del centro
+de las posiciones con que arrancó el rodeo vuelve hacia él (un centro fijo; si
+siguiera al rodeo, el grupo entero se iría corriendo y se le acercaría a la
+#208 del Acto 4). Hace falta porque ml-geo arma el grupo con los animales a
+<= 100 m entre sí y solo mira los que transmitieron en los últimos 30 min: si
+el rodeo vivo se dispersara (un random walk de 2 m por paquete se abre ~150 m
+en 15 min), ml-geo marcaría aislados a todos y la alerta de aislamiento del
+Acto 4 no sería solo de la #208.
 
 Reserva de identidades: este script NUNCA manda telemetría para las vacas que
 mueven esos scripts (FORZAR_CELO_DEVICE_ID, FUGA_DEVICE_IDS y
-FORZAR_SALUD_DEVICE_ID), ni para VIGIA-ARG-003 (ver EXCLUIR_DEL_LOOP_EN_VIVO),
-aunque se las agregue a RODEO_DEVICE_IDS. Si dos procesos mandaran para el
+FORZAR_SALUD_DEVICE_ID, ver EXCLUIR_DEL_LOOP_EN_VIVO), aunque se las agregue a
+RODEO_DEVICE_IDS. Si dos procesos mandaran para el
 mismo device_id, cada uno con su propio estado en memoria, la vaca se vería
 "teletransportándose" entre dos trayectorias — y el salto de posición puede
 disparar alertas de celo falsas.
@@ -83,7 +83,7 @@ API_URL = os.getenv("API_URL", "http://localhost:8081/api/v1/ingesta/uplink")
 # Rodeo vivo (ver docstring). Lista separada por comas.
 RODEO_DEVICE_IDS = [d.strip() for d in os.getenv(
     "RODEO_DEVICE_IDS",
-    ",".join(f"VIGIA-ARG-{i:03d}" for i in range(15, 27)),
+    ",".join(f"VIGIA-ARG-{i:03d}" for i in range(3, 41)),
 ).split(",") if d.strip()]
 
 # Distancia al centro del rodeo a partir de la cual una vaca vuelve hacia él.
@@ -126,11 +126,7 @@ FUGA_DEVICE_IDS = {d.strip() for d in os.getenv("FUGA_DEVICE_IDS", "VIGIA-ARG-01
                    if d.strip()}
 FORZAR_SALUD_DEVICE_ID = os.getenv("FORZAR_SALUD_DEVICE_ID", "VIGIA-ARG-002")
 
-# VIGIA-ARG-003 se deja fuera a propósito: el seed le pone una única
-# transmisión vieja (> 15 min) para mostrar el indicador "sin datos recientes"
-# del mapa (H0012). Si recibe telemetría nueva, ese detalle de la demo se pierde.
-EXCLUIR_DEL_LOOP_EN_VIVO = ({"VIGIA-ARG-003", FORZAR_CELO_DEVICE_ID, FORZAR_SALUD_DEVICE_ID}
-                            | FUGA_DEVICE_IDS)
+EXCLUIR_DEL_LOOP_EN_VIVO = {FORZAR_CELO_DEVICE_ID, FORZAR_SALUD_DEVICE_ID} | FUGA_DEVICE_IDS
 
 # Acto 1 (Paso 1.6): caravanas libres que Pedro puede vincular en vivo.
 EXTRA_DEVICE_IDS = [d.strip() for d in os.getenv(
