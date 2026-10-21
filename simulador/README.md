@@ -5,6 +5,7 @@ Script en Python que emula el comportamiento de cientos de caravanas IoT transmi
 ## Funcionalidades
 - **Random Walk:** Simula el pastoreo normal de los animales en el campo.
 - **Continuidad con la base:** al arrancar, cada animal consulta al backend (`GET /api/v1/ingesta/ultima-posicion/{deviceId}`) su última posición/batería real y arranca desde ahí, en vez de coordenadas hardcodeadas — evita el salto de posición que dispara alertas de celo falsas: el modelo de celo lee un salto entre dos puntos consecutivos como un desplazamiento anómalo.
+  - **Arrancarlo después de `SEED DEMO completado`** (`docker logs vigia-backend-api`): `backend-api` da `healthy` y el worker atiende antes de que `DataInitializer` termine de sembrar la telemetría. Si una vaca todavía no tiene fila, `simulador.py` espera hasta `ESPERA_SEED_SEGUNDOS` (120 s) a que aparezca su posición sembrada. Pero si se reinicia `backend-api` con el simulador corriendo, o se lo prende antes de que el seed borre la telemetría vieja, continúa desde las posiciones viejas.
 - **Anomalías forzadas**, para poder demostrar de punta a punta cada tipo de alerta sin depender del azar:
   - **Celo** (`VIGIA-ARG-001` por defecto): el historial de 24hs con patrón de alta actividad sostenida y errática ya lo persiste el backend al arrancar (`DataInitializer.java`, método `sembrarHistorialCelo`) — ningún script lo inyecta. Cada script que simula esta vaca solo manda, en su loop en vivo, los puntos nuevos con ese mismo patrón; basta que lleguen unos pocos para que el próximo ciclo del job de celo (cada 60s) evalúe la ventana completa y dispare la alerta.
   - **Salud y aislamiento** (`VIGIA-ARG-002` por defecto): igual que el celo, el historial vive en el backend. `DataInitializer` (método `sembrarHistorialMargarita`) siembra 8 días a 5 min: los primeros 7 son la calibración del perfil de referencia (ml-salud exige >= 2016 puntos), las últimas 24 hs traen la caída de ~40 % de actividad y el historial termina apartado del rodeo. `simulador_salud.py` (Acto 4) solo manda los puntos nuevos que despiertan a los jobs de salud y geo.
@@ -66,7 +67,9 @@ caer dentro de los ~25 min posteriores al reseed (ver la sección del acto 4).
   aislamientos. Nunca manda telemetría para `FORZAR_CELO_DEVICE_ID`,
   `FUGA_DEVICE_IDS` ni `FORZAR_SALUD_DEVICE_ID`, que mueven los scripts de cada
   acto. Para el Acto 1 (Paso 1.6) manda también las caravanas libres
-  `VIGIA-LIBRE-301..305`, juntas en un corral: el worker las ignora ("Sin
+  `VIGIA-LIBRE-301..305`, juntas en un corral ~275 m al oeste del Potrero
+  Principal (afuera, para dibujar en vivo el perímetro del Lote Cuarentena
+  alrededor de ellas): el worker las ignora ("Sin
   animal asociado") hasta que Pedro vincula una desde la UI, y desde el
   paquete siguiente se guarda su telemetría y el animal aparece en el mapa,
   sin reiniciar nada.

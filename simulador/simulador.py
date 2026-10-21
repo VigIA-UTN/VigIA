@@ -100,15 +100,25 @@ INTERVALO_SEGUNDOS = int(os.getenv("INTERVALO_SEGUNDOS", 5))
 # confundir con INTERVALO_SEGUNDOS.
 TICK_MODELADO_SEGUNDOS = 300
 
-# Fallback si el backend todavía no tiene ninguna fila para un device_id
-# (centro del establecimiento del seed demo).
+# Centro del establecimiento del seed demo.
 LAT_INICIAL = -34.943317
 LON_INICIAL = -59.225728
 
+# Fallback del rodeo si el backend no tiene ninguna fila para una vaca: donde el
+# seed deja el rodeo de hoy (LAT_RODEO/LON_RODEO de DataInitializer), con ~33 m
+# de dispersión. Bien adentro del Potrero Principal y en un solo grupo para
+# ml-geo; un random por todo el establecimiento dejaba vacas fuera del perímetro.
+LAT_RODEO = LAT_INICIAL - 0.0004
+LON_RODEO = LON_INICIAL + 0.0004
+
 # Corral donde arrancan las caravanas libres (no tienen posición previa): juntas,
-# así las vaquillonas que se vinculen en vivo forman un grupo en su lote.
-LAT_CORRAL = LAT_INICIAL + 0.003
-LON_CORRAL = LON_INICIAL - 0.003
+# así las vaquillonas que se vinculen en vivo forman un grupo en su lote. Queda
+# ~275 m al oeste del alambrado oeste del Potrero Principal (±0.0045° alrededor
+# del centro), lejos de la tolerancia de 50 m y del alambrado norte por donde se
+# escapan las del Acto 3: el presentador dibuja en vivo el perímetro del Lote
+# Cuarentena alrededor de ellas.
+LAT_CORRAL = LAT_INICIAL
+LON_CORRAL = LON_INICIAL - 0.0075
 
 # Escala física de pastoreo normal, alineada con generate_dataset.py: grados
 # POR TICK DE 5 MINUTOS, fija por paquete.
@@ -142,19 +152,38 @@ RESPUESTA_SIN_ANIMAL = "Ignorado: Sin animal asociado"
 # arranque de la demo.
 TIMEOUT_ULTIMA_POSICION_SEGUNDOS = 3
 
+# El worker atiende apenas levanta, pero backend-api sigue sembrando la
+# telemetría (DataInitializer tarda ~20 s más, vaca por vaca): si el simulador
+# arranca en ese rato, la vaca todavía no tiene fila y caería en el fallback
+# random. Hasta este tiempo (contado desde el arranque, no por vaca) se espera a
+# que aparezca la última posición sembrada de cada vaca del rodeo.
+ESPERA_SEED_SEGUNDOS = int(os.getenv("ESPERA_SEED_SEGUNDOS", 120))
 
-def obtener_posicion_inicial(device_id, lat_fallback, lon_fallback, dispersion):
+
+def obtener_posicion_inicial(device_id, lat_fallback, lon_fallback, dispersion, esperar_hasta=None):
     """Continúa la última posición/batería real que el backend ya tiene para
-    este device_id, en vez de arrancar en un punto desconectado."""
+    este device_id, en vez de arrancar en un punto desconectado. Con
+    esperar_hasta (time.monotonic()) reintenta hasta entonces si todavía no hay
+    fila."""
     base_url = API_URL.rsplit("/api/v1/", 1)[0]
     url = f"{base_url}/api/v1/ingesta/ultima-posicion/{device_id}"
-    try:
-        resp = requests.get(url, timeout=TIMEOUT_ULTIMA_POSICION_SEGUNDOS)
-        if resp.status_code == 200:
-            data = resp.json()
-            return data["latitud"], data["longitud"], data.get("bateria") or 100.0
-    except Exception as e:
-        print(f"AVISO: no se pudo consultar la última posición de {device_id} ({e}).")
+    avisado = False
+    while True:
+        try:
+            resp = requests.get(url, timeout=TIMEOUT_ULTIMA_POSICION_SEGUNDOS)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data["latitud"], data["longitud"], data.get("bateria") or 100.0
+            motivo = f"HTTP {resp.status_code}"
+        except Exception as e:
+            motivo = str(e)
+        if esperar_hasta is None or time.monotonic() >= esperar_hasta:
+            print(f"AVISO: no se pudo obtener la última posición de {device_id} ({motivo}).")
+            break
+        if not avisado:
+            print(f"Esperando a que el seed cargue la posición de {device_id} ({motivo})...")
+            avisado = True
+        time.sleep(2)
 
     print(f"AVISO: {device_id} no tiene posición previa conocida en el backend; "
           f"arrancando en una posición random cerca del establecimiento.")
@@ -165,14 +194,16 @@ def obtener_posicion_inicial(device_id, lat_fallback, lon_fallback, dispersion):
 
 
 animales = {}
-for grupo, ids, fallback in (
-    ("rodeo", RODEO_DEVICE_IDS, (LAT_INICIAL, LON_INICIAL, 0.005)),
-    ("libres", EXTRA_DEVICE_IDS, (LAT_CORRAL, LON_CORRAL, 0.0002)),
+# Las libres nunca tienen fila hasta que se vinculan: no se las espera.
+esperar_seed_hasta = time.monotonic() + ESPERA_SEED_SEGUNDOS
+for grupo, ids, fallback, esperar_hasta in (
+    ("rodeo", RODEO_DEVICE_IDS, (LAT_RODEO, LON_RODEO, 0.0003), esperar_seed_hasta),
+    ("libres", EXTRA_DEVICE_IDS, (LAT_CORRAL, LON_CORRAL, 0.0002), None),
 ):
     for device_id in ids:
         if device_id in EXCLUIR_DEL_LOOP_EN_VIVO or device_id in animales:
             continue
-        lat_ini, lon_ini, bateria_ini = obtener_posicion_inicial(device_id, *fallback)
+        lat_ini, lon_ini, bateria_ini = obtener_posicion_inicial(device_id, *fallback, esperar_hasta)
         animales[device_id] = {
             "grupo": grupo,
             "lat": lat_ini,
