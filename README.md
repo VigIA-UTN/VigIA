@@ -1,150 +1,158 @@
 # VigIA
 
-## Link al Drive
+**Monitoreo de bovinos con caravanas IoT e inteligencia artificial.**
+VigIA escucha lo que el animal ya está diciendo con su comportamiento (cuánto se mueve, dónde pasta, si se aparta del grupo) y lo convierte en alertas concretas para el productor: *esta vaca está en celo*, *esta otra está por enfermarse*, *estas dos salieron del perímetro*.
 
-https://drive.google.com/drive/folders/1OaNcqx1iyuzeKOyNrNP1Tt-S7YMCXce3
+> Proyecto Final de Ingeniería en Sistemas de Información — UTN FRBA, 2026.
+> *Desarrollo de un sistema de detección de celo y estado de salud en bovinos mediante sensores inerciales y de posición.*
 
----
-
-## 🚀 Inicio Rápido (Levantar todo con Docker)
-
-Si querés probar la plataforma completa de una sola vez (Base de datos, Backend, Modelos de ML y el Simulador de Telemetría), podés levantar toda la infraestructura utilizando Docker Compose:
-
-1. Abrí una terminal en la carpeta `/infra`.
-
-2. Ejecutá el comando para construir y levantar todos los servicios en segundo plano:
-
-   ```bash
-   docker-compose up -d --build
-   ```
-
-3. Para el Frontend, abrí otra terminal en `/frontend` y ejecutá:
-
-   ```bash
-   npm install && npm run dev
-   ```
-
-Con esto, tendrás corriendo:
-- **Backend (APIs):** `http://localhost:8080`
-- **Maildev (Mails simulados):** `http://localhost:8025`
-- **Frontend:** `http://localhost:5173`
-- **Base de Datos (PostgreSQL):** Puerto `5432`
-- **Modelos ML:** Corriendo en background y analizando datos automáticamente cada 30 segundos.
-
-Para apagar todo cuando termines:
-
-```bash
-cd infra
-docker-compose down -v
-```
+📁 [Drive del proyecto](https://drive.google.com/drive/folders/1OaNcqx1iyuzeKOyNrNP1Tt-S7YMCXce3) · 🛠️ [Guía de desarrollo y despliegue](docs/DESARROLLO.md)
 
 ---
 
-## 🛠️ Paso a Paso (Para Desarrollo Local)
+## El problema
 
-Si vas a programar y necesitás levantar servicios específicos para aprovechar tu IDE (autocompletado, debug, live-reload), seguí este paso a paso:
+En un tambo mediano, la eficiencia reproductiva y la sanidad del rodeo se gestionan de forma **reactiva y manual**. Las señales que anticipan un celo o el inicio de una enfermedad aparecen en el comportamiento del animal *antes* de ser visibles a simple vista, pero nadie las está mirando:
 
-### 1. Levantar Infraestructura (Base de Datos y Mail)
+- **Un celo no detectado** son 21 días más de intervalo parto-concepción.
+- **Una enfermedad detectada tarde** es un tratamiento más caro y más riesgo de descarte.
+- **El campo extensivo queda sin control de noche**, y un robo (abigeato) se descubre al día siguiente.
 
-Siempre que vayas a trabajar en el backend, necesitás la base de datos y el servidor de correos encendidos:
+Las soluciones que existen son importadas, caras y de ecosistema cerrado. VigIA apunta al segmento que quedó afuera: el **tambo mediano argentino**.
+
+## Qué hace VigIA
+
+Cada animal lleva una caravana con acelerómetro y GPS que transmite por LoRaWAN. Con esa telemetría, la plataforma genera:
+
+| Alerta | Qué detecta | Cómo |
+|---|---|---|
+| 🐄 **Celo** | Aumento brusco y sostenido de la actividad en las últimas 24 h | Red neuronal **LSTM** sobre la serie temporal de movimiento ([`ml-celo`](ml-celo/README.md)) |
+| 🩺 **Salud** | Desvíos de comportamiento que anticipan síntomas visibles (objetivo: hasta **48 h antes**) | **Perfil individual** por animal (7 días de calibración) + **Random Forest** sobre z-scores de desvío ([`ml-salud`](ml-salud/README.md)) |
+| 🧭 **Aislamiento social** | Un animal (o un subgrupo) que se aparta del rodeo y no vuelve | Grafo de proximidad entre animales con Haversine; el grupo principal es la componente conexa más grande ([`ml-geo`](ml-geo/README.md)) |
+| 🚧 **Fuera de perímetro** | Salida de un perímetro virtual del establecimiento o lote (riesgo de abigeato) | Verificación de geocerca **en el momento de la ingesta**, sin esperar al batch |
+| 📅 **Anestro** | Vacas que llevan demasiado tiempo sin señales de ciclo (celo, inseminación, parto) | Job diario con umbral de días configurable por establecimiento |
+
+Además: **mapa del rodeo en tiempo real**, **mapas de calor de pastoreo** por rodeo, lote o animal, **historial clínico y reproductivo** por animal, registro de intervenciones y diagnósticos, y notificaciones por mail.
+
+### Para quién
+
+| Rol | Qué hace en la plataforma |
+|---|---|
+| **Productor** | Toma las decisiones operativas: ve el dashboard, el mapa, las alertas y gestiona su rodeo y su equipo. |
+| **Veterinario** | Hace el seguimiento sanitario y reproductivo: diagnósticos, intervenciones, historial clínico. |
+| **Campero** | Atiende las alertas en el campo. |
+| **Administrador** | Da de alta establecimientos, caravanas y productores (rol global de la plataforma). |
+
+---
+
+## Cómo funciona
+
+```mermaid
+flowchart LR
+    C["📡 Caravana IoT<br/>acelerómetro + GPS"] -->|LoRaWAN| TTN["The Things<br/>Network"]
+    TTN -->|webhook| W
+
+    subgraph Backend ["Backend (Spring Boot)"]
+        W["backend-worker<br/>ingesta + Spring Batch"]
+        API["backend-api<br/>REST + SSE"]
+    end
+
+    W -->|guarda| DB[("PostgreSQL<br/>+ TimescaleDB")]
+    W -->|"geocerca<br/>(en la ingesta)"| W
+    W -->|"jobs periódicos"| ML
+
+    subgraph ML ["Microservicios ML (FastAPI)"]
+        CELO["ml-celo<br/>LSTM"]
+        SALUD["ml-salud<br/>Random Forest"]
+        GEO["ml-geo<br/>cohesión + heatmap"]
+    end
+
+    W -->|"telemetría y alertas"| MQ{{RabbitMQ}}
+    MQ --> API
+    API <--> DB
+    API -->|"tiempo real (SSE)"| FE["🖥️ Frontend<br/>React"]
+    API -->|mapa de calor on-demand| GEO
+    API -->|mail| MAIL["✉️ SMTP"]
+```
+
+**El recorrido de un dato:**
+
+1. La caravana transmite un paquete con posición, estado de movimiento y batería. **The Things Network** lo reenvía por webhook al `backend-worker`.
+2. El worker lo guarda en una hypertable de **TimescaleDB**, chequea en el momento si el animal salió de su perímetro y publica el evento en **RabbitMQ**.
+3. El `backend-api` consume ese evento y lo empuja por **Server-Sent Events** al mapa en vivo del frontend.
+4. En paralelo, **Spring Batch** junta periódicamente la telemetría pendiente y se la manda a los microservicios de ML. Si alguno detecta algo, se crea la alerta, se publica en la cola y le llega al usuario en la web y por mail.
+
+---
+
+## Decisiones de diseño que vale la pena mirar
+
+**Cada vaca se compara contra sí misma.** Una vaca naturalmente tranquila y una inquieta no pueden medirse con la misma vara. `ml-salud` construye un perfil de referencia por animal durante 7 días de calibración y evalúa cada día contra *ese* perfil, no contra el promedio del rodeo. El celo, en cambio, sí es un patrón poblacional, por eso usa otro modelo.
+
+**El sistema no se cae si el ML se cae.** Cada llamada a un microservicio pasa por **Resilience4j** (timeouts, reintentos, circuit breaker). Si `ml-celo` no responde, la telemetría queda marcada como `INFERENCIA_PENDIENTE` y se procesa en el próximo ciclo: no se pierde ningún dato.
+
+**Ingesta y consulta separadas.** El `backend-worker` recibe la telemetría y corre los jobs pesados; el `backend-api` atiende al usuario. Comparten entidades y lógica en `backend-core-lib`, pero escalan y se despliegan por separado.
+
+**"Aislado" tiene una definición precisa.** Dos animales están juntos si están a menos del umbral configurado por establecimiento. Los que están juntos, directa o encadenadamente, forman un grupo, y el más grande es el rodeo. Así, un subgrupo que se aleja *junto* también se detecta, y la alerta solo se dispara si el animal lleva un tiempo mínimo afuera sin volver. Ver [`ml-geo`](ml-geo/README.md).
+
+**Datos sintéticos que se parecen a los reales.** Mientras no hay dataset de campo etiquetado, los modelos se entrenan con datos sintéticos a los que se les agrega el ruido de medición de un GPS real y la cadencia real de *heartbeat* de las caravanas. Ver [`ml-training`](ml-training/README.md).
+
+**Probado con 25.000 sensores.** El stack se sometió a una prueba de carga con k6 que simula 500 clientes × 50 caravanas (más de 7 millones de puntos de telemetría), verificando además que el movimiento normal no genere alertas falsas. Ver [`loadtest`](loadtest/README.md).
+
+**Una demo que no depende del azar.** El [`simulador`](simulador/README.md) emula un rodeo completo transmitiendo por el mismo webhook que usa TTN, con escenarios guionados para mostrar de punta a punta cada tipo de alerta: celo, fuga del perímetro, desvío sanitario y aislamiento.
+
+---
+
+## Stack
+
+| Capa | Tecnologías |
+|---|---|
+| **Frontend** | React 18, TypeScript, Vite, React Query, Zustand, Leaflet, Recharts, Zod |
+| **Backend** | Java 17, Spring Boot 3 (Web, Data JPA, Batch, Security + OAuth2), Resilience4j |
+| **Machine Learning** | Python, FastAPI, TensorFlow/Keras (LSTM), scikit-learn (Random Forest) |
+| **Datos y mensajería** | PostgreSQL + TimescaleDB, RabbitMQ |
+| **IoT** | Caravanas LoRaWAN, The Things Network |
+| **Infra** | Docker Compose, GitHub Actions, Railway, k6 |
+
+## Estructura del repositorio
+
+| Carpeta | Qué hay |
+|---|---|
+| [`frontend/`](frontend/README.md) | Aplicación web: landing, dashboard, mapa en vivo, alertas, gestión del rodeo. |
+| [`backend/`](backend/README.md) | Spring Boot multi-módulo: `backend-api`, `backend-worker`, `backend-core-lib`. |
+| [`ml-celo/`](ml-celo/README.md) | Microservicio de detección de celo. |
+| [`ml-salud/`](ml-salud/README.md) | Microservicio de detección de desvíos sanitarios. |
+| [`ml-geo/`](ml-geo/README.md) | Microservicio de cohesión del rodeo y mapas de calor. |
+| [`ml-training/`](ml-training/README.md) | Generación de datasets sintéticos y entrenamiento offline de los modelos. |
+| [`simulador/`](simulador/README.md) | Simulador de caravanas y escenarios de demo. |
+| [`loadtest/`](loadtest/README.md) | Prueba de carga con k6. |
+| `infra/` | Docker Compose y configuración del entorno. |
+
+## Levantarlo en 2 minutos
+
+Con Docker instalado:
 
 ```bash
 cd infra
-docker-compose up -d db mail
+docker-compose up -d --build
 ```
-
-### 2. Levantar el Backend (Spring Boot Multi-Módulo)
-
-El backend de VigIA está dividido en módulos: `backend-api` (para las APIs REST del frontend), `backend-worker` (Batch jobs y colas asíncronas) y `backend-core-lib` (librerías compartidas).
-
-- **Opción Recomendada (IDE):** Abrí la carpeta `/backend` en tu IDE (IntelliJ, Eclipse). Podés darle 'Run' tanto a la clase principal de `backend-api` como a la de `backend-worker` al mismo tiempo.
-- **Opción Alternativa:** Si solo vas a tocar frontend y no querés usar el IDE para Java, podés levantar el backend por Docker como se explica en la sección de *Inicio Rápido*.
-
-### 3. Levantar el Frontend
-
-Si vas a trabajar en la interfaz visual:
 
 ```bash
 cd frontend
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
-### 4. Levantar Entorno de ML y Simulador (Para Pruebas)
-
-Para probar todo el flujo de alertas, primero prendé los modelos de ML mediante Docker:
-
-```bash
-cd infra
-docker-compose up -d ml-celo ml-salud ml-geo
-```
-
-Y luego, levantá el **Simulador** localmente desde tu terminal (necesita Python):
-
-```bash
-cd simulador
-py -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
-py simulador.py
-```
-
-**Nota sobre el tiempo:** Para agilizar las pruebas locales, la frecuencia de simulación y del Batch Scheduler del backend (`backend-worker`) están configuradas a **30 segundos** (en lugar de los típicos 5 a 60 minutos de la vida real). Esto permite generar inferencias rápidamente sin tener que esperar horas.
+El frontend queda en `http://localhost:5173`, la API en `http://localhost:8080` y los mails simulados en `http://localhost:8025`. Para desarrollo local por módulo, el simulador, el CI y el despliegue en Railway, ver la **[guía de desarrollo](docs/DESARROLLO.md)**.
 
 ---
 
-## ⚙️ Extras: CI/CD, Pruebas y Resiliencia
+## Equipo
 
-### Integración Continua
+| Integrante | Rol |
+|---|---|
+| Santiago Mendez | Project Manager |
+| Julián Cardoso Landin | Product Owner |
+| Tomás Agustín Fabrizio | Arquitecto de Software |
+| Matías Gabriel Jastrebow | Líder Técnico |
+| Iñaki Joaquín Lorences | Scrum Master |
 
-VigIA cuenta con un pipeline de CI en GitHub Actions (`.github/workflows/ci.yml`). 
-- **Frontend y Backend:** Se valida la compilación y el linting.
-- **Microservicios ML:** Cuentan con suites de pruebas unitarias y de integración (ej: `ml-celo/tests`) utilizando `pytest`, donde se valida el correcto funcionamiento de las inferencias (utilizando mocks de TensorFlow) y se aseguran los contratos HTTP.
-
-### Resiliencia (Circuit Breaker)
-
-No es estrictamente obligatorio levantar los contenedores ML para correr el backend. Si el microservicio de Celo está apagado o tarda en responder, el patrón Circuit Breaker (Resilience4j) en el `backend-worker` capturará el error de forma segura, marcará la telemetría como `"INFERENCIA_PENDIENTE"` en base de datos, y permitirá que la aplicación siga funcionando sin perder datos.
-
----
-
-## ☁️ Despliegue en Producción (Railway)
-
-Para desplegar VigIA en un entorno de producción como Railway, es necesario configurar correctamente las **Variables de Entorno** de cada servicio. Las credenciales de producción **nunca deben commitearse** en el repositorio (utilice el panel de variables de Railway).
-
-Puede usar el archivo `infra/.env.example` como referencia para conocer todas las variables requeridas.
-
-### Variables por Servicio en Railway:
-
-#### 1. Base de Datos (PostgreSQL / TimescaleDB)
-Si utiliza el plugin de PostgreSQL de Railway, este proveerá sus propias credenciales. Asegúrese de que el Backend consuma estos valores:
-- `DB_HOST`: Host interno provisto por Railway (ej. `postgres.railway.internal`).
-- `DB_PORT`: Puerto de la DB (usualmente `5432`).
-- `DB_NAME`: Nombre de la base de datos.
-- `DB_USER`: Usuario.
-- `DB_PASSWORD`: Contraseña.
-
-#### 2. Message Broker (RabbitMQ)
-- `SPRING_RABBITMQ_HOST`: Host interno del servicio RabbitMQ desplegado en Railway (ej. `rabbitmq.railway.internal`).
-- `SPRING_RABBITMQ_PORT`: `5672`
-- `SPRING_RABBITMQ_USERNAME`: Usuario configurado en RabbitMQ.
-- `SPRING_RABBITMQ_PASSWORD`: Contraseña de RabbitMQ.
-
-#### 3. Backend (API y Worker)
-- `SPRING_PROFILES_ACTIVE`: **producción → dejar sin setear o `prod`.** El default de la app ya es `prod`, así que un redeploy nunca ejecuta el `DataInitializer` (que limpia y re-siembra la base). **Solo el entorno de `develop` debe setear `SPRING_PROFILES_ACTIVE=dev`** para volver a tener datos de prueba en cada deploy.
-- `CORS_ORIGINS`: URLs de su frontend en producción (ej. `https://vigia-frontend.up.railway.app`).
-- `TZ`: `America/Argentina/Buenos_Aires`
-
-> **Datos iniciales de producción:** la base de prod se puebla a mano con `infra/prod/seed_prod.sql` (y se limpia con `infra/prod/wipe_prod.sql`). Ver `infra/prod/README.md`.
-
-**Microservicios de Machine Learning (Usados por el Backend Worker):**
-Asegúrese de configurar las URLs apuntando a la red interna de Railway.
-- `ML_CELO_URL`: URL interna del servicio (ej. `http://ml-celo.railway.internal:8001`)
-- `ML_SALUD_URL`: URL interna del servicio (ej. `http://ml-salud.railway.internal:8002`)
-- `ML_GEO_URL`: URL interna del servicio (ej. `http://ml-geo.railway.internal:8003`)
-
-#### 4. Servidor de Correos (SMTP)
-Para el envío de alertas reales en producción, configure un proveedor SMTP (SendGrid, AWS SES, Resend, Gmail, etc.):
-- `MAIL_HOST`: Host del proveedor (ej. `smtp.sendgrid.net`).
-- `MAIL_PORT`: Puerto SMTP (ej. `587`).
-- `MAIL_USER`: Usuario SMTP.
-- `MAIL_PASSWORD`: Contraseña o API Key SMTP.
+**Cátedra de Proyecto Final — UTN FRBA.** Directora de cátedra y profesora a cargo del curso: Mag. Ing. Gabriela Salem. Profesores a cargo del proyecto: Ing. Andrea Alegretti e Ing. Pablo Abramowicz.
