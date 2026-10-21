@@ -373,11 +373,19 @@ export default function MapPage() {
 
   return (
     <div style={{ height: '100%', width: '100%', margin: 0, padding: 0, position: 'relative', overflow: 'hidden' }}>
-      <MapContainer center={center} zoom={15} zoomControl={false} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+      <MapContainer
+        center={center}
+        zoom={15}
+        maxZoom={22}
+        zoomControl={false}
+        style={{ height: '100%', width: '100%', zIndex: 1 }}
+      >
         <ZoomControl position="bottomright" />
         <TileLayer
           attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          maxZoom={22}
+          maxNativeZoom={18}
         />
         <MapUpdater center={center} trigger={flyToTrigger} />
         {heatEnabled && <HeatmapLayer points={heatPoints} />}
