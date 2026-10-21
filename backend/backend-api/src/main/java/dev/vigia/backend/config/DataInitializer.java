@@ -199,12 +199,16 @@ public class DataInitializer implements CommandLineRunner {
                 // Semilla fija: mismas posiciones en el rodeo en cada arranque.
                 Random rndRodeo = new Random(7L);
 
+                // Los estados reproductivos (y las alertas de anestro sembradas) van justo despues de crearAnimal: en
+                // local el detector de anestro corre cada minuto y, si pasa a mitad del seed, alerta a toda vaca que
+                // todavia no tenga evidencia de ciclo.
+
                 // Vaca 1: id oficial 104, La Vaca Lola, compatible simulador
                 Animal vaca1 = crearAnimal(estP, lotePrincipal, "104", "La Vaca Lola", "Holando",
                                 LocalDate.of(2020, 1, 1), "VIGIA-ARG-001", LocalDate.now().minusDays(45));
-                sembrarHistorialCelo(vaca1.getCaravana(), posicionEnRodeo(rndRodeo));
                 sembrarEstadoReproductivo(vaca1, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
                                 LocalDate.now().minusDays(15), ahora.minusDays(15));
+                sembrarHistorialCelo(vaca1.getCaravana(), posicionEnRodeo(rndRodeo));
 
                 // Vaca 2: id oficial 208, Margarita. Acto 4: 8 dias a 5 min (calibracion de salud
                 // completa) con la caida de actividad en las ultimas 24 hs, apartada al oeste del rodeo;
@@ -221,50 +225,82 @@ public class DataInitializer implements CommandLineRunner {
                 // Vaca 3: ultima telem >1h -> "sin datos recientes" H0012
                 Animal vaca3 = crearAnimal(estP, lotePrincipal, "33333", "Renegrida", "Brangus",
                                 LocalDate.of(2022, 3, 15), "VIGIA-ARG-003", LocalDate.now().minusDays(45));
+                sembrarPartoReciente(vaca3, vet, ahora, 20);
                 crearTelemetria(vaca3.getCaravana(), LAT_CENTRO, LON_CENTRO, 45.0, ahora.minusHours(2));
 
                 // Vaca 4: ultima telem >8h -> "sin senal >6h" H0043
                 Animal vaca4 = crearAnimal(estP, lotePrincipal, "44444", "Doradita", "Angus",
                                 LocalDate.of(2021, 8, 20), "VIGIA-ARG-004", LocalDate.now().minusDays(45));
+                sembrarPartoReciente(vaca4, vet, ahora, 25);
                 crearTelemetria(vaca4.getCaravana(), LAT_CENTRO - 0.002, LON_CENTRO + 0.001, 38.0, ahora.minusHours(9));
 
                 // Vaca 5: bateria baja 14% (H0043)
                 Animal vaca5 = crearAnimal(estP, lotePrincipal, "55555", "Pinta", "Jersey",
                                 LocalDate.of(2022, 1, 10), "VIGIA-ARG-005", LocalDate.now().minusDays(45));
+                sembrarPartoReciente(vaca5, vet, ahora, 30);
                 double[] posVaca5 = posicionEnRodeo(rndRodeo);
                 crearTelemetria(vaca5.getCaravana(), posVaca5[0], posVaca5[1], 14.0, ahora.minusMinutes(8));
 
                 // Vaca 6: bateria 18% + demo sanitaria (>24h para el worker)
                 Animal vaca6 = crearAnimal(estP, lotePrincipal, "60006", "Demo Salud con perfil", "Angus",
                                 LocalDate.of(2021, 1, 1), "VIGIA-ARG-006", LocalDate.now().minusDays(45));
+                sembrarPartoReciente(vaca6, vet, ahora, 18);
                 crearTelemetria(vaca6.getCaravana(), LAT_CENTRO - 0.001, LON_CENTRO - 0.002, 18.0,
                                 ahora.minusHours(25));
 
                 // Vaca 7: demo sanitaria sin perfil
                 Animal vaca7 = crearAnimal(estP, lotePrincipal, "70007", "Demo Salud sin perfil", "Hereford",
                                 LocalDate.of(2021, 6, 1), "VIGIA-ARG-007", LocalDate.now().minusDays(45));
+                sembrarPartoReciente(vaca7, vet, ahora, 22);
 
                 // Vaca 8: demo sanitaria sin telemetria en ventana
                 Animal vaca8 = crearAnimal(estP, lotePrincipal, "80008", "Demo Salud sin telemetria", "Brangus",
                                 LocalDate.of(2021, 9, 1), "VIGIA-ARG-008", LocalDate.now().minusDays(45));
+                sembrarPartoReciente(vaca8, vet, ahora, 28);
 
                 // Vaca 9: demo historial reproductivo completo
                 Animal vaca9 = crearAnimal(estP, lotePrincipal, "90009", "Demo Historial Reproductivo", "Angus",
                                 LocalDate.of(2020, 6, 1), "VIGIA-ARG-009", LocalDate.now().minusDays(45));
+                sembrarEstadoReproductivo(vaca9, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusMonths(8), ahora.minusMonths(8));
+                sembrarEstadoReproductivo(vaca9, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA, productor,
+                                null, ahora.minusMonths(6));
+                sembrarEstadoReproductivo(vaca9, TipoReproductivo.POSIBLE_CELO, OrigenEstado.AUTOMATICO, null,
+                                null, ahora.minusDays(42));
+                sembrarInseminacionDesdeIntervencion(vaca9, vet, ahora.minusDays(40));
+                sembrarRevisionConEstadoSalud(vaca9, vet, TipoEstadoSalud.EN_OBSERVACION, ahora.minusDays(20));
+                sembrarGestante(vaca9, vet, LocalDate.now().minusDays(40), ahora.minusDays(9));
 
                 // Vaca 10: anestro PENDIENTE
                 Animal anestroPendiente = crearAnimal(estP, lotePrincipal, "10010", "Demo Anestro pendiente", "Angus",
                                 LocalDate.of(2019, 9, 1), "VIGIA-ARG-010", LocalDate.now().minusDays(45));
+                sembrarEstadoReproductivo(anestroPendiente, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(120), ahora.minusDays(120));
+                sembrarAlertaAnestro(estP, anestroPendiente, EstadoAlerta.PENDIENTE, 119, ahora.minusDays(1), null,
+                                null);
 
                 // Vaca 11: anestro CONFIRMADO
                 Animal anestroConfirmado = crearAnimal(estP, lotePrincipal, "11011", "Demo Anestro confirmado",
                                 "Hereford",
                                 LocalDate.of(2020, 2, 1), "VIGIA-ARG-011", LocalDate.now().minusDays(45));
+                sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(150), ahora.minusDays(150));
+                sembrarAlertaAnestro(estP, anestroConfirmado, EstadoAlerta.CONFIRMADA, 138, ahora.minusDays(12),
+                                ahora.minusDays(10), vet);
+                sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.ANESTRO, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(150), ahora.minusDays(10));
 
                 // Vaca 12: candidato anestro (sin alerta, detector la genera en vivo)
                 Animal anestroCandidato = crearAnimal(estP, lotePrincipal, "12012", "Demo Anestro sin alerta",
                                 "Brangus",
                                 LocalDate.of(2020, 4, 1), "VIGIA-ARG-012", LocalDate.now().minusDays(45));
+                sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(90), ahora.minusDays(90));
+                sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA,
+                                productor,
+                                null, ahora.minusDays(30));
+                log.info("[DataInitializer] Anestro (umbral {} d): 010 PENDIENTE, 011 CONFIRMADA, 012 candidato.",
+                                estP.getDiasDeteccionAnestro());
 
                 // Vacas 13-27: GESTANTE (15 vacas, partos en proximas 12 semanas)
                 String[] nombresGestantes = {
@@ -326,12 +362,29 @@ public class DataInitializer implements CommandLineRunner {
                                         null, ahora.minusDays(diasParto[i] - 14));
                         vacias.add(vacia);
                 }
+                // Los celos de sembrarAlertasHistoricas son su evidencia de ciclo, como en el flujo real (alerta de
+                // celo -> POSIBLE_CELO, confirmacion -> CELO); sin ellos alertarian anestro. 038 no tiene alertas de
+                // celo: celo visto en el campo. Despues siguen VACIA (no se inseminaron), ahora con la fecha del parto.
+                sembrarEstadoReproductivo(vacias.get(0), TipoReproductivo.POSIBLE_CELO, OrigenEstado.AUTOMATICO, null,
+                                null, ahora.minusDays(12));
+                sembrarEstadoReproductivo(vacias.get(1), TipoReproductivo.CELO, OrigenEstado.MANUAL, campero,
+                                null, ahora.minusDays(6).plusHours(2));
+                sembrarEstadoReproductivo(vacias.get(2), TipoReproductivo.CELO, OrigenEstado.MANUAL, campero,
+                                null, ahora.minusDays(18));
+                sembrarEstadoReproductivo(vacias.get(3), TipoReproductivo.CELO, OrigenEstado.MANUAL, campero,
+                                null, ahora.minusDays(7).plusHours(20));
+                for (int i = 0; i < vacias.size(); i++) {
+                        sembrarEstadoReproductivo(vacias.get(i), TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA,
+                                        productor, LocalDate.now().minusDays(diasParto[i]), ahora.minusDays(3));
+                }
 
                 // 2 vacas en calibracion (fechaAlta hace 2 dias)
                 Animal vacaCalib1 = crearAnimal(estP, lotePrincipal, "40040", "Calibra-1", "Brangus",
                                 LocalDate.of(2023, 1, 15), "VIGIA-ARG-040", LocalDate.now().minusDays(2));
+                sembrarPartoReciente(vacaCalib1, vet, ahora, 15);
                 Animal vacaCalib2 = crearAnimal(estP, lotePrincipal, "41041", "Calibra-2", "Jersey",
                                 LocalDate.of(2023, 3, 20), "VIGIA-ARG-041", LocalDate.now().minusDays(2));
+                sembrarPartoReciente(vacaCalib2, vet, ahora, 17);
 
                 log.info("[DataInitializer] 41 vacas creadas en Lote Principal.");
 
@@ -466,40 +519,6 @@ public class DataInitializer implements CommandLineRunner {
                                 new ArrayList<>(), null, null, null, null);
 
                 log.info("[DataInitializer] Alertas sanitarias sembradas (vaca6/7/8).");
-
-                // Historial reproductivo completo vaca9
-                sembrarEstadoReproductivo(vaca9, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                                LocalDate.now().minusMonths(8), ahora.minusMonths(8));
-                sembrarEstadoReproductivo(vaca9, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA, productor,
-                                null, ahora.minusMonths(6));
-                sembrarEstadoReproductivo(vaca9, TipoReproductivo.POSIBLE_CELO, OrigenEstado.AUTOMATICO, null,
-                                null, ahora.minusDays(42));
-                sembrarInseminacionDesdeIntervencion(vaca9, vet, ahora.minusDays(40));
-                sembrarRevisionConEstadoSalud(vaca9, vet, TipoEstadoSalud.EN_OBSERVACION, ahora.minusDays(20));
-                sembrarGestante(vaca9, vet, LocalDate.now().minusDays(40), ahora.minusDays(9));
-
-                // Demo de Anestro (vacas 10/11/12)
-                int umbralAnestro = estP.getDiasDeteccionAnestro();
-                sembrarEstadoReproductivo(anestroPendiente, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                                LocalDate.now().minusDays(120), ahora.minusDays(120));
-                sembrarAlertaAnestro(estP, anestroPendiente, EstadoAlerta.PENDIENTE, 119, ahora.minusDays(1), null,
-                                null);
-
-                sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                                LocalDate.now().minusDays(150), ahora.minusDays(150));
-                sembrarAlertaAnestro(estP, anestroConfirmado, EstadoAlerta.CONFIRMADA, 138, ahora.minusDays(12),
-                                ahora.minusDays(10), vet);
-                sembrarEstadoReproductivo(anestroConfirmado, TipoReproductivo.ANESTRO, OrigenEstado.MANUAL, vet,
-                                LocalDate.now().minusDays(150), ahora.minusDays(10));
-
-                sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
-                                LocalDate.now().minusDays(90), ahora.minusDays(90));
-                sembrarEstadoReproductivo(anestroCandidato, TipoReproductivo.VACIA, OrigenEstado.CARGA_MASIVA,
-                                productor,
-                                null, ahora.minusDays(30));
-
-                log.info("[DataInitializer] Anestro (umbral {} d): 010 PENDIENTE, 011 CONFIRMADA, 012 candidato.",
-                                umbralAnestro);
 
                 // Pesadas (150 dias)
                 sembrarPesadas(vaca1, new double[][] { { 150, 400 }, { 95, 412 }, { 60, 431 }, { 25, 452 } });
@@ -751,6 +770,15 @@ public class DataInitializer implements CommandLineRunner {
                 e.setFechaUltParto(fechaUltParto);
                 e.setFechaRegistro(fechaRegistro);
                 estadoReproductivoRepository.save(e);
+        }
+
+        /**
+         * PARIDA hace {@code dias} dias, para las vacas de escenarios no reproductivos (sin senal, bateria, salud,
+         * calibracion): sin ningun estado el detector de anestro cuenta desde nacimiento + 1 anio y las alerta.
+         */
+        private void sembrarPartoReciente(Animal animal, Usuario vet, LocalDateTime ahora, int dias) {
+                sembrarEstadoReproductivo(animal, TipoReproductivo.PARIDA, OrigenEstado.MANUAL, vet,
+                                LocalDate.now().minusDays(dias), ahora.minusDays(dias));
         }
 
         private void sembrarGestante(Animal animal, Usuario vet,
