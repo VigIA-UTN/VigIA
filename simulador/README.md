@@ -14,7 +14,7 @@ Script en Python que emula el comportamiento de cientos de caravanas IoT transmi
 
 Las variables de entorno (ver `.env.example`) son:
 - `API_URL`: URL del webhook del `backend-worker`.
-- `RODEO_DEVICE_IDS`: el rodeo vivo de `simulador.py`, separado por comas (default `VIGIA-ARG-015..026`). Ver la sección de la demo.
+- `RODEO_DEVICE_IDS`: el rodeo vivo de `simulador.py`, separado por comas (default `VIGIA-ARG-003..040`). Ver la sección de la demo.
 - `EXTRA_DEVICE_IDS`: caravanas adicionales a simular, separadas por coma. En `simulador.py` el default son las caravanas libres `VIGIA-LIBRE-301..305` (Acto 1).
 - `INTERVALO_SEGUNDOS`: segundos entre envíos. Si se define, pisa el default (5) de `simulador.py`, `simulador_celo.py` y `simulador_cohesion.py`. `simulador_fuga.py` y `simulador_salud.py` no lo leen (`--intervalo`). Para la demo **no** definirlo: con 300, el script de celo del Acto 2 tarda cinco minutos entre puntos. La distancia por paquete está fija a la escala de un tick de 5 min en todos los scripts, así que cambiarlo solo acelera o frena el ritmo, no rompe la calibración del modelo.
 - `TTN_WEBHOOK_API_KEY`: tiene que coincidir con la de `infra/.env`.
@@ -56,17 +56,16 @@ caer dentro de los ~25 min posteriores al reseed (ver la sección del acto 4).
 
 - **`simulador.py`**: la manada de fondo. Manda pastoreo normal, sin
   nada forzado, y queda corriendo toda la demo. Mueve el rodeo vivo
-  (`RODEO_DEVICE_IDS`, por defecto las gestantes `VIGIA-ARG-015..026`, sin rol
-  especial en el seed) y lo mantiene junto y en el lugar: la vaca que se aleja
+  (`RODEO_DEVICE_IDS`, por defecto todo el Lote Principal, `VIGIA-ARG-003..040`)
+  y lo mantiene junto y en el lugar: la vaca que se aleja
   más de 35 m del centro donde arrancó el rodeo vuelve hacia él. Hace falta porque ml-geo arma el grupo
   con los animales a <= 100 m entre sí y solo mira los que transmitieron en los
   últimos 30 min: si el rodeo vivo se dispersara, marcaría aislados a todos.
   `DataInitializer` deja las últimas posiciones de todas las vacas con datos
   recientes en un círculo de ~40 m, así que al arrancar tampoco hay
   aislamientos. Nunca manda telemetría para `FORZAR_CELO_DEVICE_ID`,
-  `FUGA_DEVICE_IDS`, `FORZAR_SALUD_DEVICE_ID` ni `VIGIA-ARG-003` (el seed le
-  deja una única transmisión vieja para el indicador "sin datos recientes" del
-  mapa, H0012). Para el Acto 1 (Paso 1.6) manda también las caravanas libres
+  `FUGA_DEVICE_IDS` ni `FORZAR_SALUD_DEVICE_ID`, que mueven los scripts de cada
+  acto. Para el Acto 1 (Paso 1.6) manda también las caravanas libres
   `VIGIA-LIBRE-301..305`, juntas en un corral: el worker las ignora ("Sin
   animal asociado") hasta que Pedro vincula una desde la UI, y desde el
   paquete siguiente se guarda su telemetría y el animal aparece en el mapa,
@@ -110,7 +109,7 @@ backend dentro de esa ventana de 24hs antes de la demo.
 
 ## `simulador_fuga.py` — Acto 3: fuga por el alambrado norte
 
-Simula que cede el alambrado norte del "Potrero Principal Demo" y dos vacas
+Simula que cede el alambrado norte del "Potrero Principal" y dos vacas
 (`FUGA_DEVICE_IDS`, por defecto `VIGIA-ARG-013` Aurora y `VIGIA-ARG-014`
 Canela) se escapan juntas. Arranca desde la última posición real de cada una,
 caminan hasta el mismo hueco del alambrado y lo cruzan en el mismo paquete
@@ -171,12 +170,14 @@ docstring del script):
 
 - Con `VIGIA_GEO_VENTANA_HORAS=1` el aislamiento sale de entrada si el Acto 4
   cae dentro de ~25 min del reinicio del backend; con 24, siempre.
-- Las vacas que reciben telemetría en vivo (rodeo vivo, #104, fuga) tienen
-  6 días de historial: el job de salud las ve "en calibración" (log INFO) en
-  vez de loguear un ERROR por minuto pidiendo un perfil que ml-salud rechaza.
-  Sembrarles 8 días a 5 min no conviene: validado offline, el pastoreo del
-  simulador contra ese perfil da alertas de salud falsas en ~7 % de las vacas
-  durante una demo de 20 min.
+- El resto del rodeo (incluidas las vacas de la fuga) tiene 8 días a 5 min con
+  el mismo pastoreo que `simulador.py` (`sembrarHistorialRodeo`), y el worker
+  les arma el perfil de salud en el primer minuto después del seed: el
+  dashboard las muestra monitoreadas. Validado offline contra ml-salud: 0
+  alertas falsas en 1200 ventanas (con el pastoreo anterior del seed daba
+  ~1 %), y en Docker, 1074 evaluaciones en 31 min con solo la alerta de la
+  #208. La #104 tiene 6 días y queda en calibración: con perfil, sus 24 hs de
+  celo darían alerta de salud en el Acto 2.
 - moveState 0-2 y la vaca quieta. Validado offline contra `ml-celo`
   (umbral 0.943): P(celo) ~0.12. El rodeo vivo con la vuelta al centro queda
   en <= 0.23.

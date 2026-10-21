@@ -35,7 +35,7 @@ INSTRUCCIONES PARA EL PRESENTADOR (Acto 3, Pasos 3.2 a 3.4)
 DETALLE TÉCNICO
 ═══════════════════════════════════════════════════════════════════════════════
 
-- Vacas por defecto: VIGIA-ARG-013 (#13013 Aurora) y VIGIA-ARG-014 (#14014
+- Vacas por defecto: VIGIA-ARG-013 (#581 Aurora) y VIGIA-ARG-014 (#618
   Canela), dos gestantes del Lote Principal que ningún otro simulador mueve
   (simulador.py las excluye vía FUGA_DEVICE_IDS).
   Se pueden cambiar con la variable de entorno FUGA_DEVICE_IDS, pero tienen
@@ -81,11 +81,11 @@ API_URL = os.getenv("API_URL", "http://localhost:8081/api/v1/ingesta/uplink")
 DEVICE_IDS = [d.strip() for d in os.getenv("FUGA_DEVICE_IDS", "VIGIA-ARG-013,VIGIA-ARG-014").split(",")
               if d.strip()]
 NOMBRES = {
-    "VIGIA-ARG-013": "#13013 — Aurora (Holando)",
-    "VIGIA-ARG-014": "#14014 — Canela (Holando)",
+    "VIGIA-ARG-013": "#581 — Aurora (Holando)",
+    "VIGIA-ARG-014": "#618 — Canela (Holando)",
 }
 
-# ─── Perímetro "Potrero Principal Demo" (DataInitializer) ────────────────
+# ─── Perímetro "Potrero Principal" (DataInitializer) ────────────────
 LAT_CENTRO = -34.943317
 LON_CENTRO = -59.225728
 DELTA_PERIMETRO = 0.0045
@@ -211,7 +211,7 @@ def main():
     print("=" * 70)
     for d in DEVICE_IDS:
         print(f"  Vaca          : {NOMBRES.get(d, d)}  [{d}]")
-    print(f"  Perímetro     : Potrero Principal Demo (tolerancia {TOLERANCIA_M} m)")
+    print(f"  Perímetro     : Potrero Principal (tolerancia {TOLERANCIA_M} m)")
     print(f"  Target API    : {API_URL}")
     print(f"  Cadencia      : {args.intervalo:g} s")
     print("=" * 70)
