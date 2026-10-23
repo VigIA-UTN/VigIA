@@ -10,6 +10,7 @@ interface PerimetroSidebarProps {
   rodeos: RodeoLoteResponse[];
   loading: boolean;
   onToggleActivo: (perimetro: PerimetroResponse) => void;
+  onToggleAll: () => void;
   onStartEdit: (perimetro: PerimetroResponse) => void;
   onCancelEdit: () => void;
   onSaveEdit: (nombre: string, loteIds: number[], zonaEstricta: boolean, distanciaToleranciaMetros: number, descripcion?: string) => Promise<void>;
@@ -27,6 +28,7 @@ export default function PerimetroSidebar({
   rodeos,
   loading,
   onToggleActivo,
+  onToggleAll,
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
@@ -80,6 +82,17 @@ export default function PerimetroSidebar({
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div className="d-flex align-items-center gap-2">
           <h4 className="m-0 fw-bold" style={{ color: '#1E3A5F' }}>Perímetros</h4>
+          {/* Switch para activar/desactivar todos los perímetros */}
+          <div className="form-check form-switch">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              role="switch"
+              id="flexSwitchCheckDefault"
+              checked={perimetros.every((p) => p.activo)}
+              onChange={onToggleAll}
+            />
+          </div>
           {!editingPerimetro && (
             <button
               onClick={onCreateNew}

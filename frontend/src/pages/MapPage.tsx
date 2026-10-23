@@ -307,6 +307,33 @@ export default function MapPage() {
     }
   };
 
+  const handleToggleAllPerimetros = async () => {
+    const todosActivos = perimetros.every(p => p.activo);
+    const nuevoEstadoTodos = !todosActivos;
+
+    // Actualizar UI inmediatamente
+    setPerimetros(prev =>
+      prev.map(p => ({ ...p, activo: nuevoEstadoTodos }))
+    );
+
+    try {
+      // Activar todos
+      if (nuevoEstadoTodos) {
+        await Promise.all(perimetros.map(p => activarPerimetro(p.id)));
+      }
+      // Desactivar todos
+      else {
+        await Promise.all(perimetros.map(p => desactivarPerimetro(p.id)));
+      }
+    } catch (err) {
+      console.error("Error al cambiar estado de todos los perímetros", err);
+      // Revertir si falla
+      setPerimetros(prev =>
+        prev.map(p => ({ ...p, activo: !nuevoEstadoTodos }))
+      );
+    }
+  };
+
   const handleStartEditPerimetro = (perimetro: PerimetroResponse) => {
     setEditingPerimetro(perimetro);
     setCoordenadasEditadas(perimetro.coordenadas ? [...perimetro.coordenadas] : []);
@@ -700,6 +727,7 @@ export default function MapPage() {
           rodeos={rodeos}
           loading={loadingPerimetros}
           onToggleActivo={handleToggleActivoPerimetro}
+          onToggleAll={handleToggleAllPerimetros}
           onStartEdit={handleStartEditPerimetro}
           onCancelEdit={handleCancelEditPerimetro}
           onSaveEdit={handleSaveEditPerimetro}
