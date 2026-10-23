@@ -2,7 +2,7 @@ import { MapContainer, TileLayer, Marker, useMap, ZoomControl, Polygon, Popup, u
 import 'leaflet/dist/leaflet.css';
 import './MapPage.css';
 import L from 'leaflet';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertSidebar from '../components/AlertSidebar';
@@ -73,6 +73,14 @@ function MapEditorEvents({
 
 const CENTRO_CAMPO: [number, number] = [-34.6037, -58.3816];
 
+function MapRefCapture({ onMap }: { onMap: (map: L.Map) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    onMap(map);
+  }, [map, onMap]);
+  return null;
+}
+
 function MapUpdater({ center, trigger }: { center: [number, number], trigger: { lat: number, lng: number, t: number } | null }) {
   const map = useMap();
   const [lat, lng] = center;
@@ -90,6 +98,7 @@ function MapUpdater({ center, trigger }: { center: [number, number], trigger: { 
 }
 
 export default function MapPage() {
+  const mapRef = useRef<L.Map | null>(null);
   const { establecimientos, selectedId } = useEstablecimientoStore();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [selectedAlertaMap, setSelectedAlertaMap] = useState<AlertaResponse | null>(null);
@@ -310,13 +319,41 @@ export default function MapPage() {
 
   const handleCreateNewPerimetro = () => {
     if (!selectedId) return;
-    const [cLat, cLng] = center;
-    const delta = 0.003;
+
+    let cLat = center[0];
+    let cLng = center[1];
+    let deltaLat = 0.003;
+    let deltaLng = 0.003;
+
+    if (mapRef.current) {
+      const map = mapRef.current;
+      const mapSize = map.getSize();
+      // Si el sidebar de perímetros está abierto y hay suficiente ancho, centramos en la parte visible del mapa
+      const sidebarWidth = isPerimetrosOpen && mapSize.x > 600 ? 350 : 0;
+      const visibleCenterPoint = L.point(
+        sidebarWidth + (mapSize.x - sidebarWidth) / 2,
+        mapSize.y / 2
+      );
+      const visualCenter = map.containerPointToLatLng(visibleCenterPoint);
+      cLat = visualCenter.lat;
+      cLng = visualCenter.lng;
+
+      const bounds = map.getBounds();
+      const latSpan = Math.abs(bounds.getNorth() - bounds.getSouth());
+      const lngSpan = Math.abs(bounds.getEast() - bounds.getWest());
+
+      // Dimensionar el polígono inicial proporcional a la vista actual (~24% del span visible)
+      if (latSpan > 0 && lngSpan > 0) {
+        deltaLat = Math.min(Math.max(latSpan * 0.12, 0.0003), 0.02);
+        deltaLng = Math.min(Math.max(lngSpan * 0.12, 0.0003), 0.02);
+      }
+    }
+
     const defaultCoords: CoordenadaDTO[] = [
-      { latitud: cLat + delta, longitud: cLng - delta },
-      { latitud: cLat + delta, longitud: cLng + delta },
-      { latitud: cLat - delta, longitud: cLng + delta },
-      { latitud: cLat - delta, longitud: cLng - delta },
+      { latitud: cLat + deltaLat, longitud: cLng - deltaLng },
+      { latitud: cLat + deltaLat, longitud: cLng + deltaLng },
+      { latitud: cLat - deltaLat, longitud: cLng + deltaLng },
+      { latitud: cLat - deltaLat, longitud: cLng - deltaLng },
     ];
     const nuevo: PerimetroResponse = {
       id: 0,
@@ -374,12 +411,14 @@ export default function MapPage() {
   return (
     <div style={{ height: '100%', width: '100%', margin: 0, padding: 0, position: 'relative', overflow: 'hidden' }}>
       <MapContainer
+        ref={mapRef}
         center={center}
         zoom={15}
         maxZoom={22}
         zoomControl={false}
         style={{ height: '100%', width: '100%', zIndex: 1 }}
       >
+        <MapRefCapture onMap={(m) => { mapRef.current = m; }} />
         <ZoomControl position="bottomright" />
         <TileLayer
           attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
