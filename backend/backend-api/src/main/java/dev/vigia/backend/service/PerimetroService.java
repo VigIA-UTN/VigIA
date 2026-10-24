@@ -15,6 +15,8 @@ public interface PerimetroService {
 
     void desactivarPerimetro(Long perimetroId, String emailUsuario);
 
+    void eliminarPerimetro(Long perimetroId, String emailUsuario);
+
     PerimetroResponse getPerimetroById(Long perimetroId, String emailUsuario);
 
     List<PerimetroResponse> getPerimetrosByEstablecimiento(Long establecimientoId, String emailUsuario);

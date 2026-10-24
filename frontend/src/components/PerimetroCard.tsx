@@ -7,6 +7,7 @@ interface PerimetroCardProps {
   rodeos: RodeoLoteResponse[];
   onToggleActivo: (perimetro: PerimetroResponse) => void;
   onEdit: (perimetro: PerimetroResponse) => void;
+  onDelete: (perimetro: PerimetroResponse) => void;
   onHoverStart: (perimetroId: number) => void;
   onHoverEnd: () => void;
   isEditing?: boolean;
@@ -17,6 +18,7 @@ export default function PerimetroCard({
   rodeos,
   onToggleActivo,
   onEdit,
+  onDelete,
   onHoverStart,
   onHoverEnd,
   isEditing = false,
@@ -70,6 +72,14 @@ export default function PerimetroCard({
           >
             {perimetro.activo && <i className="bi bi-check-lg" style={{ color: '#FFFFFF', fontSize: '1.1rem' }}></i>}
           </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(perimetro); }}
+            className="btn btn-link p-1 ms-1 text-danger"
+            title="Eliminar perímetro"
+            style={{ textDecoration: 'none' }}
+          >
+            <i className="bi bi-trash fs-5"></i>
+          </button>
         </div>
       }
     />

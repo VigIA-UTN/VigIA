@@ -14,6 +14,7 @@ interface PerimetroSidebarProps {
   onStartEdit: (perimetro: PerimetroResponse) => void;
   onCancelEdit: () => void;
   onSaveEdit: (nombre: string, loteIds: number[], zonaEstricta: boolean, distanciaToleranciaMetros: number, descripcion?: string) => Promise<void>;
+  onDelete: (perimetro: PerimetroResponse) => void;
   onCreateNew: () => void;
   editingPerimetro: PerimetroResponse | null;
   coordenadasEditadas: CoordenadaDTO[];
@@ -32,6 +33,7 @@ export default function PerimetroSidebar({
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
+  onDelete,
   onCreateNew,
   editingPerimetro,
   coordenadasEditadas,
@@ -83,9 +85,9 @@ export default function PerimetroSidebar({
         <div className="d-flex align-items-center gap-2">
           <h4 className="m-0 fw-bold" style={{ color: '#1E3A5F' }}>Perímetros</h4>
           {/* Switch para activar/desactivar todos los perímetros */}
-          <div className="form-check form-switch">
+          <div className="form-check form-switch m-0 p-0 d-flex align-items-center">
             <input
-              className="form-check-input"
+              className="form-check-input m-0"
               type="checkbox"
               role="switch"
               id="flexSwitchCheckDefault"
@@ -132,6 +134,7 @@ export default function PerimetroSidebar({
               rodeos={rodeos}
               coordenadasEditadas={coordenadasEditadas}
               onSave={onSaveEdit}
+              onDelete={onDelete}
               onCancel={handleCancelWithAnimation}
               isSaving={isSaving}
             />
@@ -157,6 +160,7 @@ export default function PerimetroSidebar({
                 rodeos={rodeos}
                 onToggleActivo={onToggleActivo}
                 onEdit={onStartEdit}
+                onDelete={onDelete}
                 onHoverStart={onHoverStart}
                 onHoverEnd={onHoverEnd}
                 isEditing={false}

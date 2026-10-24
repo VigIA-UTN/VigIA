@@ -134,6 +134,18 @@ public class PerimetroServiceImpl implements PerimetroService {
 
     @Override
     @SuppressWarnings("null")
+    public void eliminarPerimetro(Long perimetroId, String emailUsuario) {
+        Usuario usuario = buscarUsuario(emailUsuario);
+        Perimetro perimetro = perimetroRepository.findById(perimetroId)
+                .orElseThrow(() -> new IllegalArgumentException("Perímetro no encontrado con ID: " + perimetroId));
+
+        validarAccesoEstablecimiento(usuario, perimetro.getEstablecimiento());
+        perimetroRepository.delete(perimetro);
+        log.info("Perímetro {} eliminado por {}", perimetroId, emailUsuario);
+    }
+
+    @Override
+    @SuppressWarnings("null")
     @Transactional(readOnly = true)
     public PerimetroResponse getPerimetroById(Long perimetroId, String emailUsuario) {
         Usuario usuario = buscarUsuario(emailUsuario);

@@ -185,11 +185,11 @@ public class PerimetroController {
     /**
      * DELETE /api/v1/perimetros/{id}
      * <p>
-     * Alias de {@code PATCH /{id}/desactivar}: elimina (desactiva) un perímetro.
+     * Elimina definitivamente un perímetro (y sus asignaciones a lotes).
      *
      * @param id             ID del perímetro a eliminar
      * @param authentication contexto de seguridad inyectado por Spring Security
-     * @return 200 si se eliminó correctamente, 403 si acceso denegado, 400 si hay
+     * @return 204 si se eliminó correctamente, 403 si acceso denegado, 400 si hay
      *         error
      */
     @DeleteMapping("/{id}")
@@ -197,6 +197,13 @@ public class PerimetroController {
     public ResponseEntity<?> eliminarPerimetro(
             @PathVariable("id") Long id,
             Authentication authentication) {
-        return desactivarPerimetro(id, authentication);
+        try {
+            perimetroService.eliminarPerimetro(id, authentication.getName());
+            return ResponseEntity.noContent().build();
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }
