@@ -182,6 +182,11 @@ function NavScroll() {
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/invitaciones')}>
                                 <i className="bi bi-envelope me-2" />Invitaciones
                             </button>
+                            {isProductor && selectedId && (
+                                <button className="mobile-drawer-link" onClick={() => handleNavLink(`/establecimientos/${selectedId}/configuracion`)}>
+                                    <i className="bi bi-gear me-2" />Configuración
+                                </button>
+                            )}
                         </>
                     )}
                 </nav>
@@ -232,7 +237,7 @@ function NavScroll() {
                     <div className="d-none d-lg-flex align-items-center gap-2 position-absolute start-0 ps-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
                         {establecimientoSelector}
                         {/* El veterinario no ve /establecimientos: configura el establecimiento activo desde acá */}
-                        {isVeterinario && selectedId && (
+                        {(isVeterinario || isProductor) && selectedId && (
                             <Link
                                 to={`/establecimientos/${selectedId}/configuracion`}
                                 className="btn btn-sm d-flex align-items-center"
@@ -257,8 +262,8 @@ function NavScroll() {
                                 <i className="bi bi-person-circle me-1" /> Mi Perfil
                             </Nav.Link>
                         </Nav>
-                        <button 
-                            className="btn btn-sm d-flex align-items-center gap-1 btn-salir-navbar" 
+                        <button
+                            className="btn btn-sm d-flex align-items-center gap-1 btn-salir-navbar"
                             onClick={logout}
                             style={{
                                 backgroundColor: 'rgba(255,255,255,0.12)',

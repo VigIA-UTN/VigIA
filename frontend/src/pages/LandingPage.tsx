@@ -295,8 +295,7 @@ export default function LandingPage() {
       <div className={`landing-drawer ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="landing-drawer-header">
           <div className="landing-brand">
-            <img src="/vigia-logo.png" alt="VigIA" className="landing-brand-icon" />
-            <img src="/Logo 2R.png" alt="VigIA" className="landing-brand-text" />
+            <img src="/logo.png" alt="VigIA" className="landing-brand-icon" />
           </div>
           <button
             type="button"
