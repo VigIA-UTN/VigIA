@@ -28,9 +28,9 @@ public class ExcelParserServiceImpl implements FileParserService {
             Sheet sheet = workbook.getSheetAt(0);
             
             Row firstRow = sheet.getRow(0);
-            if (firstRow == null || firstRow.getLastCellNum() < 5) {
+            if (firstRow == null || firstRow.getLastCellNum() < COLUMNAS_MINIMAS) {
                 Row secondRow = sheet.getRow(1);
-                if (secondRow == null || secondRow.getLastCellNum() < 5) {
+                if (secondRow == null || secondRow.getLastCellNum() < COLUMNAS_MINIMAS) {
                     throw new IllegalArgumentException("El archivo Excel debe tener al menos 5 columnas.");
                 }
             }
@@ -41,8 +41,8 @@ public class ExcelParserServiceImpl implements FileParserService {
                     continue;
                 }
 
-                String[] data = new String[5];
-                for (int i = 0; i < 5; i++) {
+                String[] data = new String[COLUMNAS_LEIDAS];
+                for (int i = 0; i < COLUMNAS_LEIDAS; i++) {
                     data[i] = getStringCellValue(row.getCell(i));
                 }
                 rowsData.add(data);

@@ -1,6 +1,8 @@
 package dev.vigia.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -24,11 +26,14 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import dev.vigia.backend.dto.CargaMasivaResult;
+import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
+import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.service.impl.CargaMasivaServiceImpl;
@@ -43,6 +48,8 @@ class CargaMasivaServiceTest {
         private EstablecimientoRepository establecimientoRepository;
         @Mock
         private RodeoLoteRepository rodeoLoteRepository;
+        @Mock
+        private CaravanaRepository caravanaRepository;
 
         @Mock
         private FileParserService fileParserService;
@@ -55,7 +62,7 @@ class CargaMasivaServiceTest {
         @BeforeEach
         void setUp() {
                 excelReaderService = new CargaMasivaServiceImpl(animalRepository, establecimientoRepository,
-                                rodeoLoteRepository, List.of(fileParserService));
+                                rodeoLoteRepository, caravanaRepository, List.of(fileParserService));
 
                 establecimiento = new Establecimiento();
                 establecimiento.setId(1L);
@@ -276,6 +283,102 @@ class CargaMasivaServiceTest {
                 assertEquals(1, resultado.getProcesados());
                 assertEquals(0, resultado.getFallidos());
                 assertEquals(1, resultado.getAnimalesExitosos().size());
+        }
+
+        // ── Columna Sensor (opcional) ────────────────────────────────────────────
+
+        private Caravana caravana(long id, String devEui, String codigo, String alias, EstadoSensor estado) {
+                Caravana c = new Caravana();
+                c.setId(id);
+                c.setDevEui(devEui);
+                c.setCodigo(codigo);
+                c.setAlias(alias);
+                c.setEstadoSensor(estado);
+                c.setEstablecimiento(establecimiento);
+                return c;
+        }
+
+        @Test
+        @DisplayName("Sin columna Sensor no consulta caravanas y crea los animales sin sensor")
+        void procesarCargaMasiva_sinSensor_noConsultaCaravanas() throws IOException {
+                CargaMasivaResult resultado = procesarFilas(List.<String[]>of(
+                                new String[] { "CAR-1", "Lola", "2020-01-01", "Angus", "Rodeo Test" }));
+                assertEquals(1, resultado.getAnimalesExitosos().size());
+                assertNull(resultado.getAnimalesExitosos().get(0).getCaravana());
+                verify(caravanaRepository, never()).findAllByEstablecimientoId(any());
+        }
+
+        @Test
+        @DisplayName("Con Sensor vincula la caravana, buscándola por DevEUI, código o alias")
+        void procesarCargaMasiva_conSensor_vincula() throws IOException {
+                Caravana porDevEui = caravana(1L, "EUI-1", null, null, EstadoSensor.DISPONIBLE);
+                Caravana porCodigo = caravana(2L, "EUI-2", "COD-2", null, EstadoSensor.DISPONIBLE);
+                Caravana porAlias = caravana(3L, "EUI-3", null, "Sensor Lola", EstadoSensor.DISPONIBLE);
+                when(caravanaRepository.findAllByEstablecimientoId(1L)).thenReturn(List.of(porDevEui, porCodigo, porAlias));
+
+                CargaMasivaResult resultado = procesarFilas(List.of(
+                                new String[] { "CAR-1", "Vaca 1", "2020-01-01", "Angus", "Rodeo Test", "eui-1" },
+                                new String[] { "CAR-2", "Vaca 2", "2020-01-01", "Angus", "Rodeo Test", "COD-2" },
+                                new String[] { "CAR-3", "Vaca 3", "2020-01-01", "Angus", "Rodeo Test", " sensor lola " },
+                                new String[] { "CAR-4", "Vaca 4", "2020-01-01", "Angus", "Rodeo Test", "" }));
+
+                assertEquals(0, resultado.getFallidos());
+                assertSame(porDevEui, resultado.getAnimalesExitosos().get(0).getCaravana());
+                assertSame(porCodigo, resultado.getAnimalesExitosos().get(1).getCaravana());
+                assertSame(porAlias, resultado.getAnimalesExitosos().get(2).getCaravana());
+                assertNull(resultado.getAnimalesExitosos().get(3).getCaravana());
+                for (Caravana c : List.of(porDevEui, porCodigo, porAlias)) {
+                        assertEquals(EstadoSensor.VINCULADO, c.getEstadoSensor());
+                        verify(caravanaRepository).save(c);
+                }
+        }
+
+        @Test
+        @DisplayName("Falla si el sensor no existe, ya está vinculado o está dado de baja")
+        void procesarCargaMasiva_sensorInvalido() throws IOException {
+                when(caravanaRepository.findAllByEstablecimientoId(1L)).thenReturn(List.of(
+                                caravana(1L, "EUI-VINC", null, null, EstadoSensor.VINCULADO),
+                                caravana(2L, "EUI-BAJA", null, null, EstadoSensor.INACTIVO)));
+
+                CargaMasivaResult resultado = procesarFilas(List.of(
+                                new String[] { "CAR-1", "Vaca 1", "2020-01-01", "Angus", "Rodeo Test", "NO-EXISTE" },
+                                new String[] { "CAR-2", "Vaca 2", "2020-01-01", "Angus", "Rodeo Test", "EUI-VINC" },
+                                new String[] { "CAR-3", "Vaca 3", "2020-01-01", "Angus", "Rodeo Test", "EUI-BAJA" }));
+
+                assertEquals(3, resultado.getFallidos());
+                assertEquals(0, resultado.getAnimalesExitosos().size());
+                assertEquals(List.of(
+                                "Fila 2: El sensor 'NO-EXISTE' no existe en el establecimiento.",
+                                "Fila 3: El sensor 'EUI-VINC' ya está vinculado a otro animal.",
+                                "Fila 4: El sensor 'EUI-BAJA' está dado de baja."), resultado.getErrores());
+                verify(caravanaRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Falla si el mismo sensor aparece dos veces en el archivo, y no vincula nada")
+        void procesarCargaMasiva_sensorDuplicado() throws IOException {
+                Caravana libre = caravana(1L, "EUI-1", null, null, EstadoSensor.DISPONIBLE);
+                when(caravanaRepository.findAllByEstablecimientoId(1L)).thenReturn(List.of(libre));
+
+                CargaMasivaResult resultado = procesarFilas(List.of(
+                                new String[] { "CAR-1", "Vaca 1", "2020-01-01", "Angus", "Rodeo Test", "EUI-1" },
+                                new String[] { "CAR-2", "Vaca 2", "2020-01-01", "Angus", "Rodeo Test", "EUI-1" }));
+
+                assertEquals(List.of("Fila 3: Sensor duplicado en el archivo: EUI-1"), resultado.getErrores());
+                assertEquals(0, resultado.getAnimalesExitosos().size());
+                assertEquals(EstadoSensor.DISPONIBLE, libre.getEstadoSensor());
+        }
+
+        @Test
+        @DisplayName("Falla si el alias del sensor coincide con varias caravanas")
+        void procesarCargaMasiva_sensorAmbiguo() throws IOException {
+                when(caravanaRepository.findAllByEstablecimientoId(1L)).thenReturn(List.of(
+                                caravana(1L, "EUI-1", null, "Repetido", EstadoSensor.DISPONIBLE),
+                                caravana(2L, "EUI-2", null, "Repetido", EstadoSensor.DISPONIBLE)));
+
+                assertFallaConError(
+                                List.<String[]>of(new String[] { "CAR-1", "Vaca 1", "2020-01-01", "Angus", "Rodeo Test", "Repetido" }),
+                                "Fila 2: El sensor 'Repetido' coincide con varias caravanas. Indicá su DevEUI.");
         }
 
         @Test

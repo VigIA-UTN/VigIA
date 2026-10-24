@@ -1309,6 +1309,32 @@ class AnimalControllerTest {
         }
 
         @Test
+        @DisplayName("POST /api/v1/animales/csv - Con columna Sensor opcional, vincula la caravana solo a la fila que la trae")
+        @SuppressWarnings("null")
+        void cargarAnimalesExcel_conSensorOpcional_vinculaCaravana() throws Exception {
+                Caravana libre = crearCaravanaDisponible("TEST-CSV-SENSOR");
+                String[] headers = { "IdCaravana", "Alias (opcional)", "FechaNacimiento", "Raza (opcional)", "RodeoLote",
+                                "Sensor (opcional)" };
+                String[][] rows = {
+                                { "S-1", "Con Sensor", "2020-01-01", "Angus", "Rodeo Base", "TEST-CSV-SENSOR" },
+                                { "S-2", "Sin Sensor", "2020-01-01", "Angus", "Rodeo Base", null }
+                };
+
+                mockMvc.perform(multipart("/api/v1/animales/csv")
+                                .file(generateExcel(headers, rows))
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.exitosos").value(2))
+                                .andExpect(jsonPath("$.animales[0].caravanaDevEui").value("TEST-CSV-SENSOR"))
+                                .andExpect(jsonPath("$.animales[1].caravanaId").doesNotExist());
+
+                Caravana enDb = caravanaRepository.findById(libre.getId()).orElseThrow();
+                assertThat(enDb.getEstadoSensor()).isEqualTo(EstadoSensor.VINCULADO);
+                assertThat(enDb.getFechaAsignacion()).isEqualTo(LocalDate.now());
+        }
+
+        @Test
         @DisplayName("POST /api/v1/animales/csv - Fecha y rodeo obligatorios, rodeo inexistente no se crea")
         @SuppressWarnings("null")
         void cargarAnimalesExcel_validacionesAltaManual_noGuardaNada() throws Exception {

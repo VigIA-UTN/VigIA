@@ -32,18 +32,18 @@ public class CsvParserServiceImpl implements FileParserService {
             for (CSVRecord csvRecord : csvParser) {
                 if (firstRow) {
                     firstRow = false;
-                    if (csvRecord.size() < 5) {
+                    if (csvRecord.size() < COLUMNAS_MINIMAS) {
                         throw new IllegalArgumentException("El archivo CSV debe tener al menos 5 columnas.");
                     }
                     continue;
                 }
-                
-                if (csvRecord.size() < 5) {
+
+                if (csvRecord.size() < COLUMNAS_MINIMAS) {
                     throw new IllegalArgumentException("El archivo CSV debe tener al menos 5 columnas.");
                 }
 
-                String[] data = new String[5];
-                for (int i = 0; i < 5; i++) {
+                String[] data = new String[COLUMNAS_LEIDAS];
+                for (int i = 0; i < Math.min(COLUMNAS_LEIDAS, csvRecord.size()); i++) {
                     data[i] = csvRecord.get(i);
                 }
                 rowsData.add(data);

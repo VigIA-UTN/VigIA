@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -16,10 +17,13 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.multipart.MultipartFile;
 import dev.vigia.backend.dto.CargaMasivaResult;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
+import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.service.CargaMasivaService;
@@ -30,9 +34,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CargaMasivaServiceImpl implements CargaMasivaService {
 
+    private static final int COLUMNA_SENSOR = 5;
+
     private final AnimalRepository animalRepository;
     private final EstablecimientoRepository establecimientoRepository;
     private final RodeoLoteRepository rodeoLoteRepository;
+    private final CaravanaRepository caravanaRepository;
     private final List<FileParserService> parsers;
 
     @Override
@@ -71,11 +78,18 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
                 .filter(RodeoLote::isActivo)
                 .collect(Collectors.toMap(r -> normalizarNombre(r.getNombre()), Function.identity(), (a, b) -> a));
 
+        // Solo se consultan las caravanas si alguna fila trae sensor.
+        boolean haySensores = parsedRows.stream().anyMatch(data -> valor(data, COLUMNA_SENSOR) != null);
+        List<Caravana> caravanasEstablecimiento = haySensores
+                ? caravanaRepository.findAllByEstablecimientoId(establecimientoId)
+                : List.of();
+
         List<Animal> animals = new ArrayList<>();
         int procesados = 0;
         int fallidos = 0;
         Set<String> caravanasEnArchivo = new HashSet<>();
         Set<String> aliasEnArchivo = new HashSet<>();
+        Set<Long> sensoresEnArchivo = new HashSet<>();
         List<String> errores = new ArrayList<>();
 
         for (int i = 0; i < parsedRows.size(); i++) {
@@ -107,7 +121,19 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
                     }
                 }
 
-                animals.add(createAnimalFromData(data, establecimientoSeleccionado, rodeosActivos));
+                Animal animal = createAnimalFromData(data, establecimientoSeleccionado, rodeosActivos);
+
+                String sensor = valor(data, COLUMNA_SENSOR);
+                if (sensor != null) {
+                    Caravana caravana = resolverSensor(sensor, caravanasEstablecimiento);
+                    if (!sensoresEnArchivo.add(caravana.getId())) {
+                        throw new IllegalArgumentException("Sensor duplicado en el archivo: " + sensor);
+                    }
+                    // Se marca VINCULADO recién al guardar, si el archivo entero es válido.
+                    animal.setCaravana(caravana);
+                }
+
+                animals.add(animal);
             } catch (Exception e) {
                 fallidos++;
                 errores.add("Fila " + fila + ": " + e.getMessage());
@@ -124,6 +150,10 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
         }
 
         List<Animal> saveAnimals = animalRepository.saveAll(animals);
+        saveAnimals.stream()
+                .map(Animal::getCaravana)
+                .filter(Objects::nonNull)
+                .forEach(this::marcarVinculada);
 
         return CargaMasivaResult.builder()
                 .procesados(procesados)
@@ -166,6 +196,42 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
         animal.setRaza(valor(data, 3));
         animal.setEstadoActual(EstadoAnimal.ACTIVO);
         return animal;
+    }
+
+    /**
+     * Busca la caravana por DevEUI, después por código y después por alias (sin distinguir mayúsculas),
+     * que es como el usuario la puede tener identificada. Tiene que estar libre.
+     */
+    private static Caravana resolverSensor(String sensor, List<Caravana> caravanas) {
+        List<Function<Caravana, String>> campos = List.of(Caravana::getDevEui, Caravana::getCodigo, Caravana::getAlias);
+        for (Function<Caravana, String> campo : campos) {
+            List<Caravana> coinciden = caravanas.stream()
+                    .filter(c -> campo.apply(c) != null && campo.apply(c).trim().equalsIgnoreCase(sensor))
+                    .toList();
+            if (coinciden.size() > 1) {
+                throw new IllegalArgumentException(
+                        "El sensor '" + sensor + "' coincide con varias caravanas. Indicá su DevEUI.");
+            }
+            if (coinciden.size() == 1) {
+                Caravana caravana = coinciden.get(0);
+                if (caravana.getEstadoSensor() == EstadoSensor.INACTIVO) {
+                    throw new IllegalArgumentException("El sensor '" + sensor + "' está dado de baja.");
+                }
+                if (caravana.getEstadoSensor() == EstadoSensor.VINCULADO) {
+                    throw new IllegalArgumentException("El sensor '" + sensor + "' ya está vinculado a otro animal.");
+                }
+                return caravana;
+            }
+        }
+        throw new IllegalArgumentException("El sensor '" + sensor + "' no existe en el establecimiento.");
+    }
+
+    /** El mismo estado en que deja la caravana AnimalServiceImpl al vincularla a mano. */
+    private void marcarVinculada(Caravana caravana) {
+        caravana.setEstadoSensor(EstadoSensor.VINCULADO);
+        caravana.setActivo(true);
+        caravana.setFechaAsignacion(LocalDate.now());
+        caravanaRepository.save(caravana);
     }
 
     private static String valor(String[] data, int index) {
