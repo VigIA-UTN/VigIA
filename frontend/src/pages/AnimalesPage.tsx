@@ -14,6 +14,7 @@ import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
+import { showAlert, showConfirm } from '../store/dialogStore';
 import { getAlertaParaAnimal } from '../api/alertaApi';
 import type { AlertaResponse } from '../api/alertaApi';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
@@ -154,13 +155,18 @@ export default function AnimalesPage() {
     };
 
     const handleDarDeBaja = async (id: number) => {
-        if (!window.confirm("¿Estás seguro de que querés dar de baja a este animal?")) return;
+        const confirmado = await showConfirm('¿Estás seguro de que querés dar de baja a este animal?', {
+            title: 'Dar de baja animal',
+            confirmText: 'Sí, dar de baja',
+            danger: true,
+        });
+        if (!confirmado) return;
         try {
             await desactivarAnimal(id);
             setAnimales(prev => prev.filter(a => a.id !== id));
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } } };
-            alert(e.response?.data?.message || 'Error al dar de baja el animal.');
+            showAlert(e.response?.data?.message || 'Error al dar de baja el animal.', { variant: 'error' });
         }
     };
 
@@ -228,7 +234,7 @@ export default function AnimalesPage() {
             const actualizado = await vincularCaravana(animalId, caravanaId);
             setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
         } catch {
-            alert('No se pudo deshacer la acción. La caravana ya podría estar vinculada a otro animal.');
+            showAlert('No se pudo deshacer la acción. La caravana ya podría estar vinculada a otro animal.', { variant: 'error' });
         }
     };
 

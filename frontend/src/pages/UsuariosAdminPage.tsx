@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Container, Spinner, Alert, Button, Form } from 'react-bootstrap';
 import { getTodosUsuarios, toggleEstadoUsuario } from '../api/usuariosApi';
 import type { UsuarioResponse } from '../api/usuariosApi';
+import { showAlert } from '../store/dialogStore';
 import './UsuariosAdminPage.css';
 
 export default function UsuariosAdminPage() {
@@ -38,7 +39,7 @@ export default function UsuariosAdminPage() {
       setUsuarios(prev => prev.map(u => u.id === id ? { ...u, activo: !u.activo } : u));
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
-      alert(axiosError.response?.data?.message || 'Error al cambiar el estado del usuario');
+      showAlert(axiosError.response?.data?.message || 'Error al cambiar el estado del usuario', { variant: 'error' });
     } finally {
       setTogglingId(null);
     }

@@ -1,0 +1,88 @@
+/* ── Modal de alert/confirm global ── mismo estilo navy que modal-nuevo-animal ── */
+.modal-dialog-vigia .modal-content {
+    background-color: #1E3A5F;
+    border: 2px solid #4DD0E1;
+    border-radius: 16px;
+    color: white;
+}
+
+.modal-dialog-vigia .modal-header {
+    border-bottom: none;
+    padding-bottom: 0;
+    justify-content: center;
+}
+
+.modal-dialog-vigia .modal-title {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    width: 100%;
+}
+
+.modal-dialog-vigia .btn-close {
+    filter: invert(1);
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+}
+
+.modal-dialog-vigia .modal-body {
+    padding: 12px 28px 8px;
+}
+
+.modal-dialog-vigia .modal-footer {
+    border-top: none;
+    padding: 8px 28px 24px;
+    justify-content: center;
+    flex-wrap: nowrap;
+}
+
+.dialog-vigia-icon {
+    display: block;
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+}
+
+.dialog-vigia-message {
+    color: #cde;
+    font-size: 1rem;
+    white-space: pre-line;
+}
+
+.btn-dialog-vigia {
+    flex: 1;
+    border: none !important;
+    border-radius: 10px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 1.05rem !important;
+    padding: 10px !important;
+    transition: background 0.2s !important;
+}
+
+.btn-dialog-vigia-ok {
+    background-color: #8CC63F !important;
+}
+
+.btn-dialog-vigia-ok:hover {
+    background-color: #7ab332 !important;
+}
+
+.btn-dialog-vigia-danger {
+    background-color: #dc3545 !important;
+}
+
+.btn-dialog-vigia-danger:hover {
+    background-color: #bb2d3b !important;
+}
+
+.btn-dialog-vigia-cancel {
+    background-color: transparent !important;
+    border: 2px solid #4DD0E1 !important;
+    color: #4DD0E1 !important;
+}
+
+.btn-dialog-vigia-cancel:hover {
+    background-color: rgba(77, 208, 225, 0.12) !important;
+}

@@ -18,6 +18,7 @@ import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import './EstablecimientosPage.css';
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import { useAuthStore } from '../store/authStore';
+import { showAlert } from '../store/dialogStore';
 import { datosEstablecimientoSchema } from './configuracionEstablecimientoSchema';
 
 type FormData = z.infer<typeof datosEstablecimientoSchema>;
@@ -90,7 +91,7 @@ export default function EstablecimientosPage() {
       setUndoToast({ id: est.id, nombre: est.nombre });
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
-      alert(axiosError.response?.data?.message || 'Error al desactivar establecimiento');
+      showAlert(axiosError.response?.data?.message || 'Error al desactivar establecimiento', { variant: 'error' });
     }
   };
 
@@ -100,7 +101,7 @@ export default function EstablecimientosPage() {
       setEstablecimientos(establecimientos.map(e => e.id === id ? actualizado : e));
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
-      alert(axiosError.response?.data?.message || 'Error al activar el establecimiento');
+      showAlert(axiosError.response?.data?.message || 'Error al activar el establecimiento', { variant: 'error' });
     }
   };
 
@@ -112,7 +113,7 @@ export default function EstablecimientosPage() {
       const actualizado = await activarEstablecimiento(id);
       setEstablecimientos(prev => prev.map(e => e.id === id ? actualizado : e));
     } catch {
-      alert('No se pudo deshacer la acción.');
+      showAlert('No se pudo deshacer la acción.', { variant: 'error' });
     }
   };
 

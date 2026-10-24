@@ -21,6 +21,7 @@ import DashboardPage from './pages/DashboardPage';
 import PerfilPage from './pages/PerfilPage';
 import ConfiguracionEstablecimientoPage from './pages/ConfiguracionEstablecimientoPage';
 import LandingPage from './pages/LandingPage';
+import DialogHost from './components/DialogHost';
 
 function InvitacionesRouter() {
   const rol = useAuthStore(state => state.rol);
@@ -161,6 +162,7 @@ function App() {
         {/* Cualquier ruta no encontrada redirige al root */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <DialogHost />
     </BrowserRouter>
   );
 }

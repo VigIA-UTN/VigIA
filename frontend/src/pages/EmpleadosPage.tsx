@@ -3,6 +3,7 @@ import { Container, Spinner, Alert, Button, Form } from 'react-bootstrap';
 import { getEmpleados, removerEmpleado } from '../api/usuariosApi';
 import type { UsuarioResponse } from '../api/usuariosApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { showAlert, showConfirm } from '../store/dialogStore';
 import './EmpleadosPage.css';
 
 export default function EmpleadosPage() {
@@ -38,7 +39,12 @@ export default function EmpleadosPage() {
     }, [selectedId]);
 
     const handleRemoverEmpleado = async (id: number, establecimientoId: number) => {
-        if (!window.confirm('¿Estás seguro de que querés quitar a este empleado del establecimiento?')) {
+        const confirmado = await showConfirm('¿Estás seguro de que querés quitar a este empleado del establecimiento?', {
+            title: 'Quitar empleado',
+            confirmText: 'Sí, quitar',
+            danger: true,
+        });
+        if (!confirmado) {
             return;
         }
 
@@ -48,7 +54,7 @@ export default function EmpleadosPage() {
             setEmpleados(prev => prev.filter(e => !(e.id === id && e.establecimientoId === establecimientoId)));
         } catch (err) {
             const axiosError = err as { response?: { data?: { message?: string } } };
-            alert(axiosError.response?.data?.message || 'Error al remover el empleado');
+            showAlert(axiosError.response?.data?.message || 'Error al remover el empleado', { variant: 'error' });
         } finally {
             setTogglingId(null);
         }
