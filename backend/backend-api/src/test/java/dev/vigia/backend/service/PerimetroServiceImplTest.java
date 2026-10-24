@@ -179,6 +179,40 @@ class PerimetroServiceImplTest {
 
     @Test
     @SuppressWarnings("null")
+    @DisplayName("Debe eliminar el perímetro cuando el productor pertenece al establecimiento")
+    void eliminarPerimetroExitoso() {
+        Perimetro perimetro = new Perimetro(establecimiento, "Potrero",
+                GeometryUtils.crearPoligono(coordenadasValidas));
+
+        when(usuarioRepository.findByEmail("productor@vigia.dev")).thenReturn(Optional.of(productor));
+        when(perimetroRepository.findById(1L)).thenReturn(Optional.of(perimetro));
+
+        perimetroService.eliminarPerimetro(1L, "productor@vigia.dev");
+
+        verify(perimetroRepository, times(1)).delete(perimetro);
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    @DisplayName("No debe eliminar el perímetro si el usuario no pertenece al establecimiento")
+    void eliminarPerimetroUsuarioSinAcceso() {
+        Usuario ajeno = new Usuario();
+        ajeno.setId(2L);
+        ajeno.setEmail("ajeno@vigia.dev");
+        Perimetro perimetro = new Perimetro(establecimiento, "Potrero",
+                GeometryUtils.crearPoligono(coordenadasValidas));
+
+        when(usuarioRepository.findByEmail("ajeno@vigia.dev")).thenReturn(Optional.of(ajeno));
+        when(perimetroRepository.findById(1L)).thenReturn(Optional.of(perimetro));
+
+        assertThatThrownBy(() -> perimetroService.eliminarPerimetro(1L, "ajeno@vigia.dev"))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(perimetroRepository, never()).delete(any());
+    }
+
+    @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe crear perímetro con tolerancia y zona estricta indicadas")
     void crearPerimetroConUmbral() {
         PerimetroRequest request = PerimetroRequest.builder()

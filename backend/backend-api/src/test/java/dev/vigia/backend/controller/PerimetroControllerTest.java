@@ -276,4 +276,39 @@ class PerimetroControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.activo").value(true));
         }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("DELETE /api/v1/perimetros/{id} - Elimina el perímetro definitivamente")
+        void eliminarPerimetro_success() throws Exception {
+                PerimetroRequest request = PerimetroRequest.builder()
+                                .establecimientoId(establecimientoId)
+                                .nombre("Perímetro a borrar")
+                                .loteIds(List.of(loteId))
+                                .coordenadas(getCoordenadasValidas())
+                                .build();
+
+                MvcResult result = mockMvc.perform(post("/api/v1/perimetros")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andReturn();
+
+                long id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+
+                mockMvc.perform(delete("/api/v1/perimetros/" + id)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isNoContent());
+
+                mockMvc.perform(get("/api/v1/perimetros/" + id)
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isBadRequest());
+
+                mockMvc.perform(get("/api/v1/perimetros")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(0));
+        }
 }

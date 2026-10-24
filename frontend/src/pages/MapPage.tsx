@@ -2,6 +2,8 @@ import { MapContainer, TileLayer, Marker, useMap, ZoomControl, Polygon, Popup, u
 import 'leaflet/dist/leaflet.css';
 import './MapPage.css';
 import L from 'leaflet';
+import axios from 'axios';
+import { Modal, Button, Alert } from 'react-bootstrap';
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
@@ -14,6 +16,7 @@ import {
   getPerimetros,
   activarPerimetro,
   desactivarPerimetro,
+  eliminarPerimetro,
   actualizarPerimetro,
   crearPerimetro,
   type PerimetroResponse,
@@ -119,6 +122,10 @@ export default function MapPage() {
   const [editingPerimetro, setEditingPerimetro] = useState<PerimetroResponse | null>(null);
   const [coordenadasEditadas, setCoordenadasEditadas] = useState<CoordenadaDTO[]>([]);
   const [isSavingPerimetro, setIsSavingPerimetro] = useState(false);
+  const [perimetroAEliminar, setPerimetroAEliminar] = useState<PerimetroResponse | null>(null);
+  const [showConfirmDeletePerimetro, setShowConfirmDeletePerimetro] = useState(false);
+  const [isDeletingPerimetro, setIsDeletingPerimetro] = useState(false);
+  const [errorEliminarPerimetro, setErrorEliminarPerimetro] = useState<string | null>(null);
 
   // Mapa de calor
   const [heatEnabled, setHeatEnabled] = useState(false);
@@ -435,6 +442,40 @@ export default function MapPage() {
     }
   };
 
+  const handleRequestDeletePerimetro = (perimetro: PerimetroResponse) => {
+    setErrorEliminarPerimetro(null);
+    setPerimetroAEliminar(perimetro);
+    setShowConfirmDeletePerimetro(true);
+  };
+
+  const handleCloseDeletePerimetro = () => {
+    if (isDeletingPerimetro) return;
+    setShowConfirmDeletePerimetro(false);
+  };
+
+  const handleConfirmDeletePerimetro = async () => {
+    if (!perimetroAEliminar) return;
+    const perimetro = perimetroAEliminar;
+    setIsDeletingPerimetro(true);
+    setErrorEliminarPerimetro(null);
+    try {
+      await eliminarPerimetro(perimetro.id);
+      setPerimetros(prev => prev.filter(p => p.id !== perimetro.id));
+      if (hoveredPerimetroId === perimetro.id) setHoveredPerimetroId(null);
+      if (editingPerimetro?.id === perimetro.id) handleCancelEditPerimetro();
+      setShowConfirmDeletePerimetro(false);
+    } catch (err) {
+      console.error("Error al eliminar perímetro", err);
+      setErrorEliminarPerimetro(
+        axios.isAxiosError(err) && typeof err.response?.data === 'string'
+          ? err.response.data
+          : 'No se pudo eliminar el perímetro.'
+      );
+    } finally {
+      setIsDeletingPerimetro(false);
+    }
+  };
+
   return (
     <div style={{ height: '100%', width: '100%', margin: 0, padding: 0, position: 'relative', overflow: 'hidden' }}>
       <MapContainer
@@ -731,6 +772,7 @@ export default function MapPage() {
           onStartEdit={handleStartEditPerimetro}
           onCancelEdit={handleCancelEditPerimetro}
           onSaveEdit={handleSaveEditPerimetro}
+          onDelete={handleRequestDeletePerimetro}
           onCreateNew={handleCreateNewPerimetro}
           editingPerimetro={editingPerimetro}
           coordenadasEditadas={coordenadasEditadas}
@@ -739,6 +781,37 @@ export default function MapPage() {
           isSaving={isSavingPerimetro}
         />
       ) : null}
+
+      {/* Modal Confirmar Eliminación de Perímetro */}
+      <Modal
+        show={showConfirmDeletePerimetro}
+        onHide={handleCloseDeletePerimetro}
+        onExited={() => {
+          setPerimetroAEliminar(null);
+          setErrorEliminarPerimetro(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton={!isDeletingPerimetro}>
+          <Modal.Title>Eliminar Perímetro</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          ¿Estás seguro de que deseas eliminar el perímetro <strong>{perimetroAEliminar?.nombre}</strong>? Esta acción no se puede deshacer.
+          {errorEliminarPerimetro && (
+            <Alert variant="danger" className="mt-3 mb-0">
+              {errorEliminarPerimetro}
+            </Alert>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseDeletePerimetro} disabled={isDeletingPerimetro}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleConfirmDeletePerimetro} disabled={isDeletingPerimetro}>
+            {isDeletingPerimetro ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Sidebar de Intervención */}
       {isIntervencionOpen && intervencionAlerta && (

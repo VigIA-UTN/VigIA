@@ -9,6 +9,7 @@ interface PerimetroEditPanelProps {
   rodeos: RodeoLoteResponse[];
   coordenadasEditadas: CoordenadaDTO[];
   onSave: (nombre: string, loteIds: number[], zonaEstricta: boolean, distanciaToleranciaMetros: number, descripcion?: string) => Promise<void>;
+  onDelete?: (perimetro: PerimetroResponse) => void;
   onCancel: () => void;
   isSaving?: boolean;
 }
@@ -18,6 +19,7 @@ export default function PerimetroEditPanel({
   rodeos,
   coordenadasEditadas,
   onSave,
+  onDelete,
   onCancel,
   isSaving = false,
 }: PerimetroEditPanelProps) {
@@ -258,6 +260,20 @@ export default function PerimetroEditPanel({
         >
           Cancelar
         </button>
+        {onDelete && perimetro.id !== 0 && (
+          <button
+            onClick={() => onDelete(perimetro)}
+            disabled={isSaving}
+            className="btn btn-outline-danger w-100 py-2 fw-semibold"
+            style={{
+              borderRadius: '10px',
+              fontSize: '1rem',
+            }}
+          >
+            <i className="bi bi-trash me-1"></i>
+            Eliminar perímetro
+          </button>
+        )}
       </div>
     </div>
   );
