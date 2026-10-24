@@ -9,6 +9,7 @@ import { getCaravanasDisponibles } from '../api/caravanasApi';
 import type { CaravanaResponse } from '../api/caravanasApi';
 import { compararParaManga, formatBateria, formatUltimaSenial, labelCaravanaOpcion, nombreSensorAnimal } from '../utils/caravanaTelemetria';
 import { hoyIso } from '../utils/fechas';
+import { guardarArchivo } from '../utils/descargas';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
 import { crearRodeo, type RodeoRequest } from '../api/rodeoApi';
@@ -100,6 +101,7 @@ export default function AnimalesPage() {
     const [resultadoAsignacion, setResultadoAsignacion] = useState<AnimalResponse[] | null>(null);
     const [descargandoAsignacion, setDescargandoAsignacion] = useState(false);
     const [errorDescargaAsignacion, setErrorDescargaAsignacion] = useState<string | null>(null);
+    const [exportandoSensores, setExportandoSensores] = useState(false);
 
     // Alert detail overlay
     const [selectedAlertaForAnimal, setSelectedAlertaForAnimal] = useState<AlertaResponse | null>(null);
@@ -288,14 +290,7 @@ export default function AnimalesPage() {
         setDescargandoAsignacion(true);
         try {
             const excel = await descargarAsignacionesCaravanasExcel(selectedId, resultadoAsignacion.map(a => a.id));
-            const url = URL.createObjectURL(excel);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `asignacion-caravanas-${hoyIso()}.xlsx`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 0);
+            guardarArchivo(excel, `asignacion-caravanas-${hoyIso()}.xlsx`);
         } catch {
             setErrorDescargaAsignacion('No se pudo descargar el Excel. Probá de nuevo.');
         } finally {
@@ -493,6 +488,22 @@ export default function AnimalesPage() {
         );
     });
 
+    // Exportar sensores respeta lo que se ve en la lista (pestaña, rodeo, lista del dashboard y búsqueda).
+    const idsConSensorEnLista = filteredAnimales.filter(a => a.caravanaId).map(a => a.id);
+
+    const handleExportarSensores = async () => {
+        if (!selectedId || idsConSensorEnLista.length === 0) return;
+        setExportandoSensores(true);
+        try {
+            const excel = await descargarAsignacionesCaravanasExcel(selectedId, idsConSensorEnLista);
+            guardarArchivo(excel, `sensores-${hoyIso()}.xlsx`);
+        } catch {
+            showAlert('No se pudo exportar la planilla de sensores. Probá de nuevo.', { variant: 'error' });
+        } finally {
+            setExportandoSensores(false);
+        }
+    };
+
     const sortedAnimales = [...filteredAnimales].sort((a, b) => {
         if (!sortField) return 0;
         let valA = a[sortField as keyof AnimalResponse] as string | number | null;
@@ -540,9 +551,23 @@ export default function AnimalesPage() {
                         {(esProductor || (puedeGestionarCaravanas && selectedId)) && (
                             <div className="animales-action-btns d-flex align-items-center gap-2">
                                 {puedeGestionarCaravanas && selectedId && (
-                                    <Button className="btn-vigia-success" onClick={openAsignarAutoModal}>
-                                        <i className="bi bi-shuffle" /> Asignar Caravanas
-                                    </Button>
+                                    <>
+                                        <Button className="btn-vigia-success" onClick={openAsignarAutoModal}>
+                                            <i className="bi bi-shuffle" /> Asignar Caravanas
+                                        </Button>
+                                        <Button
+                                            className="btn-vigia-success"
+                                            onClick={handleExportarSensores}
+                                            disabled={exportandoSensores || idsConSensorEnLista.length === 0}
+                                            title={idsConSensorEnLista.length === 1
+                                                ? 'Descarga la planilla del animal con sensor que estás viendo'
+                                                : `Descarga la planilla de los ${idsConSensorEnLista.length} animales con sensor que estás viendo`}
+                                        >
+                                            {exportandoSensores
+                                                ? <Spinner as="span" animation="border" size="sm" />
+                                                : <><i className="bi bi-file-earmark-excel" /> Exportar Sensores ({idsConSensorEnLista.length})</>}
+                                        </Button>
+                                    </>
                                 )}
                                 {esProductor && (
                                     <>
