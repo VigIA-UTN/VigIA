@@ -742,28 +742,32 @@ public class AnimalController {
     }
 
     /**
-     * POST /api/v1/animales/asignar-caravanas?establecimientoId={id}
+     * POST /api/v1/animales/asignar-caravanas?establecimientoId={id}[&rodeoLoteId={id}]
      * <p>
      * Asigna al azar las caravanas disponibles del establecimiento a los animales
-     * activos que no tienen caravana.
+     * activos que no tienen caravana. Con rodeoLoteId, solo a los de ese rodeo/lote.
      *
      * @return 200 con los animales a los que se les asignó caravana (vacío si no
-     *         había nada para asignar), 404 si el establecimiento no existe, 403
-     *         si no tiene permisos
+     *         había nada para asignar), 404 si el establecimiento o el rodeo no
+     *         existen, 400 si el rodeo es de otro establecimiento, 403 si no tiene
+     *         permisos
      */
     @PostMapping("/asignar-caravanas")
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('CAMPERO')")
     public ResponseEntity<?> asignarCaravanasAleatoriamente(
             @RequestParam("establecimientoId") Long establecimientoId,
+            @RequestParam(value = "rodeoLoteId", required = false) Long rodeoLoteId,
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            List<AnimalResponse> response = animalService.asignarCaravanasAleatoriamente(establecimientoId, email);
+            List<AnimalResponse> response = animalService.asignarCaravanasAleatoriamente(establecimientoId,
+                    rodeoLoteId, email);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (IllegalArgumentException e) {
-            if ("Establecimiento no encontrado.".equals(e.getMessage())) {
+            if ("Establecimiento no encontrado.".equals(e.getMessage())
+                    || "Rodeo lote no encontrado.".equals(e.getMessage())) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
             }
             return ResponseEntity.badRequest().body(e.getMessage());

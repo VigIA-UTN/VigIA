@@ -127,9 +127,12 @@ export async function desvincularCaravana(animalId: number): Promise<AnimalRespo
   return response.data;
 }
 
-/** Asigna al azar las caravanas disponibles a los animales sin caravana. Devuelve los animales que recibieron una. */
-export async function asignarCaravanasAleatoriamente(establecimientoId: number): Promise<AnimalResponse[]> {
-  const response = await axiosClient.post<AnimalResponse[]>(`/animales/asignar-caravanas`, null, { params: { establecimientoId } });
+/**
+ * Asigna al azar las caravanas disponibles a los animales sin caravana; con rodeoLoteId, solo a los de ese lote.
+ * Devuelve los animales que recibieron una.
+ */
+export async function asignarCaravanasAleatoriamente(establecimientoId: number, rodeoLoteId?: number): Promise<AnimalResponse[]> {
+  const response = await axiosClient.post<AnimalResponse[]>(`/animales/asignar-caravanas`, null, { params: { establecimientoId, rodeoLoteId } });
   return response.data;
 }
 

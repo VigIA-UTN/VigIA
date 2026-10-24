@@ -77,7 +77,8 @@ public interface AnimalService {
 
         AnimalResponse desvincularCaravana(Long animalId, String emailUsuario);
 
-        List<AnimalResponse> asignarCaravanasAleatoriamente(Long establecimientoId, String emailUsuario);
+        /** {@code rodeoLoteId} es opcional: null asigna en todo el establecimiento. */
+        List<AnimalResponse> asignarCaravanasAleatoriamente(Long establecimientoId, Long rodeoLoteId, String emailUsuario);
 
         byte[] exportarAsignacionesCaravanas(Long establecimientoId, List<Long> animalIds, String emailUsuario);
 

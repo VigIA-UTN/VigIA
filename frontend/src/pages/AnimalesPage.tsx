@@ -96,6 +96,7 @@ export default function AnimalesPage() {
 
     const [asignarAutoModal, setAsignarAutoModal] = useState(false);
     const [asignandoAuto, setAsignandoAuto] = useState(false);
+    const [loteAsignarAuto, setLoteAsignarAuto] = useState<number | null>(null);
     const [formErrorAsignarAuto, setFormErrorAsignarAuto] = useState<string | null>(null);
     const [asignacionAutoToast, setAsignacionAutoToast] = useState<string | null>(null);
     const [resultadoAsignacion, setResultadoAsignacion] = useState<AnimalResponse[] | null>(null);
@@ -243,20 +244,26 @@ export default function AnimalesPage() {
         }
     };
 
-    const animalesSinCaravana = animales.filter(a =>
+    // Mismo criterio que el backend: activos, sin caravana y, si se eligió, del lote.
+    const contarSinCaravana = (loteId: number | null) => animales.filter(a =>
         a.establecimientoId === selectedId && !a.caravanaId && a.estadoActual !== 'INACTIVO'
+        && (loteId === null || a.rodeoLoteId === loteId)
     ).length;
+    const animalesSinCaravana = contarSinCaravana(loteAsignarAuto);
     const caravanasAAsignar = Math.min(animalesSinCaravana, caravanasDisponibles.length);
     const animalesSinCubrir = animalesSinCaravana - caravanasAAsignar;
+    const nombreLoteAsignarAuto = rodeoLotes.find(l => l.id === loteAsignarAuto)?.nombre;
 
     const openAsignarAutoModal = async () => {
         if (!selectedId) return;
         setFormErrorAsignarAuto(null);
-        try {
-            setCaravanasDisponibles(await getCaravanasDisponibles(selectedId));
-        } catch {
-            setCaravanasDisponibles([]);
-        }
+        setLoteAsignarAuto(null);
+        const [disponibles, lotes] = await Promise.all([
+            getCaravanasDisponibles(selectedId).catch(() => [] as CaravanaResponse[]),
+            getRodeoLotes(selectedId).catch(() => [] as RodeoLoteResponse[]),
+        ]);
+        setCaravanasDisponibles(disponibles);
+        setRodeoLotes(lotes.filter(l => l.activo));
         setAsignarAutoModal(true);
     };
 
@@ -265,7 +272,7 @@ export default function AnimalesPage() {
         setFormErrorAsignarAuto(null);
         setAsignandoAuto(true);
         try {
-            const asignados = await asignarCaravanasAleatoriamente(selectedId);
+            const asignados = await asignarCaravanasAleatoriamente(selectedId, loteAsignarAuto ?? undefined);
             const porId = new Map(asignados.map(a => [a.id, a]));
             setAnimales(prev => prev.map(a => porId.get(a.id) ?? a));
             setAsignarAutoModal(false);
@@ -1138,16 +1145,31 @@ export default function AnimalesPage() {
                     </Modal.Header>
                     <Modal.Body>
                         {formErrorAsignarAuto && <Alert variant="danger">{formErrorAsignarAuto}</Alert>}
+                        <Form.Group className="mb-3">
+                            <Form.Label>Rodeo / Lote</Form.Label>
+                            <Form.Select
+                                value={loteAsignarAuto ?? ''}
+                                onChange={e => setLoteAsignarAuto(e.target.value ? Number(e.target.value) : null)}
+                                disabled={asignandoAuto}
+                            >
+                                <option value="">Todos los lotes ({contarSinCaravana(null)} sin caravana)</option>
+                                {rodeoLotes.map(l => (
+                                    <option key={l.id} value={l.id}>{l.nombre} ({contarSinCaravana(l.id)} sin caravana)</option>
+                                ))}
+                            </Form.Select>
+                        </Form.Group>
                         <div style={{ color: '#cde' }}>
                             <p className="mb-2">
-                                Animales sin caravana: <strong style={{ color: 'white' }}>{animalesSinCaravana}</strong>
+                                Animales sin caravana{nombreLoteAsignarAuto ? ` en ${nombreLoteAsignarAuto}` : ''}: <strong style={{ color: 'white' }}>{animalesSinCaravana}</strong>
                                 <br />
                                 Caravanas disponibles: <strong style={{ color: 'white' }}>{caravanasDisponibles.length}</strong>
                             </p>
                             {caravanasAAsignar === 0 ? (
                                 <p className="mb-0">
                                     {animalesSinCaravana === 0
-                                        ? 'Todos los animales ya tienen una caravana vinculada.'
+                                        ? nombreLoteAsignarAuto
+                                            ? `Todos los animales de ${nombreLoteAsignarAuto} ya tienen una caravana vinculada.`
+                                            : 'Todos los animales ya tienen una caravana vinculada.'
                                         : 'No hay caravanas disponibles en este establecimiento.'}
                                 </p>
                             ) : (

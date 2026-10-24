@@ -2705,6 +2705,63 @@ class AnimalControllerTest {
                                 .andExpect(status().isForbidden());
         }
 
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Con rodeoLoteId, solo asigna a los animales de ese lote")
+        void asignarCaravanasAleatoriamente_porLote_soloEseLote() throws Exception {
+                RodeoLote cuarentena = new RodeoLote(establecimientoRepository.findById(establecimientoId).orElseThrow());
+                cuarentena.setNombre("Lote Cuarentena Test");
+                cuarentena = rodeoLoteRepository.save(cuarentena);
+                crearCaravanaDisponible("TEST-LOTE-01");
+                crearCaravanaDisponible("TEST-LOTE-02");
+                Long enLote = crearAnimal("Vaca Lote Cuarentena", establecimientoId, cuarentena.getId());
+                Long fueraDelLote = crearAnimal("Vaca Lote Base", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .param("rodeoLoteId", cuarentena.getId().toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].id").value(enLote));
+
+                assertThat(animalRepository.findById(enLote).orElseThrow().getCaravana()).isNotNull();
+                assertThat(animalRepository.findById(fueraDelLote).orElseThrow().getCaravana()).isNull();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 404 si el rodeoLoteId no existe")
+        void asignarCaravanasAleatoriamente_loteInexistente_retornaNotFound() throws Exception {
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .param("rodeoLoteId", "999999")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isNotFound());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 400 si el rodeo es de otro establecimiento, sin asignar nada")
+        void asignarCaravanasAleatoriamente_loteDeOtroEstablecimiento_retornaBadRequest() throws Exception {
+                Establecimiento otro = new Establecimiento();
+                otro.setNombre("Otro Establecimiento Test");
+                otro = establecimientoRepository.save(otro);
+                RodeoLote ajeno = new RodeoLote(otro);
+                ajeno.setNombre("Lote Ajeno");
+                ajeno = rodeoLoteRepository.save(ajeno);
+                Caravana caravana = crearCaravanaDisponible("TEST-LOTE-AJENO");
+                crearAnimal("Vaca Lote Ajeno", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .param("rodeoLoteId", ajeno.getId().toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isBadRequest());
+
+                assertThat(caravanaRepository.findById(caravana.getId()).orElseThrow().getEstadoSensor())
+                                .isEqualTo(EstadoSensor.DISPONIBLE);
+        }
+
         // ── Excel de asignaciones de caravanas ───────────────────────────────────
 
         /** DevEUI (columna G) de cada fila de datos del Excel, en orden. */

@@ -1529,12 +1529,15 @@ public class AnimalServiceImpl implements AnimalService {
         /**
          * Empareja al azar las caravanas DISPONIBLES del establecimiento con sus animales activos
          * que todavía no tienen caravana. Si sobran animales, cuáles quedan sin caravana también es al azar.
-         * Devuelve solo los animales a los que se les asignó una caravana.
+         * Con {@code rodeoLoteId}, solo considera los animales de ese rodeo/lote; las caravanas siguen
+         * saliendo del establecimiento, que es donde viven. Devuelve solo los animales a los que se les
+         * asignó una caravana.
          */
         @Override
         @Transactional
         @SuppressWarnings("null")
-        public List<AnimalResponse> asignarCaravanasAleatoriamente(Long establecimientoId, String emailUsuario) {
+        public List<AnimalResponse> asignarCaravanasAleatoriamente(Long establecimientoId, Long rodeoLoteId,
+                        String emailUsuario) {
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
@@ -1543,9 +1546,19 @@ public class AnimalServiceImpl implements AnimalService {
 
                 validarPermisoGestionCaravana(usuario, establecimiento);
 
+                if (rodeoLoteId != null) {
+                        RodeoLote lote = rodeoLoteRepository.findById(rodeoLoteId)
+                                        .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                        if (!lote.getEstablecimiento().getId().equals(establecimiento.getId())) {
+                                throw new IllegalArgumentException("El rodeo no pertenece al establecimiento.");
+                        }
+                }
+
                 List<Animal> animalesSinCaravana = new ArrayList<>(animalRepository.findByEstablecimientoId(establecimientoId)
                                 .stream()
                                 .filter(a -> a.getCaravana() == null && a.getEstadoActual() != EstadoAnimal.INACTIVO)
+                                .filter(a -> rodeoLoteId == null
+                                                || (a.getRodeoLote() != null && rodeoLoteId.equals(a.getRodeoLote().getId())))
                                 .toList());
                 List<Caravana> caravanasDisponibles = new ArrayList<>(caravanaRepository
                                 .findAllByEstablecimientoIdAndEstadoSensor(establecimientoId, EstadoSensor.DISPONIBLE));
