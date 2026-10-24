@@ -1521,6 +1521,43 @@ public class AnimalServiceImpl implements AnimalService {
                 return mapToResponse(animal);
         }
 
+        /**
+         * Empareja al azar las caravanas DISPONIBLES del establecimiento con sus animales activos
+         * que todavía no tienen caravana. Si sobran animales, cuáles quedan sin caravana también es al azar.
+         * Devuelve solo los animales a los que se les asignó una caravana.
+         */
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public List<AnimalResponse> asignarCaravanasAleatoriamente(Long establecimientoId, String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+
+                validarPermisoGestionCaravana(usuario, establecimiento);
+
+                List<Animal> animalesSinCaravana = new ArrayList<>(animalRepository.findByEstablecimientoId(establecimientoId)
+                                .stream()
+                                .filter(a -> a.getCaravana() == null && a.getEstadoActual() != EstadoAnimal.INACTIVO)
+                                .toList());
+                List<Caravana> caravanasDisponibles = new ArrayList<>(caravanaRepository
+                                .findAllByEstablecimientoIdAndEstadoSensor(establecimientoId, EstadoSensor.DISPONIBLE));
+
+                Collections.shuffle(animalesSinCaravana);
+                Collections.shuffle(caravanasDisponibles);
+
+                int cantidad = Math.min(animalesSinCaravana.size(), caravanasDisponibles.size());
+                List<AnimalResponse> asignados = new ArrayList<>(cantidad);
+                for (int i = 0; i < cantidad; i++) {
+                        Animal animal = animalesSinCaravana.get(i);
+                        asignarCaravanaInterna(animal, caravanasDisponibles.get(i).getId());
+                        asignados.add(mapToResponse(animalRepository.save(animal)));
+                }
+                return asignados;
+        }
+
         @SuppressWarnings("null")
         private void asignarCaravanaInterna(Animal animal, Long caravanaId) {
                 Caravana nuevaCaravana = caravanaRepository.findById(caravanaId)

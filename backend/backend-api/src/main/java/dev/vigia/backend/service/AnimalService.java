@@ -77,6 +77,8 @@ public interface AnimalService {
 
         AnimalResponse desvincularCaravana(Long animalId, String emailUsuario);
 
+        List<AnimalResponse> asignarCaravanasAleatoriamente(Long establecimientoId, String emailUsuario);
+
         CohesionResponse obtenerCohesion(String emailUsuario, Long animalId,
                         LocalDateTime desde, LocalDateTime hasta);
 }

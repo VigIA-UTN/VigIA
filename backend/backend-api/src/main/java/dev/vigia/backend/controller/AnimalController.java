@@ -737,6 +737,35 @@ public class AnimalController {
         }
     }
 
+    /**
+     * POST /api/v1/animales/asignar-caravanas?establecimientoId={id}
+     * <p>
+     * Asigna al azar las caravanas disponibles del establecimiento a los animales
+     * activos que no tienen caravana.
+     *
+     * @return 200 con los animales a los que se les asignó caravana (vacío si no
+     *         había nada para asignar), 404 si el establecimiento no existe, 403
+     *         si no tiene permisos
+     */
+    @PostMapping("/asignar-caravanas")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('CAMPERO')")
+    public ResponseEntity<?> asignarCaravanasAleatoriamente(
+            @RequestParam("establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<AnimalResponse> response = animalService.asignarCaravanasAleatoriamente(establecimientoId, email);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Establecimiento no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/{id}/cohesion")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getCohesion(

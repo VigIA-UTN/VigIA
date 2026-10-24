@@ -2588,6 +2588,123 @@ class AnimalControllerTest {
                 assertThat(animalEnDb.getCaravana()).isNull();
         }
 
+        private Caravana crearCaravanaDisponible(String devEui) {
+                Caravana caravana = new Caravana();
+                caravana.setDevEui(devEui);
+                caravana.setEstablecimiento(establecimientoRepository.findById(establecimientoId).orElseThrow());
+                caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                caravana.setActivo(false);
+                return caravanaRepository.save(caravana);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Asigna una caravana distinta a cada animal sin caravana")
+        void asignarCaravanasAleatoriamente_asignaATodos() throws Exception {
+                Caravana c1 = crearCaravanaDisponible("TEST-AUTO-01");
+                Caravana c2 = crearCaravanaDisponible("TEST-AUTO-02");
+                Long a1 = crearAnimal("Vaca Auto 1", establecimientoId, rodeoLoteId);
+                Long a2 = crearAnimal("Vaca Auto 2", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(2));
+
+                Animal animal1 = animalRepository.findById(a1).orElseThrow();
+                Animal animal2 = animalRepository.findById(a2).orElseThrow();
+                assertThat(List.of(animal1.getCaravana().getId(), animal2.getCaravana().getId()))
+                                .containsExactlyInAnyOrder(c1.getId(), c2.getId());
+                assertThat(caravanaRepository.findById(c1.getId()).orElseThrow().getEstadoSensor())
+                                .isEqualTo(EstadoSensor.VINCULADO);
+                assertThat(caravanaRepository.findById(c2.getId()).orElseThrow().getEstadoSensor())
+                                .isEqualTo(EstadoSensor.VINCULADO);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Con menos caravanas que animales, asigna solo las disponibles")
+        void asignarCaravanasAleatoriamente_menosCaravanasQueAnimales() throws Exception {
+                Caravana caravana = crearCaravanaDisponible("TEST-AUTO-UNICA");
+                Long a1 = crearAnimal("Vaca Auto Escasa 1", establecimientoId, rodeoLoteId);
+                Long a2 = crearAnimal("Vaca Auto Escasa 2", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + camperoToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].caravanaId").value(caravana.getId()));
+
+                long conCaravana = List.of(a1, a2).stream()
+                                .map(id -> animalRepository.findById(id).orElseThrow())
+                                .filter(a -> a.getCaravana() != null)
+                                .count();
+                assertThat(conCaravana).isEqualTo(1);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Con más caravanas que animales, las sobrantes quedan disponibles")
+        void asignarCaravanasAleatoriamente_masCaravanasQueAnimales() throws Exception {
+                List<Caravana> caravanas = List.of(
+                                crearCaravanaDisponible("TEST-AUTO-SOBRA-01"),
+                                crearCaravanaDisponible("TEST-AUTO-SOBRA-02"),
+                                crearCaravanaDisponible("TEST-AUTO-SOBRA-03"));
+                Long animalId = crearAnimal("Vaca Auto Sobra", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].id").value(animalId));
+
+                Long asignadaId = animalRepository.findById(animalId).orElseThrow().getCaravana().getId();
+                assertThat(caravanas).extracting(Caravana::getId).contains(asignadaId);
+
+                List<EstadoSensor> estados = caravanas.stream()
+                                .map(c -> caravanaRepository.findById(c.getId()).orElseThrow().getEstadoSensor())
+                                .toList();
+                assertThat(estados).containsExactlyInAnyOrder(
+                                EstadoSensor.VINCULADO, EstadoSensor.DISPONIBLE, EstadoSensor.DISPONIBLE);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - No toca animales que ya tienen caravana")
+        void asignarCaravanasAleatoriamente_respetaVinculados() throws Exception {
+                Caravana vinculada = crearCaravanaDisponible("TEST-AUTO-YA-VINC");
+                vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
+                vinculada.setActivo(true);
+                caravanaRepository.save(vinculada);
+                Long conSensor = crearAnimal("Vaca Ya Vinculada", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(conSensor).orElseThrow();
+                animal.setCaravana(vinculada);
+                animalRepository.save(animal);
+
+                crearCaravanaDisponible("TEST-AUTO-LIBRE");
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(0));
+
+                assertThat(animalRepository.findById(conSensor).orElseThrow().getCaravana().getId())
+                                .isEqualTo(vinculada.getId());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 403 para rol VETERINARIO")
+        void asignarCaravanasAleatoriamente_veterinario_retornaForbidden() throws Exception {
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + veterinarioToken))
+                                .andExpect(status().isForbidden());
+        }
+
         // ── Índice de cohesión (#346) ────────────────────────────────────────────
 
         private void guardarCohesion(Long animalId, LocalDateTime fecha, double indice) {

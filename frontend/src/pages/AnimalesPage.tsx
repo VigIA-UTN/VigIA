@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Container, Spinner, Alert, Modal, Form, Button, Toast } from 'react-bootstrap';
-import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, vincularCaravana, desvincularCaravana, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
+import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, vincularCaravana, desvincularCaravana, asignarCaravanasAleatoriamente, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
@@ -91,6 +91,11 @@ export default function AnimalesPage() {
     const [desvincularModalAnimal, setDesvincularModalAnimal] = useState<AnimalResponse | null>(null);
     const [formErrorDesvincular, setFormErrorDesvincular] = useState<string | null>(null);
     const [undoToast, setUndoToast] = useState<{ animalId: number; caravanaId: number; alias: string } | null>(null);
+
+    const [asignarAutoModal, setAsignarAutoModal] = useState(false);
+    const [asignandoAuto, setAsignandoAuto] = useState(false);
+    const [formErrorAsignarAuto, setFormErrorAsignarAuto] = useState<string | null>(null);
+    const [asignacionAutoToast, setAsignacionAutoToast] = useState<string | null>(null);
 
     // Alert detail overlay
     const [selectedAlertaForAnimal, setSelectedAlertaForAnimal] = useState<AlertaResponse | null>(null);
@@ -224,6 +229,43 @@ export default function AnimalesPage() {
             setAnimales(prev => prev.map(a => a.id === actualizado.id ? actualizado : a));
         } catch {
             alert('No se pudo deshacer la acción. La caravana ya podría estar vinculada a otro animal.');
+        }
+    };
+
+    const animalesSinCaravana = animales.filter(a =>
+        a.establecimientoId === selectedId && !a.caravanaId && a.estadoActual !== 'INACTIVO'
+    ).length;
+    const caravanasAAsignar = Math.min(animalesSinCaravana, caravanasDisponibles.length);
+    const animalesSinCubrir = animalesSinCaravana - caravanasAAsignar;
+
+    const openAsignarAutoModal = async () => {
+        if (!selectedId) return;
+        setFormErrorAsignarAuto(null);
+        try {
+            setCaravanasDisponibles(await getCaravanasDisponibles(selectedId));
+        } catch {
+            setCaravanasDisponibles([]);
+        }
+        setAsignarAutoModal(true);
+    };
+
+    const handleConfirmAsignarAuto = async () => {
+        if (!selectedId) return;
+        setFormErrorAsignarAuto(null);
+        setAsignandoAuto(true);
+        try {
+            const asignados = await asignarCaravanasAleatoriamente(selectedId);
+            const porId = new Map(asignados.map(a => [a.id, a]));
+            setAnimales(prev => prev.map(a => porId.get(a.id) ?? a));
+            setAsignarAutoModal(false);
+            setAsignacionAutoToast(asignados.length === 1
+                ? 'Se asignó 1 caravana.'
+                : `Se asignaron ${asignados.length} caravanas.`);
+        } catch (err) {
+            const e = err as { response?: { data?: { message?: string } | string } };
+            setFormErrorAsignarAuto(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al asignar las caravanas.');
+        } finally {
+            setAsignandoAuto(false);
         }
     };
 
@@ -461,20 +503,29 @@ export default function AnimalesPage() {
                                 <i className="bi bi-heart" /> Salud
                             </button>
                         </div>
-                        {esProductor && (
+                        {(esProductor || (puedeGestionarCaravanas && selectedId)) && (
                             <div className="animales-action-btns d-flex align-items-center gap-2">
-                                <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
-                                    <i className="bi bi-plus-lg" /> Rodeo
-                                </Button>
-                                <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
-                                    <i className="bi bi-upload" /> Cargar Estados
-                                </Button>
-                                <Button className="btn-vigia-success" onClick={openUploadModal}>
-                                    <i className="bi bi-upload" /> Cargar Animales
-                                </Button>
-                                <Button className="btn-vigia-success" onClick={openModal}>
-                                    <i className="bi bi-plus-lg" /> Animal
-                                </Button>
+                                {puedeGestionarCaravanas && selectedId && (
+                                    <Button className="btn-vigia-success" onClick={openAsignarAutoModal}>
+                                        <i className="bi bi-shuffle" /> Asignar Caravanas
+                                    </Button>
+                                )}
+                                {esProductor && (
+                                    <>
+                                        <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
+                                            <i className="bi bi-plus-lg" /> Rodeo
+                                        </Button>
+                                        <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
+                                            <i className="bi bi-upload" /> Cargar Estados
+                                        </Button>
+                                        <Button className="btn-vigia-success" onClick={openUploadModal}>
+                                            <i className="bi bi-upload" /> Cargar Animales
+                                        </Button>
+                                        <Button className="btn-vigia-success" onClick={openModal}>
+                                            <i className="bi bi-plus-lg" /> Animal
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1021,6 +1072,54 @@ export default function AnimalesPage() {
                         </Button>
                     </Modal.Footer>
                 </Modal>
+
+                <Modal show={asignarAutoModal} onHide={() => setAsignarAutoModal(false)} centered dialogClassName="modal-nuevo-animal">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Asignar caravanas automáticamente</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {formErrorAsignarAuto && <Alert variant="danger">{formErrorAsignarAuto}</Alert>}
+                        <div style={{ color: '#cde' }}>
+                            <p className="mb-2">
+                                Animales sin caravana: <strong style={{ color: 'white' }}>{animalesSinCaravana}</strong>
+                                <br />
+                                Caravanas disponibles: <strong style={{ color: 'white' }}>{caravanasDisponibles.length}</strong>
+                            </p>
+                            {caravanasAAsignar === 0 ? (
+                                <p className="mb-0">
+                                    {animalesSinCaravana === 0
+                                        ? 'Todos los animales ya tienen una caravana vinculada.'
+                                        : 'No hay caravanas disponibles en este establecimiento.'}
+                                </p>
+                            ) : (
+                                <p className="mb-0">
+                                    Se van a vincular <strong style={{ color: 'white' }}>{caravanasAAsignar}</strong> caravana{caravanasAAsignar === 1 ? '' : 's'} al azar.
+                                    {animalesSinCubrir > 0 && (
+                                        <> {animalesSinCubrir === 1 ? '1 animal va' : `${animalesSinCubrir} animales van`} a quedar sin caravana.</>
+                                    )}
+                                </p>
+                            )}
+                        </div>
+                    </Modal.Body>
+                    <Modal.Footer className="gap-3">
+                        <Button
+                            className="btn-guardar-animal"
+                            style={{ flex: 1 }}
+                            onClick={() => setAsignarAutoModal(false)}
+                            disabled={asignandoAuto}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            className="btn-guardar-animal"
+                            style={{ flex: 1 }}
+                            onClick={handleConfirmAsignarAuto}
+                            disabled={asignandoAuto || caravanasAAsignar === 0}
+                        >
+                            {asignandoAuto ? <Spinner as="span" animation="border" size="sm" /> : 'Asignar'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
             </div>
 
             {/* Alert detail overlay — rendered at page root so position:fixed works correctly */}
@@ -1064,6 +1163,15 @@ export default function AnimalesPage() {
                             Deshacer
                         </Button>
                     </Toast.Body>
+                </Toast>
+                <Toast
+                    show={!!asignacionAutoToast}
+                    onClose={() => setAsignacionAutoToast(null)}
+                    delay={4000}
+                    autohide
+                    className="undo-toast"
+                >
+                    <Toast.Body>{asignacionAutoToast}</Toast.Body>
                 </Toast>
             </div>
         </>
