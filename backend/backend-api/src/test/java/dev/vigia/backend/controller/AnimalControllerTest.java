@@ -2705,6 +2705,85 @@ class AnimalControllerTest {
                                 .andExpect(status().isForbidden());
         }
 
+        // ── Excel de asignaciones de caravanas ───────────────────────────────────
+
+        /** DevEUI (columna G) de cada fila de datos del Excel, en orden. */
+        private List<String> devEuisDelExcel(byte[] excel) throws Exception {
+                try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(
+                                new java.io.ByteArrayInputStream(excel))) {
+                        org.apache.poi.ss.usermodel.Sheet sheet = workbook.getSheetAt(0);
+                        assertThat(sheet.getRow(3).getCell(6).getStringCellValue()).isEqualTo("DevEUI");
+                        List<String> devEuis = new ArrayList<>();
+                        for (int i = 4; i <= sheet.getLastRowNum(); i++) {
+                                devEuis.add(sheet.getRow(i).getCell(6).getStringCellValue());
+                        }
+                        return devEuis;
+                }
+        }
+
+        private void vincular(Long animalId, Caravana caravana) {
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                caravana.setEstadoSensor(EstadoSensor.VINCULADO);
+                caravana.setAnimal(animal);
+                animal.setCaravana(caravanaRepository.save(caravana));
+                animalRepository.save(animal);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignaciones-caravanas/excel - Con ids, exporta solo esos animales")
+        void exportarAsignacionesCaravanas_conIds_soloEsos() throws Exception {
+                Long a1 = crearAnimal("Vaca Excel 1", establecimientoId, rodeoLoteId);
+                Long a2 = crearAnimal("Vaca Excel 2", establecimientoId, rodeoLoteId);
+                vincular(a1, crearCaravanaDisponible("TEST-EXCEL-01"));
+                vincular(a2, crearCaravanaDisponible("TEST-EXCEL-02"));
+
+                MvcResult result = mockMvc.perform(post("/api/v1/animales/asignaciones-caravanas/excel")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + camperoToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(List.of(a1))))
+                                .andExpect(status().isOk())
+                                .andReturn();
+
+                assertThat(result.getResponse().getContentType())
+                                .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                assertThat(result.getResponse().getHeader("Content-Disposition")).contains("attachment", ".xlsx");
+                assertThat(devEuisDelExcel(result.getResponse().getContentAsByteArray()))
+                                .containsExactly("TEST-EXCEL-01");
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignaciones-caravanas/excel - Sin body, exporta todos los animales con caravana")
+        void exportarAsignacionesCaravanas_sinBody_todosConCaravana() throws Exception {
+                Long conSensor = crearAnimal("Vaca Excel Con", establecimientoId, rodeoLoteId);
+                crearAnimal("Vaca Excel Sin", establecimientoId, rodeoLoteId);
+                vincular(conSensor, crearCaravanaDisponible("TEST-EXCEL-TODOS"));
+
+                MvcResult result = mockMvc.perform(post("/api/v1/animales/asignaciones-caravanas/excel")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andReturn();
+
+                long conCaravanaEnDb = animalRepository.findByEstablecimientoId(establecimientoId).stream()
+                                .filter(a -> a.getCaravana() != null)
+                                .count();
+                assertThat(devEuisDelExcel(result.getResponse().getContentAsByteArray()))
+                                .contains("TEST-EXCEL-TODOS")
+                                .hasSize((int) conCaravanaEnDb);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/asignaciones-caravanas/excel - Falla con 403 para rol VETERINARIO")
+        void exportarAsignacionesCaravanas_veterinario_retornaForbidden() throws Exception {
+                mockMvc.perform(post("/api/v1/animales/asignaciones-caravanas/excel")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + veterinarioToken))
+                                .andExpect(status().isForbidden());
+        }
+
         // ── Índice de cohesión (#346) ────────────────────────────────────────────
 
         private void guardarCohesion(Long animalId, LocalDateTime fecha, double indice) {

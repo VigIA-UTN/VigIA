@@ -11,11 +11,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -88,6 +90,7 @@ import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.RegistroPesoRepository;
 import dev.vigia.backend.service.AnimalService;
+import dev.vigia.backend.service.AsignacionCaravanasExcelService;
 import dev.vigia.backend.service.CargaMasivaService;
 import dev.vigia.backend.service.CeloDatoDesactualizadoEvaluator;
 import dev.vigia.backend.service.EstadoReproductivoCsvService;
@@ -126,6 +129,7 @@ public class AnimalServiceImpl implements AnimalService {
 
         private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
+        private final AsignacionCaravanasExcelService asignacionCaravanasExcelService;
 
         @Override
         @Transactional
@@ -411,6 +415,7 @@ public class AnimalServiceImpl implements AnimalService {
                         Caravana c = animal.getCaravana();
                         builder.caravanaId(c.getId())
                                         .caravanaDevEui(c.getDevEui())
+                                        .caravanaCodigo(c.getCodigo())
                                         .caravanaAlias(c.getAlias())
                                         .caravanaEstado(c.getEstadoSensor())
                                         .caravanaUltimaSenial(c.getUltimaSenial())
@@ -1556,6 +1561,30 @@ public class AnimalServiceImpl implements AnimalService {
                         asignados.add(mapToResponse(animalRepository.save(animal)));
                 }
                 return asignados;
+        }
+
+        /**
+         * Excel con los animales del establecimiento que tienen caravana vinculada, para colocar los
+         * sensores en el campo. Con {@code animalIds} vacío o null exporta todos; si no, solo esos.
+         */
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public byte[] exportarAsignacionesCaravanas(Long establecimientoId, List<Long> animalIds, String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+
+                validarPermisoGestionCaravana(usuario, establecimiento);
+
+                Set<Long> filtro = animalIds == null ? Set.of() : new HashSet<>(animalIds);
+                List<Animal> conCaravana = animalRepository.findByEstablecimientoId(establecimientoId).stream()
+                                .filter(a -> a.getCaravana() != null)
+                                .filter(a -> filtro.isEmpty() || filtro.contains(a.getId()))
+                                .toList();
+                return asignacionCaravanasExcelService.generar(establecimiento.getNombre(), conCaravana);
         }
 
         @SuppressWarnings("null")

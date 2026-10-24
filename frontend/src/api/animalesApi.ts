@@ -31,6 +31,7 @@ export interface AnimalResponse {
   diasRestantesCalibracion?: number;
   caravanaId: number | null;
   caravanaDevEui: string | null;
+  caravanaCodigo: string | null;
   caravanaAlias: string | null;
   caravanaEstado: 'DISPONIBLE' | 'VINCULADO' | 'INACTIVO' | null;
   caravanaUltimaSenial: string | null;
@@ -129,6 +130,15 @@ export async function desvincularCaravana(animalId: number): Promise<AnimalRespo
 /** Asigna al azar las caravanas disponibles a los animales sin caravana. Devuelve los animales que recibieron una. */
 export async function asignarCaravanasAleatoriamente(establecimientoId: number): Promise<AnimalResponse[]> {
   const response = await axiosClient.post<AnimalResponse[]>(`/animales/asignar-caravanas`, null, { params: { establecimientoId } });
+  return response.data;
+}
+
+/** Planilla .xlsx animal → sensor. Sin animalIds incluye todos los animales con caravana del establecimiento. */
+export async function descargarAsignacionesCaravanasExcel(establecimientoId: number, animalIds?: number[]): Promise<Blob> {
+  const response = await axiosClient.post<Blob>(`/animales/asignaciones-caravanas/excel`, animalIds ?? null, {
+    params: { establecimientoId },
+    responseType: 'blob',
+  });
   return response.data;
 }
 

@@ -171,6 +171,24 @@
     background-color: #7ab332 !important;
 }
 
+/* Resultado de la asignación automática: la tabla scrollea y el encabezado queda fijo */
+.asignacion-resultado-wrapper {
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
+.asignacion-resultado-wrapper .vigia-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: white;
+    padding: 0.6rem 1rem;
+}
+
+.asignacion-resultado-wrapper .vigia-table tbody td {
+    padding: 0.55rem 1rem;
+}
+
 /* Botón rojo de confirmación destructiva, mismo estilo que btn-guardar-animal */
 .btn-confirmar-desvincular {
     background-color: #dc3545 !important;

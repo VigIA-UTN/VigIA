@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Container, Spinner, Alert, Modal, Form, Button, Toast } from 'react-bootstrap';
-import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, vincularCaravana, desvincularCaravana, asignarCaravanasAleatoriamente, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
+import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, vincularCaravana, desvincularCaravana, asignarCaravanasAleatoriamente, descargarAsignacionesCaravanasExcel, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { getCaravanasDisponibles } from '../api/caravanasApi';
 import type { CaravanaResponse } from '../api/caravanasApi';
-import { formatBateria, formatUltimaSenial, labelCaravanaOpcion } from '../utils/caravanaTelemetria';
+import { compararParaManga, formatBateria, formatUltimaSenial, labelCaravanaOpcion, nombreSensorAnimal } from '../utils/caravanaTelemetria';
 import { hoyIso } from '../utils/fechas';
 import './AnimalesPage.css';
 import './EstablecimientosPage.css';
@@ -97,6 +97,9 @@ export default function AnimalesPage() {
     const [asignandoAuto, setAsignandoAuto] = useState(false);
     const [formErrorAsignarAuto, setFormErrorAsignarAuto] = useState<string | null>(null);
     const [asignacionAutoToast, setAsignacionAutoToast] = useState<string | null>(null);
+    const [resultadoAsignacion, setResultadoAsignacion] = useState<AnimalResponse[] | null>(null);
+    const [descargandoAsignacion, setDescargandoAsignacion] = useState(false);
+    const [errorDescargaAsignacion, setErrorDescargaAsignacion] = useState<string | null>(null);
 
     // Alert detail overlay
     const [selectedAlertaForAnimal, setSelectedAlertaForAnimal] = useState<AlertaResponse | null>(null);
@@ -264,14 +267,39 @@ export default function AnimalesPage() {
             const porId = new Map(asignados.map(a => [a.id, a]));
             setAnimales(prev => prev.map(a => porId.get(a.id) ?? a));
             setAsignarAutoModal(false);
-            setAsignacionAutoToast(asignados.length === 1
-                ? 'Se asignó 1 caravana.'
-                : `Se asignaron ${asignados.length} caravanas.`);
+            if (asignados.length === 0) {
+                // Otro usuario se llevó las caravanas entre que se abrió el modal y se confirmó.
+                setAsignacionAutoToast('No se asignó ninguna caravana.');
+            } else {
+                setErrorDescargaAsignacion(null);
+                setResultadoAsignacion([...asignados].sort(compararParaManga));
+            }
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } | string } };
             setFormErrorAsignarAuto(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Error al asignar las caravanas.');
         } finally {
             setAsignandoAuto(false);
+        }
+    };
+
+    const handleDescargarAsignacion = async () => {
+        if (!selectedId || !resultadoAsignacion) return;
+        setErrorDescargaAsignacion(null);
+        setDescargandoAsignacion(true);
+        try {
+            const excel = await descargarAsignacionesCaravanasExcel(selectedId, resultadoAsignacion.map(a => a.id));
+            const url = URL.createObjectURL(excel);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `asignacion-caravanas-${hoyIso()}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 0);
+        } catch {
+            setErrorDescargaAsignacion('No se pudo descargar el Excel. Probá de nuevo.');
+        } finally {
+            setDescargandoAsignacion(false);
         }
     };
 
@@ -1123,6 +1151,62 @@ export default function AnimalesPage() {
                             disabled={asignandoAuto || caravanasAAsignar === 0}
                         >
                             {asignandoAuto ? <Spinner as="span" animation="border" size="sm" /> : 'Asignar'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+
+                <Modal show={!!resultadoAsignacion} onHide={() => setResultadoAsignacion(null)} centered size="lg" dialogClassName="modal-nuevo-animal">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Caravanas asignadas</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {errorDescargaAsignacion && <Alert variant="danger">{errorDescargaAsignacion}</Alert>}
+                        <p className="mb-3" style={{ color: '#cde' }}>
+                            {resultadoAsignacion?.length === 1 ? 'Se asignó 1 caravana' : `Se asignaron ${resultadoAsignacion?.length ?? 0} caravanas`} al azar.
+                            Colocá cada sensor en el animal indicado: si queda en otro, sus datos se registran a nombre del animal equivocado.
+                            Descargá la planilla para llevarla al campo.
+                        </p>
+                        <div className="vigia-table-wrapper asignacion-resultado-wrapper">
+                            <table className="vigia-table">
+                                <thead>
+                                    <tr>
+                                        <th>Caravana oficial</th>
+                                        <th>Alias</th>
+                                        <th className="col-mobile-hide">Rodeo / Lote</th>
+                                        <th>Sensor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {resultadoAsignacion?.map(a => (
+                                        <tr key={a.id}>
+                                            <td className="fw-medium">{a.idCaravanaOficial || '—'}</td>
+                                            <td>{a.alias || '—'}</td>
+                                            <td className="col-mobile-hide">{a.rodeoLoteNombre || '—'}</td>
+                                            <td className="fw-medium">{nombreSensorAnimal(a)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Modal.Body>
+                    <Modal.Footer className="gap-3">
+                        <Button
+                            className="btn-guardar-animal"
+                            style={{ flex: 1 }}
+                            onClick={() => setResultadoAsignacion(null)}
+                            disabled={descargandoAsignacion}
+                        >
+                            Cerrar
+                        </Button>
+                        <Button
+                            className="btn-guardar-animal"
+                            style={{ flex: 1 }}
+                            onClick={handleDescargarAsignacion}
+                            disabled={descargandoAsignacion}
+                        >
+                            {descargandoAsignacion
+                                ? <Spinner as="span" animation="border" size="sm" />
+                                : <><i className="bi bi-file-earmark-excel" /> Descargar Excel</>}
                         </Button>
                     </Modal.Footer>
                 </Modal>

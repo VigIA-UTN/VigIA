@@ -79,6 +79,8 @@ public interface AnimalService {
 
         List<AnimalResponse> asignarCaravanasAleatoriamente(Long establecimientoId, String emailUsuario);
 
+        byte[] exportarAsignacionesCaravanas(Long establecimientoId, List<Long> animalIds, String emailUsuario);
+
         CohesionResponse obtenerCohesion(String emailUsuario, Long animalId,
                         LocalDateTime desde, LocalDateTime hasta);
 }

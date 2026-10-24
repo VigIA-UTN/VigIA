@@ -44,3 +44,42 @@ export function labelCaravanaOpcion(c: {
   if (c.ultimaSenial) partes.push(`señal ${formatUltimaSenial(c.ultimaSenial).text}`);
   return partes.join(' · ');
 }
+
+/** Nombre del sensor vinculado a un animal, con el mismo criterio que labelCaravanaOpcion. */
+export function nombreSensorAnimal(a: {
+  caravanaAlias: string | null;
+  caravanaCodigo: string | null;
+  caravanaDevEui: string | null;
+}): string {
+  return a.caravanaAlias || a.caravanaCodigo || a.caravanaDevEui || '—';
+}
+
+/** Numérica si las dos son números ("9" antes que "10"); si no, alfabética. */
+function compararCaravanaOficial(a: string, b: string): number {
+  if (/^\d+$/.test(a) && /^\d+$/.test(b)) {
+    const na = BigInt(a);
+    const nb = BigInt(b);
+    return na < nb ? -1 : na > nb ? 1 : 0;
+  }
+  const la = a.toLowerCase();
+  const lb = b.toLowerCase();
+  return la < lb ? -1 : la > lb ? 1 : 0;
+}
+
+function nullsLast(a: string | null, b: string | null, comparar: (a: string, b: string) => number): number {
+  if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
+  return comparar(a, b);
+}
+
+/** Por lote y después por caravana oficial: el mismo orden que el Excel de asignaciones del backend. */
+export function compararParaManga(
+  a: { rodeoLoteNombre: string | null; idCaravanaOficial: string | null },
+  b: { rodeoLoteNombre: string | null; idCaravanaOficial: string | null },
+): number {
+  const porLote = nullsLast(a.rodeoLoteNombre, b.rodeoLoteNombre, (x, y) => {
+    const lx = x.toLowerCase();
+    const ly = y.toLowerCase();
+    return lx < ly ? -1 : lx > ly ? 1 : 0;
+  });
+  return porLote !== 0 ? porLote : nullsLast(a.idCaravanaOficial, b.idCaravanaOficial, compararCaravanaOficial);
+}

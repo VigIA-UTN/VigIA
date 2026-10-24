@@ -33,6 +33,7 @@ public class AnimalResponse {
 
     private Long caravanaId;
     private String caravanaDevEui;
+    private String caravanaCodigo;
     private String caravanaAlias;
     private EstadoSensor caravanaEstado;
     private LocalDateTime caravanaUltimaSenial;

@@ -1,13 +1,17 @@
 package dev.vigia.backend.controller;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -756,6 +760,42 @@ public class AnimalController {
             String email = authentication.getName();
             List<AnimalResponse> response = animalService.asignarCaravanasAleatoriamente(establecimientoId, email);
             return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Establecimiento no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * POST /api/v1/animales/asignaciones-caravanas/excel?establecimientoId={id}
+     * <p>
+     * Planilla .xlsx animal → sensor para colocar las caravanas en el campo. El body
+     * es la lista de ids de animales a incluir (por ejemplo, los que devolvió
+     * asignar-caravanas); vacío o ausente, exporta todos los que tienen caravana.
+     * Es POST porque la lista puede ser más larga de lo que entra en una URL.
+     *
+     * @return 200 con el archivo, 404 si el establecimiento no existe, 403 si no
+     *         tiene permisos
+     */
+    @PostMapping("/asignaciones-caravanas/excel")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('CAMPERO')")
+    public ResponseEntity<?> exportarAsignacionesCaravanas(
+            @RequestParam("establecimientoId") Long establecimientoId,
+            @RequestBody(required = false) List<Long> animalIds,
+            Authentication authentication) {
+        try {
+            byte[] excel = animalService.exportarAsignacionesCaravanas(establecimientoId, animalIds,
+                    authentication.getName());
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename("asignacion-caravanas-" + LocalDate.now() + ".xlsx").build().toString())
+                    .body(excel);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (IllegalArgumentException e) {
