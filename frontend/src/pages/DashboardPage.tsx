@@ -1334,7 +1334,7 @@ export default function DashboardPage() {
                                     const dias = Math.floor(h / 24);
                                     const sevDot = alerta.severidad === 'ALTA' ? 'dash-sev-dot-alta'
                                         : alerta.severidad === 'MEDIA' ? 'dash-sev-dot-media'
-                                        : 'dash-sev-dot-baja';
+                                            : 'dash-sev-dot-baja';
                                     return (
                                         <div
                                             key={alerta.id}
@@ -1472,30 +1472,30 @@ export default function DashboardPage() {
                                         })}
                                     </div>
                                 ) : (
-                                <div className="dash-partos-chart">
-                                    {partosEsperados.semanas.map((sem, i) => (
-                                        <div key={i} className={`dash-partos-bar-col ${sem.count > 0 ? 'dash-partos-bar-col-active' : ''}`}
-                                            title={sem.count === 0 ? '' : tooltipPartos(
-                                                `📅 Semana ${sem.label} — ${sem.count} parto${sem.count > 1 ? 's' : ''} esperado${sem.count > 1 ? 's' : ''}`,
-                                                sem.animales
-                                            )}
-                                        >
-                                            <div className="dash-partos-bar-track">
-                                                <div
-                                                    className="dash-partos-bar-fill"
-                                                    style={{ height: `${maxParto > 0 ? Math.round((sem.count / maxParto) * 100) : 0}%` }}
-                                                />
+                                    <div className="dash-partos-chart">
+                                        {partosEsperados.semanas.map((sem, i) => (
+                                            <div key={i} className={`dash-partos-bar-col ${sem.count > 0 ? 'dash-partos-bar-col-active' : ''}`}
+                                                title={sem.count === 0 ? '' : tooltipPartos(
+                                                    `📅 Semana ${sem.label} — ${sem.count} parto${sem.count > 1 ? 's' : ''} esperado${sem.count > 1 ? 's' : ''}`,
+                                                    sem.animales
+                                                )}
+                                            >
+                                                <div className="dash-partos-bar-track">
+                                                    <div
+                                                        className="dash-partos-bar-fill"
+                                                        style={{ height: `${maxParto > 0 ? Math.round((sem.count / maxParto) * 100) : 0}%` }}
+                                                    />
+                                                </div>
+                                                {sem.count > 0 && (
+                                                    <span className="dash-partos-bar-count">{sem.count}</span>
+                                                )}
+                                                {i % 3 === 0 && (
+                                                    <span className="dash-partos-bar-label">{sem.label}</span>
+                                                )}
                                             </div>
-                                            {sem.count > 0 && (
-                                                <span className="dash-partos-bar-count">{sem.count}</span>
-                                            )}
-                                            {i % 3 === 0 && (
-                                                <span className="dash-partos-bar-label">{sem.label}</span>
-                                            )}
-                                        </div>
 
-                                    ))}
-                                </div>
+                                        ))}
+                                    </div>
                                 )}
                                 <div className="dash-partos-sub">
                                     {partosVista === 'anio' ? 'Por día, próximos 12 meses · tocá un día para ver las vacas' : 'Por semana, próximas 12 semanas'}
@@ -1531,9 +1531,9 @@ export default function DashboardPage() {
                                 <div className="dash-desempenyo-funnel">
                                     {[
                                         { label: 'Celo detectado', val: desempenyo.celoDetectado, cls: 'dash-desempenyo-bar-celo' },
-                                        { label: 'Atendido',        val: desempenyo.celoAtendido,  cls: 'dash-desempenyo-bar-atend' },
-                                        { label: 'Inseminado',      val: desempenyo.inseminadas,   cls: 'dash-desempenyo-bar-ins' },
-                                        { label: 'Gestante',        val: desempenyo.gestantes,     cls: 'dash-desempenyo-bar-gest' },
+                                        { label: 'Atendido', val: desempenyo.celoAtendido, cls: 'dash-desempenyo-bar-atend' },
+                                        { label: 'Inseminado', val: desempenyo.inseminadas, cls: 'dash-desempenyo-bar-ins' },
+                                        { label: 'Gestante', val: desempenyo.gestantes, cls: 'dash-desempenyo-bar-gest' },
                                     ].map(row => (
                                         <div key={row.label} className="dash-desempenyo-row">
                                             <span className="dash-desempenyo-label">{row.label}</span>
@@ -1877,447 +1877,447 @@ export default function DashboardPage() {
             {/* ── TAB: Centro de mando ──────────────────────────────────────── */}
             {activeTab === 'mando' && (
 
-            <>
-            {/* ── KPI Chips ──────────────────────────────────────────────── */}
+                <>
+                    {/* ── KPI Chips ──────────────────────────────────────────────── */}
 
-            <div className="dash-kpi-row">
-                {/* Alertas pendientes */}
-                <div className="dash-kpi-chip">
-                    <div className="dash-kpi-chip-label">
-                        Alertas pendientes
-                    </div>
-                    {loading ? <Spinner animation="border" size="sm" /> : (
-                        <div className="dash-kpi-chip-val">{kpiAlertasPendientes}</div>
-                    )}
-                    <div className="dash-kpi-chip-sub">
-                        {alertasFiltradas.filter(a => a.tipo === 'CELO').length} celo
-                        · {alertasFiltradas.filter(a => a.tipo === 'SALUD').length} salud
-                        · {alertasFiltradas.filter(a => a.tipo === 'FUERA_DE_PERIMETRO').length} perímetro
-                    </div>
-                </div>
-
-                {/* Ventanas abiertas */}
-                <div className="dash-kpi-chip">
-                    <div className="dash-kpi-chip-label">
-                        Ventanas abiertas
-                    </div>
-                    {loading ? <Spinner animation="border" size="sm" /> : (
-                        <div className="dash-kpi-chip-val">{kpiVentanasAbiertas}</div>
-                    )}
-                    <div className="dash-kpi-chip-sub">{kpiVentanasSubtexto}</div>
-                </div>
-
-                {/* Bajo observación */}
-                <div className="dash-kpi-chip">
-                    <div className="dash-kpi-chip-label">
-                        Bajo observación
-                    </div>
-                    {loading ? <Spinner animation="border" size="sm" /> : (
-                        <div className="dash-kpi-chip-val">{kpiBajoObservacion}</div>
-                    )}
-                    <div className="dash-kpi-chip-sub">{kpiObsSubtexto}</div>
-                </div>
-
-                {/* Cobertura */}
-                <div className="dash-kpi-chip">
-                    <div className="dash-kpi-chip-label">
-                        Cobertura de caravanas
-                    </div>
-                    {loading ? <Spinner animation="border" size="sm" /> : (
-                        <div className="dash-kpi-chip-val">{kpiCobertura}%</div>
-                    )}
-                    <div className="dash-kpi-chip-sub">
-                        {cobertura.silencio > 0 ? `${cobertura.silencio} sin señal · ` : ''}
-                        {cobertura.bateriaBaja > 0 ? `${cobertura.bateriaBaja} batería baja` : 'caravanas ok'}
-                    </div>
-                </div>
-            </div>
-
-            {/* ── Main grid: izquierda + derecha ──────────────────────────── */}
-            <div className="dash-main-grid">
-
-                {/* ── COLUMNA IZQUIERDA ─────────────────────────────────── */}
-                <div className="dash-left-col">
-
-                    {/* ── Idea 1: Cola de atención ─────────────────────── */}
-                    <div className="dash-card">
-                        <div className="dash-card-header">
-                            <p className="dash-card-title">
-                                <i className="bi bi-list-task" />
-                                Cola de atención
-                            </p>
-                            <button className="dash-ver-todas-btn" onClick={() => navigate('/alertas')}>
-                                Ver todas ({kpiAlertasPendientes}) <i className="bi bi-arrow-right" />
-                            </button>
+                    <div className="dash-kpi-row">
+                        {/* Alertas pendientes */}
+                        <div className="dash-kpi-chip">
+                            <div className="dash-kpi-chip-label">
+                                Alertas pendientes
+                            </div>
+                            {loading ? <Spinner animation="border" size="sm" /> : (
+                                <div className="dash-kpi-chip-val">{kpiAlertasPendientes}</div>
+                            )}
+                            <div className="dash-kpi-chip-sub">
+                                {alertasFiltradas.filter(a => a.tipo === 'CELO').length} celo
+                                · {alertasFiltradas.filter(a => a.tipo === 'SALUD').length} salud
+                                · {alertasFiltradas.filter(a => a.tipo === 'FUERA_DE_PERIMETRO').length} perímetro
+                            </div>
                         </div>
 
-                        {loading ? (
-                            <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                        ) : colaItems.length === 0 ? (
-                            <p className="dash-no-items">
-                                <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
-                                Sin alertas pendientes — todo en orden
-                            </p>
-                        ) : (
-                            <>
-                                <div className="dash-cola-header-row">
-                                    <span /> {/* Spacer para severidad */}
-                                    <span>Animal</span>
-                                    <span>Acción recomendada</span>
-                                    <span style={{ textAlign: 'center' }}>Tipo</span>
-                                    <span style={{ textAlign: 'center' }}>Antigüedad</span>
-                                    <span /> {/* Spacer para boton */}
-                                </div>
-                                {colaItems.slice(0, 8).map((item, i) => {
-                                    const { alerta, animal, ventana } = item;
-                                    const horas = horasTranscurridas(alerta.tsGeneracion);
-                                    const isCelo = alerta.tipo === 'CELO';
-                                    const horasRestantes = ventana ? ventana.tiempoRestanteSegundos / 3600 : null;
-                                    const colorTiempoClass = isCelo && horasRestantes !== null
-                                        ? horasRestantes <= 3 ? 'dash-cola-tiempo-urgente'
-                                            : horasRestantes <= 6 ? 'dash-cola-tiempo-warning'
-                                                : ''
-                                        : horas > 24 ? 'dash-cola-tiempo-urgente'
-                                            : horas > 8 ? 'dash-cola-tiempo-warning'
-                                                : '';
-                                    const tiempoClass = `dash-cola-tiempo ${colorTiempoClass}`.trim();
+                        {/* Ventanas abiertas */}
+                        <div className="dash-kpi-chip">
+                            <div className="dash-kpi-chip-label">
+                                Ventanas abiertas
+                            </div>
+                            {loading ? <Spinner animation="border" size="sm" /> : (
+                                <div className="dash-kpi-chip-val">{kpiVentanasAbiertas}</div>
+                            )}
+                            <div className="dash-kpi-chip-sub">{kpiVentanasSubtexto}</div>
+                        </div>
 
-                                    const tiempoLabel = isCelo && horasRestantes !== null
-                                        ? `${Math.floor(horasRestantes)}h restantes`
-                                        : `Hace ${formatHoras(horas)}`;
+                        {/* Bajo observación */}
+                        <div className="dash-kpi-chip">
+                            <div className="dash-kpi-chip-label">
+                                Bajo observación
+                            </div>
+                            {loading ? <Spinner animation="border" size="sm" /> : (
+                                <div className="dash-kpi-chip-val">{kpiBajoObservacion}</div>
+                            )}
+                            <div className="dash-kpi-chip-sub">{kpiObsSubtexto}</div>
+                        </div>
 
-                                    // Misma regla que el color de la antigüedad: rojo ⇔ botón destacado.
-                                    const isUrgentAtender = colorTiempoClass === 'dash-cola-tiempo-urgente';
-
-                                    const sevDotClass = alerta.severidad === 'ALTA' ? 'dash-sev-dot-alta'
-                                        : alerta.severidad === 'MEDIA' ? 'dash-sev-dot-media'
-                                            : alerta.severidad === 'BAJA' ? 'dash-sev-dot-baja'
-                                                : 'dash-sev-dot-none';
-
-                                    const tipoClass = alerta.tipo === 'CELO' ? 'dash-tipo-celo'
-                                        : alerta.tipo === 'SALUD' ? 'dash-tipo-salud'
-                                            : alerta.tipo === 'FUERA_DE_PERIMETRO' ? 'dash-tipo-perimetro'
-                                                : 'dash-tipo-caravana';
-
-                                    const tipoLabel = esAnestro(alerta) ? 'ANESTRO'
-                                        : alerta.tipo === 'CELO' ? 'CELO'
-                                        : alerta.tipo === 'SALUD' ? 'SALUD'
-                                            : alerta.tipo === 'FUERA_DE_PERIMETRO' ? 'PERÍMETRO'
-                                                : 'CARAVANA';
-
-                                    return (
-                                        <div key={`${alerta.id}-${i}`}>
-                                            {i > 0 && <div className="dash-divider" />}
-                                            <div
-                                                className="dash-cola-row"
-                                                onClick={() => animal && navigate(`/animales/${animal.id}`)}
-                                            >
-                                                <span className={`dash-sev-dot ${sevDotClass}`} />
-                                                <div className="dash-cola-nombre">{nombreAnimal(animal)}</div>
-                                                <div className="dash-cola-rec" title={textoAccionRecomendada(alerta)}>
-                                                    {textoAccionRecomendada(alerta)}
-                                                </div>
-                                                <span className={`dash-tipo-chip ${tipoClass}`}>
-                                                    {tipoLabel}
-                                                    {tieneDatoDesactualizado(alerta) && (
-                                                        <i
-                                                            className="bi bi-wifi-off ms-1"
-                                                            style={{ color: '#B7791F' }}
-                                                            title={`Dato posiblemente desactualizado: la caravana no transmite hace más de ${alerta.horasUmbralDatoDesactualizado ?? 2} h. Verificá el animal en campo antes de inseminar.`}
-                                                        />
-                                                    )}
-                                                </span>
-                                                <span className={tiempoClass}>{tiempoLabel}</span>
-                                                <button
-                                                    className={`dash-atender-btn ${isUrgentAtender ? '' : 'dash-atender-btn-outline'}`}
-                                                    onClick={e => {
-                                                        e.stopPropagation();
-                                                        if (animal) navigate(`/animales/${animal.id}`);
-                                                    }}
-                                                >
-                                                    Atender
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </>
-                        )}
+                        {/* Cobertura */}
+                        <div className="dash-kpi-chip">
+                            <div className="dash-kpi-chip-label">
+                                Cobertura de caravanas
+                            </div>
+                            {loading ? <Spinner animation="border" size="sm" /> : (
+                                <div className="dash-kpi-chip-val">{kpiCobertura}%</div>
+                            )}
+                            <div className="dash-kpi-chip-sub">
+                                {cobertura.silencio > 0 ? `${cobertura.silencio} sin señal · ` : ''}
+                                {cobertura.bateriaBaja > 0 ? `${cobertura.bateriaBaja} batería baja` : 'caravanas ok'}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* ── Idea 2: Ventanas de inseminación ─────────────── */}
-                    <div className="dash-card">
-                        <div className="dash-card-header">
-                            <p className="dash-card-title">
-                                <i className="bi bi-clock-history" />
-                                Ventanas de inseminación abiertas
-                            </p>
-                            {!loading && (
-                                <span className="dash-card-tag">
-                                    Oportunidades perdidas (30d): {celoArchivadasRecientes}
-                                </span>
+                    {/* ── Main grid: izquierda + derecha ──────────────────────────── */}
+                    <div className="dash-main-grid">
+
+                        {/* ── COLUMNA IZQUIERDA ─────────────────────────────────── */}
+                        <div className="dash-left-col">
+
+                            {/* ── Idea 1: Cola de atención ─────────────────────── */}
+                            <div className="dash-card">
+                                <div className="dash-card-header">
+                                    <p className="dash-card-title">
+                                        <i className="bi bi-list-task" />
+                                        Cola de atención
+                                    </p>
+                                    <button className="dash-ver-todas-btn" onClick={() => navigate('/alertas')}>
+                                        Ver todas ({kpiAlertasPendientes}) <i className="bi bi-arrow-right" />
+                                    </button>
+                                </div>
+
+                                {loading ? (
+                                    <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
+                                ) : colaItems.length === 0 ? (
+                                    <p className="dash-no-items">
+                                        <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
+                                        Sin alertas pendientes — todo en orden
+                                    </p>
+                                ) : (
+                                    <>
+                                        <div className="dash-cola-header-row">
+                                            <span /> {/* Spacer para severidad */}
+                                            <span>Animal</span>
+                                            <span className='d-none d-md-block'>Acción recomendada</span>
+                                            <span style={{ textAlign: 'center' }}>Tipo</span>
+                                            <span className='d-none d-md-block' style={{ textAlign: 'center' }}>Antigüedad</span>
+                                            <span /> {/* Spacer para boton */}
+                                        </div>
+                                        {colaItems.slice(0, 8).map((item, i) => {
+                                            const { alerta, animal, ventana } = item;
+                                            const horas = horasTranscurridas(alerta.tsGeneracion);
+                                            const isCelo = alerta.tipo === 'CELO';
+                                            const horasRestantes = ventana ? ventana.tiempoRestanteSegundos / 3600 : null;
+                                            const colorTiempoClass = isCelo && horasRestantes !== null
+                                                ? horasRestantes <= 3 ? 'dash-cola-tiempo-urgente'
+                                                    : horasRestantes <= 6 ? 'dash-cola-tiempo-warning'
+                                                        : ''
+                                                : horas > 24 ? 'dash-cola-tiempo-urgente'
+                                                    : horas > 8 ? 'dash-cola-tiempo-warning'
+                                                        : '';
+                                            const tiempoClass = `dash-cola-tiempo ${colorTiempoClass}`.trim();
+
+                                            const tiempoLabel = isCelo && horasRestantes !== null
+                                                ? `${Math.floor(horasRestantes)}h restantes`
+                                                : `Hace ${formatHoras(horas)}`;
+
+                                            // Misma regla que el color de la antigüedad: rojo ⇔ botón destacado.
+                                            const isUrgentAtender = colorTiempoClass === 'dash-cola-tiempo-urgente';
+
+                                            const sevDotClass = alerta.severidad === 'ALTA' ? 'dash-sev-dot-alta'
+                                                : alerta.severidad === 'MEDIA' ? 'dash-sev-dot-media'
+                                                    : alerta.severidad === 'BAJA' ? 'dash-sev-dot-baja'
+                                                        : 'dash-sev-dot-none';
+
+                                            const tipoClass = alerta.tipo === 'CELO' ? 'dash-tipo-celo'
+                                                : alerta.tipo === 'SALUD' ? 'dash-tipo-salud'
+                                                    : alerta.tipo === 'FUERA_DE_PERIMETRO' ? 'dash-tipo-perimetro'
+                                                        : 'dash-tipo-caravana';
+
+                                            const tipoLabel = esAnestro(alerta) ? 'ANESTRO'
+                                                : alerta.tipo === 'CELO' ? 'CELO'
+                                                    : alerta.tipo === 'SALUD' ? 'SALUD'
+                                                        : alerta.tipo === 'FUERA_DE_PERIMETRO' ? 'PERÍMETRO'
+                                                            : 'CARAVANA';
+
+                                            return (
+                                                <div key={`${alerta.id}-${i}`}>
+                                                    {i > 0 && <div className="dash-divider" />}
+                                                    <div
+                                                        className="dash-cola-row"
+                                                        onClick={() => animal && navigate(`/animales/${animal.id}`)}
+                                                    >
+                                                        <span className={`dash-sev-dot ${sevDotClass}`} />
+                                                        <div className="dash-cola-nombre">{nombreAnimal(animal)}</div>
+                                                        <div className="dash-cola-rec d-none d-md-block" title={textoAccionRecomendada(alerta)}>
+                                                            {textoAccionRecomendada(alerta)}
+                                                        </div>
+                                                        <span className={`dash-tipo-chip ${tipoClass}`}>
+                                                            {tipoLabel}
+                                                            {tieneDatoDesactualizado(alerta) && (
+                                                                <i
+                                                                    className="bi bi-wifi-off ms-1"
+                                                                    style={{ color: '#B7791F' }}
+                                                                    title={`Dato posiblemente desactualizado: la caravana no transmite hace más de ${alerta.horasUmbralDatoDesactualizado ?? 2} h. Verificá el animal en campo antes de inseminar.`}
+                                                                />
+                                                            )}
+                                                        </span>
+                                                        <span className={`${tiempoClass} d-none d-md-block`}>{tiempoLabel}</span>
+                                                        <button
+                                                            className={`dash-atender-btn ${isUrgentAtender ? '' : 'dash-atender-btn-outline'}`}
+                                                            onClick={e => {
+                                                                e.stopPropagation();
+                                                                if (animal) navigate(`/animales/${animal.id}`);
+                                                            }}
+                                                        >
+                                                            Atender
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </>
+                                )}
+                            </div>
+
+                            {/* ── Idea 2: Ventanas de inseminación ─────────────── */}
+                            <div className="dash-card">
+                                <div className="dash-card-header">
+                                    <p className="dash-card-title">
+                                        <i className="bi bi-clock-history" />
+                                        Ventanas de inseminación abiertas
+                                    </p>
+                                    {!loading && (
+                                        <span className="dash-card-tag">
+                                            Oportunidades perdidas (30d): {celoArchivadasRecientes}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {loading ? (
+                                    <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
+                                ) : ventanaItems.length === 0 ? (
+                                    <p className="dash-no-items">
+                                        <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
+                                        Sin ventanas activas
+                                    </p>
+                                ) : (
+                                    ventanaItems.map(({ alerta, animal, ventana }) => {
+                                        const isFutura = ventana.estado === 'FUTURA';
+                                        const vc = isFutura ? 'futura' : ventanaClass(ventana.tiempoRestanteSegundos);
+                                        const pct = isFutura ? 0 : Math.min(100, Math.max(0, ventana.porcentajeTranscurrido * 100));
+                                        const restanteClass = isFutura
+                                            ? 'dash-ventana-restante-futura'
+                                            : vc === 'critica'
+                                                ? 'dash-ventana-restante-urgente'
+                                                : vc === 'venciendo'
+                                                    ? 'dash-ventana-restante-warning'
+                                                    : 'dash-ventana-restante-ok';
+
+                                        const timeLabel = isFutura
+                                            ? `Abre en ${formatHorasRestantes(ventana.tiempoRestanteSegundos).replace(' restantes', '')}`
+                                            : formatHorasRestantes(ventana.tiempoRestanteSegundos);
+
+                                        return (
+                                            <div
+                                                key={alerta.id}
+                                                className="dash-ventana-row"
+                                                style={{ cursor: 'pointer' }}
+                                                onClick={() => animal && navigate(`/animales/${animal.id}`)}
+                                            >
+                                                <div className="dash-ventana-id">{nombreAnimal(animal)}</div>
+                                                <div className="dash-ventana-bar-track">
+                                                    <div
+                                                        className={`dash-ventana-bar-fill dash-ventana-bar-${vc}`}
+                                                        style={{ width: `${pct}%` }}
+                                                    />
+                                                </div>
+                                                <div className={`dash-ventana-restante ${restanteClass}`}>
+                                                    {timeLabel}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ── COLUMNA DERECHA ───────────────────────────────────── */}
+                        <div className="dash-right-col">
+
+                            {/* ── Idea 4: Cobertura de caravanas ─────────────────── */}
+                            <div className="dash-card dash-card-dark">
+                                <div className="dash-card-header">
+                                    <p className="dash-card-title">
+                                        <i className="bi bi-wifi" />
+                                        Estado del monitoreo
+                                    </p>
+                                </div>
+
+                                {loading ? (
+                                    <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
+                                ) : (
+                                    <>
+                                        <div className="dash-coverage-pct">
+                                            {cobertura.pct}%
+                                        </div>
+                                        <div className="dash-coverage-sub">del rodeo vigilado</div>
+
+                                        <div className="dash-coverage-bar-wrap">
+                                            {cobertura.ok > 0 && (
+                                                <div className="dash-coverage-seg dash-coverage-ok"
+                                                    style={{ flex: cobertura.ok }} title={`Monitoreados: ${cobertura.ok}`} />
+                                            )}
+                                            {cobertura.calibrando > 0 && (
+                                                <div className="dash-coverage-seg dash-coverage-calibrando"
+                                                    style={{ flex: cobertura.calibrando }} title={`Calibrando: ${cobertura.calibrando}`} />
+                                            )}
+                                            {cobertura.bateriaBaja > 0 && (
+                                                <div className="dash-coverage-seg dash-coverage-bateria"
+                                                    style={{ flex: cobertura.bateriaBaja }} title={`Batería baja: ${cobertura.bateriaBaja}`} />
+                                            )}
+                                            {cobertura.silencio > 0 && (
+                                                <div className="dash-coverage-seg dash-coverage-silencio"
+                                                    style={{ flex: cobertura.silencio }} title={`Sin señal: ${cobertura.silencio}`} />
+                                            )}
+                                            {cobertura.sinCaravana > 0 && (
+                                                <div className="dash-coverage-seg dash-coverage-sincaravana"
+                                                    style={{ flex: cobertura.sinCaravana }} title={`Sin caravana: ${cobertura.sinCaravana}`} />
+                                            )}
+                                        </div>
+
+                                        <div className="dash-coverage-legend">
+                                            {[
+                                                { label: 'Monitoreados', count: cobertura.ok, cls: 'dash-coverage-ok' },
+                                                { label: 'En calibración', count: cobertura.calibrando, cls: 'dash-coverage-calibrando' },
+                                                { label: 'Sin señal > 6h', count: cobertura.silencio, cls: 'dash-coverage-silencio' },
+                                                { label: `Batería ≤ ${BATERIA_BAJA_PCT}%`, count: cobertura.bateriaBaja, cls: 'dash-coverage-bateria' },
+                                                { label: 'Sin caravana', count: cobertura.sinCaravana, cls: 'dash-coverage-sincaravana' },
+                                            ].filter(r => r.count > 0).map(row => (
+                                                <div key={row.label} className="dash-coverage-leg-row">
+                                                    <div className="dash-coverage-leg-left">
+                                                        <span className={`dash-dot ${row.cls}`} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%' }} />
+                                                        {row.label}
+                                                    </div>
+                                                    <span className="dash-coverage-leg-count">{row.count}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* ── Idea 5: Mapa vivo ──────────────────────────────── */}
+                            <div className="dash-card" style={{ padding: '18px 18px 14px' }}>
+                                <div className="dash-card-header">
+                                    <p className="dash-card-title">
+                                        <i className="bi bi-map-fill" />
+                                        Mapa en vivo
+                                    </p>
+                                    <button className="dash-ver-todas-btn" onClick={() => navigate('/mapa')}>
+                                        Expandir <i className="bi bi-box-arrow-up-right" />
+                                    </button>
+                                </div>
+
+                                {loading ? (
+                                    <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
+                                ) : (
+                                    <div className="dash-map-wrap" onClick={() => navigate('/mapa')}>
+                                        <MapContainer
+                                            center={[-34.6037, -58.3816]}
+                                            zoom={12}
+                                            style={{ height: '100%', width: '100%' }}
+                                            zoomControl={false}
+                                            attributionControl={false}
+                                            dragging={false}
+                                            scrollWheelZoom={false}
+                                            doubleClickZoom={false}
+                                            touchZoom={false}
+                                            keyboard={false}
+                                        >
+                                            <TileLayer
+                                                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                            />
+                                            {animalesMapa
+                                                .filter(a => a.latitud && a.longitud)
+                                                .map(a => (
+                                                    <Marker
+                                                        key={a.id}
+                                                        position={[a.latitud!, a.longitud!]}
+                                                        icon={determinarIcono(a)}
+                                                    />
+                                                ))
+                                            }
+                                            <MapFitter animales={animalesMapa} />
+                                        </MapContainer>
+
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ══ DEBAJO DEL PLIEGUE ══════════════════════════════════════ */}
+
+                    <div className="dash-below-grid">
+
+                        {/* ── Idea 6: Embudo reproductivo ──────────────────────── */}
+                        <div className="dash-card">
+                            <div className="dash-card-header">
+                                <p className="dash-card-title">
+                                    <i className="bi bi-diagram-3-fill" />
+                                    Embudo reproductivo
+                                </p>
+                                {!loading && embudo.inseminadasPendienteDiag > 0 && (
+                                    <span style={{ fontSize: '0.75rem', color: '#ECC94B' }}>
+                                        {embudo.inseminadasPendienteDiag} esperan diagnóstico
+                                    </span>
+                                )}
+                            </div>
+
+                            {loading ? (
+                                <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
+                            ) : embudo.totalRepro === 0 ? (
+                                <p className="dash-no-items">Sin animales reproductivos registrados</p>
+                            ) : (
+                                <>
+                                    <div className="dash-embudo-bar-wrap">
+                                        {Object.entries(embudo.dist)
+                                            .filter(([, v]) => v > 0)
+                                            .map(([estado, count]) => (
+                                                <div
+                                                    key={estado}
+                                                    className={`dash-embudo-seg dash-embudo-${estado.toLowerCase()}`}
+                                                    style={{ flex: count }}
+                                                    title={`${ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado.replace('_', ' ')}: ${count}`}
+                                                />
+                                            ))}
+                                    </div>
+                                    <div className="dash-embudo-legend">
+                                        {Object.entries(embudo.dist).filter(([, v]) => v > 0).map(([estado, count]) => (
+                                            <span key={estado} className="dash-embudo-leg-item">
+                                                <span className={`dash-dot dash-embudo-${estado.toLowerCase()}`}
+                                                    style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%' }}
+                                                />
+                                                {ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado.replace('_', ' ')}
+                                                <strong>{count}</strong>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </>
                             )}
                         </div>
 
-                        {loading ? (
-                            <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                        ) : ventanaItems.length === 0 ? (
-                            <p className="dash-no-items">
-                                <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
-                                Sin ventanas activas
-                            </p>
-                        ) : (
-                            ventanaItems.map(({ alerta, animal, ventana }) => {
-                                const isFutura = ventana.estado === 'FUTURA';
-                                const vc = isFutura ? 'futura' : ventanaClass(ventana.tiempoRestanteSegundos);
-                                const pct = isFutura ? 0 : Math.min(100, Math.max(0, ventana.porcentajeTranscurrido * 100));
-                                const restanteClass = isFutura 
-                                    ? 'dash-ventana-restante-futura' 
-                                    : vc === 'critica'
-                                        ? 'dash-ventana-restante-urgente'
-                                        : vc === 'venciendo'
-                                            ? 'dash-ventana-restante-warning'
-                                            : 'dash-ventana-restante-ok';
-
-                                const timeLabel = isFutura
-                                    ? `Abre en ${formatHorasRestantes(ventana.tiempoRestanteSegundos).replace(' restantes', '')}`
-                                    : formatHorasRestantes(ventana.tiempoRestanteSegundos);
-
-                                return (
-                                    <div
-                                        key={alerta.id}
-                                        className="dash-ventana-row"
-                                        style={{ cursor: 'pointer' }}
-                                        onClick={() => animal && navigate(`/animales/${animal.id}`)}
-                                    >
-                                        <div className="dash-ventana-id">{nombreAnimal(animal)}</div>
-                                        <div className="dash-ventana-bar-track">
-                                            <div
-                                                className={`dash-ventana-bar-fill dash-ventana-bar-${vc}`}
-                                                style={{ width: `${pct}%` }}
-                                            />
-                                        </div>
-                                        <div className={`dash-ventana-restante ${restanteClass}`}>
-                                            {timeLabel}
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
-
-                {/* ── COLUMNA DERECHA ───────────────────────────────────── */}
-                <div className="dash-right-col">
-
-                    {/* ── Idea 4: Cobertura de caravanas ─────────────────── */}
-                    <div className="dash-card dash-card-dark">
-                        <div className="dash-card-header">
-                            <p className="dash-card-title">
-                                <i className="bi bi-wifi" />
-                                Estado del monitoreo
-                            </p>
+                        {/* ── Idea 8: Tendencia 8 semanas ──────────────────────────── */}
+                        <div className="dash-card">
+                            <div className="dash-card-header">
+                                <p className="dash-card-title">
+                                    <i className="bi bi-graph-up" />
+                                    Tendencia de alertas · 8 semanas
+                                </p>
+                            </div>
+                            {loading ? (
+                                <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
+                            ) : tendencia8SemanasLote.tipos.every(t => tendencia8SemanasLote.datos[t].every(v => v === 0)) ? (
+                                <p className="dash-no-items">
+                                    <i className="bi bi-bar-chart" style={{ color: '#94A3B8' }} />
+                                    Sin alertas en las últimas 8 semanas
+                                </p>
+                            ) : (
+                                <TrendChart
+                                    datos={tendencia8SemanasLote.datos}
+                                    semanas={tendencia8SemanasLote.semanas}
+                                    tipos={tendencia8SemanasLote.tipos}
+                                />
+                            )}
                         </div>
 
-                        {loading ? (
-                            <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                        ) : (
-                            <>
-                                <div className="dash-coverage-pct">
-                                    {cobertura.pct}%
-                                </div>
-                                <div className="dash-coverage-sub">del rodeo vigilado</div>
-
-                                <div className="dash-coverage-bar-wrap">
-                                    {cobertura.ok > 0 && (
-                                        <div className="dash-coverage-seg dash-coverage-ok"
-                                            style={{ flex: cobertura.ok }} title={`Monitoreados: ${cobertura.ok}`} />
-                                    )}
-                                    {cobertura.calibrando > 0 && (
-                                        <div className="dash-coverage-seg dash-coverage-calibrando"
-                                            style={{ flex: cobertura.calibrando }} title={`Calibrando: ${cobertura.calibrando}`} />
-                                    )}
-                                    {cobertura.bateriaBaja > 0 && (
-                                        <div className="dash-coverage-seg dash-coverage-bateria"
-                                            style={{ flex: cobertura.bateriaBaja }} title={`Batería baja: ${cobertura.bateriaBaja}`} />
-                                    )}
-                                    {cobertura.silencio > 0 && (
-                                        <div className="dash-coverage-seg dash-coverage-silencio"
-                                            style={{ flex: cobertura.silencio }} title={`Sin señal: ${cobertura.silencio}`} />
-                                    )}
-                                    {cobertura.sinCaravana > 0 && (
-                                        <div className="dash-coverage-seg dash-coverage-sincaravana"
-                                            style={{ flex: cobertura.sinCaravana }} title={`Sin caravana: ${cobertura.sinCaravana}`} />
-                                    )}
-                                </div>
-
-                                <div className="dash-coverage-legend">
-                                    {[
-                                        { label: 'Monitoreados', count: cobertura.ok, cls: 'dash-coverage-ok' },
-                                        { label: 'En calibración', count: cobertura.calibrando, cls: 'dash-coverage-calibrando' },
-                                        { label: 'Sin señal > 6h', count: cobertura.silencio, cls: 'dash-coverage-silencio' },
-                                        { label: `Batería ≤ ${BATERIA_BAJA_PCT}%`, count: cobertura.bateriaBaja, cls: 'dash-coverage-bateria' },
-                                        { label: 'Sin caravana', count: cobertura.sinCaravana, cls: 'dash-coverage-sincaravana' },
-                                    ].filter(r => r.count > 0).map(row => (
-                                        <div key={row.label} className="dash-coverage-leg-row">
-                                            <div className="dash-coverage-leg-left">
-                                                <span className={`dash-dot ${row.cls}`} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%' }} />
-                                                {row.label}
-                                            </div>
-                                            <span className="dash-coverage-leg-count">{row.count}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* ── Idea 5: Mapa vivo ──────────────────────────────── */}
-                    <div className="dash-card" style={{ padding: '18px 18px 14px' }}>
-                        <div className="dash-card-header">
-                            <p className="dash-card-title">
-                                <i className="bi bi-map-fill" />
-                                Mapa en vivo
-                            </p>
-                            <button className="dash-ver-todas-btn" onClick={() => navigate('/mapa')}>
-                                Expandir <i className="bi bi-box-arrow-up-right" />
-                            </button>
+                        {/* ── Idea 10: Comparativa por lote (Placeholder) ─────────── */}
+                        <div className="dash-card">
+                            <div className="dash-card-header">
+                                <p className="dash-card-title">
+                                    <i className="bi bi-bar-chart-line-fill" />
+                                    Comparativa por lote
+                                </p>
+                            </div>
+                            <div className="dash-salud-peso-empty" style={{ padding: '40px 16px' }}>
+                                <i className="bi bi-kanban" style={{ fontSize: '1.6rem', color: '#CBD5E1' }} />
+                                <span className="dash-salud-peso-empty-text">
+                                    Disponible próximamente
+                                </span>
+                                <span className="dash-salud-peso-empty-sub">
+                                    Módulo de analítica por lote en desarrollo
+                                </span>
+                            </div>
                         </div>
-
-                        {loading ? (
-                            <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                        ) : (
-                            <div className="dash-map-wrap" onClick={() => navigate('/mapa')}>
-                                <MapContainer
-                                    center={[-34.6037, -58.3816]}
-                                    zoom={12}
-                                    style={{ height: '100%', width: '100%' }}
-                                    zoomControl={false}
-                                    attributionControl={false}
-                                    dragging={false}
-                                    scrollWheelZoom={false}
-                                    doubleClickZoom={false}
-                                    touchZoom={false}
-                                    keyboard={false}
-                                >
-                                    <TileLayer
-                                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                    />
-                                    {animalesMapa
-                                        .filter(a => a.latitud && a.longitud)
-                                        .map(a => (
-                                            <Marker
-                                                key={a.id}
-                                                position={[a.latitud!, a.longitud!]}
-                                                icon={determinarIcono(a)}
-                                            />
-                                        ))
-                                    }
-                                    <MapFitter animales={animalesMapa} />
-                                </MapContainer>
-
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* ══ DEBAJO DEL PLIEGUE ══════════════════════════════════════ */}
-
-            <div className="dash-below-grid">
-
-                {/* ── Idea 6: Embudo reproductivo ──────────────────────── */}
-                <div className="dash-card">
-                    <div className="dash-card-header">
-                        <p className="dash-card-title">
-                            <i className="bi bi-diagram-3-fill" />
-                            Embudo reproductivo
-                        </p>
-                        {!loading && embudo.inseminadasPendienteDiag > 0 && (
-                            <span style={{ fontSize: '0.75rem', color: '#ECC94B' }}>
-                                {embudo.inseminadasPendienteDiag} esperan diagnóstico
-                            </span>
-                        )}
                     </div>
 
-                    {loading ? (
-                        <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                    ) : embudo.totalRepro === 0 ? (
-                        <p className="dash-no-items">Sin animales reproductivos registrados</p>
-                    ) : (
-                        <>
-                            <div className="dash-embudo-bar-wrap">
-                                {Object.entries(embudo.dist)
-                                    .filter(([, v]) => v > 0)
-                                    .map(([estado, count]) => (
-                                        <div
-                                            key={estado}
-                                            className={`dash-embudo-seg dash-embudo-${estado.toLowerCase()}`}
-                                            style={{ flex: count }}
-                                            title={`${ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado.replace('_', ' ')}: ${count}`}
-                                        />
-                                    ))}
-                            </div>
-                            <div className="dash-embudo-legend">
-                                {Object.entries(embudo.dist).filter(([, v]) => v > 0).map(([estado, count]) => (
-                                    <span key={estado} className="dash-embudo-leg-item">
-                                        <span className={`dash-dot dash-embudo-${estado.toLowerCase()}`}
-                                            style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%' }}
-                                        />
-                                        {ESTADO_REPRODUCTIVO_LABEL[estado] ?? estado.replace('_', ' ')}
-                                        <strong>{count}</strong>
-                                    </span>
-                                ))}
-                            </div>
-                        </>
-                    )}
-                </div>
-
-                {/* ── Idea 8: Tendencia 8 semanas ──────────────────────────── */}
-                <div className="dash-card">
-                    <div className="dash-card-header">
-                        <p className="dash-card-title">
-                            <i className="bi bi-graph-up" />
-                            Tendencia de alertas · 8 semanas
-                        </p>
-                    </div>
-                    {loading ? (
-                        <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                    ) : tendencia8SemanasLote.tipos.every(t => tendencia8SemanasLote.datos[t].every(v => v === 0)) ? (
-                        <p className="dash-no-items">
-                            <i className="bi bi-bar-chart" style={{ color: '#94A3B8' }} />
-                            Sin alertas en las últimas 8 semanas
-                        </p>
-                    ) : (
-                        <TrendChart
-                            datos={tendencia8SemanasLote.datos}
-                            semanas={tendencia8SemanasLote.semanas}
-                            tipos={tendencia8SemanasLote.tipos}
-                        />
-                    )}
-                </div>
-
-                {/* ── Idea 10: Comparativa por lote (Placeholder) ─────────── */}
-                <div className="dash-card">
-                    <div className="dash-card-header">
-                        <p className="dash-card-title">
-                            <i className="bi bi-bar-chart-line-fill" />
-                            Comparativa por lote
-                        </p>
-                    </div>
-                    <div className="dash-salud-peso-empty" style={{ padding: '40px 16px' }}>
-                        <i className="bi bi-kanban" style={{ fontSize: '1.6rem', color: '#CBD5E1' }} />
-                        <span className="dash-salud-peso-empty-text">
-                            Disponible próximamente
-                        </span>
-                        <span className="dash-salud-peso-empty-sub">
-                            Módulo de analítica por lote en desarrollo
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            </>
+                </>
             )}
 
         </div>

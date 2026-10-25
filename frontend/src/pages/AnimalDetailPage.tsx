@@ -46,7 +46,7 @@ function CaravanaVinculadaInfo({ animal }: { animal: AnimalResponse }) {
     const hasSenial = senial.text !== '—';
 
     return (
-        <div className="d-flex align-items-center justify-content-between mt-1 px-3 py-2 bg-light rounded border border-light-subtle w-100">
+        <div className="d-flex flex-column flex-lg-row align-items-center justify-content-between mt-1 px-3 py-2 bg-light rounded border border-light-subtle w-100">
             <div className="d-flex align-items-center gap-2">
                 <span className="fw-medium text-dark text-nowrap">
                     <i className="bi bi-tag-fill text-primary me-2"></i>

@@ -555,6 +555,9 @@ export default function AnimalesPage() {
                                 <i className="bi bi-heart" /> Salud
                             </button>
                         </div>
+
+                    </div>
+                    <div>
                         {(esProductor || (puedeGestionarCaravanas && selectedId)) && (
                             <div className="animales-action-btns d-flex align-items-center gap-2">
                                 {puedeGestionarCaravanas && selectedId && (

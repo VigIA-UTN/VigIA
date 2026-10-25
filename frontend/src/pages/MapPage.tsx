@@ -715,16 +715,7 @@ export default function MapPage() {
 
       {/* Resumen de Alertas Cards */}
       {resumenAlertas && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            zIndex: 1000,
-            display: 'flex',
-            gap: '10px'
-          }}
-        >
+        <div className="resumen-alertas">
           {/* Tarjeta Reproductivo */}
           <div className="card text-center" style={{ minWidth: '100px', backgroundColor: 'rgba(255, 255, 255, 0.9)', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>
             <div className="card-body p-2">

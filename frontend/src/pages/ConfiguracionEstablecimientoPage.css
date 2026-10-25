@@ -1,7 +1,8 @@
 /* ── Layout de página ───────────────────────────────────────────────────── */
 .cfg-page {
   padding: 2rem 2rem 4rem;
-  width: 100%; /* #root es flex: con margin auto, sin esto se encoge al ancho del contenido */
+  width: 100%;
+  /* #root es flex: con margin auto, sin esto se encoge al ancho del contenido */
   max-width: 1120px;
   margin: 0 auto;
   min-height: calc(100vh - 120px);
@@ -74,7 +75,9 @@
   opacity: 1;
 }
 
-.cfg-toast i { color: #8CC63F; }
+.cfg-toast i {
+  color: #8CC63F;
+}
 
 /* ── Alerta de error ────────────────────────────────────────────────────── */
 .cfg-alert {
@@ -169,7 +172,7 @@
   color: #6b7280;
   font-size: 0.72rem;
   font-weight: 600;
-  white-space: nowrap;
+  white-space: wrap;
 }
 
 .cfg-card-title {
@@ -192,7 +195,9 @@
   gap: 0.45rem;
 }
 
-.cfg-field--narrow { max-width: 420px; }
+.cfg-field--narrow {
+  max-width: 420px;
+}
 
 .cfg-grid {
   display: grid;
@@ -223,18 +228,25 @@
   font-weight: 500;
   cursor: pointer;
 }
-.cfg-link-btn:hover { color: #1E3A5F; }
+
+.cfg-link-btn:hover {
+  color: #1E3A5F;
+}
 
 /* ── Vista previa del mapa (no interactiva; el pin queda fijo en el centro) ── */
 .cfg-map-preview {
   position: relative;
-  isolation: isolate; /* encierra los z-index de Leaflet para que no tapen la barra fija */
+  isolation: isolate;
+  /* encierra los z-index de Leaflet para que no tapen la barra fija */
   height: 220px;
   border-top: 1px solid #e8ecf0;
-  transition: height 0.25s ease; /* MapInvalidator smooth re-centra el mapa en cada frame */
+  transition: height 0.25s ease;
+  /* MapInvalidator smooth re-centra el mapa en cada frame */
 }
 
-.cfg-map-preview--ampliado { height: 440px; }
+.cfg-map-preview--ampliado {
+  height: 440px;
+}
 
 .cfg-map-credit {
   margin: 0;
@@ -243,7 +255,9 @@
   color: #A0AEC0;
 }
 
-.cfg-map-preview--editable .leaflet-container { cursor: crosshair; }
+.cfg-map-preview--editable .leaflet-container {
+  cursor: crosshair;
+}
 
 /* Mismo botón que el mapa de calor de la ficha del animal (ActividadTab) */
 .cfg-map-expand {
@@ -282,9 +296,19 @@
 }
 
 @keyframes cfg-shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-4px);
+  }
+
+  75% {
+    transform: translateX(4px);
+  }
 }
 
 /* ── Toggle pill de severidad ───────────────────────────────────────────── */
@@ -381,8 +405,15 @@
   cursor: pointer;
   transition: background-color 0.15s;
 }
-.cfg-nav-item:hover { background: #f3f6f9; }
-.cfg-nav-item i:first-child { font-size: 1rem; width: 18px; }
+
+.cfg-nav-item:hover {
+  background: #f3f6f9;
+}
+
+.cfg-nav-item i:first-child {
+  font-size: 1rem;
+  width: 18px;
+}
 
 .cfg-nav-item--active {
   background: #eef3f8;
@@ -390,8 +421,14 @@
   font-weight: 700;
 }
 
-.cfg-nav-label { flex: 1; }
-.cfg-nav-error { color: #ef4444; font-size: 0.85rem; }
+.cfg-nav-label {
+  flex: 1;
+}
+
+.cfg-nav-error {
+  color: #ef4444;
+  font-size: 0.85rem;
+}
 
 .cfg-dot {
   width: 8px;
@@ -409,7 +446,9 @@
   gap: 1.5rem;
 }
 
-.cfg-form .cfg-alert { margin-bottom: 0; }
+.cfg-form .cfg-alert {
+  margin-bottom: 0;
+}
 
 .cfg-section {
   display: flex;
@@ -431,7 +470,8 @@
   /* Más ancha que la columna: tapa la sombra de las cards (≈16px) que asomaba en los extremos */
   margin: 0 -1.5rem;
   padding: 1rem 1.5rem;
-  background: rgba(255, 255, 255, 0.96); /* mismo blanco que el fondo de la página (body de Bootstrap) */
+  background: rgba(255, 255, 255, 0.96);
+  /* mismo blanco que el fondo de la página (body de Bootstrap) */
   border-top: 1px solid #e8ecf0;
 }
 
@@ -458,21 +498,28 @@
   transition: background-color 0.15s, transform 0.1s;
 }
 
-.cfg-btn:active { transform: scale(0.97); }
+.cfg-btn:active {
+  transform: scale(0.97);
+}
 
 .cfg-btn-cancel {
   background: #f3f4f6;
   color: #374151;
 }
-.cfg-btn-cancel:hover { background: #e5e7eb; }
+
+.cfg-btn-cancel:hover {
+  background: #e5e7eb;
+}
 
 .cfg-btn-save {
   background-color: #8CC63F;
   color: #fff;
 }
+
 .cfg-btn-save:hover:not(:disabled) {
   background-color: #7ab332;
 }
+
 .cfg-btn-save:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -492,14 +539,18 @@
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2.5px solid rgba(255,255,255,0.4);
+  border: 2.5px solid rgba(255, 255, 255, 0.4);
   border-top-color: #fff;
   border-radius: 50%;
   animation: cfg-spin 0.7s linear infinite;
   margin-right: 0.5rem;
 }
 
-@keyframes cfg-spin { to { transform: rotate(360deg); } }
+@keyframes cfg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* ── Estados vacíos ─────────────────────────────────────────────────────── */
 .cfg-loading,
@@ -515,8 +566,15 @@
   color: #6b7280;
 }
 
-.cfg-error-icon { font-size: 3rem; color: #ef4444; }
-.cfg-lock-icon  { font-size: 3rem; color: #9ca3af; }
+.cfg-error-icon {
+  font-size: 3rem;
+  color: #ef4444;
+}
+
+.cfg-lock-icon {
+  font-size: 3rem;
+  color: #9ca3af;
+}
 
 .cfg-btn-back {
   background: #1E3A5F;
@@ -529,30 +587,74 @@
   font-size: 0.9rem;
   transition: background-color 0.15s;
 }
-.cfg-btn-back:hover { background: #152b47; }
+
+.cfg-btn-back:hover {
+  background: #152b47;
+}
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-  .cfg-layout { flex-direction: column; align-items: stretch; }
+  .cfg-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .cfg-nav {
     position: static;
     flex-direction: row;
+    justify-content: space-around;
     overflow-x: auto;
   }
-  .cfg-nav-title { display: none; }
-  .cfg-nav-item { width: auto; white-space: nowrap; }
+
+  .cfg-nav-title {
+    display: none;
+  }
+
+  .cfg-nav-item {
+    width: 100%;
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 600px) {
-  .cfg-page { padding: 1.5rem 1rem 4rem; }
+  .cfg-page {
+    padding: 1.5rem 1rem 4rem;
+  }
+
   /* El padding lateral de la página baja a 1rem: la barra no puede salirse más que eso (scroll horizontal) */
-  .cfg-savebar { margin: 0 -1rem; padding: 1rem; }
+  .cfg-savebar {
+    margin: 0 -1rem;
+    padding: 1rem;
+  }
+
   .cfg-card-body {
     flex-direction: column;
   }
+
   .cfg-divider {
     width: auto;
     height: 1px;
+  }
+
+  .cfg-nav {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 8px;
+    overflow-x: visible;
+  }
+
+  .cfg-nav-item {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    gap: 8px;
+  }
+
+  .cfg-nav-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
