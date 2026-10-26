@@ -217,11 +217,10 @@ export default function AnimalDetailPage() {
                         )}
                     </h2>
                     <div className="d-flex align-items-center gap-2 flex-shrink-0">
-                        {rol === 'PRODUCTOR' && !isEditing && (
+                        {rol === 'PRODUCTOR' && !isEditing && activeTab === 'ficha' && (
                             <Button
                                 className="btn-vigia-primary px-4"
                                 onClick={() => setIsEditing(true)}
-                                style={{ visibility: activeTab === 'ficha' ? 'visible' : 'hidden' }}
                             >
                                 <i className="bi bi-pencil me-2" /> Editar
                             </Button>

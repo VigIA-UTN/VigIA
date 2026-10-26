@@ -55,10 +55,10 @@ function CustomTooltip({ active, payload, label, unit }: TooltipProps) {
     );
 }
 
-const PANEL_MAX_WIDTH = 462;
+const PANEL_MAX_WIDTH = 340;
 const PANEL_INSET = 16;
 /** Horizontal space the overlaid panel covers on the left of the map. */
-const panelCover = () => Math.min(PANEL_MAX_WIDTH, window.innerWidth - 40) + PANEL_INSET * 2;
+const panelCover = () => Math.min(window.innerWidth < 768 ? 280 : PANEL_MAX_WIDTH, window.innerWidth - 40) + PANEL_INSET * 2;
 
 /**
  * The map is always full width and the panel floats over its left side, so the map never resizes.
@@ -355,9 +355,11 @@ export default function ActividadTab({ animalId, establecimientoId }: ActividadT
                     {/* panel over the map; only opacity/transform animate, so toggling never resizes or redraws the map */}
                     <div
                         aria-hidden={mapExpanded}
+                        className="hm-fixed-wrapper"
                         style={{
                             position: 'absolute', top: PANEL_INSET, bottom: PANEL_INSET, left: PANEL_INSET, zIndex: 1000,
                             display: 'flex', pointerEvents: 'none',
+                            maxWidth: '100%',
                             opacity: mapExpanded ? 0 : 1,
                             transform: mapExpanded ? 'translateX(-16px)' : 'translateX(0)',
                             visibility: mapExpanded ? 'hidden' : 'visible',

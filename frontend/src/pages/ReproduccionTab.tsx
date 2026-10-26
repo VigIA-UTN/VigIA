@@ -195,7 +195,7 @@ export default function ReproduccionTab({ animal, rol, onAnimalUpdated }: Props)
             {/* ── Sección Historial Reproductivo ── */}
             <Card className="shadow-sm border-0 animal-card">
                 <Card.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
+                    <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <h4 className="section-title mb-0">Historial Reproductivo</h4>
                         {canEdit && (
                             <Button className="btn-vigia-success btn-sm px-3" onClick={openNuevoEstadoModal}>
@@ -211,7 +211,7 @@ export default function ReproduccionTab({ animal, rol, onAnimalUpdated }: Props)
                     ) : historial.length === 0 ? (
                         <p className="text-muted text-center py-3">Sin registros reproductivos aún.</p>
                     ) : (
-                        <div className="table-responsive">
+                        <div className="table-responsive w-100" style={{ maxWidth: '100%', WebkitOverflowScrolling: 'touch' }}>
                             <table className="vigia-table" style={{ fontSize: '0.92rem' }}>
                                 <thead>
                                     <tr>
