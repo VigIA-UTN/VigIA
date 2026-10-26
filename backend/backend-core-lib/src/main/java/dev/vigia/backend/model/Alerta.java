@@ -1,6 +1,8 @@
 package dev.vigia.backend.model;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,6 +14,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,6 +27,9 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class Alerta {
+
+    public static final String TIPO_ANESTRO = "Anestro Detectado";
+    public static final String TIPO_CELO = "Celo Detectado";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -93,4 +100,8 @@ public class Alerta {
 
     @Column(name = "serie_comparativa_json", columnDefinition = "TEXT")
     private String serieComparativaJson;
+
+    @OneToMany(mappedBy = "alerta", fetch = FetchType.LAZY)
+    @OrderBy("fecha DESC")
+    private List<Diagnostico> diagnosticos = new ArrayList<>();
 }

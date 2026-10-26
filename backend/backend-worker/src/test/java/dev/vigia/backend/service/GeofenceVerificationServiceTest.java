@@ -1,6 +1,5 @@
 package dev.vigia.backend.service;
 
-import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.CoordenadaDTO;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.model.*;
@@ -15,7 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -40,7 +39,7 @@ class GeofenceVerificationServiceTest {
     private AlertaRepository alertaRepository;
 
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private PublicadorDeAlertas publicadorDeAlertas;
 
     @InjectMocks
     private GeofenceVerificationService geofenceVerificationService;
@@ -115,7 +114,7 @@ class GeofenceVerificationServiceTest {
 
         verifyNoInteractions(perimetroRepository);
         verifyNoInteractions(alertaRepository);
-        verifyNoInteractions(rabbitTemplate);
+        verifyNoInteractions(publicadorDeAlertas);
     }
 
     @Test
@@ -139,7 +138,7 @@ class GeofenceVerificationServiceTest {
 
         verify(perimetroRepository, times(1)).calcularDistanciasAPerimetrosActivos(100L, -34.5, -57.5);
         verifyNoInteractions(alertaRepository);
-        verifyNoInteractions(rabbitTemplate);
+        verifyNoInteractions(publicadorDeAlertas);
     }
 
     @Test
@@ -151,7 +150,7 @@ class GeofenceVerificationServiceTest {
         geofenceVerificationService.verificarPosicion(animal, -40.0, -60.0, LocalDateTime.now());
 
         verifyNoInteractions(alertaRepository);
-        verifyNoInteractions(rabbitTemplate);
+        verifyNoInteractions(publicadorDeAlertas);
     }
 
     @SuppressWarnings("null")
@@ -165,8 +164,7 @@ class GeofenceVerificationServiceTest {
         geofenceVerificationService.verificarPosicion(animal, -40.0, -60.0, LocalDateTime.now());
 
         verify(alertaRepository, times(1)).save(any(Alerta.class));
-        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""),
-                any(AlertaEventDTO.class));
+        verify(publicadorDeAlertas, times(1)).publicar(any(AlertaEventDTO.class));
     }
 
     @SuppressWarnings("null")
@@ -180,8 +178,7 @@ class GeofenceVerificationServiceTest {
         geofenceVerificationService.verificarPosicion(animal, -40.0, -60.0, LocalDateTime.now());
 
         verify(alertaRepository, times(1)).save(any(Alerta.class));
-        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""),
-                any(AlertaEventDTO.class));
+        verify(publicadorDeAlertas, times(1)).publicar(any(AlertaEventDTO.class));
     }
 
     @SuppressWarnings("null")
@@ -207,8 +204,7 @@ class GeofenceVerificationServiceTest {
                 .isEqualTo("Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.");
 
         ArgumentCaptor<AlertaEventDTO> eventCaptor = ArgumentCaptor.forClass(AlertaEventDTO.class);
-        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.ALERTAS_EXCHANGE), eq(""),
-                eventCaptor.capture());
+        verify(publicadorDeAlertas, times(1)).publicar(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getAccionRecomendada())
                 .isEqualTo("Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.");
         assertThat(eventCaptor.getValue().getLatitud()).isEqualTo(-40.0);
@@ -236,7 +232,7 @@ class GeofenceVerificationServiceTest {
         assertThat(activa.getLatitud()).isEqualTo(-41.0);
         assertThat(activa.getLongitud()).isEqualTo(-61.0);
         assertThat(activa.getTsGeneracion()).isEqualTo(horaSalida);
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(publicadorDeAlertas, never()).publicar(any());
     }
 
     @SuppressWarnings("null")
@@ -253,6 +249,6 @@ class GeofenceVerificationServiceTest {
 
         verify(alertaRepository, never()).save(any());
         assertThat(resuelta.getLatitud()).isEqualTo(-39.0);
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(publicadorDeAlertas, never()).publicar(any());
     }
 }

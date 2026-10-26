@@ -1,5 +1,6 @@
 package dev.vigia.backend.dto;
 
+import dev.vigia.backend.model.SeveridadAlerta;
 import lombok.Builder;
 import lombok.Data;
 
@@ -14,4 +15,7 @@ public class EstablecimientoResponse {
     private Double longitud;
     private boolean activo;
     private LocalDate fechaAlta;
+    private Integer diasDeteccionAnestro;
+    private SeveridadAlerta severidadAnestro;
+    private Double umbralAislamientoM;
 }

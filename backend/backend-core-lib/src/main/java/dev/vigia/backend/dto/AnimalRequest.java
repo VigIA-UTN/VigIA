@@ -3,15 +3,19 @@ package dev.vigia.backend.dto;
 import java.time.LocalDate;
 
 import dev.vigia.backend.model.EstadoAnimal;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 @Data
 public class AnimalRequest {
+    @NotBlank(message = "El identificador es obligatorio")
     private String idCaravanaOficial;
     private String alias;
     @NotNull(message = "La fecha de nacimiento es obligatoria")
+    @PastOrPresent(message = "La fecha de nacimiento no puede ser futura")
     private LocalDate fechaNacimiento;
     private String raza;
     @NotNull(message = "El rodeo/lote es obligatorio")
@@ -23,6 +27,5 @@ public class AnimalRequest {
     @Positive(message = "El peso inicial debe ser un valor positivo")
     private Double pesoInicial;
 
-    /** Id de la caravana LoRaWAN a vincular (opcional). */
     private Long caravanaId;
 }

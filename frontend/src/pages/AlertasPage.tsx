@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Container, Spinner, Alert, Form, Button } from 'react-bootstrap';
-import { getAlertas, type AlertaResponse } from '../api/alertaApi';
+import { getAlertas, esAnestro, aplicarAlertaEnLista, combinarAlerta, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
-import { useAuthStore } from '../store/authStore';
+import { useAlertasStream } from '../hooks/useAlertasStream';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
+import DatoDesactualizadoBadge from '../components/DatoDesactualizadoBadge';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import './AnimalesPage.css'; // For common vigia styles
 import './AlertasPage.css';
@@ -34,7 +35,6 @@ function getEstadoClass(estado: string) {
 
 export default function AlertasPage() {
     const selectedId = useEstablecimientoStore((s) => s.selectedId);
-    const token = useAuthStore((s) => s.token);
 
     const [alertas, setAlertas] = useState<AlertaResponse[]>([]);
     const [loading, setLoading] = useState(true);
@@ -54,8 +54,6 @@ export default function AlertasPage() {
     const [isIntervencionOpen, setIsIntervencionOpen] = useState(false);
     const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
 
-    const maxAlertaIdRef = useRef<number>(0);
-
     const fetchAlertas = useCallback(async () => {
         if (!selectedId) return;
         setLoading(true);
@@ -68,13 +66,6 @@ export default function AlertasPage() {
                 filtroEstado || undefined
             );
             setAlertas(data);
-            if (data.length > 0) {
-                // Update max ID for SSE
-                const currentMax = Math.max(...data.map((a) => a.id));
-                if (currentMax > maxAlertaIdRef.current) {
-                    maxAlertaIdRef.current = currentMax;
-                }
-            }
         } catch (err) {
             const e = err as { response?: { data?: { message?: string } } };
             setError(e.response?.data?.message || 'Error al cargar las alertas.');
@@ -89,54 +80,16 @@ export default function AlertasPage() {
         fetchAlertas();
     }, [fetchAlertas]);
 
-    // Setup SSE connection for real-time updates
-    useEffect(() => {
-        if (!selectedId) return;
-        let isMounted = true;
-
-        const API_URL = import.meta.env.VITE_API_URL as string;
-        let sseUrl = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
-        if (token) {
-            sseUrl += `&token=${token}`;
-        }
-        if (maxAlertaIdRef.current > 0) {
-            sseUrl += `&lastEventId=${maxAlertaIdRef.current}`;
-        }
-
-        const eventSource = new EventSource(sseUrl);
-
-        eventSource.onmessage = (event) => {
-            if (!isMounted) return;
-            const newAlerta = JSON.parse(event.data) as AlertaResponse;
-
-            // Update max ID
-            if (newAlerta.id > maxAlertaIdRef.current) {
-                maxAlertaIdRef.current = newAlerta.id;
-            }
-
-            // Actualizar si ya existe, o agregar si es nueva y cumple filtros
-            setAlertas((prev) => {
-                if (prev.some((a) => a.id === newAlerta.id)) {
-                    return prev.map(a => a.id === newAlerta.id ? newAlerta : a);
-                }
-                // Si estamos filtrando y la alerta nueva no matchea, la ignoramos
-                if (filtroEstado && newAlerta.estado !== filtroEstado) return prev;
-                if (filtroTipo && newAlerta.tipo !== filtroTipo) return prev;
-                if (filtroSeveridad && newAlerta.severidad !== filtroSeveridad) return prev;
-                
-                return [newAlerta, ...prev];
-            });
-        };
-
-        eventSource.onerror = (error) => {
-            console.error("SSE connection error in AlertasPage:", error);
-        };
-
-        return () => {
-            isMounted = false;
-            eventSource.close();
-        };
-    }, [selectedId, token, filtroEstado, filtroTipo, filtroSeveridad]); // reconnect if filters change, to only get relevant SSE (though SSE from backend might send all, frontend filters them)
+    // Alertas en tiempo real sobre la conexión SSE compartida: cambiar filtros no la reabre.
+    useAlertasStream(selectedId, (newAlerta) => {
+        const filtros = { tipo: filtroTipo, severidad: filtroSeveridad, estado: filtroEstado };
+        // Reemplaza (sin perder campos que el evento no trae), saca si dejó de cumplir los filtros o agrega
+        setAlertas((prev) => aplicarAlertaEnLista(prev, newAlerta, filtros));
+        // El detalle abierto sigue a la alerta (animales que se suman o vuelven)
+        setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? combinarAlerta(prev, newAlerta) : prev));
+    // El replay del backend solo trae alertas nuevas: al reconectar se recarga la lista para no
+    // perder los cambios de estado y los animales que se sumaron mientras estuvo cortado.
+    }, fetchAlertas);
 
     const handleActionComplete = (alertaId: number, nuevoEstado: 'CONFIRMADA' | 'DESCARTADA') => {
         setAlertas((prev) => {
@@ -215,7 +168,7 @@ export default function AlertasPage() {
                                 <option value="">Todos los tipos</option>
                                 <option value="CELO">Celo</option>
                                 <option value="SALUD">Salud</option>
-                                <option value="ABIGEATO">Posición / Abigeato</option>
+                                <option value="GEOESPACIAL">Geoespacial</option>
                             </Form.Select>
                         </div>
                         <div style={{ flex: '1 1 200px' }}>
@@ -283,12 +236,22 @@ export default function AlertasPage() {
                                         sortedAlertas.map((a) => {
                                             // Fallback gravedad to severidad mapping just in case backend still sends gravedad
                                             const sev = a.severidad ?? (a.gravedad as 'ALTA' | 'MEDIA' | 'BAJA') ?? (a.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
-                                            const tipoLower = (a.tipo || 'CELO').toLowerCase();
+                                            const tipoLower = esAnestro(a) ? 'anestro' : (a.tipo || 'CELO').toLowerCase();
+                                            // Aislamiento: todos sus animales, no solo el principal (las demás alertas no traen lista)
+                                            const aislados = a.animalesAislados ?? [];
+                                            const idAnimal = aislados.length > 1
+                                                ? `${aislados.length} animales`
+                                                : `#${aislados[0]?.identificador ?? a.animalId}`;
                                             
                                             return (
                                                 <tr key={a.id}>
-                                                    <td className="fw-medium">#{a.animalId}</td>
-                                                    <td><span className={`tipo-badge tipo-${tipoLower}`}>{a.tipo || 'CELO'}</span></td>
+                                                    <td className="fw-medium">{idAnimal}</td>
+                                                    <td>
+                                                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                                                            <span className={`tipo-badge tipo-${tipoLower}`}>{esAnestro(a) ? 'ANESTRO' : (a.tipo || 'CELO').replace(/_/g, ' ')}</span>
+                                                            <DatoDesactualizadoBadge alerta={a} />
+                                                        </div>
+                                                    </td>
                                                     <td className="text-center">
                                                         <span className={`severidad-badge ${getSeveridadClass(sev)}`}>
                                                             {sev}
@@ -302,7 +265,7 @@ export default function AlertasPage() {
                                                     </td>
                                                     <td className="text-center">
                                                         <Button
-                                                            variant="outline-primary"
+                                                            variant="vigia-outline"
                                                             size="sm"
                                                             onClick={() => setSelectedAlerta(a)}
                                                         >

@@ -14,6 +14,7 @@ function NavScroll() {
     const { rol, logout } = useAuthStore();
     const isAdmin = rol === 'ADMINISTRADOR';
     const isProductor = rol === 'PRODUCTOR';
+    const isVeterinario = rol === 'VETERINARIO';
     const navigate = useNavigate();
 
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -50,7 +51,7 @@ function NavScroll() {
 
     const getDashboardRoute = () => {
         if (isAdmin) return '/establecimientos';
-        return '/mapa';
+        return '/dashboard';
     };
 
     const establecimientoSelector = !isAdmin && activeEstablecimientos.length > 0 && (
@@ -149,15 +150,25 @@ function NavScroll() {
                         </>
                     ) : (
                         <>
-                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/dashboard')}>
-                                <i className="bi bi-speedometer2 me-2" />Dashboard
-                            </button>
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/mapa')}>
                                 <i className="bi bi-map me-2" />Mapa
+                            </button>
+                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/alertas')}>
+                                <i className="bi bi-bell me-2" />Alertas
                             </button>
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/animales')}>
                                 <i className="bi bi-heart-pulse me-2" />Animales
                             </button>
+                            {isVeterinario && (
+                                <button className="mobile-drawer-link" onClick={() => handleNavLink('/diagnosticos')}>
+                                    <i className="bi bi-clipboard2-pulse me-2" />Diagnósticos
+                                </button>
+                            )}
+                            {isVeterinario && selectedId && (
+                                <button className="mobile-drawer-link" onClick={() => handleNavLink(`/establecimientos/${selectedId}/configuracion`)}>
+                                    <i className="bi bi-gear me-2" />Configuración
+                                </button>
+                            )}
                             {isProductor && (
                                 <>
                                     <button className="mobile-drawer-link" onClick={() => handleNavLink('/empleados')}>
@@ -168,9 +179,14 @@ function NavScroll() {
                                     </button>
                                 </>
                             )}
-                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/alertas')}>
+                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/invitaciones')}>
                                 <i className="bi bi-envelope me-2" />Invitaciones
                             </button>
+                            {isProductor && selectedId && (
+                                <button className="mobile-drawer-link" onClick={() => handleNavLink(`/establecimientos/${selectedId}/configuracion`)}>
+                                    <i className="bi bi-gear me-2" />Configuración
+                                </button>
+                            )}
                         </>
                     )}
                 </nav>
@@ -182,7 +198,7 @@ function NavScroll() {
                     </div>
                     <div className="mt-3">
                         <button
-                            className="btn btn-outline-primary btn-sm w-100 mb-2"
+                            className="btn btn-vigia-outline btn-sm w-100 mb-2"
                             onClick={() => { setDrawerOpen(false); navigate('/perfil'); }}
                         >
                             Mi Perfil
@@ -220,6 +236,23 @@ function NavScroll() {
                     {/* Selector (Desktop) posicionado absoluto a la izquierda */}
                     <div className="d-none d-lg-flex align-items-center gap-2 position-absolute start-0 ps-4" style={{ top: '50%', transform: 'translateY(-50%)', zIndex: 20 }}>
                         {establecimientoSelector}
+                        {/* El veterinario no ve /establecimientos: configura el establecimiento activo desde acá */}
+                        {(isVeterinario || isProductor) && selectedId && (
+                            <Link
+                                to={`/establecimientos/${selectedId}/configuracion`}
+                                className="btn btn-sm d-flex align-items-center"
+                                title="Configuración del establecimiento"
+                                aria-label="Configuración del establecimiento"
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.12)',
+                                    color: '#fff',
+                                    border: '1px solid rgba(255,255,255,0.25)',
+                                    borderRadius: '8px',
+                                }}
+                            >
+                                <i className="bi bi-gear" />
+                            </Link>
+                        )}
                     </div>
 
                     {/* Opciones de usuario (Desktop) posicionadas absoluto a la derecha */}
@@ -229,8 +262,8 @@ function NavScroll() {
                                 <i className="bi bi-person-circle me-1" /> Mi Perfil
                             </Nav.Link>
                         </Nav>
-                        <button 
-                            className="btn btn-sm d-flex align-items-center gap-1 btn-salir-navbar" 
+                        <button
+                            className="btn btn-sm d-flex align-items-center gap-1 btn-salir-navbar"
                             onClick={logout}
                             style={{
                                 backgroundColor: 'rgba(255,255,255,0.12)',
@@ -266,6 +299,9 @@ function NavScroll() {
                                         </>
                                     )}
                                     <Nav.Link as={Link} to="/animales" className="mx-2 fw-semibold">Animales</Nav.Link>
+                                    {isVeterinario && (
+                                        <Nav.Link as={Link} to="/diagnosticos" className="mx-2 fw-semibold">Diagnósticos</Nav.Link>
+                                    )}
                                 </>
                             )}
                         </Nav>
@@ -288,7 +324,7 @@ function NavScroll() {
                                 </>
                             ) : (
                                 <>
-                                    <Nav.Link as={Link} to="/dashboard" className="mx-2 fw-semibold">Dashboard</Nav.Link>
+                                    <Nav.Link as={Link} to="/mapa" className="mx-2 fw-semibold">Mapa</Nav.Link>
                                     <Nav.Link as={Link} to="/alertas" className="mx-2 fw-semibold">Alertas</Nav.Link>
                                     <Nav.Link as={Link} to="/invitaciones" className="mx-2 fw-semibold">Invitaciones</Nav.Link>
                                 </>

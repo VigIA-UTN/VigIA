@@ -3,7 +3,9 @@ package dev.vigia.backend.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.dto.AuthRequest;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.AlertaAnimalAislado;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.Diagnostico;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Empleado;
 import dev.vigia.backend.model.Establecimiento;
@@ -13,14 +15,17 @@ import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.DiagnosticoRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.service.AuthService;
+import dev.vigia.backend.service.SseAlertaPublisher;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,9 +41,14 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -55,6 +65,8 @@ class AlertaControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+    @Autowired
+    private SseAlertaPublisher sseAlertaPublisher;
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
@@ -76,6 +88,10 @@ class AlertaControllerTest {
     private InvitacionRepository invitacionRepository;
     @Autowired
     private EstadoReproductivoRepository estadoReproductivoRepository;
+    @Autowired
+    private DiagnosticoRepository diagnosticoRepository;
+    @Autowired
+    private AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
     private Long alertaId;
     private Long alertaOtroEstId;
@@ -335,13 +351,67 @@ class AlertaControllerTest {
     // =========================================================================
 
     @Test
-    @DisplayName("Campero intenta actualizar alerta → 403 Forbidden")
+    @DisplayName("Campero confirma alerta de CELO PENDIENTE → 200 con estado CONFIRMADA")
     @SuppressWarnings("null")
-    void actualizarAlerta_comoCampero_returns403() throws Exception {
+    void confirmarAlertaCelo_comoCampero_returns200() throws Exception {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + camperoToken)
                 .param("estado", "CONFIRMADA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(alertaId))
+                .andExpect(jsonPath("$.estado").value("CONFIRMADA"));
+    }
+
+    @Test
+    @DisplayName("Campero descarta alerta geoespacial PENDIENTE → 200 con estado DESCARTADA")
+    @SuppressWarnings("null")
+    void descartarAlertaGeoespacial_comoCampero_returns200() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.FUERA_DE_PERIMETRO, EstadoAlerta.PENDIENTE);
+
+        mockMvc.perform(put("/api/v1/alertas/estado/{id}", id)
+                .header("Authorization", "Bearer " + camperoToken)
+                .param("estado", "DESCARTADA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.estado").value("DESCARTADA"));
+    }
+
+    @Test
+    @DisplayName("Campero intenta confirmar o descartar alerta SALUD → 403 y la alerta sigue PENDIENTE")
+    @SuppressWarnings("null")
+    void actualizarAlertaSalud_comoCampero_returns403() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.PENDIENTE);
+
+        mockMvc.perform(put("/api/v1/alertas/estado/{id}", id)
+                .header("Authorization", "Bearer " + camperoToken)
+                .param("estado", "CONFIRMADA"))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/alertas/estado/{id}", id)
+                .header("Authorization", "Bearer " + camperoToken)
+                .param("estado", "DESCARTADA"))
+                .andExpect(status().isForbidden());
+
+        Alerta despues = alertaRepository.findById(id).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(EstadoAlerta.PENDIENTE, despues.getEstado());
+        org.junit.jupiter.api.Assertions.assertNull(despues.getUsuarioConfirmacion());
+    }
+
+    @Test
+    @DisplayName("Campero registra intervención sobre alerta de CELO confirmada → 200")
+    void intervenirAlertaCelo_comoCampero_returns200() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.CELO, EstadoAlerta.CONFIRMADA);
+
+        postIntervencion(camperoToken, id, INTERVENCION_OK)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id));
+    }
+
+    @Test
+    @DisplayName("Campero intenta registrar intervención sobre alerta SALUD confirmada → 403")
+    void intervenirAlertaSalud_comoCampero_returns403() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+
+        postIntervencion(camperoToken, id, INTERVENCION_OK).andExpect(status().isForbidden());
     }
 
     @Test
@@ -388,9 +458,9 @@ class AlertaControllerTest {
     }
 
     @Test
-    @DisplayName("Confirmar alerta ya CONFIRMADA → 400 (transición inválida)")
+    @DisplayName("Confirmar alerta ya CONFIRMADA → 409 con quién la procesó")
     @SuppressWarnings("null")
-    void confirmarAlerta_yaConfirmada_returns400() throws Exception {
+    void confirmarAlerta_yaConfirmada_returns409() throws Exception {
         // Primera confirmación
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
@@ -401,13 +471,14 @@ class AlertaControllerTest {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
                 .param("estado", "CONFIRMADA"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Esta alerta ya fue confirmada por")));
     }
 
     @Test
-    @DisplayName("Confirmar alerta ya DESCARTADA → 400 (transición inválida)")
+    @DisplayName("Confirmar alerta ya DESCARTADA → 409 con quién la procesó")
     @SuppressWarnings("null")
-    void confirmarAlerta_yaDescartada_returns400() throws Exception {
+    void confirmarAlerta_yaDescartada_returns409() throws Exception {
         // Primero descartar
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
@@ -418,7 +489,8 @@ class AlertaControllerTest {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", alertaId)
                 .header("Authorization", "Bearer " + productorToken)
                 .param("estado", "CONFIRMADA"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Esta alerta ya fue descartada por")));
     }
 
     @Test
@@ -622,6 +694,83 @@ class AlertaControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/alertas?tipo=aislamiento_social - expone los animales aislados con el contrato del frontend")
+    @SuppressWarnings("null")
+    void listarAlertas_aislamiento_exponeAnimalesAislados() throws Exception {
+        Animal animal = animalPropio();
+        animal.setAlias("Lola");
+        Alerta alerta = alertaRepository.findById(
+                crearAlerta(animal, DisparadorAlerta.AISLAMIENTO_SOCIAL, EstadoAlerta.PENDIENTE)).orElseThrow();
+        alerta.setValorUmbral(150.0);
+        alertaAnimalAisladoRepository.save(AlertaAnimalAislado.builder()
+                .alerta(alerta)
+                .animal(animal)
+                .segundosFuera(1800L)
+                .distanciaGrupoM(320.4)
+                .tsInicio(LocalDateTime.now().minusMinutes(30))
+                .build());
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString())
+                .param("tipo", "aislamiento_social"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].tipo").value("AISLAMIENTO_SOCIAL"))
+                .andExpect(jsonPath("$[0].animalesAislados.length()").value(1))
+                .andExpect(jsonPath("$[0].animalesAislados[0].length()").value(9))
+                .andExpect(jsonPath("$[0].animalesAislados[0].tsRegreso").isEmpty())
+                .andExpect(jsonPath("$[0].animalesAislados[0].motivoCierre").isEmpty())
+                .andExpect(jsonPath("$[0].animalesAislados[0].minutosFueraSeguidos").value(30))
+                .andExpect(jsonPath("$[0].animalesAislados[0].animalId").value(animal.getId()))
+                .andExpect(jsonPath("$[0].animalesAislados[0].identificador").value("CAR-001"))
+                .andExpect(jsonPath("$[0].animalesAislados[0].alias").value("Lola"))
+                .andExpect(jsonPath("$[0].animalesAislados[0].minutosFuera").value(30))
+                .andExpect(jsonPath("$[0].animalesAislados[0].distanciaGrupoM").value(320))
+                .andExpect(jsonPath("$[0].animalesAislados[0].severidad").value("ALTA"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/alertas?tipo= - Salud, Celo (con anestro) y Geoespacial filtran como el frontend; un tipo desconocido es 400")
+    @SuppressWarnings("null")
+    void listarAlertas_filtroTipo_valoresDelFrontend() throws Exception {
+        // En setUp ya se creó 1 alerta de CELO PENDIENTE.
+        Animal animal = animalPropio();
+        Alerta anestro = alertaRepository.findById(
+                crearAlerta(animal, DisparadorAlerta.CELO, EstadoAlerta.PENDIENTE)).orElseThrow();
+        anestro.setTipo("Anestro Detectado");
+        alertaRepository.save(anestro);
+        crearAlerta(animal, DisparadorAlerta.SALUD, EstadoAlerta.PENDIENTE);
+        crearAlerta(animal, DisparadorAlerta.FUERA_DE_PERIMETRO, EstadoAlerta.PENDIENTE);
+        crearAlerta(animal, DisparadorAlerta.AISLAMIENTO_SOCIAL, EstadoAlerta.PENDIENTE);
+
+        listarPorTipo("SALUD")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].tipo", containsInAnyOrder("SALUD")));
+        listarPorTipo("CELO")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].tipo", containsInAnyOrder("CELO", "CELO")))
+                .andExpect(jsonPath("$[*].subtipo", hasItem("Anestro Detectado")));
+        listarPorTipo("GEOESPACIAL")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].tipo", containsInAnyOrder("FUERA_DE_PERIMETRO", "AISLAMIENTO_SOCIAL")));
+        listarPorTipo("foo")
+                .andExpect(status().isBadRequest());
+        listarPorTipo("")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5));
+    }
+
+    @SuppressWarnings("null")
+    private org.springframework.test.web.servlet.ResultActions listarPorTipo(String tipo) throws Exception {
+        return mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/alertas")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString())
+                .param("tipo", tipo));
+    }
+
+    @Test
     @DisplayName("GET /api/v1/alertas/resumen - Conteo correcto de alertas por tipo")
     @SuppressWarnings("null")
     void obtenerResumenAlertas_conteoCorrecto() throws Exception {
@@ -661,7 +810,11 @@ class AlertaControllerTest {
         alertaGeo.setValorUmbral(0.0);
         alertaGeo.setValorDetectado(0.0);
         alertaRepository.save(alertaGeo);
-        
+
+        // Aislamiento social y fuera de perímetro también son geoespaciales (mismo grupo que el filtro GEO del mapa)
+        crearAlerta(animal, DisparadorAlerta.AISLAMIENTO_SOCIAL, EstadoAlerta.PENDIENTE);
+        crearAlerta(animal, DisparadorAlerta.FUERA_DE_PERIMETRO, EstadoAlerta.PENDIENTE);
+
         // Agregamos 1 DESCARTADA (no debería contar si el resumen es de activas)
         Alerta alertaDescartada = new Alerta();
         alertaDescartada.setAnimal(animal);
@@ -680,12 +833,377 @@ class AlertaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reproductivo").value(1))
                 .andExpect(jsonPath("$.sanitario").value(2))
-                .andExpect(jsonPath("$.geoespacial").value(1));
+                .andExpect(jsonPath("$.geoespacial").value(3));
+    }
+
+    // =========================================================================
+    // Diagnósticos
+    // =========================================================================
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta sanitaria confirmada → 200 con vínculo a alerta y dato de origen, sin cambiar la alerta")
+    @SuppressWarnings("null")
+    void registrarDiagnostico_veterinario_alertaSaludConfirmada_returns200() throws Exception {
+        Animal animal = alertaRepository.findById(alertaId).orElseThrow().getAnimal();
+        Usuario productor = usuarioRepository.findByEmail("productor@vigia.dev").orElseThrow();
+        LocalDateTime tsConfirmacion = LocalDateTime.of(2026, 9, 30, 8, 15);
+
+        Alerta salud = new Alerta();
+        salud.setAnimal(animal);
+        salud.setDisparador(DisparadorAlerta.SALUD);
+        salud.setTipo("SALUD");
+        salud.setSeveridad(SeveridadAlerta.ALTA);
+        salud.setEstado(EstadoAlerta.CONFIRMADA);
+        salud.setTsGeneracion(LocalDateTime.now());
+        salud.setTsConfirmacion(tsConfirmacion);
+        salud.setUsuarioConfirmacion(productor);
+        salud.setValorUmbral(0.5);
+        salud.setValorDetectado(0.9);
+        salud = alertaRepository.save(salud);
+
+        mockMvc.perform(post("/api/v1/alertas/{id}/diagnosticos", salud.getId())
+                .header("Authorization", "Bearer " + veterinarioToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"diagnostico\":\"Neumonía leve\",\"tratamiento\":\"Oxitetraciclina LA 20 mg/kg IM\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.alertaId").value(salud.getId()))
+                .andExpect(jsonPath("$.animalId").value(animal.getId()))
+                .andExpect(jsonPath("$.animalCaravanaOficial").value("CAR-001"))
+                .andExpect(jsonPath("$.establecimientoNombre").value("Estancia Test"))
+                .andExpect(jsonPath("$.diagnostico").value("Neumonía leve"))
+                .andExpect(jsonPath("$.tratamiento").value("Oxitetraciclina LA 20 mg/kg IM"))
+                .andExpect(jsonPath("$.veterinarioNombre").value("veterinario"))
+                .andExpect(jsonPath("$.disparador").value("SALUD"))
+                .andExpect(jsonPath("$.datoOrigen").isNotEmpty())
+                .andExpect(jsonPath("$.fechaRegistro").value(org.hamcrest.Matchers.matchesPattern(
+                        "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}.*")));
+
+        Alerta despues = alertaRepository.findById(salud.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(EstadoAlerta.CONFIRMADA, despues.getEstado());
+        org.junit.jupiter.api.Assertions.assertEquals(tsConfirmacion, despues.getTsConfirmacion());
+        org.junit.jupiter.api.Assertions.assertEquals(productor.getId(), despues.getUsuarioConfirmacion().getId());
+        org.junit.jupiter.api.Assertions.assertEquals(1, diagnosticoRepository.count());
+    }
+
+    private static final String DIAGNOSTICO_OK = "{\"diagnostico\":\"Neumonía leve\",\"tratamiento\":\"Reposo\"}";
+
+    @Test
+    @DisplayName("Registrar diagnóstico como PRODUCTOR → 403")
+    void registrarDiagnostico_productor_returns403() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(productorToken, id, DIAGNOSTICO_OK).andExpect(status().isForbidden());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico como CAMPERO → 403")
+    void registrarDiagnostico_campero_returns403() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(camperoToken, id, DIAGNOSTICO_OK).andExpect(status().isForbidden());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico como ADMINISTRADOR → 403")
+    void registrarDiagnostico_administrador_returns403() throws Exception {
+        crearUsuario("admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+        String adminToken = getTokenFor("admin@vigia.dev", "admin123");
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(adminToken, id, DIAGNOSTICO_OK).andExpect(status().isForbidden());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta de otro establecimiento → 403")
+    @SuppressWarnings("null")
+    void registrarDiagnostico_alertaDeOtroEstablecimiento_returns403() throws Exception {
+        Animal animalAjeno = alertaRepository.findById(alertaOtroEstId).orElseThrow().getAnimal();
+        Long id = crearAlerta(animalAjeno, DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isForbidden());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta de CELO confirmada → 400")
+    void registrarDiagnostico_alertaNoSanitaria_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.CELO, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta sanitaria PENDIENTE → 400")
+    void registrarDiagnostico_alertaPendiente_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.PENDIENTE);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta sanitaria DESCARTADA → 400")
+    void registrarDiagnostico_alertaDescartada_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.DESCARTADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico vacío → 400")
+    void registrarDiagnostico_diagnosticoVacio_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, "{\"diagnostico\":\"   \",\"tratamiento\":\"Reposo\"}")
+                .andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sin campo diagnostico → 400")
+    void registrarDiagnostico_sinDiagnostico_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, "{\"tratamiento\":\"Reposo\"}").andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico de más de 200 caracteres → 400")
+    void registrarDiagnostico_diagnosticoMuyLargo_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        String body = "{\"diagnostico\":\"" + "a".repeat(201) + "\"}";
+        postDiagnostico(veterinarioToken, id, body).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar tratamiento de más de 500 caracteres → 400")
+    void registrarDiagnostico_tratamientoMuyLargo_returns400() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        String body = "{\"diagnostico\":\"Neumonía\",\"tratamiento\":\"" + "a".repeat(501) + "\"}";
+        postDiagnostico(veterinarioToken, id, body).andExpect(status().isBadRequest());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sin tratamiento → 200 con tratamiento vacío")
+    void registrarDiagnostico_sinTratamiento_returns200() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, "{\"diagnostico\":\"Neumonía leve\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tratamiento").value(""));
+    }
+
+    @Test
+    @DisplayName("Registrar diagnóstico sobre alerta inexistente → 404")
+    void registrarDiagnostico_alertaInexistente_returns404() throws Exception {
+        postDiagnostico(veterinarioToken, 999999L, DIAGNOSTICO_OK).andExpect(status().isNotFound());
+        org.junit.jupiter.api.Assertions.assertEquals(0, diagnosticoRepository.count());
+    }
+
+    @Test
+    @DisplayName("Modificar o borrar diagnósticos vía API (PUT/PATCH/DELETE) → 405 y el diagnóstico queda intacto")
+    @SuppressWarnings("null")
+    void modificarOBorrarDiagnostico_noExisteEnLaApi_returns405() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/alertas/{id}/diagnosticos", id)
+                .header("Authorization", "Bearer " + veterinarioToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"diagnostico\":\"Diagnóstico alterado\"}"))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/v1/alertas/{id}/diagnosticos", id)
+                .header("Authorization", "Bearer " + veterinarioToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"diagnostico\":\"Diagnóstico alterado\"}"))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/v1/alertas/{id}/diagnosticos", id)
+                .header("Authorization", "Bearer " + veterinarioToken))
+                .andExpect(status().isMethodNotAllowed());
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, diagnosticoRepository.count());
+        org.junit.jupiter.api.Assertions.assertEquals("Neumonía leve",
+                diagnosticoRepository.findAll().get(0).getDiagnostico());
+    }
+
+    @Test
+    @DisplayName("Borrar o modificar intervenciones vía API (PUT/DELETE) → 405")
+    @SuppressWarnings("null")
+    void modificarOBorrarIntervencion_noExisteEnLaApi_returns405() throws Exception {
+        Long animalId = animalPropio().getId();
+
+        mockMvc.perform(put("/api/v1/animales/{id}/intervenciones", animalId)
+                .header("Authorization", "Bearer " + veterinarioToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"descripcion\":\"alterada\"}"))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/v1/animales/{id}/intervenciones", animalId)
+                .header("Authorization", "Bearer " + veterinarioToken))
+                .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos de un animal → más reciente primero, mismo formato que el POST")
+    void listarDiagnosticos_porAnimal_masRecientePrimero() throws Exception {
+        Animal animal = animalPropio();
+        Long id = crearAlerta(animal, DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, "{\"diagnostico\":\"Primero\"}").andExpect(status().isOk());
+        postDiagnostico(veterinarioToken, id, "{\"diagnostico\":\"Segundo\",\"tratamiento\":\"Control\"}")
+                .andExpect(status().isOk());
+
+        getDiagnosticos(veterinarioToken, "animalId", animal.getId().toString())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].diagnostico").value("Segundo"))
+                .andExpect(jsonPath("$[0].tratamiento").value("Control"))
+                .andExpect(jsonPath("$[0].alertaId").value(id))
+                .andExpect(jsonPath("$[0].animalCaravanaOficial").value("CAR-001"))
+                .andExpect(jsonPath("$[0].establecimientoNombre").value("Estancia Test"))
+                .andExpect(jsonPath("$[0].veterinarioNombre").value("veterinario"))
+                .andExpect(jsonPath("$[0].disparador").value("SALUD"))
+                .andExpect(jsonPath("$[0].datoOrigen").isNotEmpty())
+                .andExpect(jsonPath("$[1].diagnostico").value("Primero"));
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos sin filtros como PRODUCTOR → ve los de su establecimiento")
+    void listarDiagnosticos_sinFiltros_productorDelEstablecimiento() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isOk());
+
+        getDiagnosticos(productorToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].alertaId").value(id));
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos filtrando por establecimiento propio → 200")
+    @SuppressWarnings("null")
+    void listarDiagnosticos_establecimientoPropio_returns200() throws Exception {
+        Long id = crearAlerta(animalPropio(), DisparadorAlerta.SALUD, EstadoAlerta.CONFIRMADA);
+        postDiagnostico(veterinarioToken, id, DIAGNOSTICO_OK).andExpect(status().isOk());
+
+        getDiagnosticos(veterinarioToken, "establecimientoId", establecimientoId.toString())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos de otro establecimiento → no se ven (animal ajeno vacío, sin filtros no aparecen)")
+    @SuppressWarnings("null")
+    void listarDiagnosticos_deOtroEstablecimiento_noSeVen() throws Exception {
+        Alerta alertaAjena = alertaRepository.findById(alertaOtroEstId).orElseThrow();
+        Diagnostico ajeno = new Diagnostico();
+        ajeno.setAlerta(alertaAjena);
+        ajeno.setAnimal(alertaAjena.getAnimal());
+        ajeno.setVeterinario(usuarioRepository.findByEmail("veterinario@vigia.dev").orElseThrow());
+        ajeno.setDiagnostico("Diagnóstico ajeno");
+        ajeno.setIndicaciones("");
+        ajeno.setFecha(LocalDateTime.now());
+        diagnosticoRepository.save(ajeno);
+
+        getDiagnosticos(veterinarioToken, "animalId", alertaAjena.getAnimal().getId().toString())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        getDiagnosticos(veterinarioToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos de un establecimiento ajeno → 403")
+    @SuppressWarnings("null")
+    void listarDiagnosticos_establecimientoAjeno_returns403() throws Exception {
+        Long otroEstId = alertaRepository.findById(alertaOtroEstId).orElseThrow()
+                .getAnimal().getEstablecimiento().getId();
+        getDiagnosticos(veterinarioToken, "establecimientoId", otroEstId.toString())
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Listar diagnósticos como ADMINISTRADOR → 403")
+    void listarDiagnosticos_administrador_returns403() throws Exception {
+        crearUsuario("admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+        getDiagnosticos(getTokenFor("admin@vigia.dev", "admin123")).andExpect(status().isForbidden());
     }
 
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    @Test
+    @DisplayName("Stream SSE: un usuario que no es miembro del establecimiento recibe 403")
+    void streamAlertas_noMiembro_returns403() throws Exception {
+        crearUsuario("ajeno-stream@vigia.dev", "ajeno123", Rol.PRODUCTOR);
+        String ajenoToken = getTokenFor("ajeno-stream@vigia.dev", "ajeno123");
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + ajenoToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Stream SSE: ADMINISTRADOR no recibe alertas operativas (403)")
+    void streamAlertas_administrador_returns403() throws Exception {
+        crearUsuario("admin-stream@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+        String adminToken = getTokenFor("admin-stream@vigia.dev", "admin123");
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + adminToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Stream SSE: un miembro activo del establecimiento se suscribe")
+    void streamAlertas_miembro_abreElStream() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+    }
+
+    @Test
+    @DisplayName("Stream SSE: el heartbeat le llega al cliente como comentario, para que el proxy no corte el stream")
+    void streamAlertas_heartbeat_llegaComoComentario() throws Exception {
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + productorToken)
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        sseAlertaPublisher.enviarHeartbeat();
+
+        assertThat(result.getResponse().getContentAsString()).contains(":ping");
+        result.getRequest().getAsyncContext().complete();
+    }
+
+    @Test
+    @DisplayName("Stream SSE: acepta el header Last-Event-ID de la reconexión automática, con o sin el parámetro")
+    void streamAlertas_conHeaderLastEventId_abreElStream() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + productorToken)
+                .header("Last-Event-ID", alertaId.toString())
+                .param("establecimientoId", establecimientoId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .get("/api/v1/alertas/stream")
+                .header("Authorization", "Bearer " + productorToken)
+                .header("Last-Event-ID", alertaId.toString())
+                .param("establecimientoId", establecimientoId.toString())
+                .param("lastEventId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+    }
 
     private Usuario crearUsuario(String email, String password, Rol rol) {
         Usuario u = new Usuario();
@@ -696,6 +1214,53 @@ class AlertaControllerTest {
         u.setActivo(true);
         u.setFechaAlta(LocalDate.now());
         return usuarioRepository.save(u);
+    }
+
+    @SuppressWarnings("null")
+    private Animal animalPropio() {
+        return alertaRepository.findById(alertaId).orElseThrow().getAnimal();
+    }
+
+    private Long crearAlerta(Animal animal, DisparadorAlerta disparador, EstadoAlerta estado) {
+        Alerta a = new Alerta();
+        a.setAnimal(animal);
+        a.setDisparador(disparador);
+        a.setEstado(estado);
+        a.setTsGeneracion(LocalDateTime.now());
+        a.setValorUmbral(0.5);
+        a.setValorDetectado(0.9);
+        return alertaRepository.save(a).getId();
+    }
+
+    @SuppressWarnings("null")
+    private org.springframework.test.web.servlet.ResultActions postDiagnostico(String token, Long alertaId, String body)
+            throws Exception {
+        return mockMvc.perform(post("/api/v1/alertas/{id}/diagnosticos", alertaId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body));
+    }
+
+    private static final String INTERVENCION_OK = "{\"tipo\":\"INSEMINACION\",\"descripcion\":\"Inseminación artificial\"}";
+
+    @SuppressWarnings("null")
+    private org.springframework.test.web.servlet.ResultActions postIntervencion(String token, Long alertaId, String body)
+            throws Exception {
+        return mockMvc.perform(post("/api/v1/alertas/intervenir/{id}", alertaId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body));
+    }
+
+    @SuppressWarnings("null")
+    private org.springframework.test.web.servlet.ResultActions getDiagnosticos(String token, String... params)
+            throws Exception {
+        var req = MockMvcRequestBuilders.get("/api/v1/alertas/diagnosticos")
+                .header("Authorization", "Bearer " + token);
+        for (int i = 0; i < params.length; i += 2) {
+            req.param(params[i], params[i + 1]);
+        }
+        return mockMvc.perform(req);
     }
 
     @SuppressWarnings("null")

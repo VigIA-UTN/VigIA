@@ -46,14 +46,13 @@ export default function AnimalAlertasSanitarias({ animalId, establecimientoId, o
 
   const handleActionComplete = (alertaId: number, nuevoEstado: 'CONFIRMADA' | 'DESCARTADA') => {
     setAlertas((prev) => prev.map((a) => (a.id === alertaId ? { ...a, estado: nuevoEstado } : a)));
-    setSelected(null);
   };
 
   return (
     <>
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', padding: '1.5rem', marginBottom: '1.5rem' }}>
-        <h5 className="d-flex align-items-center gap-2" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#1E3A5F' }}>
-          <i className="bi bi-heart-pulse" /> Alertas sanitarias
+        <h5 className="d-flex align-items-center gap-2" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: '#1E3A5F' }}>
+          Alertas sanitarias
         </h5>
         <p style={{ margin: '2px 0 1rem', fontSize: '0.8rem', color: '#A0AEC0' }}>
           Desvíos de comportamiento detectados para este animal
@@ -84,7 +83,7 @@ export default function AnimalAlertasSanitarias({ animalId, establecimientoId, o
                     <small className="text-muted">Estado: {a.estado}</small>
                   </div>
                 </div>
-                <Button variant="outline-primary" size="sm" className="flex-shrink-0 ms-auto" onClick={() => setSelected(a)}>
+                <Button variant="vigia-outline" size="sm" className="flex-shrink-0 ms-auto" onClick={() => setSelected(a)}>
                   <i className="bi bi-eye" /> Ver detalle
                 </Button>
               </div>

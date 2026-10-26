@@ -293,4 +293,57 @@ body {
     background-color: rgba(220, 53, 69, 0.35) !important;
     border-color: rgba(220, 53, 69, 0.5) !important;
     color: #fff !important;
-}
+}
+/* ── Undo toast (snackbar estilo Gmail, compartido entre páginas) ── */
+.undo-toast-container {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 2000;
+}
+
+.undo-toast {
+    background-color: #1E3A5F !important;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    min-width: 320px;
+}
+
+.undo-toast .toast-body {
+    color: white;
+    font-size: 0.92rem;
+}
+
+.undo-toast-btn {
+    color: #8CC63F !important;
+    font-weight: 700 !important;
+    text-decoration: underline !important;
+    white-space: nowrap;
+}
+
+.undo-toast-btn:hover {
+    color: #a6dc5f !important;
+}
+
+/* Botón secundario VigIA (reemplaza al outline-primary de Bootstrap). Uso: <Button variant="vigia-outline">
+   o className="btn btn-vigia-outline". Se define con las variables de .btn para respetar btn-sm, hover y disabled;
+   .btn.btn-vigia-outline gana a .btn, que Bootstrap carga después de este archivo. */
+.btn.btn-vigia-outline {
+  --bs-btn-color: #1E3A5F;
+  --bs-btn-border-color: #1E3A5F;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #1E3A5F;
+  --bs-btn-hover-border-color: #1E3A5F;
+  --bs-btn-focus-shadow-rgb: 30, 58, 95;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #132a47;
+  --bs-btn-active-border-color: #132a47;
+  --bs-btn-disabled-color: #1E3A5F;
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: #1E3A5F;
+  --bs-btn-border-radius: 8px;
+  --bs-btn-font-weight: 500;
+}

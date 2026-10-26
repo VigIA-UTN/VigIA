@@ -4,16 +4,32 @@ import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import { HEAT_GRADIENT, type HeatLatLngTuple } from './types';
 
+// leaflet.heat hardcodes `t.getPanes().overlayPane.removeChild(this._canvas)`.
+// But we move its canvas to a custom 'heat' pane (so it renders above perimeter polygons).
+// When the layer or the map unmounts, that hardcoded overlayPane.removeChild call throws:
+// "NotFoundError: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node."
+// We patch HeatLayer.prototype.onRemove once so it safely removes the canvas from its actual parentNode.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const HeatLayerClass = (L as any).HeatLayer;
+if (HeatLayerClass && !HeatLayerClass.prototype._patchedSafeRemove) {
+    HeatLayerClass.prototype.onRemove = function (map: L.Map) {
+        if (this._canvas && this._canvas.parentNode) {
+            this._canvas.parentNode.removeChild(this._canvas);
+        }
+        const targetMap = map || this._map;
+        if (targetMap) {
+            targetMap.off('moveend', this._reset, this);
+            if (targetMap.options && targetMap.options.zoomAnimation) {
+                targetMap.off('zoomanim', this._animateZoom, this);
+            }
+        }
+    };
+    HeatLayerClass.prototype._patchedSafeRemove = true;
+}
+
 // leaflet.heat patches L globally — no named exports
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createHeatLayer = (points: HeatLatLngTuple[], opts: object) => (window as any).L.heatLayer(points, opts);
-
-// leaflet.heat's onRemove removes its canvas from overlayPane, so hand the canvas back before removing the layer
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const removeHeatLayer = (map: L.Map, layer: any) => {
-    if (layer._canvas) map.getPane('overlayPane')!.appendChild(layer._canvas);
-    map.removeLayer(layer);
-};
 
 /** Map child: renders `points` as a heat layer. Must live inside a react-leaflet MapContainer. */
 export default function HeatmapLayer({ points }: { points: HeatLatLngTuple[] }) {
@@ -23,26 +39,36 @@ export default function HeatmapLayer({ points }: { points: HeatLatLngTuple[] }) 
 
     useEffect(() => {
         if (!map) return;
-        if (layerRef.current) {
-            removeHeatLayer(map, layerRef.current);
-        }
-        layerRef.current = createHeatLayer(points, {
-            radius: 28,
-            blur: 20,
-            maxZoom: 17,
-            gradient: HEAT_GRADIENT,
-        }).addTo(map);
-        // leaflet.heat always draws into overlayPane, under the perimeter polygons: move its canvas to a pane above them
+
         const pane = map.getPane('heat') ?? map.createPane('heat');
         pane.style.zIndex = '450'; // overlayPane is 400, markers 600
         pane.style.pointerEvents = 'none';
-        pane.appendChild(layerRef.current._canvas);
 
-        return () => {
-            if (layerRef.current) removeHeatLayer(map, layerRef.current);
-            layerRef.current = null;
-        };
+        if (!layerRef.current) {
+            const layer = createHeatLayer(points, {
+                radius: 28,
+                blur: 20,
+                maxZoom: 17,
+                gradient: HEAT_GRADIENT,
+            }).addTo(map);
+
+            if (layer._canvas && layer._canvas.parentNode !== pane) {
+                pane.appendChild(layer._canvas);
+            }
+            layerRef.current = layer;
+        } else {
+            layerRef.current.setLatLngs(points);
+        }
     }, [map, points]);
+
+    useEffect(() => {
+        return () => {
+            if (layerRef.current && map) {
+                map.removeLayer(layerRef.current);
+                layerRef.current = null;
+            }
+        };
+    }, [map]);
 
     return null;
 }

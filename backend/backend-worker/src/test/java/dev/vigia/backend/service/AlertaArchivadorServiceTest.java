@@ -22,7 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.repository.AlertaRepository;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Establecimiento;
 
@@ -33,7 +33,7 @@ public class AlertaArchivadorServiceTest {
     private AlertaRepository alertaRepository;
 
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private PublicadorDeAlertas publicadorDeAlertas;
 
     @InjectMocks
     private AlertaArchivadorService alertaArchivadorService;
@@ -84,7 +84,7 @@ public class AlertaArchivadorServiceTest {
         List<Alerta> savedAlertas = captor.getValue();
         assertEquals(2, savedAlertas.size());
 
-        verify(rabbitTemplate, times(2)).convertAndSend(any(String.class), any(String.class), any(Object.class));
+        verify(publicadorDeAlertas, times(2)).publicar(any());
     }
 
     @SuppressWarnings("null")

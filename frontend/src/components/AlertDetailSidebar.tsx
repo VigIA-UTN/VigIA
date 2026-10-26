@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import type { AlertaResponse, AlertaDetalleResponse, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
-import { updateAlertaEstado, getAlertaDetalle } from '../api/alertaApi';
+import { useLocation, useNavigate } from 'react-router-dom';
+import type { AlertaResponse, AlertaDetalleResponse, AnimalAislado, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
+import { updateAlertaEstado, getAlertaDetalle, esAnestro, esAislamiento, estadoAislado } from '../api/alertaApi';
+import { formatMinutos } from '../utils/fechas';
+import { SEVERIDAD } from '../utils/severidadColores';
 import SanitarioAlertDetail, { SeveridadBadge } from './SanitarioAlertDetail';
+import DiagnosticoSection from './DiagnosticoSection';
 import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useVentanaInseminacion, formatCountdown } from '../hooks/useVentanaInseminacion';
+import { formatUltimaSenial } from '../utils/caravanaTelemetria';
 
 interface AlertDetailSidebarProps {
   alerta: AlertaResponse;
@@ -16,10 +21,22 @@ interface AlertDetailSidebarProps {
   onOpenIntervencion?: () => void;
 }
 
+const AISLADOS_VISIBLES = 3;
+
+/** El backend responde texto plano o { message } según el endpoint. */
+function mensajeError(err: unknown, fallback: string): string {
+  const data = (err as { response?: { data?: { message?: string } | string } })?.response?.data;
+  return (typeof data === 'string' ? data : data?.message) || fallback;
+}
+
 export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, mode = 'absolute', onOpenIntervencion }: AlertDetailSidebarProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [notas, setNotas] = useState('');
+  // H0010: error al confirmar/descartar; conflicto = otro usuario ya la procesó (409)
+  const [actionError, setActionError] = useState<{ mensaje: string; conflicto: boolean } | null>(null);
+  // Estado real tras un 409: se informa al padre al cerrar, para que el aviso no desaparezca antes de leerlo
+  const estadoPorSincronizar = useRef<'CONFIRMADA' | 'DESCARTADA' | null>(null);
 
   const [detalle, setDetalle] = useState<AlertaDetalleResponse | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
@@ -27,13 +44,17 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
   const { rol } = useAuthStore();
   const { selectedId } = useEstablecimientoStore();
-  const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR';
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [verTodosAislados, setVerTodosAislados] = useState(false);
 
   // Ventana optima de inseminacion con countdown en tiempo real.
   // El backend puede devolver 'CELO', 'Celo Detectado' o 'reproductivo'
   // segun venga del listado general o del endpoint especifico de celo.
   const tipoNorm = (alerta.tipo ?? '').toLowerCase();
-  const isCelo = tipoNorm === 'celo' || tipoNorm === 'reproductivo' || tipoNorm.includes('celo');
+  // El anestro llega con disparador CELO pero no tiene ventana: sin countdown ni archivado automático.
+  const isAnestro = esAnestro(alerta);
+  const isCelo = (tipoNorm === 'celo' || tipoNorm === 'reproductivo' || tipoNorm.includes('celo')) && !isAnestro;
   const { ventana, segundosRestantes, loading: loadingVentana } = useVentanaInseminacion(
     isCelo ? alerta.id : null,
     selectedId ?? null,
@@ -45,6 +66,23 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const isGeoespacial = disparadorNorm.includes('FUERA') || disparadorNorm.includes('PERIMETRO') ||
     (detalle?.datoDisparador ?? '').toString().toUpperCase() === 'FUERA_DE_PERIMETRO';
   const detGeo: DetalleGeoespacial | null = detalle?.detalleGeoespacial ?? null;
+
+  // Aislamiento social: uno o más animales lejos del rodeo. Al abrir manda la lista del detalle (la más fresca);
+  // si después llega la misma alerta por SSE (un animal se suma o vuelve), manda esa. Primero los que siguen afuera.
+  const isAislamiento = esAislamiento(alerta);
+  const detAisl = detalle?.detalleAislamiento ?? null;
+  const [aisladosSse, setAisladosSse] = useState<AnimalAislado[] | null>(null);
+  const [alertaPrevia, setAlertaPrevia] = useState(alerta);
+  if (alerta !== alertaPrevia) {
+    setAlertaPrevia(alerta);
+    setAisladosSse(alerta.id === alertaPrevia.id ? alerta.animalesAislados ?? null : null);
+  }
+  const aislados = [...(aisladosSse ?? detAisl?.animalesAislados ?? alerta.animalesAislados ?? [])]
+    .sort((a, b) => Number(!!a.tsRegreso) - Number(!!b.tsRegreso) || b.minutosFueraSeguidos - a.minutosFueraSeguidos);
+  const ventanaHoras = detAisl?.ventanaHoras ?? 24;
+  const tituloAislamiento = aislados.length > 1
+    ? `${aislados.length} animales aislados del rodeo`
+    : `#${aislados[0]?.identificador ?? alerta.animalId} aislado del rodeo`;
 
   // Contador en vivo del tiempo fuera del perímetro (tick cada segundo)
   const [segundosVivoFuera, setSegundosVivoFuera] = useState<number>(0);
@@ -81,12 +119,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
         if (isMounted) setDetalle(data);
       } catch (err) {
         console.error("Error fetching alerta detalle:", err);
-        if (isMounted) {
-          const e = err as { response?: { data?: { message?: string } | string } };
-          const responseData = e?.response?.data;
-          const errorMessage = typeof responseData === 'string' ? responseData : responseData?.message;
-          setErrorDetail(errorMessage || "Ocurrió un error al cargar el detalle de la alerta.");
-        }
+        if (isMounted) setErrorDetail(mensajeError(err, "Ocurrió un error al cargar el detalle de la alerta."));
       } finally {
         if (isMounted) setLoadingDetail(false);
       }
@@ -99,6 +132,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   }, [alerta.id, selectedId]);
 
   const handleClose = () => {
+    if (estadoPorSincronizar.current) {
+      onActionComplete(alerta.id, estadoPorSincronizar.current);
+      estadoPorSincronizar.current = null;
+    }
     setIsClosing(true);
     setTimeout(() => {
       onClose();
@@ -107,19 +144,42 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
   const handleAccion = async (nuevoEstado: 'CONFIRMADA' | 'DESCARTADA', triggerIntervencion: boolean = true, notaOverride?: string) => {
     setActionLoading(true);
+    setActionError(null);
     try {
-      // Si la alerta es un mock, el backend va a tirar 404/500, lo atajamos acá para que actualice igual visualmente.
-      await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride).catch(err => {
-        console.warn('Backend falló (probablemente es un mock alert), forzando update frontend:', err);
-      });
+      await updateAlertaEstado(alerta.id, nuevoEstado, notas.trim() || notaOverride);
 
       onActionComplete(alerta.id, nuevoEstado);
+      // Confirmar una alerta sanitaria deja el sidebar abierto para cargar el diagnóstico.
+      if (isSanitaria && nuevoEstado === 'CONFIRMADA') {
+        setDetalle(d => d && { ...d, estadoActual: nuevoEstado });
+        setActionLoading(false);
+        return;
+      }
       if (nuevoEstado === 'CONFIRMADA' && triggerIntervencion) {
         onOpenIntervencion?.();
       }
       handleClose();
-    } catch (error) {
-      console.error('Error actualizando alerta:', error);
+    } catch (err) {
+      console.error('Error actualizando alerta:', err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+
+      if (status === 409) {
+        setActionError({ mensaje: mensajeError(err, 'Esta alerta ya fue procesada por otro usuario.'), conflicto: true });
+        // Refrescamos el detalle para mostrar el estado real y ocultar los botones
+        if (selectedId) {
+          try {
+            const actualizado = await getAlertaDetalle(alerta.id, selectedId);
+            setDetalle(actualizado);
+            if (actualizado.estadoActual === 'CONFIRMADA' || actualizado.estadoActual === 'DESCARTADA') {
+              estadoPorSincronizar.current = actualizado.estadoActual;
+            }
+          } catch (refreshErr) {
+            console.error('Error refrescando alerta:', refreshErr);
+          }
+        }
+      } else {
+        setActionError({ mensaje: mensajeError(err, 'No se pudo actualizar la alerta. Intentá de nuevo.'), conflicto: false });
+      }
       setActionLoading(false);
     }
   };
@@ -130,10 +190,15 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   let windowEnd = new Date();
   
   const caravanaText = detalle?.animalCaravanaOficial ? detalle.animalCaravanaOficial : alerta.animalId;
-  const animalName = detalle?.animalAlias ? `${detalle.animalAlias} (#${caravanaText})` : `Vaca #${caravanaText}`;
+  const animalName = detalle?.animalAlias || 'Vaca';
+  // Link a la ficha, salvo que el panel ya esté abierto dentro de la ficha de este animal
+  const fichaAnimal = `/animales/${alerta.animalId}`;
+  const enFichaDelAnimal = pathname === fichaAnimal || pathname.startsWith(`${fichaAnimal}/`);
 
   const disparador = (detalle?.datoDisparador ?? alerta.tipo ?? '').toUpperCase();
   const isSanitaria = disparador.includes('SALUD') || disparador.includes('SANITARI');
+  // El campero actúa sobre alertas de celo y geoespaciales, pero no sobre las sanitarias.
+  const canActOnAlerts = rol === 'VETERINARIO' || rol === 'PRODUCTOR' || (rol === 'CAMPERO' && !isSanitaria);
   const detSan = detalle?.detalleSanitario ?? null;
   const sevHeader: SeveridadNivel | null =
     (isSanitaria ? detSan?.severidad : (alerta.severidad as SeveridadNivel | undefined)) ?? null;
@@ -182,8 +247,12 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
       return detalle.accionRecomendada;
     } else if (isSanitaria) {
       return 'Revisar al animal y realizar seguimiento clínico.';
+    } else if (isAislamiento) {
+      return 'Recorrer la zona y verificar el estado de los animales alejados del rodeo.';
     } else if (isGeoespacial) {
       return 'Verificar ubicación del animal en el mapa y retornarlo al perímetro autorizado.';
+    } else if (isAnestro) {
+      return 'Revisión veterinaria: el animal no registra celo en el período configurado.';
     } else if (isCelo) {
       return 'Realizar inseminación artificial dentro de la ventana óptima.';
     } else {
@@ -233,13 +302,27 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
         <div className="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
           <div style={{ minWidth: 0 }}>
-            <h2 className="m-0 fw-bold text-break" style={{ color: '#1E3A5F' }}>{animalName}</h2>
-            <p className="m-0 text-muted fs-6">Animal en seguimiento</p>
+            <h2 className="m-0 fw-bold text-break" style={{ color: '#1E3A5F' }}>{isAislamiento ? tituloAislamiento : animalName}</h2>
+            <p className="m-0 text-muted fs-6">{isAislamiento ? detAisl?.nombreLote ?? 'Aislamiento social' : `#${caravanaText}`}</p>
+            {/* Aislamiento ya linkea a cada animal desde su lista */}
+            {!isAislamiento && !enFichaDelAnimal && (
+              <button
+                type="button"
+                className="btn btn-link p-0 border-0 mt-1 d-inline-flex align-items-center gap-1"
+                style={{ fontSize: '0.85rem', color: '#1E3A5F', textDecoration: 'none', fontWeight: 600 }}
+                onClick={() => {
+                  handleClose();
+                  navigate(fichaAnimal);
+                }}
+              >
+                Ver ficha del animal <i className="bi bi-arrow-right"></i>
+              </button>
+            )}
           </div>
           {sevHeader ? (
             <SeveridadBadge severidad={sevHeader} />
           ) : (
-            <div className="px-3 py-1 rounded-pill d-flex align-items-center gap-2" style={{ backgroundColor: '#FDECEC', color: '#B00020', border: '1px solid #B00020', fontWeight: 'bold' }}>
+            <div className="d-flex align-items-center gap-2" style={{ color: '#B00020', fontWeight: 'bold' }}>
               ALTO <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#B00020' }}></div>
             </div>
           )}
@@ -270,10 +353,101 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           </div>
         ) : (
           <>
+            {/* H0008: el backend lo marca solo en alertas de celo pendientes con la caravana sin transmitir */}
+            {detalle?.datoPosiblementeDesactualizado && (
+              <div
+                className="d-flex align-items-start gap-2 rounded-4 px-3 py-2"
+                role="alert"
+                style={{ backgroundColor: '#FFF8E1', border: '1px solid #F2C94C', color: '#7A5A00', fontSize: '0.9rem' }}
+              >
+                <i className="bi bi-wifi-off fs-5" style={{ lineHeight: 1.2 }}></i>
+                <div>
+                  <div className="fw-bold">Dato posiblemente desactualizado</div>
+                  {detalle.caravanaUltimaSenial
+                    ? <>La caravana no transmite desde hace más de {detalle.horasUmbralDatoDesactualizado ?? 2} h (última señal {formatUltimaSenial(detalle.caravanaUltimaSenial).text}).</>
+                    : <>No hay transmisiones registradas de la caravana de este animal.</>}
+                  {' '}Verificá el estado del animal en campo antes de inseminar.
+                </div>
+              </div>
+            )}
+
+            {/* Aislamiento social: tiempo fuera del grupo + animales que se alejaron */}
+            {isAislamiento && (
+              <div className="d-flex flex-column gap-3">
+                <div className="d-flex align-items-center gap-3 rounded-4 px-4 py-3" style={{ backgroundColor: '#FDECEC' }}>
+                  <i className="bi bi-clock-history fs-3" style={{ color: '#dc3545' }}></i>
+                  <div>
+                    <small className="d-block" style={{ color: '#5A5A5A' }}>Tiempo acumulado fuera del grupo (últimas {ventanaHoras} h)</small>
+                    <span className="fw-bold" style={{ color: '#B00020', fontSize: '1.4rem' }}>
+                      {aislados.length ? formatMinutos(Math.max(...aislados.map(a => a.minutosFuera))) : '—'}
+                    </span>
+                  </div>
+                </div>
+                <p className="m-0" style={{ color: '#3F3F3F', fontSize: '0.95rem' }}>
+                  {aislados.length > 1
+                    ? 'Se estima que estos animales se alejaron del rodeo. Andá a revisarlos.'
+                    : `Se estima que #${aislados[0]?.identificador ?? alerta.animalId} se alejó del rodeo. Andá a revisarlo.`}
+                </p>
+
+                <div>
+                  <h6 className="fw-bold mb-2" style={{ color: '#5A5A5A', fontSize: '0.8rem', letterSpacing: '.04em' }}>
+                    ANIMALES QUE SE ALEJARON
+                  </h6>
+                  <div className="rounded-4 overflow-hidden bg-white" style={{ boxShadow: 'inset 0 0 0 1px #E8E7E7' }}>
+                    {(verTodosAislados ? aislados : aislados.slice(0, AISLADOS_VISIBLES)).map((a, i) => (
+                      <button
+                        key={a.animalId}
+                        type="button"
+                        className="aislado-row w-100 d-flex align-items-center gap-3 px-3 py-2 text-start bg-transparent border-0"
+                        style={{ borderTop: i ? '1px solid #E8E7E7' : 'none', opacity: a.tsRegreso ? 0.7 : 1 }}
+                        title={`Abrir ficha de #${a.identificador}`}
+                        onClick={() => navigate(`/animales/${a.animalId}?tab=actividad`)}
+                      >
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, backgroundColor: SEVERIDAD[a.severidad].bar }} />
+                        <span className="flex-grow-1" style={{ minWidth: 0 }}>
+                          <span className="d-block fw-semibold" style={{ color: '#1E3A5F' }}>
+                            #{a.identificador}
+                            {estadoAislado(a) === 'VOLVIO' && (
+                              <span className="badge rounded-pill ms-2" style={{ backgroundColor: '#E6F4EA', color: '#2E7D32', fontWeight: 600 }}>
+                                Volvió {new Date(a.tsRegreso!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                            {estadoAislado(a) === 'SIN_DATOS' && (
+                              <span className="badge rounded-pill ms-2" style={{ backgroundColor: '#EDF2F7', color: '#4A5568', fontWeight: 600 }}
+                                title="La caravana dejó de transmitir: no se sabe si volvió al grupo.">
+                                Sin datos desde {new Date(a.tsRegreso!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </span>
+                          <small className="d-block text-muted text-truncate">{a.alias ?? 'Sin alias'}</small>
+                        </span>
+                        <span className="text-end text-nowrap">
+                          <span className="d-block fw-semibold" style={{ color: '#263238', fontSize: '0.9rem' }}>{estadoAislado(a) === 'VOLVIO' ? `Estuvo fuera ${formatMinutos(a.minutosFueraSeguidos)}` : formatMinutos(a.minutosFueraSeguidos)}</span>
+                          <small className="d-block text-muted">{formatMinutos(a.minutosFuera)} en {ventanaHoras} h</small>
+                          <small className="d-block text-muted">{a.distanciaGrupoM != null ? `a ${a.distanciaGrupoM} m del grupo` : 'distancia sin datos'}</small>
+                        </span>
+                        <i className="bi bi-chevron-right" style={{ color: '#98A2B3' }}></i>
+                      </button>
+                    ))}
+                    {aislados.length > AISLADOS_VISIBLES && (
+                      <button
+                        type="button"
+                        className="aislado-row w-100 border-0 bg-transparent py-2 fw-medium"
+                        style={{ borderTop: '1px solid #E8E7E7', color: '#1E3A5F', fontSize: '0.9rem' }}
+                        onClick={() => setVerTodosAislados(v => !v)}
+                      >
+                        {verTodosAislados ? 'Ver menos' : `Ver ${aislados.length - AISLADOS_VISIBLES} más`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Dato de origen — misma seccion para cualquier tipo de alerta */}
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                <i className="bi bi-search"></i> Dato de origen
+                Dato de origen
               </h6>
               <div className="card border-0 shadow-sm rounded-4">
                 <div className="card-body">
@@ -281,16 +455,13 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                     {detalle?.descripcionDatoOrigen ||
                       'El sistema detectó un comportamiento que se aparta de lo habitual para este animal.'}
                   </p>
-                  <small className="text-muted d-block mt-2">
-                    <i className="bi bi-calendar-event me-1"></i>{detectedText}
-                  </small>
                 </div>
               </div>
             </div>
 
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                <i className="bi bi-info-circle"></i> Acción recomendada
+                Acción recomendada
               </h6>
               <div className="card border-0 shadow-sm rounded-4">
                 <div className="card-body">
@@ -303,6 +474,15 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
 
             {/* Detalle sanitario (solo alertas de SALUD) */}
             {isSanitaria && detSan && <SanitarioAlertDetail detalle={detSan} />}
+
+            {/* Diagnóstico veterinario + historial clínico (solo alertas de SALUD) */}
+            {isSanitaria && (
+              <DiagnosticoSection
+                alertaId={alerta.id}
+                animalId={detalle?.animalId ?? alerta.animalId}
+                showForm={rol === 'VETERINARIO' && estadoVisual === 'CONFIRMADA'}
+              />
+            )}
 
             {/* Detalle geoespacial (solo alertas FUERA_DE_PERIMETRO) */}
             {isGeoespacial && (
@@ -392,10 +572,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
             )}
 
             {/* Ventana de inseminacion (solo reproductivo, no sanitario, no geoespacial) */}
-            {!isSanitaria && !isGeoespacial && (
+            {!isSanitaria && !isGeoespacial && !isAislamiento && !isAnestro && (
               <div>
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                  <i className="bi bi-clock"></i> Ventana de inseminación
+                  Ventana de inseminación
                 </h6>
 
                 {/* Barra de horarios inicio-fin */}
@@ -530,7 +710,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
             {/* Informacion Adicional */}
             <div>
               <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                <i className="bi bi-info-square"></i> Información adicional
+                Información adicional
               </h6>
               <div className="card border-0 shadow-sm rounded-4">
                 <div className="card-body d-flex justify-content-between">
@@ -553,18 +733,12 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                       <span className="fw-semibold text-dark">{detalle.animalRaza}</span>
                     </div>
                   )}
-                  <div>
-                    <small className="text-muted d-block mb-1">Última ubicación</small>
-                    <a href="#" className="fw-semibold text-primary text-decoration-none d-flex align-items-center gap-1">
-                      Ver en mapa <i className="bi bi-geo-alt-fill"></i>
-                    </a>
-                  </div>
                 </div>
               </div>
             </div>
 
             {/* Ultimos Estados Reproductivos (solo reproductivo, no geoespacial) */}
-            {!isSanitaria && !isGeoespacial && detalle?.ultimosEstadosReproductivos && detalle.ultimosEstadosReproductivos.length > 0 && (
+            {!isSanitaria && !isGeoespacial && !isAislamiento && detalle?.ultimosEstadosReproductivos && detalle.ultimosEstadosReproductivos.length > 0 && (
               <div>
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
                   <i className="bi bi-activity"></i> Últimos estados reproductivos
@@ -601,30 +775,49 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               </div>
             )}
 
-            {/* Notas */}
-            <div>
-              <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-                <i className="bi bi-journal-text"></i> Notas
-              </h6>
-              <div className="position-relative">
-                <textarea
-                  className="form-control rounded-4 shadow-sm border-0"
-                  rows={3}
-                  placeholder="Agregá una nota (opcional)..."
-                  value={notas}
-                  onChange={(e) => setNotas(e.target.value)}
-                  style={{ resize: 'none', paddingRight: '15px', paddingBottom: '30px' }}
-                ></textarea>
-                <small className="text-muted position-absolute" style={{ bottom: '10px', right: '15px' }}>
-                  {notas.length}/200
-                </small>
+            {/* Notas — oculto para VETERINARIO */}
+            {rol !== 'VETERINARIO' && (
+              <div>
+                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
+                  Notas
+                </h6>
+                <div className="position-relative">
+                  <textarea
+                    className="form-control rounded-4 shadow-sm border-0"
+                    rows={3}
+                    placeholder="Agregá una nota (opcional)..."
+                    value={notas}
+                    onChange={(e) => setNotas(e.target.value)}
+                    style={{ resize: 'none', paddingRight: '15px', paddingBottom: '30px' }}
+                  ></textarea>
+                  <small className="text-muted position-absolute" style={{ bottom: '10px', right: '15px' }}>
+                    {notas.length}/200
+                  </small>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>
 
-      {/* Acciones — solo visibles para Productor y Veterinario */}
+      {/* H0010: aviso de error al confirmar/descartar, fijo sobre el pie para que siempre se vea */}
+      {actionError && (
+        <div
+          className="d-flex align-items-start gap-2 px-4 py-3 border-top"
+          role="alert"
+          style={actionError.conflicto
+            ? { backgroundColor: '#E3F2FD', color: '#0D47A1', fontSize: '0.9rem' }
+            : { backgroundColor: '#FDECEA', color: '#B71C1C', fontSize: '0.9rem' }}
+        >
+          <i className={`bi ${actionError.conflicto ? 'bi-person-check' : 'bi-exclamation-triangle'} fs-5`} style={{ lineHeight: 1.2 }}></i>
+          <div>
+            {actionError.conflicto && <div className="fw-bold">Alerta ya procesada</div>}
+            {actionError.mensaje}
+          </div>
+        </div>
+      )}
+
+      {/* Acciones — Productor y Veterinario siempre; Campero salvo en alertas sanitarias */}
       {canActOnAlerts && !loadingDetail && !errorDetail && estadoVisual === 'PENDIENTE' && (
         <div className="p-4 bg-white border-top d-flex flex-column gap-2" style={{ zIndex: 10, borderRadius: '0 0 0 12px' }}>
           <div className="d-flex gap-3 justify-content-between">
@@ -642,10 +835,10 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
               onClick={() => handleAccion('CONFIRMADA', false, isSanitaria ? 'Alerta sanitaria atendida' : undefined)}
               disabled={actionLoading}
             >
-              <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : isGeoespacial ? 'Confirmar salida' : 'Confirmar celo'}
+              <i className="bi bi-check2"></i> {actionLoading ? '...' : isSanitaria ? 'Confirmar alerta' : isGeoespacial ? 'Confirmar salida' : isAislamiento ? 'Confirmar aislamiento' : isAnestro ? 'Confirmar anestro' : 'Confirmar celo'}
             </button>
           </div>
-          {!isSanitaria && !isGeoespacial && (
+          {!isSanitaria && !isGeoespacial && !isAislamiento && !isAnestro && (
             <button
               className="btn rounded-3 fw-semibold w-100 py-2 d-flex justify-content-center align-items-center gap-2"
               style={{ backgroundColor: '#198754', color: 'white', border: '1px solid #198754' }}
@@ -671,6 +864,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
           0%, 100% { opacity: 1; transform: scale(1); }
           50%       { opacity: 0.6; transform: scale(1.15); }
         }
+        .aislado-row:hover { background-color: #F8F9FC !important; }
         .urgency-pulse {
           animation: urgencyPulse 1.2s ease-in-out infinite;
         }

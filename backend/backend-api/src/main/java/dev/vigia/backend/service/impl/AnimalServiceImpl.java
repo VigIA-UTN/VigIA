@@ -1,17 +1,23 @@
 package dev.vigia.backend.service.impl;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -24,12 +30,15 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.AnimalIndicadoresSaludResponse;
 import dev.vigia.backend.dto.AnimalMapaResponse;
 import dev.vigia.backend.dto.AnimalMetricaResponse;
 import dev.vigia.backend.dto.AnimalRequest;
 import dev.vigia.backend.dto.CargaMasivaResponse;
 import dev.vigia.backend.dto.CargaMasivaResult;
+import dev.vigia.backend.dto.CohesionPuntoSerie;
+import dev.vigia.backend.dto.CohesionResponse;
 import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.EstadoReproductivoCsvRequest;
 import dev.vigia.backend.dto.EstadoReproductivoParseResult;
@@ -40,6 +49,7 @@ import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.dto.RegistroPesoRequest;
 import dev.vigia.backend.dto.RegistroPesoResponse;
@@ -52,7 +62,10 @@ import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.OrigenEstado;
 import dev.vigia.backend.model.PerfilReferencia;
+import dev.vigia.backend.model.RegistroCohesion;
 import dev.vigia.backend.model.EstadoSalud;
+import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.RegistroPeso;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.model.Rol;
@@ -61,12 +74,15 @@ import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
+import dev.vigia.backend.repository.PerfilReferenciaRepository;
 import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.repository.CaravanaRepository;
@@ -74,7 +90,9 @@ import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.RegistroPesoRepository;
 import dev.vigia.backend.service.AnimalService;
+import dev.vigia.backend.service.AsignacionCaravanasExcelService;
 import dev.vigia.backend.service.CargaMasivaService;
+import dev.vigia.backend.service.CeloDatoDesactualizadoEvaluator;
 import dev.vigia.backend.service.EstadoReproductivoCsvService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -91,9 +109,13 @@ public class AnimalServiceImpl implements AnimalService {
         private final EstadoReproductivoRepository estadoReproductivoRepository;
         private final IntervencionRepository intervencionRepository;
         private final TelemetriaRepository telemetriaRepository;
+        private final PerfilReferenciaRepository perfilReferenciaRepository;
         private final EstadoSaludRepository estadoSaludRepository;
         private final RegistroPesoRepository registroPesoRepository;
         private final CaravanaRepository caravanaRepository;
+        private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
+        private final RegistroCohesionRepository cohesionRepository;
+        private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
         @Value("${vigia.salud.calibracion-dias:7}")
         private int calibracionDias;
@@ -103,9 +125,11 @@ public class AnimalServiceImpl implements AnimalService {
         private static final double SIGMA_ROJO_MOVIMIENTO = 2.0;
 
         private static final long HORAS_SIN_DATOS_MOVIMIENTO = 6;
+        private static final int DIAS_COHESION_POR_DEFECTO = 7;
 
         private final CargaMasivaService cargaMasivaService;
         private final EstadoReproductivoCsvService estadoReproductivoCsvService;
+        private final AsignacionCaravanasExcelService asignacionCaravanasExcelService;
 
         @Override
         @Transactional
@@ -131,16 +155,23 @@ public class AnimalServiceImpl implements AnimalService {
                                         "El identificador ya se encuentra registrado en este establecimiento.");
                 }
 
-                if (request.getRodeoLoteId() != null) {
-                        rodeoLoteRepository.findById(request.getRodeoLoteId())
-                                        .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                if (request.getAlias() != null && !request.getAlias().isBlank()
+                                && animalRepository.existsByAliasAndEstablecimientoId(request.getAlias(),
+                                                request.getEstablecimientoId())) {
+                        throw new IllegalArgumentException(
+                                        "El nombre/alias ya se encuentra registrado en este establecimiento.");
                 }
 
-                Animal animal = new Animal(
-                                establecimiento,
-                                request.getRodeoLoteId() != null
-                                                ? rodeoLoteRepository.findById(request.getRodeoLoteId()).get()
-                                                : null);
+                RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
+                                .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                if (!lote.getEstablecimiento().getId().equals(establecimiento.getId())) {
+                        throw new IllegalArgumentException("El rodeo no pertenece al establecimiento.");
+                }
+                if (!lote.isActivo()) {
+                        throw new IllegalArgumentException("El rodeo/lote no está activo.");
+                }
+
+                Animal animal = new Animal(establecimiento, lote);
 
                 animal.setIdCaravanaOficial(request.getIdCaravanaOficial());
                 animal.setAlias(request.getAlias());
@@ -217,16 +248,27 @@ public class AnimalServiceImpl implements AnimalService {
                         }
                 }
 
-                if (request.getRodeoLoteId() != null) {
-                        RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
-                                        .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
-                        if (!lote.getEstablecimiento().getId().equals(nuevoEstablecimiento.getId())) {
-                                throw new IllegalArgumentException("El rodeo no pertenece al establecimiento destino.");
-                        }
-                        animal.setRodeoLote(lote);
-                } else {
-                        animal.setRodeoLote(null);
+                if (request.getAlias() != null && !request.getAlias().isBlank()
+                                && (!request.getAlias().equals(animal.getAlias())
+                                                || !request.getEstablecimientoId()
+                                                                .equals(establecimientoActual.getId()))
+                                && animalRepository.existsByAliasAndEstablecimientoId(request.getAlias(),
+                                                request.getEstablecimientoId())) {
+                        throw new IllegalArgumentException(
+                                        "El nombre/alias ya se encuentra registrado en el establecimiento destino.");
                 }
+
+                RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
+                                .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                if (!lote.getEstablecimiento().getId().equals(nuevoEstablecimiento.getId())) {
+                        throw new IllegalArgumentException("El rodeo no pertenece al establecimiento destino.");
+                }
+                boolean cambioDeRodeo = animal.getRodeoLote() == null
+                                || !animal.getRodeoLote().getId().equals(lote.getId());
+                if (cambioDeRodeo && !lote.isActivo()) {
+                        throw new IllegalArgumentException("El rodeo/lote no está activo.");
+                }
+                animal.setRodeoLote(lote);
 
                 animal.setEstablecimiento(nuevoEstablecimiento);
                 animal.setIdCaravanaOficial(request.getIdCaravanaOficial());
@@ -246,6 +288,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public void desactivarAnimal(Long animalId, String emailProductor) {
                 Usuario productorUser = usuarioRepository.findByEmail(emailProductor)
@@ -308,44 +351,34 @@ public class AnimalServiceImpl implements AnimalService {
                 return animales.stream().map(this::mapToResponse).toList();
         }
 
-        private void calcularCalibracion(Animal animal, AnimalResponse.AnimalResponseBuilder builder) {
-                LocalDate fechaBase = animal.getFechaAlta();
-                if (fechaBase != null) {
-                        if (animal.getCaravana() != null && animal.getCaravana().getFechaAsignacion() != null) {
-                                if (animal.getCaravana().getFechaAsignacion().isAfter(fechaBase)) {
-                                        fechaBase = animal.getCaravana().getFechaAsignacion();
-                                }
-                        }
-                        LocalDate finCalibracion = fechaBase.plusDays(calibracionDias);
-                        LocalDate hoy = LocalDate.now();
-                        if (!hoy.isAfter(finCalibracion)) {
-                                builder.enCalibracion(true);
-                                builder.diasRestantesCalibracion((int) ChronoUnit.DAYS.between(hoy, finCalibracion));
-                        } else {
-                                builder.enCalibracion(false);
-                                builder.diasRestantesCalibracion(0);
-                        }
-                }
+        private record Calibracion(boolean enCurso, int diasRestantes) {
         }
 
-        private void calcularCalibracionMapa(Animal animal, AnimalMapaResponse.AnimalMapaResponseBuilder builder) {
-                LocalDate fechaBase = animal.getFechaAlta();
-                if (fechaBase != null) {
-                        if (animal.getCaravana() != null && animal.getCaravana().getFechaAsignacion() != null) {
-                                if (animal.getCaravana().getFechaAsignacion().isAfter(fechaBase)) {
-                                        fechaBase = animal.getCaravana().getFechaAsignacion();
-                                }
-                        }
-                        LocalDate finCalibracion = fechaBase.plusDays(calibracionDias);
-                        LocalDate hoy = LocalDate.now();
-                        if (!hoy.isAfter(finCalibracion)) {
-                                builder.enCalibracion(true);
-                                builder.diasRestantesCalibracion((int) ChronoUnit.DAYS.between(hoy, finCalibracion));
-                        } else {
-                                builder.enCalibracion(false);
-                                builder.diasRestantesCalibracion(0);
-                        }
+        /**
+         * Misma regla que SaludDetectorStrategyImpl en el worker: el animal calibra hasta tener perfil de salud,
+         * con los primeros N días de datos de su caravana desde el día en que se le asignó. Null si no tiene
+         * perfil ni caravana: no hay calibración que mostrar.
+         */
+        private Calibracion calibracion(Animal animal) {
+                if (perfilReferenciaRepository.existsByAnimal(animal)) {
+                        return new Calibracion(false, 0);
                 }
+                Caravana caravana = animal.getCaravana();
+                if (caravana == null) {
+                        return null;
+                }
+                LocalDateTime desdeAsignacion = caravana.getFechaAsignacion() != null
+                                ? caravana.getFechaAsignacion().atStartOfDay()
+                                : LocalDate.EPOCH.atStartOfDay();
+                return telemetriaRepository
+                                .findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(caravana, desdeAsignacion)
+                                .map(primerDato -> {
+                                        LocalDate fin = primerDato.getFechaHora().plusDays(calibracionDias).toLocalDate();
+                                        // 0 también si ya pasó y el worker todavía no armó el perfil: "finaliza hoy"
+                                        return new Calibracion(true,
+                                                        (int) Math.max(0, ChronoUnit.DAYS.between(LocalDate.now(), fin)));
+                                })
+                                .orElse(new Calibracion(true, calibracionDias));
         }
 
         private AnimalResponse mapToResponse(Animal animal) {
@@ -382,13 +415,18 @@ public class AnimalServiceImpl implements AnimalService {
                         Caravana c = animal.getCaravana();
                         builder.caravanaId(c.getId())
                                         .caravanaDevEui(c.getDevEui())
+                                        .caravanaCodigo(c.getCodigo())
                                         .caravanaAlias(c.getAlias())
                                         .caravanaEstado(c.getEstadoSensor())
                                         .caravanaUltimaSenial(c.getUltimaSenial())
                                         .caravanaBateria(c.getBateria());
                 }
 
-                calcularCalibracion(animal, builder);
+                Calibracion calibracion = calibracion(animal);
+                if (calibracion != null) {
+                        builder.enCalibracion(calibracion.enCurso())
+                                        .diasRestantesCalibracion(calibracion.diasRestantes());
+                }
                 return builder.build();
         }
 
@@ -488,7 +526,11 @@ public class AnimalServiceImpl implements AnimalService {
                         AnimalMapaResponse.AnimalMapaResponseBuilder builder = AnimalMapaResponse.builder()
                                         .id(animal.getId())
                                         .identificador(animal.getIdCaravanaOficial());
-                        calcularCalibracionMapa(animal, builder);
+                        Calibracion calibracion = calibracion(animal);
+                        if (calibracion != null) {
+                                builder.enCalibracion(calibracion.enCurso())
+                                                .diasRestantesCalibracion(calibracion.diasRestantes());
+                        }
 
                         if (animal.getCaravana() != null) {
                                 Optional<Telemetria> ultimaPos = telemetriaRepository
@@ -517,6 +559,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public EstadoReproductivoResponse registrarEstadoReproductivo(Long animalId, String emailProductor,
                         EstadoReproductivoRequest request) {
@@ -595,6 +638,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
+        @Transactional
         @SuppressWarnings("null")
         public EstadoReproductivoResponse editarEstadoReproductivo(Long animalId, Long estadoId, String emailProductor,
                         EstadoReproductivoRequest request) {
@@ -659,6 +703,9 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
+        // Sin @Transactional a propósito: procesarCargaMasiva marca su transacción rollback-only cuando hay
+        // filas con error y devuelve la lista de errores; una transacción externa lo convertiría en un 500
+        // (UnexpectedRollbackException).
         @Override
         @SuppressWarnings("null")
         public CargaMasivaResponse cargarAnimalesExcel(MultipartFile file, Long establecimientoId,
@@ -844,40 +891,119 @@ public class AnimalServiceImpl implements AnimalService {
                 }
 
                 return intervencionRepository.findByAnimalIdOrderByFechaHoraDesc(animalId).stream()
-                                .map(i -> {
-                                        String interventorStr = i.getInterventor().getNombre();
-                                        if (i.getInterventor().getApellido() != null
-                                                        && !i.getInterventor().getApellido().isEmpty()) {
-                                                interventorStr += " " + i.getInterventor().getApellido();
-                                        }
-                                        if (interventorStr == null || interventorStr.isBlank()) {
-                                                interventorStr = i.getInterventor().getEmail();
-                                        }
-
-                                        return dev.vigia.backend.dto.IntervencionResponse.builder()
-                                                        .id(i.getId())
-                                                        .alertaId(i.getAlerta() != null ? i.getAlerta().getId() : null)
-                                                        .animalId(i.getAnimal().getId())
-                                                        .interventor(interventorStr)
-                                                        .descripcion(i.getDescripcion())
-                                                        .fechaHora(i.getFechaHora())
-                                                        .tipo(i.getTipo())
-                                                        .build();
-                                })
+                                .map(this::toIntervencionResponse)
                                 .collect(Collectors.toList());
         }
 
+        /**
+         * Registra una intervención sobre un animal sin alerta asociada. No genera
+         * estados derivados (a diferencia de intervenir una alerta).
+         */
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public IntervencionResponse registrarIntervencion(Long animalId, String emailUsuario,
+                        IntervencionRequest request) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                validarAccesoEstablecimiento(usuario, animal.getEstablecimiento());
+
+                if (animal.getEstadoActual() == EstadoAnimal.INACTIVO) {
+                        throw new IllegalArgumentException(
+                                        "No se pueden registrar intervenciones en animales inactivos.");
+                }
+
+                if (request.getTipo() == null) {
+                        throw new IllegalArgumentException("El tipo de intervención es obligatorio.");
+                }
+                if (request.getTipo() == TipoIntervencion.INSEMINACION) {
+                        throw new IllegalArgumentException(
+                                        "Las inseminaciones no se registran como intervención manual.");
+                }
+
+                String descripcion = request.getDescripcion() != null ? request.getDescripcion().trim() : "";
+                if (descripcion.isEmpty()) {
+                        throw new IllegalArgumentException("La descripción es obligatoria.");
+                }
+                if (descripcion.length() > 1000) {
+                        throw new IllegalArgumentException("La descripción no puede superar los 1000 caracteres.");
+                }
+
+                LocalDateTime ahora = LocalDateTime.now();
+                // 1 min de tolerancia por diferencias de reloj entre navegador y servidor.
+                if (request.getFechaHora() != null && request.getFechaHora().isAfter(ahora.plusMinutes(1))) {
+                        throw new IllegalArgumentException("La fecha y hora de la intervención no puede ser futura.");
+                }
+
+                Intervencion intervencion = new Intervencion();
+                intervencion.setAnimal(animal);
+                intervencion.setInterventor(usuario);
+                intervencion.setTipo(request.getTipo());
+                intervencion.setDescripcion(descripcion);
+                intervencion.setFechaHora(request.getFechaHora() != null ? request.getFechaHora() : ahora);
+
+                return toIntervencionResponse(intervencionRepository.save(intervencion));
+        }
+
+        private IntervencionResponse toIntervencionResponse(Intervencion i) {
+                String interventorStr = i.getInterventor().getNombre();
+                if (i.getInterventor().getApellido() != null
+                                && !i.getInterventor().getApellido().isEmpty()) {
+                        interventorStr += " " + i.getInterventor().getApellido();
+                }
+                if (interventorStr == null || interventorStr.isBlank()) {
+                        interventorStr = i.getInterventor().getEmail();
+                }
+
+                return IntervencionResponse.builder()
+                                .id(i.getId())
+                                .alertaId(i.getAlerta() != null ? i.getAlerta().getId() : null)
+                                .animalId(i.getAnimal().getId())
+                                .interventor(interventorStr)
+                                .descripcion(i.getDescripcion())
+                                .fechaHora(i.getFechaHora())
+                                .tipo(i.getTipo())
+                                .build();
+        }
+
         private AlertaResponse alertaToAlertaResponse(Alerta alerta) {
+                boolean aplicaAviso = datoDesactualizadoEvaluator.aplica(alerta.getDisparador(), alerta.getTipo(),
+                                alerta.getEstado());
+                LocalDateTime ultimaSenial = aplicaAviso && alerta.getAnimal() != null
+                                && alerta.getAnimal().getCaravana() != null
+                                                ? alerta.getAnimal().getCaravana().getUltimaSenial()
+                                                : null;
                 return AlertaResponse.builder()
                                 .id(alerta.getId())
                                 .tipo(alerta.getTipo())
+                                .subtipo(alerta.getTipo())
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
                                 .latitud(alerta.getLatitud())
                                 .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
                                 .severidad(alerta.getSeveridad().name())
+                                .caravanaUltimaSenial(ultimaSenial)
+                                .datoPosiblementeDesactualizado(datoDesactualizadoEvaluator.esDatoDesactualizado(
+                                                alerta.getDisparador(), alerta.getTipo(), alerta.getEstado(),
+                                                ultimaSenial))
+                                .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
+                                .animalesAislados(alerta.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL
+                                                ? animalesAislados(alerta)
+                                                : null)
                                 .build();
+        }
+
+        // ponytail: una consulta por alerta de aislamiento y por animal del mapa;
+        // cargarlas en lote si el mapa crece.
+        private List<AnimalAisladoResponse> animalesAislados(Alerta alerta) {
+                return alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId()).stream()
+                                .map(episodio -> AnimalAisladoResponse.from(episodio, alerta.getValorUmbral()))
+                                .toList();
         }
 
         @Override
@@ -1212,7 +1338,7 @@ public class AnimalServiceImpl implements AnimalService {
                 if (telemetriaDesactualizada(telemetria)) {
                         return IndicadorResponse.builder()
                                         .nombre("Estado de movimiento")
-                                        .descripcion(descripcionSinDatosPorCollarDesactualizado())
+                                        .descripcion(descripcionSinDatosPorCaravanaDesactualizada())
                                         .valor(String.valueOf(telemetria.getMoveState()))
                                         .estado("SIN DATOS")
                                         .build();
@@ -1238,8 +1364,8 @@ public class AnimalServiceImpl implements AnimalService {
                 return antiguedad.compareTo(Duration.ofHours(HORAS_SIN_DATOS_MOVIMIENTO)) > 0;
         }
 
-        private String descripcionSinDatosPorCollarDesactualizado() {
-                return "El collar no transmitió datos en las últimas " + HORAS_SIN_DATOS_MOVIMIENTO
+        private String descripcionSinDatosPorCaravanaDesactualizada() {
+                return "La caravana no transmitió datos en las últimas " + HORAS_SIN_DATOS_MOVIMIENTO
                                 + " horas; no se puede calcular el estado de movimiento actual.";
         }
 
@@ -1400,6 +1526,80 @@ public class AnimalServiceImpl implements AnimalService {
                 return mapToResponse(animal);
         }
 
+        /**
+         * Empareja al azar las caravanas DISPONIBLES del establecimiento con sus animales activos
+         * que todavía no tienen caravana. Si sobran animales, cuáles quedan sin caravana también es al azar.
+         * Con {@code rodeoLoteId}, solo considera los animales de ese rodeo/lote; las caravanas siguen
+         * saliendo del establecimiento, que es donde viven. Devuelve solo los animales a los que se les
+         * asignó una caravana.
+         */
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public List<AnimalResponse> asignarCaravanasAleatoriamente(Long establecimientoId, Long rodeoLoteId,
+                        String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+
+                validarPermisoGestionCaravana(usuario, establecimiento);
+
+                if (rodeoLoteId != null) {
+                        RodeoLote lote = rodeoLoteRepository.findById(rodeoLoteId)
+                                        .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
+                        if (!lote.getEstablecimiento().getId().equals(establecimiento.getId())) {
+                                throw new IllegalArgumentException("El rodeo no pertenece al establecimiento.");
+                        }
+                }
+
+                List<Animal> animalesSinCaravana = new ArrayList<>(animalRepository.findByEstablecimientoId(establecimientoId)
+                                .stream()
+                                .filter(a -> a.getCaravana() == null && a.getEstadoActual() != EstadoAnimal.INACTIVO)
+                                .filter(a -> rodeoLoteId == null
+                                                || (a.getRodeoLote() != null && rodeoLoteId.equals(a.getRodeoLote().getId())))
+                                .toList());
+                List<Caravana> caravanasDisponibles = new ArrayList<>(caravanaRepository
+                                .findAllByEstablecimientoIdAndEstadoSensor(establecimientoId, EstadoSensor.DISPONIBLE));
+
+                Collections.shuffle(animalesSinCaravana);
+                Collections.shuffle(caravanasDisponibles);
+
+                int cantidad = Math.min(animalesSinCaravana.size(), caravanasDisponibles.size());
+                List<AnimalResponse> asignados = new ArrayList<>(cantidad);
+                for (int i = 0; i < cantidad; i++) {
+                        Animal animal = animalesSinCaravana.get(i);
+                        asignarCaravanaInterna(animal, caravanasDisponibles.get(i).getId());
+                        asignados.add(mapToResponse(animalRepository.save(animal)));
+                }
+                return asignados;
+        }
+
+        /**
+         * Excel con los animales del establecimiento que tienen caravana vinculada, para colocar los
+         * sensores en el campo. Con {@code animalIds} vacío o null exporta todos; si no, solo esos.
+         */
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public byte[] exportarAsignacionesCaravanas(Long establecimientoId, List<Long> animalIds, String emailUsuario) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
+                                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
+
+                validarPermisoGestionCaravana(usuario, establecimiento);
+
+                Set<Long> filtro = animalIds == null ? Set.of() : new HashSet<>(animalIds);
+                List<Animal> conCaravana = animalRepository.findByEstablecimientoId(establecimientoId).stream()
+                                .filter(a -> a.getCaravana() != null)
+                                .filter(a -> filtro.isEmpty() || filtro.contains(a.getId()))
+                                .toList();
+                return asignacionCaravanasExcelService.generar(establecimiento.getNombre(), conCaravana);
+        }
+
         @SuppressWarnings("null")
         private void asignarCaravanaInterna(Animal animal, Long caravanaId) {
                 Caravana nuevaCaravana = caravanaRepository.findById(caravanaId)
@@ -1475,5 +1675,114 @@ public class AnimalServiceImpl implements AnimalService {
                         default:
                                 return "No hay revisiones de estado de salud cargadas para este animal.";
                 }
+        }
+
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public CohesionResponse obtenerCohesion(String emailUsuario, Long animalId,
+                        LocalDateTime desde, LocalDateTime hasta) {
+                Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+                Animal animal = animalRepository.findById(animalId)
+                                .orElseThrow(() -> new IllegalArgumentException("Animal no encontrado."));
+
+                Establecimiento establecimiento = animal.getEstablecimiento();
+                if (establecimiento == null) {
+                        throw new AccessDeniedException("El animal no pertenece a ningún establecimiento.");
+                }
+
+                boolean miembroActivo = establecimiento.getEmpleados().stream()
+                                .anyMatch(v -> v.getUsuario().equals(usuario) && v.isActivo());
+                if (!miembroActivo) {
+                        throw new AccessDeniedException(
+                                        "El usuario no pertenece al establecimiento del animal o no está activo.");
+                }
+
+                // Por defecto, los últimos 7 días calendario incluyendo hoy (lo que muestra la ficha).
+                if (hasta == null) {
+                        hasta = LocalDateTime.now();
+                }
+                if (desde == null) {
+                        desde = hasta.toLocalDate().minusDays(DIAS_COHESION_POR_DEFECTO - 1).atStartOfDay();
+                }
+                if (desde.isAfter(hasta)) {
+                        throw new IllegalArgumentException("La fecha 'desde' no puede ser posterior a 'hasta'.");
+                }
+
+                List<RegistroCohesion> cohesionRegistros = cohesionRepository
+                                .findByEstablecimientoIdAndAnimalIdAndFechaBetweenOrderByFechaAsc(
+                                                establecimiento.getId(), animalId, desde, hasta);
+
+                LocalDateTime hastaAnterior = desde;
+                LocalDateTime desdeAnterior = hastaAnterior.minus(Duration.between(desde, hasta));
+                Double promedioPeriodoAnterior = promedio(cohesionRepository
+                                .findByEstablecimientoIdAndAnimalIdAndFechaBetweenOrderByFechaAsc(
+                                                establecimiento.getId(), animalId, desdeAnterior, hastaAnterior)
+                                .stream().map(RegistroCohesion::getIndiceCohesion).toList());
+
+                // Promedio del rodeo del animal en cada análisis (ml-geo mide la cohesión
+                // contra su propio rodeo; los animales sin rodeo forman un grupo aparte).
+                List<Object[]> promediosRodeo = animal.getRodeoLote() != null
+                                ? cohesionRepository.promedioPorFechaDelRodeo(establecimiento.getId(),
+                                                animal.getRodeoLote().getId(), desde, hasta)
+                                : cohesionRepository.promedioPorFechaSinRodeo(establecimiento.getId(), desde, hasta);
+
+                // Un punto por hora (rangos de hasta 48 h) o por día; los intervalos sin análisis van con null.
+                ChronoUnit unidad = Duration.between(desde, hasta).compareTo(Duration.ofHours(48)) <= 0
+                                ? ChronoUnit.HOURS
+                                : ChronoUnit.DAYS;
+                Map<LocalDateTime, List<Double>> animalPorIntervalo = cohesionRegistros.stream()
+                                .collect(Collectors.groupingBy(r -> r.getFecha().truncatedTo(unidad),
+                                                Collectors.mapping(RegistroCohesion::getIndiceCohesion,
+                                                                Collectors.toList())));
+                Map<LocalDateTime, List<Double>> rodeoPorIntervalo = promediosRodeo.stream()
+                                .collect(Collectors.groupingBy(fila -> ((LocalDateTime) fila[0]).truncatedTo(unidad),
+                                                Collectors.mapping(fila -> ((Number) fila[1]).doubleValue(),
+                                                                Collectors.toList())));
+
+                List<CohesionPuntoSerie> serie = new ArrayList<>();
+                for (LocalDateTime inicio = desde.truncatedTo(unidad); !inicio.isAfter(hasta); inicio = inicio
+                                .plus(1, unidad)) {
+                        serie.add(new CohesionPuntoSerie(
+                                        inicio.atZone(ZoneId.systemDefault()).toOffsetDateTime(),
+                                        escalarCohesion(promedio(animalPorIntervalo.get(inicio))),
+                                        escalarCohesion(promedio(rodeoPorIntervalo.get(inicio)))));
+                }
+
+                Double indiceActual = cohesionRegistros.isEmpty()
+                                ? null
+                                : cohesionRegistros.get(cohesionRegistros.size() - 1).getIndiceCohesion();
+
+                return CohesionResponse.builder()
+                                .actual(escalarCohesion(indiceActual))
+                                .promedioRodeo(escalarCohesion(promedio(promediosRodeo.stream()
+                                                .map(fila -> ((Number) fila[1]).doubleValue()).toList())))
+                                .promedioPeriodoAnterior(escalarCohesion(promedioPeriodoAnterior))
+                                .serie(serie)
+                                .build();
+        }
+
+        /** Promedio de los valores, o null si no hay ninguno (sin datos no es 0). */
+        private static Double promedio(List<Double> valores) {
+                if (valores == null || valores.isEmpty()) {
+                        return null;
+                }
+                return valores.stream().mapToDouble(Double::doubleValue).average().getAsDouble();
+        }
+
+        /** El índice se guarda 0–1; la ficha lo muestra 0–100 con dos decimales. */
+        private static Double escalarCohesion(Double indice) {
+                return indice == null ? null : redondearDosDecimales(indice * 100);
+        }
+
+        private static Double redondearDosDecimales(Double valor) {
+                if (valor == null) {
+                        return null;
+                }
+                return BigDecimal.valueOf(valor)
+                                .setScale(2, RoundingMode.HALF_UP)
+                                .doubleValue();
         }
 }

@@ -69,7 +69,7 @@ class CaravanaServiceImplTest {
     void crearCaravanaSinCodigoExitoso() {
         CaravanaRequest request = CaravanaRequest.builder()
                 .dev_eui("AA-BB-CC-DD")
-                .alias("Collar 1")
+                .alias("Caravana 1")
                 .establecimientoId(10L)
                 .build();
 
@@ -85,7 +85,7 @@ class CaravanaServiceImplTest {
 
         assertThat(response.getId()).isEqualTo(1L);
         assertThat(response.getDevEui()).isEqualTo("AA-BB-CC-DD");
-        assertThat(response.getAlias()).isEqualTo("Collar 1");
+        assertThat(response.getAlias()).isEqualTo("Caravana 1");
         assertThat(response.getCodigo()).isNull();
         assertThat(response.getFechaAsignacion()).isNull();
         assertThat(response.getEstadoSensor()).isEqualTo(EstadoSensor.DISPONIBLE);
@@ -122,6 +122,7 @@ class CaravanaServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe rechazar el alta con DevEuiDuplicadoException si el dev_eui ya existe")
     void crearCaravanaDevEuiDuplicado() {
         CaravanaRequest request = CaravanaRequest.builder()
@@ -140,6 +141,7 @@ class CaravanaServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe rechazar el alta si el idCaravanaOficial ya existe")
     void crearCaravanaCodigoDuplicado() {
         CaravanaRequest request = CaravanaRequest.builder()
@@ -160,6 +162,7 @@ class CaravanaServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("Debe rechazar el alta si el establecimiento no existe")
     void crearCaravanaEstablecimientoInexistente() {
         CaravanaRequest request = CaravanaRequest.builder()
@@ -297,6 +300,7 @@ class CaravanaServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("darDeBajaCaravana debe marcar INACTIVO/no-activo una caravana DISPONIBLE")
     void darDeBajaCaravanaDisponibleExitoso() {
         Caravana caravana = new Caravana();
@@ -312,7 +316,7 @@ class CaravanaServiceImplTest {
         when(caravanaRepository.findById(1L)).thenReturn(Optional.of(caravana));
         when(caravanaRepository.save(any(Caravana.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CaravanaResponse response = caravanaService.darDeBajaCaravana(1L, "Collar dañado", "admin@vigia.dev");
+        CaravanaResponse response = caravanaService.darDeBajaCaravana(1L, "Caravana dañada", "admin@vigia.dev");
 
         assertThat(response.getEstadoSensor()).isEqualTo(EstadoSensor.INACTIVO);
         assertThat(response.getActivo()).isFalse();
@@ -320,6 +324,7 @@ class CaravanaServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("darDeBajaCaravana debe desvincular el animal cuando la caravana está VINCULADO")
     void darDeBajaCaravanaVinculadaDesvinculaAnimal() {
         Animal animal = new Animal();
@@ -347,6 +352,7 @@ class CaravanaServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("darDeBajaCaravana debe rechazar una caravana ya INACTIVO con 400")
     void darDeBajaCaravanaYaInactivaRechazada() {
         Caravana caravana = new Caravana();
@@ -368,6 +374,7 @@ class CaravanaServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("darDeBajaCaravana debe rechazar el acceso de un usuario ajeno al establecimiento")
     void darDeBajaCaravanaUsuarioSinAcceso() {
         establecimiento.setEmpleados(List.of());
@@ -387,6 +394,7 @@ class CaravanaServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("reactivarCaravana debe marcar DISPONIBLE una caravana INACTIVO")
     void reactivarCaravanaExitoso() {
         Caravana caravana = new Caravana();
@@ -471,6 +479,7 @@ class CaravanaServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     @DisplayName("reactivarCaravana debe rechazar una caravana que no está INACTIVO con 400")
     void reactivarCaravanaNoInactivaRechazada() {
         Caravana caravana = new Caravana();

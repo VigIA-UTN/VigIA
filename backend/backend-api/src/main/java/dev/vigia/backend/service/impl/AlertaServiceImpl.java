@@ -3,34 +3,48 @@ package dev.vigia.backend.service.impl;
 import java.util.Comparator;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
+import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
 import dev.vigia.backend.dto.DetalleSanitarioResponse;
+import dev.vigia.backend.dto.DetalleAislamientoResponse;
 import dev.vigia.backend.dto.DetalleGeoespacialResponse;
+import dev.vigia.backend.dto.DiagnosticoRequest;
+import dev.vigia.backend.dto.DiagnosticoResponse;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
+import dev.vigia.backend.exception.AlertaYaProcesadaException;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.AlertaAnimalAislado;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.Diagnostico;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.Usuario;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.DiagnosticoRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
@@ -40,32 +54,45 @@ import dev.vigia.backend.model.EstadoReproductivo;
 import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.OrigenEstado;
+import dev.vigia.backend.model.Rol;
 import dev.vigia.backend.model.SeveridadAlerta;
 import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.service.AlertaService;
+import dev.vigia.backend.service.CeloDatoDesactualizadoEvaluator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AlertaServiceImpl implements AlertaService {
 
+        /** Mismo grupo que el filtro GEO del mapa: el contador "Geoespacial" y el filtro tipo=geoespacial. */
+        private static final Set<DisparadorAlerta> GEOESPACIALES = EnumSet.of(
+                        DisparadorAlerta.ABIGEATO, DisparadorAlerta.FUERA_DE_PERIMETRO,
+                        DisparadorAlerta.AISLAMIENTO_SOCIAL);
+
         private final AlertaRepository alertaRepository;
+
+        /** Misma ventana que usa el worker para el análisis geoespacial (VIGIA_GEO_VENTANA_HORAS). */
+        @Value("${vigia.geo.ventana-horas:24}")
+        private int ventanaHorasGeo = 24;
         private final AnimalRepository animalRepository;
         private final UsuarioRepository usuarioRepository;
         private final EstablecimientoRepository establecimientoRepository;
         private final IntervencionRepository intervencionRepository;
         private final EstadoReproductivoRepository estadoReproductivoRepository;
         private final EstadoSaludRepository estadoSaludRepository;
-        private final RabbitTemplate rabbitTemplate;
+        private final DiagnosticoRepository diagnosticoRepository;
+        private final PublicadorDeAlertas publicadorDeAlertas;
         private final ObjectMapper objectMapper;
+        private final CeloDatoDesactualizadoEvaluator datoDesactualizadoEvaluator;
+        private final AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
 
         @Override
+        @Transactional(readOnly = true)
         public List<AlertaResponse> listarAlertas(String emailUsuario, Long establecimientoId, String tipo,
                         String severidad, EstadoAlerta estado) {
                 usuarioRepository.findByEmail(emailUsuario)
@@ -82,18 +109,9 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                DisparadorAlerta disparadorEnum = null;
-                if (tipo != null && !tipo.isBlank()) {
-                        String t = tipo.trim().toLowerCase();
-                        if (t.equals("reproductivo"))
-                                disparadorEnum = DisparadorAlerta.CELO;
-                        else if (t.equals("sanitario"))
-                                disparadorEnum = DisparadorAlerta.SALUD;
-                        else if (t.equals("geoespacial"))
-                                disparadorEnum = DisparadorAlerta.ABIGEATO;
-                }
+                Set<DisparadorAlerta> disparadores = resolverDisparadores(tipo);
 
-                dev.vigia.backend.model.SeveridadAlerta severidadEnum = null;
+                SeveridadAlerta severidadEnum = null;
                 if (severidad != null && !severidad.isBlank()) {
                         String s = severidad.trim().toUpperCase();
                         if (s.equals("ALTA"))
@@ -104,7 +122,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 severidadEnum = SeveridadAlerta.BAJA;
                 }
 
-                List<Alerta> alertas = alertaRepository.findByFiltros(establecimientoId, estado, disparadorEnum,
+                List<Alerta> alertas = alertaRepository.findByFiltros(establecimientoId, estado, disparadores,
                                 severidadEnum);
 
                 return alertas.stream()
@@ -113,6 +131,7 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         @Override
+        @Transactional(readOnly = true)
         public List<AlertaResponse> listarAlertasCelo(
                         String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
 
@@ -140,6 +159,7 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         @Override
+        @Transactional(readOnly = true)
         public List<AlertaResponse> listarAlertasSalud(
                         String emailUsuario, Long establecimientoId, EstadoAlerta estado) {
 
@@ -195,8 +215,8 @@ public class AlertaServiceImpl implements AlertaService {
                                 reproductivo = count;
                         } else if (disparador == DisparadorAlerta.SALUD) {
                                 sanitario = count;
-                        } else if (disparador == DisparadorAlerta.ABIGEATO) {
-                                geoespacial = count;
+                        } else if (GEOESPACIALES.contains(disparador)) {
+                                geoespacial += count;
                         }
                 }
 
@@ -270,17 +290,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 })
                                 .collect(Collectors.toList());
 
-                String usuarioAccionStr = null;
-                if (alerta.getUsuarioConfirmacion() != null) {
-                        usuarioAccionStr = alerta.getUsuarioConfirmacion().getNombre();
-                        if (alerta.getUsuarioConfirmacion().getApellido() != null
-                                        && !alerta.getUsuarioConfirmacion().getApellido().isEmpty()) {
-                                usuarioAccionStr += " " + alerta.getUsuarioConfirmacion().getApellido();
-                        }
-                        if (usuarioAccionStr == null || usuarioAccionStr.isBlank()) {
-                                usuarioAccionStr = alerta.getUsuarioConfirmacion().getEmail();
-                        }
-                }
+                String usuarioAccionStr = nombreVisible(alerta.getUsuarioConfirmacion());
 
                 DetalleSanitarioResponse detalleSanitario = null;
                 if (alerta.getDisparador() == DisparadorAlerta.SALUD) {
@@ -292,7 +302,14 @@ public class AlertaServiceImpl implements AlertaService {
                         detalleGeoespacial = construirDetalleGeoespacial(alerta);
                 }
 
+                DetalleAislamientoResponse detalleAislamiento = null;
+                if (alerta.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL) {
+                        detalleAislamiento = construirDetalleAislamiento(alerta);
+                }
+
                 String descripcionDatoOrigen = construirDescripcionDatoOrigen(alerta, detalleSanitario);
+
+                LocalDateTime ultimaSenial = ultimaSenialDe(alerta);
 
                 return AlertaDetalleResponse.builder()
                                 .id(alerta.getId())
@@ -315,8 +332,23 @@ public class AlertaServiceImpl implements AlertaService {
                                 .descripcionDatoOrigen(descripcionDatoOrigen)
                                 .detalleSanitario(detalleSanitario)
                                 .detalleGeoespacial(detalleGeoespacial)
+                                .detalleAislamiento(detalleAislamiento)
                                 .accionRecomendada(alerta.getAccionRecomendada())
+                                .caravanaUltimaSenial(ultimaSenial)
+                                .datoPosiblementeDesactualizado(esDatoDesactualizado(alerta, ultimaSenial))
+                                .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
                                 .build();
+        }
+
+        private static LocalDateTime ultimaSenialDe(Alerta alerta) {
+                return alerta.getAnimal() != null && alerta.getAnimal().getCaravana() != null
+                                ? alerta.getAnimal().getCaravana().getUltimaSenial()
+                                : null;
+        }
+
+        private boolean esDatoDesactualizado(Alerta alerta, LocalDateTime ultimaSenial) {
+                return datoDesactualizadoEvaluator.esDatoDesactualizado(alerta.getDisparador(), alerta.getTipo(),
+                                alerta.getEstado(), ultimaSenial);
         }
 
         private String construirDescripcionDatoOrigen(Alerta alerta, DetalleSanitarioResponse detalleSanitario) {
@@ -326,6 +358,11 @@ public class AlertaServiceImpl implements AlertaService {
 
                 Integer confianzaPct = formatConfianzaPct(alerta.getValorDetectado());
                 DisparadorAlerta disparador = alerta.getDisparador();
+
+                if (Alerta.TIPO_ANESTRO.equals(alerta.getTipo())) {
+                        return String.format("El animal no registra celo hace %d días (umbral: %d días).",
+                                        Math.round(alerta.getValorDetectado()), Math.round(alerta.getValorUmbral()));
+                }
 
                 if (disparador == DisparadorAlerta.CELO) {
                         if (confianzaPct != null) {
@@ -350,6 +387,10 @@ public class AlertaServiceImpl implements AlertaService {
 
                 if (disparador == DisparadorAlerta.FUERA_DE_PERIMETRO) {
                         return "El sistema detectó que el animal salió del perímetro asignado.";
+                }
+
+                if (disparador == DisparadorAlerta.AISLAMIENTO_SOCIAL) {
+                        return "La posición de los animales listados se mantuvo lejos del grupo principal del rodeo durante más tiempo que lo habitual.";
                 }
 
                 if (confianzaPct != null) {
@@ -427,6 +468,27 @@ public class AlertaServiceImpl implements AlertaService {
                                 .build();
         }
 
+        private DetalleAislamientoResponse construirDetalleAislamiento(Alerta alerta) {
+                List<AlertaAnimalAislado> episodios = alertaAnimalAisladoRepository
+                                .findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId());
+
+                String nombreLote = (alerta.getAnimal() != null && alerta.getAnimal().getRodeoLote() != null)
+                                ? alerta.getAnimal().getRodeoLote().getNombre()
+                                : null;
+
+                return DetalleAislamientoResponse.builder()
+                                .animalesAislados(episodios.stream()
+                                                .map(episodio -> AnimalAisladoResponse.from(episodio, alerta.getValorUmbral()))
+                                                .toList())
+                                .tsInicio(episodios.stream()
+                                                .map(AlertaAnimalAislado::getTsInicio)
+                                                .min(Comparator.naturalOrder())
+                                                .orElse(alerta.getTsGeneracion()))
+                                .nombreLote(nombreLote)
+                                .ventanaHoras(ventanaHorasGeo)
+                                .build();
+        }
+
         private String descripcionGenerica(String severidad, String posibleCausa) {
                 String sev = severidad != null ? severidad.toLowerCase() : "desconocida";
                 String causa = (posibleCausa != null && !posibleCausa.isBlank()) ? posibleCausa : "no determinada";
@@ -436,17 +498,35 @@ public class AlertaServiceImpl implements AlertaService {
         }
 
         private AlertaResponse toResponse(Alerta alerta) {
+                LocalDateTime ultimaSenial = datoDesactualizadoEvaluator.aplica(alerta.getDisparador(),
+                                alerta.getTipo(), alerta.getEstado()) ? ultimaSenialDe(alerta) : null;
                 return AlertaResponse.builder()
                                 .id(alerta.getId())
                                 .tipo(alerta.getDisparador() != null ? alerta.getDisparador().name() : alerta.getTipo())
+                                .subtipo(alerta.getTipo())
                                 .severidad(alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null)
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
+                                .tsConfirmacion(alerta.getTsConfirmacion())
                                 .latitud(alerta.getLatitud())
                                 .longitud(alerta.getLongitud())
                                 .estado(alerta.getEstado())
                                 .accionRecomendada(alerta.getAccionRecomendada())
+                                .caravanaUltimaSenial(ultimaSenial)
+                                .datoPosiblementeDesactualizado(esDatoDesactualizado(alerta, ultimaSenial))
+                                .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
+                                .animalesAislados(animalesAislados(alerta))
                                 .build();
+        }
+
+        // ponytail: una consulta por cada alerta de aislamiento de un listado; cargarlas en lote si los listados crecen.
+        private List<AnimalAisladoResponse> animalesAislados(Alerta alerta) {
+                if (alerta.getDisparador() != DisparadorAlerta.AISLAMIENTO_SOCIAL) {
+                        return null;
+                }
+                return alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId()).stream()
+                                .map(episodio -> AnimalAisladoResponse.from(episodio, alerta.getValorUmbral()))
+                                .toList();
         }
 
         @Override
@@ -458,7 +538,7 @@ public class AlertaServiceImpl implements AlertaService {
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
-                Alerta alerta = alertaRepository.findById(alertaId)
+                Alerta alerta = alertaRepository.findByIdForUpdate(alertaId)
                                 .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
 
                 Long establecimientoId = alerta.getAnimal().getEstablecimiento().getId();
@@ -473,7 +553,13 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
+                validarCamperoNoActuaSobreSalud(usuario, alerta);
+
                 EstadoAlerta estadoAnterior = alerta.getEstado();
+
+                if (estadoAnterior != EstadoAlerta.PENDIENTE) {
+                        throw new AlertaYaProcesadaException(mensajeAlertaYaProcesada(alerta));
+                }
 
                 if (estadoAnterior == EstadoAlerta.PENDIENTE &&
                                 (nuevoEstado == EstadoAlerta.CONFIRMADA || nuevoEstado == EstadoAlerta.DESCARTADA)) {
@@ -489,7 +575,10 @@ public class AlertaServiceImpl implements AlertaService {
                                 EstadoReproductivo estadoCelo = new EstadoReproductivo();
                                 estadoCelo.setAnimal(alerta.getAnimal());
                                 estadoCelo.setUsuarioRegistrador(usuario);
-                                estadoCelo.setEstado(TipoReproductivo.CELO);
+                                // Confirmar un anestro deja el animal en ANESTRO: el detector no lo vuelve a alertar.
+                                estadoCelo.setEstado(Alerta.TIPO_ANESTRO.equals(alerta.getTipo())
+                                                ? TipoReproductivo.ANESTRO
+                                                : TipoReproductivo.CELO);
                                 estadoCelo.setOrigen(OrigenEstado.MANUAL);
                                 estadoCelo.setFechaRegistro(LocalDateTime.now());
 
@@ -506,15 +595,7 @@ public class AlertaServiceImpl implements AlertaService {
                 }
                 Alerta actualizado = alertaRepository.save(alerta);
 
-                AlertaEventDTO eventDTO = AlertaEventDTO.builder()
-                                .id(actualizado.getId())
-                                .animalId(actualizado.getAnimal().getId())
-                                .estado(actualizado.getEstado())
-                                .tipo(actualizado.getDisparador() != null ? actualizado.getDisparador().name()
-                                                : actualizado.getTipo())
-                                .tsGeneracion(actualizado.getTsGeneracion())
-                                .build();
-                rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
+                publicarCambioDeEstado(actualizado);
 
                 return this.toResponse(actualizado);
         }
@@ -537,12 +618,16 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento indicado o no está activo.");
                 }
 
-                Alerta alerta = alertaRepository.findById(alertaId)
+                Alerta alerta = alertaRepository.findByIdForUpdate(alertaId)
                                 .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada."));
 
                 if (alerta.getAnimal() == null || alerta.getAnimal().getEstablecimiento() == null ||
                                 !alerta.getAnimal().getEstablecimiento().getId().equals(establecimientoId)) {
                         throw new AccessDeniedException("La alerta no pertenece al establecimiento indicado.");
+                }
+
+                if (Alerta.TIPO_ANESTRO.equals(alerta.getTipo())) {
+                        throw new IllegalArgumentException("Las alertas de anestro no tienen ventana de inseminación.");
                 }
 
                 if (alerta.getEstado() != EstadoAlerta.PENDIENTE) {
@@ -554,17 +639,30 @@ public class AlertaServiceImpl implements AlertaService {
                 alerta.setTsConfirmacion(LocalDateTime.now());
                 Alerta actualizado = alertaRepository.save(alerta);
 
-                AlertaEventDTO eventDTO = AlertaEventDTO.builder()
-                                .id(actualizado.getId())
-                                .animalId(actualizado.getAnimal().getId())
-                                .estado(actualizado.getEstado())
-                                .tipo(actualizado.getTipo())
-                                .tsGeneracion(actualizado.getTsGeneracion())
-                                .build();
-                rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "alerta.update", eventDTO);
+                publicarCambioDeEstado(actualizado);
 
                 return this.toResponse(actualizado);
         }
+
+        /** Publica la alerta completa, no solo el estado: el SSE la reenvía tal cual y el front reemplaza la tarjeta. */
+        private void publicarCambioDeEstado(Alerta alerta) {
+                AlertaEventDTO eventDTO = AlertaEventDTO.builder()
+                                .id(alerta.getId())
+                                .animalId(alerta.getAnimal().getId())
+                                .estado(alerta.getEstado())
+                                .tipo(alerta.getTipo())
+                                .disparador(alerta.getDisparador())
+                                .severidad(alerta.getSeveridad())
+                                .valorUmbral(alerta.getValorUmbral())
+                                .valorDetectado(alerta.getValorDetectado())
+                                .latitud(alerta.getLatitud())
+                                .longitud(alerta.getLongitud())
+                                .accionRecomendada(alerta.getAccionRecomendada())
+                                .tsGeneracion(alerta.getTsGeneracion())
+                                .build();
+                publicadorDeAlertas.publicar(eventDTO);
+        }
+
 
         @Override
         @SuppressWarnings("null")
@@ -595,6 +693,9 @@ public class AlertaServiceImpl implements AlertaService {
 
                 if (alerta.getDisparador() != DisparadorAlerta.CELO) {
                         throw new IllegalArgumentException("La alerta no es de tipo CELO.");
+                }
+                if (Alerta.TIPO_ANESTRO.equals(alerta.getTipo())) {
+                        throw new IllegalArgumentException("Las alertas de anestro no tienen ventana de inseminación.");
                 }
 
                 LocalDateTime now = LocalDateTime.now();
@@ -669,6 +770,8 @@ public class AlertaServiceImpl implements AlertaService {
                         throw new AccessDeniedException("No tiene permiso para intervenir esta alerta");
                 }
 
+                validarCamperoNoActuaSobreSalud(usuario, alerta);
+
                 if (alerta.getEstado() != EstadoAlerta.CONFIRMADA) {
                         throw new IllegalArgumentException(
                                         "La alerta debe estar confirmada antes de registrar una intervención.");
@@ -703,6 +806,118 @@ public class AlertaServiceImpl implements AlertaService {
                 return this.toResponse(alerta);
         }
 
+        /**
+         * Registra un diagnóstico veterinario sobre una alerta sanitaria confirmada
+         * de un establecimiento del usuario. Solo inserta en diagnosticos: no
+         * modifica la alerta ni publica eventos.
+         */
+        @Override
+        @Transactional
+        @SuppressWarnings("null")
+        public DiagnosticoResponse registrarDiagnostico(String emailUsuario, Long alertaId, DiagnosticoRequest request) {
+
+                Alerta alerta = alertaRepository.findById(alertaId)
+                                .orElseThrow(() -> new IllegalArgumentException("Alerta no encontrada"));
+
+                Usuario veterinario = usuarioRepository.findByEmail(emailUsuario)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+                Long establecimientoId = alerta.getAnimal().getEstablecimiento().getId();
+                boolean perteneceAlEstablecimiento = establecimientoRepository
+                                .findActiveEstablecimientoByUsuarioEmail(emailUsuario).stream()
+                                .anyMatch(e -> e.getId().equals(establecimientoId));
+                if (!perteneceAlEstablecimiento) {
+                        throw new AccessDeniedException("No tiene permiso para diagnosticar esta alerta");
+                }
+
+                if (alerta.getDisparador() != DisparadorAlerta.SALUD) {
+                        throw new IllegalArgumentException(
+                                        "Solo se pueden registrar diagnósticos sobre alertas sanitarias.");
+                }
+
+                if (alerta.getEstado() != EstadoAlerta.CONFIRMADA) {
+                        throw new IllegalArgumentException(
+                                        "La alerta debe estar confirmada antes de registrar un diagnóstico.");
+                }
+
+                String texto = request.getDiagnostico() != null ? request.getDiagnostico().trim() : "";
+                String tratamiento = request.getTratamiento() != null ? request.getTratamiento().trim() : "";
+                if (texto.isEmpty()) {
+                        throw new IllegalArgumentException("El diagnóstico es obligatorio.");
+                }
+                if (texto.length() > 200) {
+                        throw new IllegalArgumentException("El diagnóstico no puede superar los 200 caracteres.");
+                }
+                if (tratamiento.length() > 500) {
+                        throw new IllegalArgumentException(
+                                        "La indicación o tratamiento no puede superar los 500 caracteres.");
+                }
+
+                Diagnostico diagnostico = new Diagnostico();
+                diagnostico.setAlerta(alerta);
+                diagnostico.setAnimal(alerta.getAnimal());
+                diagnostico.setVeterinario(veterinario);
+                diagnostico.setDiagnostico(texto);
+                diagnostico.setIndicaciones(tratamiento);
+                diagnostico.setFecha(LocalDateTime.now());
+
+                return toDiagnosticoResponse(diagnosticoRepository.save(diagnostico));
+        }
+
+        /**
+         * Lista los diagnósticos de los establecimientos activos del usuario,
+         * opcionalmente restringidos a un establecimiento y/o a un animal.
+         */
+        @Override
+        @Transactional(readOnly = true)
+        @SuppressWarnings("null")
+        public List<DiagnosticoResponse> listarDiagnosticos(String emailUsuario, Long animalId, Long establecimientoId) {
+
+                List<Long> ids = establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(emailUsuario)
+                                .stream().map(Establecimiento::getId).toList();
+
+                if (establecimientoId != null) {
+                        if (!ids.contains(establecimientoId)) {
+                                throw new AccessDeniedException(
+                                                "El usuario no pertenece al establecimiento indicado o no está activo.");
+                        }
+                        ids = List.of(establecimientoId);
+                }
+
+                if (ids.isEmpty()) {
+                        return List.of();
+                }
+
+                // ponytail: sin paginación, agregar Pageable cuando un veterinario tenga cientos de diagnósticos
+                return diagnosticoRepository.findVisibles(ids, animalId).stream()
+                                .map(this::toDiagnosticoResponse)
+                                .toList();
+        }
+
+        private DiagnosticoResponse toDiagnosticoResponse(Diagnostico d) {
+                Alerta alerta = d.getAlerta();
+                Animal animal = d.getAnimal();
+
+                DetalleSanitarioResponse detalleSanitario = alerta.getDisparador() == DisparadorAlerta.SALUD
+                                ? construirDetalleSanitario(alerta)
+                                : null;
+
+                return DiagnosticoResponse.builder()
+                                .id(d.getId())
+                                .alertaId(alerta.getId())
+                                .animalId(animal.getId())
+                                .animalAlias(animal.getAlias())
+                                .animalCaravanaOficial(animal.getIdCaravanaOficial())
+                                .establecimientoNombre(animal.getEstablecimiento().getNombre())
+                                .diagnostico(d.getDiagnostico())
+                                .tratamiento(d.getIndicaciones())
+                                .fechaRegistro(d.getFecha())
+                                .veterinarioNombre(nombreVisible(d.getVeterinario()))
+                                .disparador(alerta.getDisparador() != null ? alerta.getDisparador().name() : null)
+                                .datoOrigen(construirDescripcionDatoOrigen(alerta, detalleSanitario))
+                                .build();
+        }
+
         @Override
         @Transactional(readOnly = true)
         @SuppressWarnings("null")
@@ -735,10 +950,10 @@ public class AlertaServiceImpl implements AlertaService {
                                         "El usuario no pertenece al establecimiento del animal indicado.");
                 }
 
-                DisparadorAlerta disparadorEnum = resolverDisparador(tipo);
+                Set<DisparadorAlerta> disparadores = resolverDisparadores(tipo);
 
                 List<Alerta> alertas = alertaRepository.findByAnimalConFiltros(
-                                animalId, disparadorEnum, desde, hasta);
+                                animalId, disparadores, desde, hasta);
                 List<Intervencion> intervenciones = intervencionRepository
                                 .findByAnimalConRango(animalId, desde, hasta);
 
@@ -758,17 +973,20 @@ public class AlertaServiceImpl implements AlertaService {
                 return eventos;
         }
 
+        /** Disparadores del filtro {@code tipo}; sin tipo, todos. Un tipo desconocido es un 400, no "sin filtro". */
         @SuppressWarnings("null")
-        private DisparadorAlerta resolverDisparador(String tipo) {
+        private Set<DisparadorAlerta> resolverDisparadores(String tipo) {
                 if (tipo == null || tipo.isBlank()) {
-                        return null;
+                        return EnumSet.allOf(DisparadorAlerta.class);
                 }
                 return switch (tipo.trim().toLowerCase()) {
-                        case "celo", "reproductivo" -> DisparadorAlerta.CELO;
-                        case "sanitario" -> DisparadorAlerta.SALUD;
-                        case "geoespacial" -> DisparadorAlerta.ABIGEATO;
-                        case "perimetro" -> DisparadorAlerta.FUERA_DE_PERIMETRO;
-                        default -> null;
+                        case "celo", "reproductivo" -> EnumSet.of(DisparadorAlerta.CELO);
+                        case "salud", "sanitario" -> EnumSet.of(DisparadorAlerta.SALUD);
+                        case "abigeato" -> EnumSet.of(DisparadorAlerta.ABIGEATO);
+                        case "perimetro", "fuera_de_perimetro" -> EnumSet.of(DisparadorAlerta.FUERA_DE_PERIMETRO);
+                        case "aislamiento_social" -> EnumSet.of(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+                        case "geoespacial" -> GEOESPACIALES;
+                        default -> throw new IllegalArgumentException("Tipo de alerta desconocido: " + tipo);
                 };
         }
 
@@ -778,6 +996,7 @@ public class AlertaServiceImpl implements AlertaService {
                 return switch (estado) {
                         case CONFIRMADA -> "CONFIRMADA";
                         case DESCARTADA -> "DESCARTADA";
+                        case ARCHIVADA -> "ARCHIVADA";
                         default -> "SIN_ATENDER";
                 };
         }
@@ -790,26 +1009,30 @@ public class AlertaServiceImpl implements AlertaService {
                                 .tipo(alerta.getDisparador() != null
                                                 ? alerta.getDisparador().name()
                                                 : alerta.getTipo())
+                                .subtipo(alerta.getTipo())
                                 .severidad(alerta.getSeveridad() != null
                                                 ? alerta.getSeveridad().name()
                                                 : null)
+                                .valorDetectado(alerta.getValorDetectado())
+                                .valorUmbral(alerta.getValorUmbral())
                                 .estadoResolucion(resolverEstadoResolucion(alerta.getEstado()))
+                                .usuarioResolucion(nombreVisible(alerta.getUsuarioConfirmacion()))
+                                .tsResolucion(alerta.getTsConfirmacion())
+                                .descripcion(alerta.getAccionRecomendada())
                                 .build();
         }
 
-        private LineaTiempoEventoResponse intervencionToLineaTiempo(Intervencion intervencion) {
-                String interventorNombre = null;
-                if (intervencion.getInterventor() != null) {
-                        interventorNombre = intervencion.getInterventor().getNombre();
-                        if (intervencion.getInterventor().getApellido() != null
-                                        && !intervencion.getInterventor().getApellido().isBlank()) {
-                                interventorNombre += " " + intervencion.getInterventor().getApellido();
-                        }
-                        if (interventorNombre == null || interventorNombre.isBlank()) {
-                                interventorNombre = intervencion.getInterventor().getEmail();
-                        }
+        /** "Nombre Apellido", o el email si el usuario no cargó nombre; null si no hay usuario. */
+        private static String nombreVisible(Usuario u) {
+                if (u == null) {
+                        return null;
                 }
+                String nombre = ((u.getNombre() != null ? u.getNombre() : "") + " "
+                                + (u.getApellido() != null ? u.getApellido() : "")).trim();
+                return nombre.isEmpty() ? u.getEmail() : nombre;
+        }
 
+        private LineaTiempoEventoResponse intervencionToLineaTiempo(Intervencion intervencion) {
                 return LineaTiempoEventoResponse.builder()
                                 .tipoEvento("INTERVENCION")
                                 .id(intervencion.getId())
@@ -818,11 +1041,42 @@ public class AlertaServiceImpl implements AlertaService {
                                                 ? intervencion.getTipo().name()
                                                 : null)
                                 .descripcion(intervencion.getDescripcion())
-                                .interventor(interventorNombre)
+                                .interventor(nombreVisible(intervencion.getInterventor()))
                                 .alertaAsociadaId(intervencion.getAlerta() != null
                                                 ? intervencion.getAlerta().getId()
                                                 : null)
                                 .build();
+        }
+
+        private static final DateTimeFormatter FECHA_ACCION = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
+
+        private String mensajeAlertaYaProcesada(Alerta alerta) {
+                if (alerta.getEstado() == EstadoAlerta.ARCHIVADA) {
+                        return "Esta alerta ya fue archivada porque venció la ventana de inseminación.";
+                }
+                if (alerta.getEstado() == EstadoAlerta.VENCIDA) {
+                        return "Esta alerta ya venció y no admite cambios.";
+                }
+                String accion = switch (alerta.getEstado()) {
+                        case CONFIRMADA -> "confirmada";
+                        case DESCARTADA -> "descartada";
+                        default -> "procesada";
+                };
+                StringBuilder msg = new StringBuilder("Esta alerta ya fue ").append(accion);
+                String quien = nombreVisible(alerta.getUsuarioConfirmacion());
+                if (quien != null) {
+                        msg.append(" por ").append(quien);
+                }
+                if (alerta.getTsConfirmacion() != null) {
+                        msg.append(" el ").append(alerta.getTsConfirmacion().format(FECHA_ACCION));
+                }
+                return msg.append(".").toString();
+        }
+
+        private void validarCamperoNoActuaSobreSalud(Usuario usuario, Alerta alerta) {
+                if (usuario.getRol() == Rol.CAMPERO && alerta.getDisparador() == DisparadorAlerta.SALUD) {
+                        throw new AccessDeniedException("El campero no puede actuar sobre alertas sanitarias.");
+                }
         }
 
         private void registrarEstadoDerivado(Intervencion intervencion, IntervencionRequest request, Usuario usuario) {

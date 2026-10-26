@@ -1,11 +1,17 @@
 package dev.vigia.backend.controller;
 
+import dev.vigia.backend.dto.ConfigAislamientoRequest;
+import dev.vigia.backend.dto.ConfigAislamientoResponse;
+import dev.vigia.backend.dto.ConfigAnestroRequest;
+import dev.vigia.backend.dto.ConfigAnestroResponse;
 import dev.vigia.backend.dto.EstablecimientoRequest;
 import dev.vigia.backend.dto.EstablecimientoResponse;
+import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.service.EstablecimientoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -50,7 +56,7 @@ public class EstablecimientoController {
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<List<EstablecimientoResponse>> getAllEstablecimientos(Authentication authentication) {
-        if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"))) {
+        if (esAdmin(authentication)) {
             return ResponseEntity.ok(establecimientoService.getAllEstablecimientos());
         } else {
             return ResponseEntity.ok(establecimientoService.getEstablecimientosByUsuario(authentication.getName()));
@@ -74,16 +80,25 @@ public class EstablecimientoController {
     /**
      * PUT /api/v1/establecimientos/{id}
      * <p>
-     * Edita los datos de un establecimiento existente.
+     * Edita los datos de un establecimiento existente. Un ADMINISTRADOR puede
+     * editar cualquiera; un PRODUCTOR solo los establecimientos a los que pertenece.
      *
-     * @param id      ID del establecimiento a editar
-     * @param request nuevos datos del establecimiento
-     * @return 200 con el establecimiento actualizado
+     * @param id             ID del establecimiento a editar
+     * @param request        nuevos datos del establecimiento
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con el establecimiento actualizado, 403 si el usuario no
+     *         pertenece al establecimiento
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<EstablecimientoResponse> updateEstablecimiento(@PathVariable Long id, @RequestBody EstablecimientoRequest request) {
-        return ResponseEntity.ok(establecimientoService.updateEstablecimiento(id, request));
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR')")
+    public ResponseEntity<?> updateEstablecimiento(@PathVariable Long id,
+            @RequestBody EstablecimientoRequest request, Authentication authentication) {
+        try {
+            return ResponseEntity.ok(establecimientoService.updateEstablecimiento(
+                    id, request, authentication.getName(), esAdmin(authentication)));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        }
     }
 
     /**
@@ -112,5 +127,125 @@ public class EstablecimientoController {
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<EstablecimientoResponse> activarEstablecimiento(@PathVariable Long id) {
         return ResponseEntity.ok(establecimientoService.activarEstablecimiento(id));
+    }
+
+    private boolean esAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"));
+    }
+
+    @GetMapping("{id}/intervenciones")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> obtenerIntervenciones(@PathVariable Long id, Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<IntervencionResponse> response = establecimientoService.obtenerIntervenciones(email, id);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al obtener intervenciones: " + e.getMessage());
+        }
+    }
+
+    /**
+     * GET /api/v1/establecimientos/{id}/pesos
+     * <p>
+     * Lista todas las pesadas de los animales del establecimiento, la más reciente primero.
+     * Alimenta la card "Ganancia de peso" del dashboard.
+     */
+    @GetMapping("{id}/pesos")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> obtenerPesos(@PathVariable Long id, Authentication authentication) {
+        try {
+            return ResponseEntity.ok(establecimientoService.obtenerPesos(authentication.getName(), id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al obtener pesadas: " + e.getMessage());
+        }
+    }
+
+    // ── Configuración de anestro ──────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/establecimientos/{id}/anestro
+     * <p>
+     * Consulta los parámetros de detección de anestro de un establecimiento.
+     * Solo el PRODUCTOR o VETERINARIO activo del establecimiento puede consultarlos.
+     *
+     * @param id             ID del establecimiento
+     * @param authentication contexto de seguridad
+     * @return 200 con la configuración de anestro, 403 si no pertenece al establecimiento
+     */
+    @GetMapping("/{id}/anestro")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<ConfigAnestroResponse> getConfigAnestro(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                establecimientoService.getConfigAnestro(id, authentication.getName()));
+    }
+
+    /**
+     * PUT /api/v1/establecimientos/{id}/anestro
+     * <p>
+     * Actualiza los parámetros de detección de anestro de un establecimiento.
+     * Solo el PRODUCTOR o VETERINARIO activo del establecimiento puede editarlos.
+     * Valida rangos: días 1–365 y severidad dentro de {BAJA, MEDIA, ALTA}.
+     *
+     * @param id             ID del establecimiento
+     * @param request        nuevos parámetros (diasDeteccionAnestro, severidadAnestro)
+     * @param authentication contexto de seguridad
+     * @return 200 con la configuración actualizada, 400 si los valores son inválidos,
+     *         403 si no pertenece al establecimiento
+     */
+    @PutMapping("/{id}/anestro")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<ConfigAnestroResponse> updateConfigAnestro(
+            @PathVariable Long id,
+            @RequestBody ConfigAnestroRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                establecimientoService.updateConfigAnestro(id, request, authentication.getName()));
+    }
+
+    // ── Configuración de aislamiento ──────────────────────────────────────────
+
+    /**
+     * GET /api/v1/establecimientos/{id}/aislamiento
+     * <p>
+     * Consulta el umbral de aislamiento en metros de un establecimiento.
+     * Solo el PRODUCTOR o VETERINARIO activo del establecimiento puede consultarlo.
+     *
+     * @param id             ID del establecimiento
+     * @param authentication contexto de seguridad
+     * @return 200 con la configuración de aislamiento, 403 si no pertenece al establecimiento
+     */
+    @GetMapping("/{id}/aislamiento")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<ConfigAislamientoResponse> getConfigAislamiento(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                establecimientoService.getConfigAislamiento(id, authentication.getName()));
+    }
+
+    /**
+     * PUT /api/v1/establecimientos/{id}/aislamiento
+     * <p>
+     * Actualiza el umbral de aislamiento en metros de un establecimiento.
+     * Solo el PRODUCTOR o VETERINARIO activo del establecimiento puede editarlo.
+     * Valida que el umbral se encuentre en el rango permitido (10.0 a 1000.0 m).
+     *
+     * @param id             ID del establecimiento
+     * @param request        nuevo umbral (umbralAislamientoM)
+     * @param authentication contexto de seguridad
+     * @return 200 con la configuración actualizada, 400 si el valor es inválido o fuera de rango,
+     *         403 si no pertenece al establecimiento
+     */
+    @PutMapping("/{id}/aislamiento")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    public ResponseEntity<ConfigAislamientoResponse> updateConfigAislamiento(
+            @PathVariable Long id,
+            @RequestBody ConfigAislamientoRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                establecimientoService.updateConfigAislamiento(id, request, authentication.getName()));
     }
 }

@@ -15,9 +15,13 @@ import { useAuthStore } from './store/authStore';
 import EmpleadosPage from './pages/EmpleadosPage';
 import AnimalesPage from './pages/AnimalesPage';
 import AnimalDetailPage from './pages/AnimalDetailPage';
+import DiagnosticosPage from './pages/DiagnosticosPage';
 import AlertasPage from './pages/AlertasPage';
 import DashboardPage from './pages/DashboardPage';
 import PerfilPage from './pages/PerfilPage';
+import ConfiguracionEstablecimientoPage from './pages/ConfiguracionEstablecimientoPage';
+import LandingPage from './pages/LandingPage';
+import DialogHost from './components/DialogHost';
 
 function InvitacionesRouter() {
   const rol = useAuthStore(state => state.rol);
@@ -31,7 +35,7 @@ function RootRouter() {
   const rol = useAuthStore(state => state.rol);
   if (rol === 'ADMINISTRADOR') return <Navigate to="/establecimientos" replace />;
   if (rol === 'PENDIENTE') return <Navigate to="/invitaciones" replace />;
-  if (!rol) return <Navigate to="/login" replace />;
+  if (!rol) return <LandingPage />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -66,6 +70,7 @@ function App() {
           }
         />
         <Route path="/" element={<RootRouter />} />
+        <Route path="/landing" element={<LandingPage />} />
         <Route
           path="/establecimientos"
           element={
@@ -123,6 +128,14 @@ function App() {
           }
         />
         <Route
+          path="/diagnosticos"
+          element={
+            <ProtectedRoute roles={['VETERINARIO']}>
+              <DiagnosticosPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/alertas"
           element={
             <ProtectedRoute roles={['PRODUCTOR', 'VETERINARIO', 'CAMPERO']}>
@@ -138,9 +151,18 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/establecimientos/:id/configuracion"
+          element={
+            <ProtectedRoute roles={['ADMINISTRADOR', 'PRODUCTOR', 'VETERINARIO']}>
+              <ConfiguracionEstablecimientoPage />
+            </ProtectedRoute>
+          }
+        />
         {/* Cualquier ruta no encontrada redirige al root */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <DialogHost />
     </BrowserRouter>
   );
 }

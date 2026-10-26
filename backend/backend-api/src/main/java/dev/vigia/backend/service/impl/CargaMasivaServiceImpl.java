@@ -4,18 +4,26 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.multipart.MultipartFile;
 import dev.vigia.backend.dto.CargaMasivaResult;
 import dev.vigia.backend.model.Animal;
+import dev.vigia.backend.model.Caravana;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.EstadoAnimal;
+import dev.vigia.backend.model.EstadoSensor;
 import dev.vigia.backend.model.RodeoLote;
 import dev.vigia.backend.repository.AnimalRepository;
+import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.service.CargaMasivaService;
@@ -26,9 +34,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CargaMasivaServiceImpl implements CargaMasivaService {
 
+    private static final int COLUMNA_SENSOR = 5;
+
     private final AnimalRepository animalRepository;
     private final EstablecimientoRepository establecimientoRepository;
     private final RodeoLoteRepository rodeoLoteRepository;
+    private final CaravanaRepository caravanaRepository;
     private final List<FileParserService> parsers;
 
     @Override
@@ -63,39 +74,69 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
 
         List<String[]> parsedRows = selectedParser.parse(file);
 
+        Map<String, RodeoLote> rodeosActivos = rodeoLoteRepository.findByEstablecimientoId(establecimientoId).stream()
+                .filter(RodeoLote::isActivo)
+                .collect(Collectors.toMap(r -> normalizarNombre(r.getNombre()), Function.identity(), (a, b) -> a));
+
+        // Solo se consultan las caravanas si alguna fila trae sensor.
+        boolean haySensores = parsedRows.stream().anyMatch(data -> valor(data, COLUMNA_SENSOR) != null);
+        List<Caravana> caravanasEstablecimiento = haySensores
+                ? caravanaRepository.findAllByEstablecimientoId(establecimientoId)
+                : List.of();
+
         List<Animal> animals = new ArrayList<>();
         int procesados = 0;
         int fallidos = 0;
-        java.util.Set<String> caravanasEnArchivo = new java.util.HashSet<>();
+        Set<String> caravanasEnArchivo = new HashSet<>();
+        Set<String> aliasEnArchivo = new HashSet<>();
+        Set<Long> sensoresEnArchivo = new HashSet<>();
         List<String> errores = new ArrayList<>();
 
-        for (String[] data : parsedRows) {
+        for (int i = 0; i < parsedRows.size(); i++) {
+            String[] data = parsedRows.get(i);
+            if (esFilaVacia(data)) {
+                continue;
+            }
+            int fila = i + 2;
             procesados++;
             try {
-                String idCaravana = data.length > 0 ? data[0] : null;
-                if (idCaravana != null) {
-                    idCaravana = idCaravana.trim();
-                    if (!idCaravana.isEmpty()) {
-                        if (caravanasEnArchivo.contains(idCaravana)) {
-                            throw new IllegalArgumentException("ID Caravana duplicado en el archivo: " + idCaravana);
-                        }
-                        if (animalRepository.existsByIdCaravanaOficialAndEstablecimientoId(idCaravana, establecimientoId)) {
-                            throw new IllegalArgumentException("El ID Caravana " + idCaravana + " ya existe en el establecimiento.");
-                        }
-                        caravanasEnArchivo.add(idCaravana);
+                String idCaravana = valor(data, 0);
+                if (idCaravana == null) {
+                    throw new IllegalArgumentException("El IdCaravana es obligatorio.");
+                }
+                if (!caravanasEnArchivo.add(idCaravana)) {
+                    throw new IllegalArgumentException("ID Caravana duplicado en el archivo: " + idCaravana);
+                }
+                if (animalRepository.existsByIdCaravanaOficialAndEstablecimientoId(idCaravana, establecimientoId)) {
+                    throw new IllegalArgumentException("El ID Caravana " + idCaravana + " ya existe en el establecimiento.");
+                }
+
+                String alias = valor(data, 1);
+                if (alias != null) {
+                    if (!aliasEnArchivo.add(alias)) {
+                        throw new IllegalArgumentException("Alias duplicado en el archivo: " + alias);
+                    }
+                    if (animalRepository.existsByAliasAndEstablecimientoId(alias, establecimientoId)) {
+                        throw new IllegalArgumentException("El Alias " + alias + " ya existe en el establecimiento.");
                     }
                 }
 
-                Animal animal = createAnimalFromData(data, establecimientoSeleccionado);
-                if (animal.getEstablecimiento() != null) {
-                    animals.add(animal);
-                } else {
-                    fallidos++;
-                    errores.add("Fila " + procesados + ": Establecimiento nulo");
+                Animal animal = createAnimalFromData(data, establecimientoSeleccionado, rodeosActivos);
+
+                String sensor = valor(data, COLUMNA_SENSOR);
+                if (sensor != null) {
+                    Caravana caravana = resolverSensor(sensor, caravanasEstablecimiento);
+                    if (!sensoresEnArchivo.add(caravana.getId())) {
+                        throw new IllegalArgumentException("Sensor duplicado en el archivo: " + sensor);
+                    }
+                    // Se marca VINCULADO recién al guardar, si el archivo entero es válido.
+                    animal.setCaravana(caravana);
                 }
+
+                animals.add(animal);
             } catch (Exception e) {
                 fallidos++;
-                errores.add("Fila " + procesados + ": " + e.getMessage());
+                errores.add("Fila " + fila + ": " + e.getMessage());
             }
         }
 
@@ -103,12 +144,16 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
             try {
                 TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             } catch (org.springframework.transaction.NoTransactionException e) {
-                // Ignorar en unit tests sin proxy
+
             }
             animals.clear();
         }
 
         List<Animal> saveAnimals = animalRepository.saveAll(animals);
+        saveAnimals.stream()
+                .map(Animal::getCaravana)
+                .filter(Objects::nonNull)
+                .forEach(this::marcarVinculada);
 
         return CargaMasivaResult.builder()
                 .procesados(procesados)
@@ -118,60 +163,95 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
                 .build();
     }
 
-    private Animal createAnimalFromData(String[] data, Establecimiento establecimiento) {
-        Animal animal = new Animal(establecimiento, null);
-
-        String idCaravana = data.length > 0 ? data[0] : null;
-        if (idCaravana != null)
-            idCaravana = idCaravana.trim();
-        animal.setIdCaravanaOficial(idCaravana);
-
-        String alias = data.length > 1 ? data[1] : null;
-        if (alias != null)
-            alias = alias.trim();
-        animal.setAlias(alias);
-
-        if ((idCaravana == null || idCaravana.isEmpty()) && (alias == null || alias.isEmpty())) {
-            throw new IllegalArgumentException("El animal debe tener al menos un IdCaravana o un Alias.");
+    private Animal createAnimalFromData(String[] data, Establecimiento establecimiento,
+            Map<String, RodeoLote> rodeosActivos) {
+        String fechaStr = valor(data, 2);
+        if (fechaStr == null) {
+            throw new IllegalArgumentException("La fecha de nacimiento es obligatoria.");
+        }
+        LocalDate fecha;
+        try {
+            fecha = LocalDate.parse(fechaStr);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Formato de fecha inválido. Use YYYY-MM-DD.");
+        }
+        if (fecha.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha de nacimiento no puede ser futura.");
         }
 
-        String fechaStr = data.length > 2 ? data[2] : null;
-        if (fechaStr != null && !fechaStr.trim().isEmpty()) {
-            try {
-                LocalDate fecha = LocalDate.parse(fechaStr.trim());
-                animal.setFechaNacimiento(fecha);
-            } catch (DateTimeParseException e) {
-                throw new IllegalArgumentException("Formato de fecha inválido. Use YYYY-MM-DD.");
-            }
+        String nombreRodeoLote = valor(data, 4);
+        if (nombreRodeoLote == null) {
+            throw new IllegalArgumentException("El rodeo/lote es obligatorio.");
+        }
+        RodeoLote rodeo = rodeosActivos.get(normalizarNombre(nombreRodeoLote));
+        if (rodeo == null) {
+            throw new IllegalArgumentException("El rodeo/lote '" + nombreRodeoLote
+                    + "' no existe o no está activo en el establecimiento.");
         }
 
-        String raza = data.length > 3 ? data[3] : null;
-        if (raza != null)
-            raza = raza.trim();
-        animal.setRaza(raza);
-
-        String nombreRodeoLote = data.length > 4 ? data[4] : null;
-
-        RodeoLote rodeo = null;
-
-        if (nombreRodeoLote != null && !nombreRodeoLote.trim().isEmpty()) {
-            List<RodeoLote> rodeos = rodeoLoteRepository.findByEstablecimientoId(establecimiento.getId());
-            Optional<RodeoLote> optRodeo = rodeos.stream()
-                    .filter(e -> e.getNombre().equalsIgnoreCase(nombreRodeoLote.trim()))
-                    .findFirst();
-
-            if (optRodeo.isPresent()) {
-                rodeo = optRodeo.get();
-            } else {
-                rodeo = new RodeoLote(establecimiento);
-                rodeo.setNombre(nombreRodeoLote.trim());
-                rodeo = rodeoLoteRepository.save(rodeo);
-            }
-        }
-        animal.setRodeoLote(rodeo);
-
+        Animal animal = new Animal(establecimiento, rodeo);
+        animal.setIdCaravanaOficial(valor(data, 0));
+        animal.setAlias(valor(data, 1));
+        animal.setFechaNacimiento(fecha);
+        animal.setRaza(valor(data, 3));
         animal.setEstadoActual(EstadoAnimal.ACTIVO);
-
         return animal;
+    }
+
+    /**
+     * Busca la caravana por DevEUI, después por código y después por alias (sin distinguir mayúsculas),
+     * que es como el usuario la puede tener identificada. Tiene que estar libre.
+     */
+    private static Caravana resolverSensor(String sensor, List<Caravana> caravanas) {
+        List<Function<Caravana, String>> campos = List.of(Caravana::getDevEui, Caravana::getCodigo, Caravana::getAlias);
+        for (Function<Caravana, String> campo : campos) {
+            List<Caravana> coinciden = caravanas.stream()
+                    .filter(c -> campo.apply(c) != null && campo.apply(c).trim().equalsIgnoreCase(sensor))
+                    .toList();
+            if (coinciden.size() > 1) {
+                throw new IllegalArgumentException(
+                        "El sensor '" + sensor + "' coincide con varias caravanas. Indicá su DevEUI.");
+            }
+            if (coinciden.size() == 1) {
+                Caravana caravana = coinciden.get(0);
+                if (caravana.getEstadoSensor() == EstadoSensor.INACTIVO) {
+                    throw new IllegalArgumentException("El sensor '" + sensor + "' está dado de baja.");
+                }
+                if (caravana.getEstadoSensor() == EstadoSensor.VINCULADO) {
+                    throw new IllegalArgumentException("El sensor '" + sensor + "' ya está vinculado a otro animal.");
+                }
+                return caravana;
+            }
+        }
+        throw new IllegalArgumentException("El sensor '" + sensor + "' no existe en el establecimiento.");
+    }
+
+    /** El mismo estado en que deja la caravana AnimalServiceImpl al vincularla a mano. */
+    private void marcarVinculada(Caravana caravana) {
+        caravana.setEstadoSensor(EstadoSensor.VINCULADO);
+        caravana.setActivo(true);
+        caravana.setFechaAsignacion(LocalDate.now());
+        caravanaRepository.save(caravana);
+    }
+
+    private static String valor(String[] data, int index) {
+        if (data == null || data.length <= index || data[index] == null) {
+            return null;
+        }
+        String v = data[index].trim();
+        return v.isEmpty() ? null : v;
+    }
+
+    private static boolean esFilaVacia(String[] data) {
+        for (int i = 0; i < (data == null ? 0 : data.length); i++) {
+            if (valor(data, i) != null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String normalizarNombre(String nombre) {
+        return nombre == null ? "" : nombre.trim().toLowerCase();
     }
 }

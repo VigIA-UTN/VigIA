@@ -1,26 +1,38 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { Spinner, Form } from 'react-bootstrap';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { Spinner } from 'react-bootstrap';
 import {
   getLineaTiempoAlertas,
+  ESTADO_REPRODUCTIVO_LABEL,
+  type EstadoReproductivoResponse,
   type LineaTiempoEventoResponse,
   type LineaTiempoFiltros,
 } from '../api/animalesApi';
+import { esAnestro, getAlertaDetalle, type AlertaResponse } from '../api/alertaApi';
+import { useEstablecimientoStore } from '../store/establecimientoStore';
+import AlertDetailSidebar from './AlertDetailSidebar';
+import DateRangeCalendar from './heatmap/DateRangeCalendar';
+import { dayStart, lastDaysRange } from './heatmap/heatmapFilters';
+import './heatmap/heatmap.css';
 import './LineaTiempoAlertas.css';
 
 // ── Label maps ────────────────────────────────────────────────────────────────
 
 const TIPO_ALERTA_LABEL: Record<string, string> = {
   CELO: 'Celo',
-  SALUD: 'Sanitaria',
-  ABIGEATO: 'Abigeato',
-  FUERA_DE_PERIMETRO: 'Fuera de perímetro',
+  ANESTRO: 'Anestro',
 };
 
 const TIPO_ALERTA_ICON: Record<string, string> = {
   CELO: 'bi-heart-pulse-fill',
-  SALUD: 'bi-shield-fill-exclamation',
-  ABIGEATO: 'bi-geo-alt-fill',
-  FUERA_DE_PERIMETRO: 'bi-bounding-box-circles',
+  ANESTRO: 'bi-hourglass-split',
+};
+
+// estadoResolucion del backend: PENDIENTE llega como SIN_ATENDER.
+const ESTADO_ALERTA_LABEL: Record<string, string> = {
+  SIN_ATENDER: 'Pendiente',
+  CONFIRMADA: 'Confirmada',
+  DESCARTADA: 'Descartada',
+  ARCHIVADA: 'Archivada',
 };
 
 const TIPO_INTERVENCION_LABEL: Record<string, string> = {
@@ -38,14 +50,6 @@ const TIPO_INTERVENCION_ICON: Record<string, string> = {
   INSEMINACION: 'bi-eyedropper',
   OTRO: 'bi-clipboard2-pulse-fill',
 };
-
-const FILTER_OPTIONS = [
-  { value: '', label: 'Todos los tipos' },
-  { value: 'celo', label: 'Celo (Reproductivo)' },
-  { value: 'sanitario', label: 'Sanitaria' },
-  { value: 'geoespacial', label: 'Geoespacial (Abigeato)' },
-  { value: 'perimetro', label: 'Fuera de perímetro' },
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -71,35 +75,50 @@ function severidadClass(sev: string | null): string {
   return 'sev-none';
 }
 
-function estadoClass(estado: string | null): string {
-  if (estado === 'CONFIRMADA') return 'estado-confirmada';
-  if (estado === 'DESCARTADA') return 'estado-descartada';
-  return 'estado-sin-atender';
+const DAY_MS = 86400000;
+const PRESETS: [string, string][] = [['30', '30 días'], ['90', '90 días'], ['365', '12 meses'], ['todo', 'Todo']];
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** Día (timestamp de inicio de día) -> ISO-8601 local para la API; `finDelDia` usa 23:59:59. */
+function diaToIso(ts: number, finDelDia = false): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${finDelDia ? '23:59:59' : '00:00:00'}`;
 }
 
-function estadoLabel(estado: string | null): string {
-  if (estado === 'CONFIRMADA') return 'Confirmada';
-  if (estado === 'DESCARTADA') return 'Descartada';
-  return 'Sin atender';
-}
+const fmtDia = (ts: number) => { const d = new Date(ts); return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`; };
 
-/** Convert a local datetime-local input value (YYYY-MM-DDTHH:mm) to ISO-8601 for the API */
-function localToIso(val: string): string {
-  if (!val) return '';
-  // datetime-local gives YYYY-MM-DDTHH:mm; add :00 for seconds
-  return val.length === 16 ? `${val}:00` : val;
-}
+/** Evento de la línea de tiempo: los del backend más los estados reproductivos registrados por el usuario. */
+type TimelineEvento = Omit<LineaTiempoEventoResponse, 'tipoEvento'> & {
+  tipoEvento: 'ALERTA' | 'INTERVENCION' | 'ESTADO';
+  estadoRepro?: EstadoReproductivoResponse;
+};
+
+const estadoToEvento = (e: EstadoReproductivoResponse): TimelineEvento => ({
+  tipoEvento: 'ESTADO', id: e.id, fecha: e.fechaRegistro, tipo: e.estado, severidad: null, estadoResolucion: null,
+  tipoIntervencion: null, descripcion: null, interventor: e.registradoPor, alertaAsociadaId: null, estadoRepro: e,
+});
+
+/** Clave de las alertas para los mapas de label/ícono: el anestro llega con tipo CELO. */
+const claveAlerta = (e: TimelineEvento) => (esAnestro(e) ? 'ANESTRO' : (e.tipo ?? '').toUpperCase());
 
 // ── Popup card ────────────────────────────────────────────────────────────────
 
-interface PopupProps {
-  evento: LineaTiempoEventoResponse;
+/** Apertura del detalle de una alerta desde su popup. */
+interface VerAlertaProps {
+  onVerAlerta: (evento: TimelineEvento) => void;
+  abriendoAlertaId: number | null;
+  alertaError: { id: number; msg: string } | null;
+}
+
+interface PopupProps extends VerAlertaProps {
+  evento: TimelineEvento;
   onClose: () => void;
   position: 'above' | 'below';
 }
 
-function EventoPopup({ evento, onClose, position }: PopupProps) {
+function EventoPopup({ evento, onClose, position, onVerAlerta, abriendoAlertaId, alertaError }: PopupProps) {
   const isAlerta = evento.tipoEvento === 'ALERTA';
+  const isEstado = evento.tipoEvento === 'ESTADO';
   const ref = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -116,70 +135,102 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
   return (
     <div
       ref={ref}
-      className={`lt-popup ${position === 'above' ? 'lt-popup--above' : 'lt-popup--below'} ${isAlerta ? 'lt-popup--alerta' : 'lt-popup--intervencion'}`}
+      className={`lt-popup ${position === 'above' ? 'lt-popup--above' : 'lt-popup--below'} ${isAlerta ? `lt-popup--alerta ${severidadClass(evento.severidad)}` : isEstado ? 'lt-popup--estado' : 'lt-popup--intervencion'}`}
     >
       <button className="lt-popup-close" onClick={onClose} aria-label="Cerrar">
         <i className="bi bi-x" />
       </button>
 
-      {isAlerta ? (
+      {isEstado && evento.estadoRepro ? (
+        <>
+          <div className="lt-popup-header">
+            <span className="lt-popup-icon-wrap lt-popup-icon-wrap--estado">
+              <i className="bi bi-flag-fill" />
+            </span>
+            <div>
+              <div className="lt-popup-title">
+                Estado reproductivo: {ESTADO_REPRODUCTIVO_LABEL[evento.estadoRepro.estado ?? ''] ?? evento.estadoRepro.estado ?? '—'}
+              </div>
+              <div className="lt-popup-fecha">{formatDateTime(evento.fecha)}</div>
+            </div>
+          </div>
+          <div className="lt-popup-desc">
+            Último parto: <strong>{formatDateOnly(evento.estadoRepro.fechaUltimoParto)}</strong><br />
+            Última inseminación: <strong>{formatDateOnly(evento.estadoRepro.fechaUltimaInseminacion)}</strong>
+          </div>
+          {evento.interventor && (
+            <div className="lt-popup-interventor">
+              <i className="bi bi-person-circle me-1" />
+              {evento.interventor}
+            </div>
+          )}
+        </>
+      ) : isAlerta ? (
         <>
           {/* Header */}
           <div className="lt-popup-header">
             <span className={`lt-popup-icon-wrap lt-popup-icon-wrap--alerta ${severidadClass(evento.severidad)}`}>
-              <i className={`bi ${TIPO_ALERTA_ICON[evento.tipo ?? ''] ?? 'bi-bell-fill'}`} />
+              <i className={`bi ${TIPO_ALERTA_ICON[claveAlerta(evento)] ?? 'bi-bell-fill'}`} />
             </span>
             <div>
               <div className="lt-popup-title">
-                Alerta {TIPO_ALERTA_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? '—'}
+                Alerta {TIPO_ALERTA_LABEL[claveAlerta(evento)] ?? evento.tipo ?? '—'}
               </div>
               <div className="lt-popup-fecha">{formatDateTime(evento.fecha)}</div>
             </div>
           </div>
 
-          {/* Chips */}
-          <div className="lt-popup-chips">
-            {evento.severidad && (
-              <span className={`lt-chip lt-chip--sev ${severidadClass(evento.severidad)}`}>
-                <i className="bi bi-exclamation-triangle-fill me-1" />
-                Severidad {evento.severidad.charAt(0) + evento.severidad.slice(1).toLowerCase()}
-              </span>
-            )}
-            <span className={`lt-chip lt-chip--estado ${estadoClass(evento.estadoResolucion)}`}>
-              {evento.estadoResolucion === 'CONFIRMADA' && <i className="bi bi-check-circle-fill me-1" />}
-              {evento.estadoResolucion === 'DESCARTADA' && <i className="bi bi-x-circle-fill me-1" />}
-              {evento.estadoResolucion === 'SIN_ATENDER' && <i className="bi bi-clock-fill me-1" />}
-              {estadoLabel(evento.estadoResolucion)}
-            </span>
-          </div>
-
           {/* Descripción contextual */}
           <div className="lt-popup-desc">
-            {evento.tipo === 'CELO' && (
+            {claveAlerta(evento) === 'CELO' && (
               <>
                 <i className="bi bi-info-circle me-1" />
                 Detección automática de signos de celo. La ventana óptima de inseminación es de 6 a 24 hs desde la generación.
               </>
             )}
-            {evento.tipo === 'SALUD' && (
+            {claveAlerta(evento) === 'ANESTRO' && (
               <>
-                <i className="bi bi-info-circle me-1" />
-                Desvío en indicadores sanitarios respecto al perfil de referencia del animal.
-              </>
-            )}
-            {evento.tipo === 'ABIGEATO' && (
-              <>
-                <i className="bi bi-info-circle me-1" />
-                Patrón de desplazamiento inusual detectado. Posible riesgo de abigeato o extravío.
-              </>
-            )}
-            {evento.tipo === 'FUERA_DE_PERIMETRO' && (
-              <>
-                <i className="bi bi-info-circle me-1" />
-                El animal fue detectado fuera de los límites del perímetro configurado.
+                {evento.valorDetectado != null ? (
+                  // Los días ya vienen como dato: no se repite la descripción, que los incluye en el texto
+                  <>
+                    <strong>{Math.round(evento.valorDetectado)} días sin ciclo</strong>
+                    {evento.valorUmbral != null && ` (umbral: ${Math.round(evento.valorUmbral)} días)`}
+                    <br />
+                    <i className="bi bi-info-circle me-1" />
+                    Se recomienda revisión veterinaria.
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-info-circle me-1" />
+                    {/* descripcion = acción recomendada del detector, con los días sin ciclo */}
+                    {evento.descripcion ?? 'El animal superó el umbral de días sin celo registrado. Se recomienda revisión veterinaria.'}
+                  </>
+                )}
               </>
             )}
           </div>
+
+          {/* Estado y acceso al detalle en una fila, para que el popup no crezca de alto */}
+          <div className="lt-popup-footer">
+            {evento.estadoResolucion && (
+              <span className="lt-popup-interventor mb-0">
+                <i className="bi bi-check2-circle me-1" />
+                Estado:&nbsp;<strong>{ESTADO_ALERTA_LABEL[evento.estadoResolucion] ?? evento.estadoResolucion}</strong>
+              </span>
+            )}
+            <button
+              type="button"
+              className="lt-popup-link"
+              onClick={() => onVerAlerta(evento)}
+              disabled={abriendoAlertaId === evento.id}
+            >
+              <i className="bi bi-box-arrow-up-right me-1" />
+              {abriendoAlertaId === evento.id ? 'Abriendo...' : `Ver alerta #${evento.id}`}
+            </button>
+          </div>
+          {alertaError?.id === evento.id && (
+            <div role="alert" style={{ color: '#D50000', fontSize: '0.8rem' }}>{alertaError.msg}</div>
+          )}
         </>
       ) : (
         <>
@@ -228,19 +279,20 @@ function EventoPopup({ evento, onClose, position }: PopupProps) {
 
 // ── Nodo de la línea de tiempo ────────────────────────────────────────────────
 
-interface NodoProps {
-  evento: LineaTiempoEventoResponse;
+interface NodoProps extends VerAlertaProps {
+  evento: TimelineEvento;
   position: 'above' | 'below';
   index: number;
 }
 
-function EventoNodo({ evento, position, index }: NodoProps) {
+function EventoNodo({ evento, position, index, ...verAlerta }: NodoProps) {
   const [open, setOpen] = useState(false);
   const isAlerta = evento.tipoEvento === 'ALERTA';
+  const isEstado = evento.tipoEvento === 'ESTADO';
 
   const nodeClass = [
     'lt-nodo',
-    isAlerta ? `lt-nodo--alerta ${severidadClass(evento.severidad)}` : 'lt-nodo--intervencion',
+    isAlerta ? `lt-nodo--alerta ${severidadClass(evento.severidad)}` : isEstado ? 'lt-nodo--estado' : 'lt-nodo--intervencion',
   ].join(' ');
 
   const labelClass = [
@@ -249,23 +301,23 @@ function EventoNodo({ evento, position, index }: NodoProps) {
   ].join(' ');
 
   const label = isAlerta
-    ? TIPO_ALERTA_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? 'Alerta'
-    : TIPO_INTERVENCION_LABEL[evento.tipoIntervencion ?? ''] ?? 'Intervención';
+    ? TIPO_ALERTA_LABEL[claveAlerta(evento)] ?? evento.tipo ?? 'Alerta'
+    : isEstado
+      ? ESTADO_REPRODUCTIVO_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? 'Estado'
+      : TIPO_INTERVENCION_LABEL[evento.tipoIntervencion ?? ''] ?? 'Intervención';
 
   const icon = isAlerta
-    ? TIPO_ALERTA_ICON[evento.tipo?.toUpperCase() ?? ''] ?? 'bi-bell-fill'
-    : TIPO_INTERVENCION_ICON[evento.tipoIntervencion?.toUpperCase() ?? ''] ?? 'bi-clipboard2-pulse-fill';
+    ? TIPO_ALERTA_ICON[claveAlerta(evento)] ?? 'bi-bell-fill'
+    : isEstado
+      ? 'bi-flag-fill'
+      : TIPO_INTERVENCION_ICON[evento.tipoIntervencion?.toUpperCase() ?? ''] ?? 'bi-clipboard2-pulse-fill';
 
   return (
     <div className="lt-nodo-wrapper" style={{ '--nodo-index': index } as React.CSSProperties}>
       {/* Label flotante */}
       <div className={labelClass} onClick={() => setOpen(o => !o)}>
-        <span className="lt-nodo-label-type">
-          <i className={`bi ${icon} me-1`} />
-          {label}
-        </span>
+        <span className="lt-nodo-label-type">{label}</span>
         <span className="lt-nodo-label-time">{formatDateOnly(evento.fecha)}</span>
-        <span className="lt-nodo-label-cta">Más info</span>
       </div>
 
       {/* Punto sobre la línea */}
@@ -284,6 +336,7 @@ function EventoNodo({ evento, position, index }: NodoProps) {
           evento={evento}
           onClose={() => setOpen(false)}
           position={position}
+          {...verAlerta}
         />
       )}
     </div>
@@ -294,42 +347,91 @@ function EventoNodo({ evento, position, index }: NodoProps) {
 
 interface Props {
   animalId: number;
+  /** Estados reproductivos del animal; se muestran como nodos propios (INSEMINADA se omite: ya figura como intervención). */
+  estados?: EstadoReproductivoResponse[];
+  /** Se llama al confirmar o descartar una alerta desde su detalle (confirmar un anestro registra un estado). */
+  onAlertaResuelta?: () => void;
 }
 
-export default function LineaTiempoAlertas({ animalId }: Props) {
-  const [eventos, setEventos] = useState<LineaTiempoEventoResponse[]>([]);
+export default function LineaTiempoAlertas({ animalId, estados, onAlertaResuelta }: Props) {
+  const [remotos, setRemotos] = useState<LineaTiempoEventoResponse[]>([]);
+  const { selectedId } = useEstablecimientoStore();
+
+  // Detalle de alerta abierto desde un popup; version fuerza la recarga al resolverla.
+  const [alertaAbierta, setAlertaAbierta] = useState<AlertaResponse | null>(null);
+  const [abriendoAlertaId, setAbriendoAlertaId] = useState<number | null>(null);
+  const [alertaError, setAlertaError] = useState<{ id: number; msg: string } | null>(null);
+  const [version, setVersion] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [cargado, setCargado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filtros
-  const [tipo, setTipo] = useState('');
-  const [desde, setDesde] = useState('');
-  const [hasta, setHasta] = useState('');
+  const [desde, setDesde] = useState<number | null>(null);
+  const [hasta, setHasta] = useState<number | null>(null);
+  const [calOpen, setCalOpen] = useState(false);
+  const calRef = useRef<HTMLDivElement>(null);
+  const presetActivo = desde == null && hasta == null ? 'todo'
+    : PRESETS.find(([k]) => k !== 'todo' && desde === lastDaysRange(Number(k)).from && hasta === lastDaysRange(Number(k)).to)?.[0];
+
+  useEffect(() => {
+    if (!calOpen) return;
+    const close = (e: MouseEvent) => { if (!calRef.current?.contains(e.target as Node)) setCalOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [calOpen]);
 
   const fetchData = useCallback(async (filtros: LineaTiempoFiltros) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getLineaTiempoAlertas(animalId, filtros);
-      setEventos(data);
+      const data = await getLineaTiempoAlertas(animalId, { ...filtros, tipo: 'celo' });
+      // Solo celo: alertas de celo e inseminaciones (el backend no filtra intervenciones por tipo)
+      setRemotos(data.filter(e =>
+        e.tipoEvento === 'ALERTA' ? e.tipo === 'CELO' : e.tipoIntervencion === 'INSEMINACION'));
     } catch {
       setError('No se pudo cargar la línea de tiempo.');
     } finally {
       setLoading(false);
+      setCargado(true);
     }
   }, [animalId]);
 
   useEffect(() => {
     const f: LineaTiempoFiltros = {};
-    if (tipo) f.tipo = tipo;
-    if (desde) f.desde = localToIso(desde);
-    if (hasta) f.hasta = localToIso(hasta);
+    if (desde != null) f.desde = diaToIso(desde);
+    if (hasta != null) f.hasta = diaToIso(hasta, true);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData(f);
-  }, [tipo, desde, hasta, fetchData]);
+  }, [desde, hasta, fetchData, version]);
 
-  const totalAlertas = eventos.filter(e => e.tipoEvento === 'ALERTA').length;
-  const totalIntervenciones = eventos.filter(e => e.tipoEvento === 'INTERVENCION').length;
+  const abrirAlerta = async (ev: TimelineEvento) => {
+    if (!selectedId) return;
+    setAbriendoAlertaId(ev.id); setAlertaError(null);
+    try {
+      const d = await getAlertaDetalle(ev.id, selectedId);
+      // El detalle solo trae el disparador (CELO): el subtipo del evento es el que marca el anestro
+      setAlertaAbierta({
+        id: d.id, tipo: d.datoDisparador, subtipo: ev.subtipo, animalId: d.animalId,
+        tsGeneracion: d.tsGeneracion, estado: d.estadoActual, accionRecomendada: d.accionRecomendada,
+      });
+    } catch {
+      setAlertaError({ id: ev.id, msg: 'No se pudo abrir la alerta.' });
+    } finally {
+      setAbriendoAlertaId(null);
+    }
+  };
+
+  const eventos = useMemo<TimelineEvento[]>(() => {
+    const deMs = desde ?? -Infinity;
+    const haMs = hasta != null ? hasta + DAY_MS - 1 : Infinity;
+    const propios = (estados ?? [])
+      .filter(e => e.estado !== 'INSEMINADA')
+      .map(estadoToEvento)
+      .filter(e => { const t = new Date(e.fecha).getTime(); return t >= deMs && t <= haMs; });
+    return [...(remotos as TimelineEvento[]), ...propios]
+      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+  }, [remotos, estados, desde, hasta]);
 
   return (
     <section className="lt-section">
@@ -337,82 +439,48 @@ export default function LineaTiempoAlertas({ animalId }: Props) {
       <div className="lt-header">
         <div className="lt-header-left">
           <h3 className="lt-title">
-            <i className="bi bi-clock-history me-2" />
-            Línea de Tiempo
+            Línea de tiempo reproductiva
           </h3>
-          {!loading && !error && (
-            <div className="lt-counts">
-              <span className="lt-count-badge lt-count-alerta">
-                <i className="bi bi-bell-fill me-1" />{totalAlertas} alerta{totalAlertas !== 1 ? 's' : ''}
-              </span>
-              <span className="lt-count-badge lt-count-intervencion">
-                <i className="bi bi-clipboard2-pulse-fill me-1" />{totalIntervenciones} intervención{totalIntervenciones !== 1 ? 'es' : ''}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
       {/* ── Filtros ── */}
       <div className="lt-filters">
-        <div className="lt-filter-group">
-          <label htmlFor="lt-tipo" className="lt-filter-label">
-            <i className="bi bi-funnel me-1" />Tipo de alerta
-          </label>
-          <Form.Select
-            id="lt-tipo"
-            size="sm"
-            value={tipo}
-            onChange={e => setTipo(e.target.value)}
-            className="lt-filter-select"
-          >
-            {FILTER_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </Form.Select>
+        <div className="lt-presets">
+          {PRESETS.map(([k, l]) => (
+            <button key={k} type="button" className={presetActivo === k ? 'on' : ''}
+              onClick={() => {
+                const r = k === 'todo' ? null : lastDaysRange(Number(k));
+                setDesde(r?.from ?? null); setHasta(r?.to ?? null);
+              }}>{l}</button>
+          ))}
         </div>
 
-        <div className="lt-filter-group">
-          <label htmlFor="lt-desde" className="lt-filter-label">
-            <i className="bi bi-calendar-event me-1" />Desde
-          </label>
-          <input
-            id="lt-desde"
-            type="datetime-local"
-            className="lt-filter-input"
-            value={desde}
-            onChange={e => setDesde(e.target.value)}
-          />
-        </div>
-
-        <div className="lt-filter-group">
-          <label htmlFor="lt-hasta" className="lt-filter-label">
-            <i className="bi bi-calendar-check me-1" />Hasta
-          </label>
-          <input
-            id="lt-hasta"
-            type="datetime-local"
-            className="lt-filter-input"
-            value={hasta}
-            onChange={e => setHasta(e.target.value)}
-          />
-        </div>
-
-        {(tipo || desde || hasta) && (
-          <button
-            className="lt-filter-clear"
-            onClick={() => { setTipo(''); setDesde(''); setHasta(''); }}
-          >
-            <i className="bi bi-x-circle me-1" />Limpiar filtros
+        <div className="lt-filter-group" ref={calRef}>
+          <button type="button" className="lt-date-btn" aria-expanded={calOpen} onClick={() => setCalOpen(o => !o)}>
+            <i className="bi bi-calendar3" />
+            {desde == null && hasta == null ? 'Todo el historial' : `${desde != null ? fmtDia(desde) : '…'} → ${hasta != null ? fmtDia(hasta) : '…'}`}
           </button>
-        )}
+          {calOpen && (
+            <div className="hm-panel lt-cal-pop">
+              <DateRangeCalendar
+                from={desde ?? hasta ?? dayStart(new Date())}
+                to={hasta ?? desde ?? dayStart(new Date())}
+                onChange={(f, t) => { setDesde(f); setHasta(t); if (f !== t) setCalOpen(false); }}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Estados ── */}
-      {loading && (
-        <div className="lt-state-wrapper">
-          <Spinner animation="border" style={{ color: '#3B8D99' }} />
-          <span className="ms-3 text-secondary">Cargando eventos…</span>
+      {/* Primera carga: esqueleto con la misma altura que el rail para que la página no salte */}
+      {!cargado && (
+        <div className="lt-scroll-wrapper lt-skeleton">
+          <div className="lt-rail-container">
+            <div className="lt-axis" />
+            <Spinner animation="border" className="lt-skeleton-spinner" />
+          </div>
         </div>
       )}
 
@@ -423,17 +491,18 @@ export default function LineaTiempoAlertas({ animalId }: Props) {
         </div>
       )}
 
-      {!loading && !error && eventos.length === 0 && (
-        <div className="lt-state-wrapper lt-state--empty">
+      {/* Recargas: se mantiene el contenido anterior atenuado hasta que llegan los datos */}
+      {cargado && !error && eventos.length === 0 && (
+        <div className={`lt-state-wrapper lt-state--empty${loading ? ' lt-refrescando' : ''}`}>
           <i className="bi bi-hourglass me-2" />
           Sin eventos registrados
-          {(tipo || desde || hasta) ? ' con los filtros aplicados.' : ' para este animal.'}
+          {(desde != null || hasta != null) ? ' con los filtros aplicados.' : ' para este animal.'}
         </div>
       )}
 
       {/* ── Rail de la línea de tiempo ── */}
-      {!loading && !error && eventos.length > 0 && (
-        <div className="lt-scroll-wrapper">
+      {cargado && !error && eventos.length > 0 && (
+        <div className={`lt-scroll-wrapper${loading ? ' lt-refrescando' : ''}`}>
           <div className="lt-rail-container" style={{ '--event-count': eventos.length } as React.CSSProperties}>
 
             {/* Eje horizontal */}
@@ -446,6 +515,9 @@ export default function LineaTiempoAlertas({ animalId }: Props) {
                 evento={ev}
                 position={i % 2 === 0 ? 'above' : 'below'}
                 index={i}
+                onVerAlerta={abrirAlerta}
+                abriendoAlertaId={abriendoAlertaId}
+                alertaError={alertaError}
               />
             ))}
 
@@ -460,26 +532,13 @@ export default function LineaTiempoAlertas({ animalId }: Props) {
         </div>
       )}
 
-      {/* ── Leyenda ── */}
-      {!loading && !error && eventos.length > 0 && (
-        <div className="lt-legend">
-          <div className="lt-legend-item">
-            <span className="lt-legend-dot lt-legend-dot--alta" />
-            <span>Severidad Alta</span>
-          </div>
-          <div className="lt-legend-item">
-            <span className="lt-legend-dot lt-legend-dot--media" />
-            <span>Severidad Media</span>
-          </div>
-          <div className="lt-legend-item">
-            <span className="lt-legend-dot lt-legend-dot--baja" />
-            <span>Severidad Baja</span>
-          </div>
-          <div className="lt-legend-item">
-            <span className="lt-legend-dot lt-legend-dot--intervencion" />
-            <span>Intervención</span>
-          </div>
-        </div>
+      {alertaAbierta && (
+        <AlertDetailSidebar
+          alerta={alertaAbierta}
+          mode="fixed"
+          onClose={() => setAlertaAbierta(null)}
+          onActionComplete={() => { setVersion(v => v + 1); onAlertaResuelta?.(); }}
+        />
       )}
     </section>
   );

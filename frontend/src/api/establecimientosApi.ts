@@ -13,6 +13,22 @@ export interface EstablecimientoResponse {
   longitud: number;
   activo: boolean;
   fechaAlta: string;
+  diasDeteccionAnestro: number;
+  severidadAnestro: string;
+}
+
+/** Forma del response del endpoint dedicado de anestro. */
+export interface ConfigAnestroResponse {
+  establecimientoId: number;
+  nombreEstablecimiento: string;
+  diasDeteccionAnestro: number;
+  severidadAnestro: string;
+}
+
+/** Forma del request del endpoint dedicado de anestro. */
+export interface ConfigAnestroRequest {
+  diasDeteccionAnestro: number;
+  severidadAnestro: string;
 }
 
 export async function getEstablecimientos(): Promise<EstablecimientoResponse[]> {
@@ -37,5 +53,53 @@ export async function activarEstablecimiento(id: number): Promise<Establecimient
 
 export async function updateEstablecimiento(id: number, data: EstablecimientoRequest): Promise<EstablecimientoResponse> {
   const response = await axiosClient.put<EstablecimientoResponse>(`/establecimientos/${id}`, data);
+  return response.data;
+}
+
+/**
+ * Consulta los parámetros de anestro de un establecimiento.
+ * Solo accesible para PRODUCTOR y VETERINARIO del establecimiento.
+ */
+export async function getConfigAnestro(id: number): Promise<ConfigAnestroResponse> {
+  const response = await axiosClient.get<ConfigAnestroResponse>(`/establecimientos/${id}/anestro`);
+  return response.data;
+}
+
+/**
+ * Actualiza los parámetros de anestro de un establecimiento.
+ * Solo accesible para PRODUCTOR y VETERINARIO del establecimiento.
+ */
+export async function updateConfigAnestro(id: number, data: ConfigAnestroRequest): Promise<ConfigAnestroResponse> {
+  const response = await axiosClient.put<ConfigAnestroResponse>(`/establecimientos/${id}/anestro`, data);
+  return response.data;
+}
+
+/** Forma del response del endpoint dedicado de aislamiento. */
+export interface ConfigAislamientoResponse {
+  establecimientoId: number;
+  nombreEstablecimiento: string;
+  umbralAislamientoM: number;
+}
+
+/** Forma del request del endpoint dedicado de aislamiento. */
+export interface ConfigAislamientoRequest {
+  umbralAislamientoM: number;
+}
+
+/**
+ * Consulta el umbral de aislamiento (en metros) de un establecimiento.
+ * Solo accesible para PRODUCTOR y VETERINARIO del establecimiento.
+ */
+export async function getConfigAislamiento(id: number): Promise<ConfigAislamientoResponse> {
+  const response = await axiosClient.get<ConfigAislamientoResponse>(`/establecimientos/${id}/aislamiento`);
+  return response.data;
+}
+
+/**
+ * Actualiza el umbral de aislamiento (en metros) de un establecimiento.
+ * Solo accesible para PRODUCTOR y VETERINARIO del establecimiento.
+ */
+export async function updateConfigAislamiento(id: number, data: ConfigAislamientoRequest): Promise<ConfigAislamientoResponse> {
+  const response = await axiosClient.put<ConfigAislamientoResponse>(`/establecimientos/${id}/aislamiento`, data);
   return response.data;
 }

@@ -17,6 +17,7 @@ import {
 } from '../api/animalesApi';
 import 'leaflet/dist/leaflet.css';
 import HeatmapLayer from '../components/heatmap/HeatmapLayer';
+import MapInvalidator from '../components/MapInvalidator';
 import HeatmapPanel from '../components/heatmap/HeatmapPanel';
 import { useHeatPoints } from '../components/heatmap/useHeatPoints';
 import { lastDaysRange } from '../components/heatmap/heatmapFilters';
@@ -52,22 +53,6 @@ function CustomTooltip({ active, payload, label, unit }: TooltipProps) {
             }
         </div>
     );
-}
-
-// keep the map in sync with its container (tab becoming visible, expand/collapse, window resize).
-// Debounced: invalidateSize redraws tiles and the heat canvas, so it must run once after the resize settles, not per frame.
-function MapInvalidator() {
-    const map = useMap();
-    useEffect(() => {
-        let timer: number | undefined;
-        const observer = new ResizeObserver(() => {
-            window.clearTimeout(timer);
-            timer = window.setTimeout(() => map.invalidateSize({ animate: false }), 120);
-        });
-        observer.observe(map.getContainer());
-        return () => { window.clearTimeout(timer); observer.disconnect(); };
-    }, [map]);
-    return null;
 }
 
 const PANEL_MAX_WIDTH = 462;
@@ -136,7 +121,7 @@ function ChartCard({
                 gap: 8,
             }}>
                 <div>
-                    <h5 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#1E3A5F' }}>{title}</h5>
+                    <h5 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: '#1E3A5F' }}>{title}</h5>
                     {subtitle && <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#A0AEC0' }}>{subtitle}</p>}
                 </div>
                 {action && <div>{action}</div>}

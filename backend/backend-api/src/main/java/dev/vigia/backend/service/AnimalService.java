@@ -1,6 +1,7 @@
 package dev.vigia.backend.service;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -13,7 +14,9 @@ import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
+import dev.vigia.backend.dto.CohesionResponse;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.dto.RegistroPesoRequest;
 import dev.vigia.backend.dto.RegistroPesoResponse;
@@ -45,6 +48,8 @@ public interface AnimalService {
 
         List<IntervencionResponse> listarIntervenciones(Long animalId, String emailUsuario);
 
+        IntervencionResponse registrarIntervencion(Long animalId, String emailUsuario, IntervencionRequest request);
+
         EstadoSaludResponse registrarEstadoSalud(Long animalId, String emailProductor,
                         EstadoSaludRequest request);
 
@@ -71,4 +76,12 @@ public interface AnimalService {
         AnimalResponse vincularCaravana(Long animalId, Long caravanaId, String emailUsuario);
 
         AnimalResponse desvincularCaravana(Long animalId, String emailUsuario);
+
+        /** {@code rodeoLoteId} es opcional: null asigna en todo el establecimiento. */
+        List<AnimalResponse> asignarCaravanasAleatoriamente(Long establecimientoId, Long rodeoLoteId, String emailUsuario);
+
+        byte[] exportarAsignacionesCaravanas(Long establecimientoId, List<Long> animalIds, String emailUsuario);
+
+        CohesionResponse obtenerCohesion(String emailUsuario, Long animalId,
+                        LocalDateTime desde, LocalDateTime hasta);
 }

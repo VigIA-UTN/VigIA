@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,9 +20,23 @@ public interface TelemetriaRepository extends JpaRepository<Telemetria, Long> {
         List<Telemetria> findByCaravanaAndEstadoInferenciaSaludAndFechaHoraAfter(Caravana caravana,
                         EstadoInferencia estadoInferenciaSalud, LocalDateTime fechaHora);
 
+        /** Hay telemetría del establecimiento todavía no analizada por ml-geo desde {@code desde}. */
+        @Query("SELECT COUNT(t) > 0 FROM Telemetria t " +
+                        "WHERE t.caravana.establecimiento.id = :establecimientoId " +
+                        "AND t.estadoInferenciaGeo = :estado " +
+                        "AND t.fechaHora > :desde")
+        boolean existsPendientesGeoByEstablecimiento(
+                        @Param("establecimientoId") Long establecimientoId,
+                        @Param("estado") EstadoInferencia estado,
+                        @Param("desde") LocalDateTime desde);
+
         List<Telemetria> findByCaravanaAndFechaHoraAfterOrderByFechaHoraAsc(Caravana caravana, LocalDateTime fechaHora);
 
         Optional<Telemetria> findFirstByCaravanaOrderByFechaHoraDesc(Caravana caravana);
+
+        /** Primer dato de la caravana desde {@code desde}: donde empieza la primera calibración de salud. */
+        Optional<Telemetria> findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(
+                        Caravana caravana, LocalDateTime desde);
 
         List<Telemetria> findByCaravanaAndFechaHoraBetweenOrderByFechaHoraAsc(
                         Caravana caravana, LocalDateTime desde, LocalDateTime hasta);
@@ -39,14 +52,25 @@ public interface TelemetriaRepository extends JpaRepository<Telemetria, Long> {
                         @Param("hasta") LocalDateTime hasta,
                         @Param("animalId") Long animalId);
 
-        @Query("SELECT t FROM Telemetria t " +
-                        "WHERE t.caravana.establecimiento.id = :establecimientoId " +
+        // Mapa de calor (API): estas dos traen caravana y animal en la misma consulta, así el service no
+        // los carga de a uno ni necesita una transacción abierta mientras espera a ml-geo.
+        @Query("SELECT t FROM Telemetria t JOIN FETCH t.caravana c JOIN FETCH c.animal a " +
+                        "WHERE c.establecimiento.id = :establecimientoId " +
                         "AND t.fechaHora BETWEEN :desde AND :hasta " +
-                        "AND t.caravana.animal.id IN :animalIds " +
+                        "ORDER BY t.fechaHora ASC")
+        List<Telemetria> findConAnimalByEstablecimientoAndFechaHoraBetween(
+                        @Param("establecimientoId") Long establecimientoId,
+                        @Param("desde") LocalDateTime desde,
+                        @Param("hasta") LocalDateTime hasta);
+
+        @Query("SELECT t FROM Telemetria t JOIN FETCH t.caravana c JOIN FETCH c.animal a " +
+                        "WHERE c.establecimiento.id = :establecimientoId " +
+                        "AND t.fechaHora BETWEEN :desde AND :hasta " +
+                        "AND a.id IN :animalIds " +
                         "ORDER BY t.fechaHora ASC")
         List<Telemetria> findByEstablecimientoAndAnimalesAndFechaHoraBetween(
                         @Param("establecimientoId") Long establecimientoId,
                         @Param("desde") LocalDateTime desde,
                         @Param("hasta") LocalDateTime hasta,
-                        @Param("animalIds") Collection<Long> animalIds);
+                        @Param("animalIds") java.util.List<Long> animalIds);
 }

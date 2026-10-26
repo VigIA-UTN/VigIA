@@ -13,22 +13,15 @@ const SEVERIDAD_STYLE: Record<SeveridadNivel, { bg: string; fg: string; dot: str
 
 export function SeveridadBadge({ severidad, size = 'md' }: { severidad?: SeveridadNivel | null; size?: 'sm' | 'md' }) {
   const s = severidad ? SEVERIDAD_STYLE[severidad] : null;
-  const pad = size === 'sm' ? '2px 10px' : '4px 14px';
   const fontSize = size === 'sm' ? '0.78rem' : '0.9rem';
+  const dotSize = size === 'sm' ? 8 : 10;
   if (!s) {
-    return (
-      <span style={{ padding: pad, borderRadius: 999, background: '#EDF2F7', color: '#4A5568', fontWeight: 700, fontSize }}>
-        SIN DATO
-      </span>
-    );
+    return <span style={{ color: '#4A5568', fontWeight: 700, fontSize }}>SIN DATO</span>;
   }
   return (
-    <span
-      className="d-inline-flex align-items-center gap-2"
-      style={{ padding: pad, borderRadius: 999, background: s.bg, color: s.fg, border: `1px solid ${s.fg}`, fontWeight: 700, fontSize }}
-    >
+    <span className="d-inline-flex align-items-center gap-2" style={{ color: s.fg, fontWeight: 700, fontSize }}>
       {s.label}
-      <span style={{ width: 9, height: 9, borderRadius: '50%', background: s.dot }} />
+      <span style={{ width: dotSize, height: dotSize, borderRadius: '50%', background: s.dot }} />
     </span>
   );
 }
@@ -140,7 +133,7 @@ export default function SanitarioAlertDetail({ detalle }: { detalle: DetalleSani
       {/* Descripción del desvío + severidad */}
       <div>
         <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-          <i className="bi bi-heart-pulse" /> Desvío sanitario detectado
+          Desvío sanitario detectado
         </h6>
         <div className="card border-0 shadow-sm rounded-4">
           <div className="card-body">
@@ -166,7 +159,7 @@ export default function SanitarioAlertDetail({ detalle }: { detalle: DetalleSani
       {/* Gráfico comparativo actual vs. referencia */}
       <div>
         <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-          <i className="bi bi-bar-chart-line" /> Comportamiento actual vs. perfil de referencia
+          Comportamiento actual vs. perfil de referencia
         </h6>
         <ComparativoChart
           titulo="Actividad"
@@ -185,7 +178,7 @@ export default function SanitarioAlertDetail({ detalle }: { detalle: DetalleSani
       {/* Metadatos del análisis */}
       <div>
         <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1E3A5F' }}>
-          <i className="bi bi-info-square" /> Detalle del análisis
+          Detalle del análisis
         </h6>
         <div className="card border-0 shadow-sm rounded-4">
           <div className="card-body d-flex flex-wrap gap-3">

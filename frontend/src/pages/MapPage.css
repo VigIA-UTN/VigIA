@@ -1,22 +1,95 @@
 /* Floating action buttons: square icon, expands sideways on hover/focus/open. */
-.map-fabs { position: absolute; top: 20px; left: 20px; z-index: 1000; display: flex; gap: 10px; align-items: flex-start; }
-.map-fab {
-    --w: 170px;
-    display: flex; align-items: center; flex-shrink: 0;
-    width: 48px; height: 48px; padding: 0; overflow: hidden; white-space: nowrap;
-    background: #1E3A5F; color: #fff; font-weight: 700; font-size: 1rem;
-    border: 2px solid #13D4FB; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, .3);
-    cursor: pointer; transition: width .2s ease;
+.map-fabs {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
 }
-.map-fab:hover, .map-fab:focus-visible, .map-fab[aria-expanded="true"] { width: var(--w); }
-.map-fab-icon { flex: 0 0 44px; display: flex; align-items: center; justify-content: center; color: #13D4FB; font-size: 1.1rem; }
-.map-fab-label { padding: 0 14px 0 2px; opacity: 0; transition: opacity .15s ease; }
-.map-fab:hover .map-fab-label, .map-fab:focus-visible .map-fab-label, .map-fab[aria-expanded="true"] .map-fab-label { opacity: 1; }
-.map-fab-dot { width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle, #FFC700 0%, #94C11E 48%, #13D4FB 100%); }
-.map-fab-on { margin-left: 6px; font-size: .65rem; background: #94C11E; color: #1B344D; border-radius: 999px; padding: 1px 6px; }
+
+.map-fab {
+  --w: 170px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  background: #1E3A5F;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  border: 2px solid #13D4FB;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, .3);
+  cursor: pointer;
+  transition: width .2s ease;
+}
+
+.map-fab:hover,
+.map-fab:focus-visible,
+.map-fab[aria-expanded="true"] {
+  width: var(--w);
+}
+
+.map-fab-icon {
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #13D4FB;
+  font-size: 1.1rem;
+}
+
+.map-fab-label {
+  padding: 0 14px 0 2px;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+
+.map-fab:hover .map-fab-label,
+.map-fab:focus-visible .map-fab-label,
+.map-fab[aria-expanded="true"] .map-fab-label {
+  opacity: 1;
+}
+
+.map-fab-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #FFC700 0%, #94C11E 48%, #13D4FB 100%);
+}
+
+.map-fab-on {
+  margin-left: 6px;
+  font-size: .65rem;
+  background: #94C11E;
+  color: #1B344D;
+  border-radius: 999px;
+  padding: 1px 6px;
+}
 
 /* Transición suave entre pin normal y seleccionado (Leaflet reutiliza el <img> y solo cambia tamaño/margen).
    No se toca transform: lo usa Leaflet para posicionar y animar el zoom. */
 .leaflet-marker-icon {
   transition: width 120ms ease-out, height 120ms ease-out, margin 120ms ease-out;
+}
+
+.resumen-alertas {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  gap: 10px
+}
+
+@media (max-width: 600px) {
+  .resumen-alertas {
+    flex-direction: column;
+  }
 }

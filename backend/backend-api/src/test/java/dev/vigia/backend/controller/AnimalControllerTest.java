@@ -30,10 +30,14 @@ import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.InvitacionRepository;
 import dev.vigia.backend.repository.PerfilReferenciaRepository;
+import dev.vigia.backend.repository.RegistroCohesionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.UsuarioRepository;
 import dev.vigia.backend.repository.AlertaRepository;
+import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
+import dev.vigia.backend.model.AlertaAnimalAislado;
+import com.jayway.jsonpath.JsonPath;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.EstadoAlerta;
@@ -55,6 +59,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -105,9 +110,13 @@ class AnimalControllerTest {
         @Autowired
         private AlertaRepository alertaRepository;
         @Autowired
+        private AlertaAnimalAisladoRepository alertaAnimalAisladoRepository;
+        @Autowired
         private PerfilReferenciaRepository perfilReferenciaRepository;
         @Autowired
         private EstadoSaludRepository estadoSaludRepository;
+        @Autowired
+        private RegistroCohesionRepository registroCohesionRepository;
 
         private Long establecimientoId;
         private Long rodeoLoteId;
@@ -127,6 +136,7 @@ class AnimalControllerTest {
                 estadoReproductivoRepository.deleteAll();
                 estadoSaludRepository.deleteAll();
                 perfilReferenciaRepository.deleteAll();
+                registroCohesionRepository.deleteAll();
                 animalRepository.deleteAll();
                 caravanaRepository.deleteAll();
                 rodeoLoteRepository.deleteAll();
@@ -425,6 +435,86 @@ class AnimalControllerTest {
                                 .andExpect(status().isBadRequest());
         }
 
+        private AnimalRequest animalRequestValido(String alias) {
+                AnimalRequest req = new AnimalRequest();
+                req.setIdCaravanaOficial(UUID.randomUUID().toString());
+                req.setAlias(alias);
+                req.setFechaNacimiento(LocalDate.of(2022, 1, 1));
+                req.setRodeoLoteId(rodeoLoteId);
+                req.setEstablecimientoId(establecimientoId);
+                req.setEstadoActual(EstadoAnimal.ACTIVO);
+                return req;
+        }
+
+        @SuppressWarnings("null")
+        private void esperarBadRequest(AnimalRequest req) throws Exception {
+                mockMvc.perform(post("/api/v1/animales")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isBadRequest());
+                assertThat(animalRepository.findAll()).noneMatch(a -> req.getIdCaravanaOficial() != null
+                                && req.getIdCaravanaOficial().equals(a.getIdCaravanaOficial()));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Sin identificador retorna 400 aunque tenga alias")
+        void cargarAnimal_sinIdentificador_badRequest() throws Exception {
+                AnimalRequest req = animalRequestValido("Solo Alias");
+                req.setIdCaravanaOficial("  ");
+                esperarBadRequest(req);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Fecha de nacimiento futura retorna 400")
+        void cargarAnimal_fechaFutura_badRequest() throws Exception {
+                AnimalRequest req = animalRequestValido("Vaca Futura");
+                req.setFechaNacimiento(LocalDate.now().plusDays(1));
+                esperarBadRequest(req);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Rodeo de otro establecimiento retorna 400")
+        @SuppressWarnings("null")
+        void cargarAnimal_rodeoDeOtroEstablecimiento_badRequest() throws Exception {
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Rodeo");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst = establecimientoRepository.save(otroEst);
+                RodeoLote rodeoAjeno = new RodeoLote(otroEst);
+                rodeoAjeno.setNombre("Rodeo Ajeno");
+                rodeoAjeno = rodeoLoteRepository.save(rodeoAjeno);
+
+                AnimalRequest req = animalRequestValido("Vaca Rodeo Ajeno");
+                req.setRodeoLoteId(rodeoAjeno.getId());
+                esperarBadRequest(req);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Rodeo inactivo retorna 400")
+        @SuppressWarnings("null")
+        void cargarAnimal_rodeoInactivo_badRequest() throws Exception {
+                RodeoLote inactivo = new RodeoLote(establecimientoRepository.findById(establecimientoId).get());
+                inactivo.setNombre("Rodeo Inactivo");
+                inactivo.setActivo(false);
+                inactivo = rodeoLoteRepository.save(inactivo);
+
+                AnimalRequest req = animalRequestValido("Vaca Rodeo Inactivo");
+                req.setRodeoLoteId(inactivo.getId());
+                esperarBadRequest(req);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales - Alias duplicado en el establecimiento retorna 400")
+        void cargarAnimal_aliasDuplicado_badRequest() throws Exception {
+                crearAnimal("Lola", establecimientoId, rodeoLoteId);
+                esperarBadRequest(animalRequestValido("Lola"));
+        }
+
         // =========================================================================
         // GET /api/v1/animales — listarAnimales
         // =========================================================================
@@ -690,6 +780,82 @@ class AnimalControllerTest {
         void getAnimalById_sinAuth_forbidden() throws Exception {
                 mockMvc.perform(get("/api/v1/animales/1"))
                                 .andExpect(status().isUnauthorized());
+        }
+
+        // =========================================================================
+        // Badge de calibración: misma regla que SaludDetectorStrategyImpl (calibra
+        // hasta tener perfil, con los primeros 7 días de datos de su caravana)
+        // =========================================================================
+
+        @SuppressWarnings("null")
+        private Animal animalConCaravana(String nombre, LocalDate fechaAlta, LocalDate fechaAsignacion, String devEui)
+                        throws Exception {
+                Animal animal = animalRepository.findById(crearAnimal(nombre, establecimientoId, rodeoLoteId))
+                                .orElseThrow();
+                animal.setFechaAlta(fechaAlta);
+                if (devEui != null) {
+                        Caravana caravana = new Caravana();
+                        caravana.setCodigo("C-" + devEui);
+                        caravana.setActivo(true);
+                        caravana.setDevEui(devEui);
+                        caravana.setFechaAsignacion(fechaAsignacion);
+                        animal.setCaravana(caravanaRepository.save(caravana));
+                }
+                return animalRepository.save(animal);
+        }
+
+        private void telemetriaEn(Animal animal, LocalDateTime fechaHora) {
+                Telemetria t = new Telemetria();
+                t.setCaravana(animal.getCaravana());
+                t.setFechaHora(fechaHora);
+                t.setLatitud(-34.1);
+                t.setLongitud(-58.1);
+                telemetriaRepository.save(t);
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id} - Alta de hace años y primer dato de hace 3 días: sigue en calibración")
+        void getAnimalById_altaViejaConDatosRecientes_sigueEnCalibracion() throws Exception {
+                Animal animal = animalConCaravana("Vaca Vieja", LocalDate.now().minusYears(3),
+                                LocalDate.now().minusDays(10), "DEV-CAL-001");
+                telemetriaEn(animal, LocalDateTime.now().minusDays(3));
+                telemetriaEn(animal, LocalDateTime.now().minusHours(1));
+
+                mockMvc.perform(get("/api/v1/animales/" + animal.getId())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.enCalibracion").value(true))
+                                .andExpect(jsonPath("$.diasRestantesCalibracion").value(4));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/mapa - Badge de calibración: con perfil, sin datos, con datos, sin caravana")
+        void getPosicionesMapa_badgeDeCalibracion_mismaReglaQueSalud() throws Exception {
+                Animal calibrado = animalConCaravana("Calibrada", LocalDate.now(), LocalDate.now(), "DEV-CAL-002");
+                PerfilReferencia perfil = new PerfilReferencia();
+                perfil.setAnimal(calibrado);
+                perfil.setPerfilJson("{}");
+                perfil.setFechaCalculo(LocalDateTime.now());
+                perfilReferenciaRepository.save(perfil);
+
+                Animal sinDatos = animalConCaravana("Sin Datos", null, LocalDate.now(), "DEV-CAL-003");
+                Animal conDatos = animalConCaravana("Con Datos", LocalDate.now().minusYears(3), null, "DEV-CAL-004");
+                telemetriaEn(conDatos, LocalDateTime.now().minusDays(3));
+                Animal sinCaravana = animalConCaravana("Sin Caravana", LocalDate.now(), null, null);
+
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[?(@.id == " + calibrado.getId() + ")].enCalibracion").value(false))
+                                .andExpect(jsonPath("$[?(@.id == " + sinDatos.getId() + ")].enCalibracion").value(true))
+                                .andExpect(jsonPath("$[?(@.id == " + sinDatos.getId() + ")].diasRestantesCalibracion")
+                                                .value(7))
+                                .andExpect(jsonPath("$[?(@.id == " + conDatos.getId() + ")].enCalibracion").value(true))
+                                .andExpect(jsonPath("$[?(@.id == " + conDatos.getId() + ")].diasRestantesCalibracion")
+                                                .value(4))
+                                .andExpect(jsonPath("$[?(@.id == " + sinCaravana.getId() + ")].enCalibracion")
+                                                .value((Object) null));
         }
 
         // =========================================================================
@@ -1123,9 +1289,9 @@ class AnimalControllerTest {
         @DisplayName("POST /api/v1/animales/csv - Carga Exitosa (Productor)")
         @SuppressWarnings("null")
         void cargarAnimalesExcel_asProductor_success() throws Exception {
-                String[] headers = { "IdCaravana", "Alias", "FechaNacimiento", "Raza", "Establecimiento", "Rodeo" };
+                String[] headers = { "IdCaravana", "Alias", "FechaNacimiento", "Raza", "RodeoLote" };
                 String[][] rows = {
-                                { "X-123", "Vaca Excel", "2020-01-01", "Angus", "Estancia Test", "Rodeo Base" }
+                                { "X-123", "Vaca Excel", "2020-01-01", "Angus", "Rodeo Base" }
                 };
 
                 MockMultipartFile file = generateExcel(headers, rows);
@@ -1138,7 +1304,65 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$.procesados").value(1))
                                 .andExpect(jsonPath("$.exitosos").value(1))
                                 .andExpect(jsonPath("$.fallidos").value(0))
-                                .andExpect(jsonPath("$.animales[0].alias").value("Vaca Excel"));
+                                .andExpect(jsonPath("$.animales[0].alias").value("Vaca Excel"))
+                                .andExpect(jsonPath("$.animales[0].rodeoLoteId").value(rodeoLoteId));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/csv - Con columna Sensor opcional, vincula la caravana solo a la fila que la trae")
+        @SuppressWarnings("null")
+        void cargarAnimalesExcel_conSensorOpcional_vinculaCaravana() throws Exception {
+                Caravana libre = crearCaravanaDisponible("TEST-CSV-SENSOR");
+                String[] headers = { "IdCaravana", "Alias (opcional)", "FechaNacimiento", "Raza (opcional)", "RodeoLote",
+                                "Sensor (opcional)" };
+                String[][] rows = {
+                                { "S-1", "Con Sensor", "2020-01-01", "Angus", "Rodeo Base", "TEST-CSV-SENSOR" },
+                                { "S-2", "Sin Sensor", "2020-01-01", "Angus", "Rodeo Base", null }
+                };
+
+                mockMvc.perform(multipart("/api/v1/animales/csv")
+                                .file(generateExcel(headers, rows))
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.exitosos").value(2))
+                                .andExpect(jsonPath("$.animales[0].caravanaDevEui").value("TEST-CSV-SENSOR"))
+                                .andExpect(jsonPath("$.animales[1].caravanaId").doesNotExist());
+
+                Caravana enDb = caravanaRepository.findById(libre.getId()).orElseThrow();
+                assertThat(enDb.getEstadoSensor()).isEqualTo(EstadoSensor.VINCULADO);
+                assertThat(enDb.getFechaAsignacion()).isEqualTo(LocalDate.now());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/csv - Fecha y rodeo obligatorios, rodeo inexistente no se crea")
+        @SuppressWarnings("null")
+        void cargarAnimalesExcel_validacionesAltaManual_noGuardaNada() throws Exception {
+                String[] headers = { "IdCaravana", "Alias", "FechaNacimiento", "Raza", "RodeoLote" };
+                String[][] rows = {
+                                { "X-1", "Vaca OK", "2020-01-01", "Angus", "Rodeo Base" },
+                                { "X-2", "Vaca Sin Fecha", null, "Angus", "Rodeo Base" },
+                                { "X-3", "Vaca Sin Rodeo", "2020-01-01", "Angus", null },
+                                { "X-4", "Vaca Rodeo Nuevo", "2020-01-01", "Angus", "Rodeo Inventado" }
+                };
+                MockMultipartFile file = generateExcel(headers, rows);
+
+                mockMvc.perform(multipart("/api/v1/animales/csv")
+                                .file(file)
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.procesados").value(4))
+                                .andExpect(jsonPath("$.exitosos").value(0))
+                                .andExpect(jsonPath("$.fallidos").value(3))
+                                .andExpect(jsonPath("$.errores[0]")
+                                                .value("Fila 3: La fecha de nacimiento es obligatoria."))
+                                .andExpect(jsonPath("$.errores[1]").value("Fila 4: El rodeo/lote es obligatorio."))
+                                .andExpect(jsonPath("$.errores[2]").value(
+                                                "Fila 5: El rodeo/lote 'Rodeo Inventado' no existe o no está activo en el establecimiento."));
+
+                assertThat(animalRepository.findAll()).isEmpty();
+                assertThat(rodeoLoteRepository.findByEstablecimientoId(establecimientoId)).hasSize(1);
         }
 
         @Test
@@ -1383,6 +1607,72 @@ class AnimalControllerTest {
                                 .andExpect(jsonPath("$[?(@.id == " + animal3Id + ")].alertasAnimal[1].tipo")
                                                 .value("CELO"));
         }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/mapa - Una alerta de aislamiento pendiente aparece en cada animal que lista, con sus animales")
+        @SuppressWarnings("null")
+        void getPosicionesMapa_aislamiento_enCadaAnimalListado() throws Exception {
+                Animal principal = animalRepository.findById(
+                                crearAnimal("Principal", establecimientoId, rodeoLoteId)).orElseThrow();
+                Animal volvio = animalRepository.findById(
+                                crearAnimal("Volvio", establecimientoId, rodeoLoteId)).orElseThrow();
+                Long noListadoId = crearAnimal("No Listado", establecimientoId, rodeoLoteId);
+
+                Alerta alerta = new Alerta();
+                alerta.setAnimal(principal);
+                alerta.setDisparador(DisparadorAlerta.AISLAMIENTO_SOCIAL);
+                alerta.setTipo("AISLAMIENTO_SOCIAL");
+                alerta.setEstado(EstadoAlerta.PENDIENTE);
+                alerta.setSeveridad(SeveridadAlerta.ALTA);
+                alerta.setTsGeneracion(LocalDateTime.now());
+                alerta.setValorUmbral(150.0);
+                alerta.setValorDetectado(400.0);
+                alerta = alertaRepository.save(alerta);
+                alertaAnimalAisladoRepository.save(AlertaAnimalAislado.builder()
+                                .alerta(alerta).animal(principal)
+                                .segundosFuera(1800L).distanciaGrupoM(400.0)
+                                .tsInicio(LocalDateTime.now().minusMinutes(30))
+                                .build());
+                alertaAnimalAisladoRepository.save(AlertaAnimalAislado.builder()
+                                .alerta(alerta).animal(volvio)
+                                .segundosFuera(900L).distanciaGrupoM(200.0)
+                                .tsInicio(LocalDateTime.now().minusMinutes(40))
+                                .tsRegreso(LocalDateTime.now().minusMinutes(10))
+                                .build());
+
+                String json = mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[?(@.id == " + principal.getId() + ")].alertasAnimal.length()")
+                                                .value(1))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal.length()")
+                                                .value(1))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal[0].id")
+                                                .value(alerta.getId().intValue()))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId()
+                                                + ")].alertasAnimal[0].animalesAislados.length()").value(2))
+                                .andExpect(jsonPath("$[?(@.id == " + noListadoId + ")].alertasAnimal.length()")
+                                                .value(0))
+                                .andReturn().getResponse().getContentAsString();
+                List<Object> regreso = JsonPath.read(json, "$[?(@.id == " + volvio.getId()
+                                + ")].alertasAnimal[0].animalesAislados[?(@.animalId == " + volvio.getId()
+                                + ")].tsRegreso");
+                assertThat(regreso).singleElement().isNotNull();
+
+                // Confirmada deja de estar activa: no aparece en ningún pin
+                alerta.setEstado(EstadoAlerta.CONFIRMADA);
+                alertaRepository.save(alerta);
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[?(@.id == " + principal.getId() + ")].alertasAnimal.length()")
+                                                .value(0))
+                                .andExpect(jsonPath("$[?(@.id == " + volvio.getId() + ")].alertasAnimal.length()")
+                                                .value(0));
+        }
+
         // =========================================================================
         // GET /api/v1/animales/{id}/metricas
         // =========================================================================
@@ -1506,6 +1796,193 @@ class AnimalControllerTest {
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
                                 .header("Authorization", "Bearer " + camperoToken))
                                 .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Veterinario registra intervención sin alerta → 201")
+        @SuppressWarnings("null")
+        void registrarIntervencion_veterinario_returns201() throws Exception {
+                Long animalId = crearAnimal("Vaca Intervencion", establecimientoId, rodeoLoteId);
+                String fechaHora = LocalDateTime.now().minusDays(1).withSecond(0).withNano(0).toString();
+                long estadosSaludAntes = estadoSaludRepository.count();
+                long estadosReproAntes = estadoReproductivoRepository.count();
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/intervenciones")
+                                .header("Authorization", "Bearer " + veterinarioToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"tipo\":\"TRATAMIENTO\",\"fechaHora\":\"" + fechaHora
+                                                + "\",\"descripcion\":\"  Pediluvio con sulfato de cobre 5 %  \"}"))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.id").isNumber())
+                                .andExpect(jsonPath("$.alertaId").doesNotExist())
+                                .andExpect(jsonPath("$.animalId").value(animalId))
+                                .andExpect(jsonPath("$.interventor").value("Veterinario"))
+                                .andExpect(jsonPath("$.tipo").value("TRATAMIENTO"))
+                                .andExpect(jsonPath("$.descripcion").value("Pediluvio con sulfato de cobre 5 %"))
+                                .andExpect(jsonPath("$.fechaHora").value(org.hamcrest.Matchers.startsWith(fechaHora)));
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/intervenciones")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].descripcion").value("Pediluvio con sulfato de cobre 5 %"));
+
+                assertThat(estadoSaludRepository.count()).isEqualTo(estadosSaludAntes);
+                assertThat(estadoReproductivoRepository.count()).isEqualTo(estadosReproAntes);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Sin fechaHora usa la hora actual")
+        @SuppressWarnings("null")
+        void registrarIntervencion_sinFechaHora_usaAhora() throws Exception {
+                Long animalId = crearAnimal("Vaca Intervencion Sin Fecha", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/" + animalId + "/intervenciones")
+                                .header("Authorization", "Bearer " + veterinarioToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"tipo\":\"VACUNACION\",\"descripcion\":\"Antiaftosa 2 ml SC\"}"))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.fechaHora").value(org.hamcrest.Matchers.startsWith(
+                                                LocalDate.now().toString())));
+        }
+
+        private static final String INTERVENCION_OK = "{\"tipo\":\"TRATAMIENTO\",\"descripcion\":\"Ivermectina 1 %\"}";
+
+        @SuppressWarnings("null")
+        private org.springframework.test.web.servlet.ResultActions postIntervencion(String token, Long animalId,
+                        String body) throws Exception {
+                return mockMvc.perform(post("/api/v1/animales/" + animalId + "/intervenciones")
+                                .header("Authorization", "Bearer " + token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body));
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - PRODUCTOR → 403")
+        void registrarIntervencion_productor_returns403() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Productor", establecimientoId, rodeoLoteId);
+                postIntervencion(productorToken, animalId, INTERVENCION_OK).andExpect(status().isForbidden());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - CAMPERO → 403")
+        void registrarIntervencion_campero_returns403() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Campero", establecimientoId, rodeoLoteId);
+                postIntervencion(camperoToken, animalId, INTERVENCION_OK).andExpect(status().isForbidden());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - ADMINISTRADOR → 403")
+        void registrarIntervencion_administrador_returns403() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Admin", establecimientoId, rodeoLoteId);
+                postIntervencion(adminToken, animalId, INTERVENCION_OK).andExpect(status().isForbidden());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Veterinario de otro establecimiento → 403")
+        @SuppressWarnings("null")
+        void registrarIntervencion_veterinarioAjeno_returns403() throws Exception {
+                Usuario otroVet = new Usuario();
+                otroVet.setEmail("otrovet@vigia.dev");
+                otroVet.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroVet.setNombre("Otro Vet");
+                otroVet.setRol(Rol.VETERINARIO);
+                otroVet.setActivo(true);
+                otroVet = usuarioRepository.save(otroVet);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Intv");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroVet));
+                establecimientoRepository.save(otroEst);
+
+                Long animalId = crearAnimal("Vaca Intv Ajena", establecimientoId, rodeoLoteId);
+                postIntervencion(getTokenFor("otrovet@vigia.dev", "otro123"), animalId, INTERVENCION_OK)
+                                .andExpect(status().isForbidden());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Animal inexistente → 404")
+        void registrarIntervencion_animalInexistente_returns404() throws Exception {
+                postIntervencion(veterinarioToken, 999999L, INTERVENCION_OK).andExpect(status().isNotFound());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Animal INACTIVO → 400")
+        @SuppressWarnings("null")
+        void registrarIntervencion_animalInactivo_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Inactiva", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                animal.setEstadoActual(EstadoAnimal.INACTIVO);
+                animalRepository.save(animal);
+
+                postIntervencion(veterinarioToken, animalId, INTERVENCION_OK).andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Sin tipo → 400")
+        void registrarIntervencion_sinTipo_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Sin Tipo", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId, "{\"descripcion\":\"Algo\"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - INSEMINACION → 400")
+        void registrarIntervencion_inseminacion_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Inseminacion", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId, "{\"tipo\":\"INSEMINACION\",\"descripcion\":\"IA\"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Descripción vacía → 400")
+        void registrarIntervencion_descripcionVacia_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Desc Vacia", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId, "{\"tipo\":\"OTRO\",\"descripcion\":\"   \"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Sin descripción → 400")
+        void registrarIntervencion_sinDescripcion_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Sin Desc", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId, "{\"tipo\":\"OTRO\"}").andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - Descripción de más de 1000 caracteres → 400")
+        void registrarIntervencion_descripcionMuyLarga_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Desc Larga", establecimientoId, rodeoLoteId);
+                postIntervencion(veterinarioToken, animalId,
+                                "{\"tipo\":\"OTRO\",\"descripcion\":\"" + "a".repeat(1001) + "\"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/intervenciones - fechaHora futura → 400")
+        void registrarIntervencion_fechaFutura_returns400() throws Exception {
+                Long animalId = crearAnimal("Vaca Intv Futura", establecimientoId, rodeoLoteId);
+                String manana = LocalDateTime.now().plusDays(1).withSecond(0).withNano(0).toString();
+                postIntervencion(veterinarioToken, animalId,
+                                "{\"tipo\":\"OTRO\",\"fechaHora\":\"" + manana + "\",\"descripcion\":\"Futuro\"}")
+                                .andExpect(status().isBadRequest());
+                assertThat(intervencionRepository.count()).isZero();
         }
 
         @Test
@@ -1686,12 +2163,12 @@ class AnimalControllerTest {
         // =========================================================================
 
         @SuppressWarnings("null")
-        private void asignarCollarConMoveState(Long animalId, int moveState) {
-                asignarCollarConMoveState(animalId, moveState, LocalDateTime.now());
+        private void asignarCaravanaConMoveState(Long animalId, int moveState) {
+                asignarCaravanaConMoveState(animalId, moveState, LocalDateTime.now());
         }
 
         @SuppressWarnings("null")
-        private void asignarCollarConMoveState(Long animalId, int moveState, LocalDateTime fechaHoraTelemetria) {
+        private void asignarCaravanaConMoveState(Long animalId, int moveState, LocalDateTime fechaHoraTelemetria) {
                 Animal animal = animalRepository.findById(animalId).orElseThrow();
 
                 Caravana caravana = new Caravana();
@@ -1754,7 +2231,7 @@ class AnimalControllerTest {
         void getIndicadoresSalud_verde() throws Exception {
                 Long animalId = crearAnimal("Vaca Indicadores Verde", establecimientoId, rodeoLoteId);
 
-                asignarCollarConMoveState(animalId, 100); // igual a la media -> VERDE
+                asignarCaravanaConMoveState(animalId, 100); // igual a la media -> VERDE
                 asignarEstadoReproductivo(animalId, TipoReproductivo.GESTANTE);
                 asignarEstadoSalud(animalId, TipoEstadoSalud.SANO);
 
@@ -1785,10 +2262,10 @@ class AnimalControllerTest {
         @SuppressWarnings("null")
         void getIndicadoresSalud_movimientoAmarilloYRojo() throws Exception {
                 Long animalAmarilloId = crearAnimal("Vaca Indicadores Amarillo", establecimientoId, rodeoLoteId);
-                asignarCollarConMoveState(animalAmarilloId, 115); // 1.5 std por encima de la media -> AMARILLO
+                asignarCaravanaConMoveState(animalAmarilloId, 115); // 1.5 std por encima de la media -> AMARILLO
 
                 Long animalRojoId = crearAnimal("Vaca Indicadores Rojo", establecimientoId, rodeoLoteId);
-                asignarCollarConMoveState(animalRojoId, 200); // muy por encima de la media -> ROJO
+                asignarCaravanaConMoveState(animalRojoId, 200); // muy por encima de la media -> ROJO
 
                 mockMvc.perform(get("/api/v1/animales/" + animalAmarilloId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -1830,7 +2307,7 @@ class AnimalControllerTest {
         @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - Animal sin caravana, estado reproductivo ni estado de salud devuelve SIN DATOS (no 500)")
         @SuppressWarnings("null")
         void getIndicadoresSalud_sinDatos() throws Exception {
-                Long animalId = crearAnimal("Vaca Sin Collar", establecimientoId, rodeoLoteId);
+                Long animalId = crearAnimal("Vaca Sin Caravana", establecimientoId, rodeoLoteId);
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -1903,7 +2380,7 @@ class AnimalControllerTest {
                 Long animalId = crearAnimal("Vaca Telemetria Reciente", establecimientoId, rodeoLoteId);
                 // 5h59m de antigüedad: todavía dentro de la ventana de 6hs -> se calcula el
                 // color normalmente.
-                asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).plusMinutes(1));
+                asignarCaravanaConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).plusMinutes(1));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -1919,7 +2396,7 @@ class AnimalControllerTest {
                 Long animalId = crearAnimal("Vaca Telemetria Vieja", establecimientoId, rodeoLoteId);
                 // 6h01m de antigüedad: supera la ventana de 6hs -> SIN DATOS, aunque el
                 // moveState sea "normal" (VERDE).
-                asignarCollarConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).minusMinutes(1));
+                asignarCaravanaConMoveState(animalId, 100, LocalDateTime.now().minusHours(6).minusMinutes(1));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -1935,7 +2412,7 @@ class AnimalControllerTest {
                 Long animalId = crearAnimal("Vaca Telemetria Vieja Rojo", establecimientoId, rodeoLoteId);
                 // moveState muy alejado de la media (daría ROJO), pero la telemetría es de hace
                 // más de 6hs.
-                asignarCollarConMoveState(animalId, 500, LocalDateTime.now().minusHours(7));
+                asignarCaravanaConMoveState(animalId, 500, LocalDateTime.now().minusHours(7));
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + productorToken))
@@ -2012,7 +2489,7 @@ class AnimalControllerTest {
 
                 Caravana caravana = new Caravana();
                 caravana.setDevEui("TEST-DEV-EUI-01");
-                caravana.setAlias("Sensor Collar 01");
+                caravana.setAlias("Sensor Caravana 01");
                 caravana.setEstablecimiento(est);
                 caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
                 caravana.setActivo(false);
@@ -2029,7 +2506,7 @@ class AnimalControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.caravanaId").value(caravana.getId()))
                                 .andExpect(jsonPath("$.caravanaDevEui").value("TEST-DEV-EUI-01"))
-                                .andExpect(jsonPath("$.caravanaAlias").value("Sensor Collar 01"))
+                                .andExpect(jsonPath("$.caravanaAlias").value("Sensor Caravana 01"))
                                 .andExpect(jsonPath("$.caravanaEstado").value("VINCULADO"));
 
                 Caravana enDb = caravanaRepository.findById(caravana.getId()).orElseThrow();
@@ -2135,5 +2612,418 @@ class AnimalControllerTest {
 
                 Animal animalEnDb = animalRepository.findById(animalId).orElseThrow();
                 assertThat(animalEnDb.getCaravana()).isNull();
+        }
+
+        private Caravana crearCaravanaDisponible(String devEui) {
+                Caravana caravana = new Caravana();
+                caravana.setDevEui(devEui);
+                caravana.setEstablecimiento(establecimientoRepository.findById(establecimientoId).orElseThrow());
+                caravana.setEstadoSensor(EstadoSensor.DISPONIBLE);
+                caravana.setActivo(false);
+                return caravanaRepository.save(caravana);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Asigna una caravana distinta a cada animal sin caravana")
+        void asignarCaravanasAleatoriamente_asignaATodos() throws Exception {
+                Caravana c1 = crearCaravanaDisponible("TEST-AUTO-01");
+                Caravana c2 = crearCaravanaDisponible("TEST-AUTO-02");
+                Long a1 = crearAnimal("Vaca Auto 1", establecimientoId, rodeoLoteId);
+                Long a2 = crearAnimal("Vaca Auto 2", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(2));
+
+                Animal animal1 = animalRepository.findById(a1).orElseThrow();
+                Animal animal2 = animalRepository.findById(a2).orElseThrow();
+                assertThat(List.of(animal1.getCaravana().getId(), animal2.getCaravana().getId()))
+                                .containsExactlyInAnyOrder(c1.getId(), c2.getId());
+                assertThat(caravanaRepository.findById(c1.getId()).orElseThrow().getEstadoSensor())
+                                .isEqualTo(EstadoSensor.VINCULADO);
+                assertThat(caravanaRepository.findById(c2.getId()).orElseThrow().getEstadoSensor())
+                                .isEqualTo(EstadoSensor.VINCULADO);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Con menos caravanas que animales, asigna solo las disponibles")
+        void asignarCaravanasAleatoriamente_menosCaravanasQueAnimales() throws Exception {
+                Caravana caravana = crearCaravanaDisponible("TEST-AUTO-UNICA");
+                Long a1 = crearAnimal("Vaca Auto Escasa 1", establecimientoId, rodeoLoteId);
+                Long a2 = crearAnimal("Vaca Auto Escasa 2", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + camperoToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].caravanaId").value(caravana.getId()));
+
+                long conCaravana = List.of(a1, a2).stream()
+                                .map(id -> animalRepository.findById(id).orElseThrow())
+                                .filter(a -> a.getCaravana() != null)
+                                .count();
+                assertThat(conCaravana).isEqualTo(1);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Con más caravanas que animales, las sobrantes quedan disponibles")
+        void asignarCaravanasAleatoriamente_masCaravanasQueAnimales() throws Exception {
+                List<Caravana> caravanas = List.of(
+                                crearCaravanaDisponible("TEST-AUTO-SOBRA-01"),
+                                crearCaravanaDisponible("TEST-AUTO-SOBRA-02"),
+                                crearCaravanaDisponible("TEST-AUTO-SOBRA-03"));
+                Long animalId = crearAnimal("Vaca Auto Sobra", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].id").value(animalId));
+
+                Long asignadaId = animalRepository.findById(animalId).orElseThrow().getCaravana().getId();
+                assertThat(caravanas).extracting(Caravana::getId).contains(asignadaId);
+
+                List<EstadoSensor> estados = caravanas.stream()
+                                .map(c -> caravanaRepository.findById(c.getId()).orElseThrow().getEstadoSensor())
+                                .toList();
+                assertThat(estados).containsExactlyInAnyOrder(
+                                EstadoSensor.VINCULADO, EstadoSensor.DISPONIBLE, EstadoSensor.DISPONIBLE);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - No toca animales que ya tienen caravana")
+        void asignarCaravanasAleatoriamente_respetaVinculados() throws Exception {
+                Caravana vinculada = crearCaravanaDisponible("TEST-AUTO-YA-VINC");
+                vinculada.setEstadoSensor(EstadoSensor.VINCULADO);
+                vinculada.setActivo(true);
+                caravanaRepository.save(vinculada);
+                Long conSensor = crearAnimal("Vaca Ya Vinculada", establecimientoId, rodeoLoteId);
+                Animal animal = animalRepository.findById(conSensor).orElseThrow();
+                animal.setCaravana(vinculada);
+                animalRepository.save(animal);
+
+                crearCaravanaDisponible("TEST-AUTO-LIBRE");
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(0));
+
+                assertThat(animalRepository.findById(conSensor).orElseThrow().getCaravana().getId())
+                                .isEqualTo(vinculada.getId());
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 403 para rol VETERINARIO")
+        void asignarCaravanasAleatoriamente_veterinario_retornaForbidden() throws Exception {
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + veterinarioToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Con rodeoLoteId, solo asigna a los animales de ese lote")
+        void asignarCaravanasAleatoriamente_porLote_soloEseLote() throws Exception {
+                RodeoLote cuarentena = new RodeoLote(establecimientoRepository.findById(establecimientoId).orElseThrow());
+                cuarentena.setNombre("Lote Cuarentena Test");
+                cuarentena = rodeoLoteRepository.save(cuarentena);
+                crearCaravanaDisponible("TEST-LOTE-01");
+                crearCaravanaDisponible("TEST-LOTE-02");
+                Long enLote = crearAnimal("Vaca Lote Cuarentena", establecimientoId, cuarentena.getId());
+                Long fueraDelLote = crearAnimal("Vaca Lote Base", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .param("rodeoLoteId", cuarentena.getId().toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].id").value(enLote));
+
+                assertThat(animalRepository.findById(enLote).orElseThrow().getCaravana()).isNotNull();
+                assertThat(animalRepository.findById(fueraDelLote).orElseThrow().getCaravana()).isNull();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 404 si el rodeoLoteId no existe")
+        void asignarCaravanasAleatoriamente_loteInexistente_retornaNotFound() throws Exception {
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .param("rodeoLoteId", "999999")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isNotFound());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 400 si el rodeo es de otro establecimiento, sin asignar nada")
+        void asignarCaravanasAleatoriamente_loteDeOtroEstablecimiento_retornaBadRequest() throws Exception {
+                Establecimiento otro = new Establecimiento();
+                otro.setNombre("Otro Establecimiento Test");
+                otro = establecimientoRepository.save(otro);
+                RodeoLote ajeno = new RodeoLote(otro);
+                ajeno.setNombre("Lote Ajeno");
+                ajeno = rodeoLoteRepository.save(ajeno);
+                Caravana caravana = crearCaravanaDisponible("TEST-LOTE-AJENO");
+                crearAnimal("Vaca Lote Ajeno", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(post("/api/v1/animales/asignar-caravanas")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .param("rodeoLoteId", ajeno.getId().toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isBadRequest());
+
+                assertThat(caravanaRepository.findById(caravana.getId()).orElseThrow().getEstadoSensor())
+                                .isEqualTo(EstadoSensor.DISPONIBLE);
+        }
+
+        // ── Excel de asignaciones de caravanas ───────────────────────────────────
+
+        /** DevEUI (columna G) de cada fila de datos del Excel, en orden. */
+        private List<String> devEuisDelExcel(byte[] excel) throws Exception {
+                try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(
+                                new java.io.ByteArrayInputStream(excel))) {
+                        org.apache.poi.ss.usermodel.Sheet sheet = workbook.getSheetAt(0);
+                        assertThat(sheet.getRow(3).getCell(6).getStringCellValue()).isEqualTo("DevEUI");
+                        List<String> devEuis = new ArrayList<>();
+                        for (int i = 4; i <= sheet.getLastRowNum(); i++) {
+                                devEuis.add(sheet.getRow(i).getCell(6).getStringCellValue());
+                        }
+                        return devEuis;
+                }
+        }
+
+        private void vincular(Long animalId, Caravana caravana) {
+                Animal animal = animalRepository.findById(animalId).orElseThrow();
+                caravana.setEstadoSensor(EstadoSensor.VINCULADO);
+                caravana.setAnimal(animal);
+                animal.setCaravana(caravanaRepository.save(caravana));
+                animalRepository.save(animal);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignaciones-caravanas/excel - Con ids, exporta solo esos animales")
+        void exportarAsignacionesCaravanas_conIds_soloEsos() throws Exception {
+                Long a1 = crearAnimal("Vaca Excel 1", establecimientoId, rodeoLoteId);
+                Long a2 = crearAnimal("Vaca Excel 2", establecimientoId, rodeoLoteId);
+                vincular(a1, crearCaravanaDisponible("TEST-EXCEL-01"));
+                vincular(a2, crearCaravanaDisponible("TEST-EXCEL-02"));
+
+                MvcResult result = mockMvc.perform(post("/api/v1/animales/asignaciones-caravanas/excel")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + camperoToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(List.of(a1))))
+                                .andExpect(status().isOk())
+                                .andReturn();
+
+                assertThat(result.getResponse().getContentType())
+                                .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                assertThat(result.getResponse().getHeader("Content-Disposition")).contains("attachment", ".xlsx");
+                assertThat(devEuisDelExcel(result.getResponse().getContentAsByteArray()))
+                                .containsExactly("TEST-EXCEL-01");
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/asignaciones-caravanas/excel - Sin body, exporta todos los animales con caravana")
+        void exportarAsignacionesCaravanas_sinBody_todosConCaravana() throws Exception {
+                Long conSensor = crearAnimal("Vaca Excel Con", establecimientoId, rodeoLoteId);
+                crearAnimal("Vaca Excel Sin", establecimientoId, rodeoLoteId);
+                vincular(conSensor, crearCaravanaDisponible("TEST-EXCEL-TODOS"));
+
+                MvcResult result = mockMvc.perform(post("/api/v1/animales/asignaciones-caravanas/excel")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andReturn();
+
+                long conCaravanaEnDb = animalRepository.findByEstablecimientoId(establecimientoId).stream()
+                                .filter(a -> a.getCaravana() != null)
+                                .count();
+                assertThat(devEuisDelExcel(result.getResponse().getContentAsByteArray()))
+                                .contains("TEST-EXCEL-TODOS")
+                                .hasSize((int) conCaravanaEnDb);
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/animales/asignaciones-caravanas/excel - Falla con 403 para rol VETERINARIO")
+        void exportarAsignacionesCaravanas_veterinario_retornaForbidden() throws Exception {
+                mockMvc.perform(post("/api/v1/animales/asignaciones-caravanas/excel")
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + veterinarioToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        // ── Índice de cohesión (#346) ────────────────────────────────────────────
+
+        private void guardarCohesion(Long animalId, LocalDateTime fecha, double indice) {
+                dev.vigia.backend.model.RegistroCohesion registro = dev.vigia.backend.model.RegistroCohesion.builder()
+                                .animal(animalRepository.findById(animalId).orElseThrow())
+                                .establecimiento(establecimientoRepository.findById(establecimientoId).orElseThrow())
+                                .fecha(fecha)
+                                .indiceCohesion(indice)
+                                .tiempoFueraGrupoS(0L)
+                                .build();
+                registroCohesionRepository.save(registro);
+        }
+
+        /** Posición en la serie por defecto (hoy y los 6 días anteriores) del día de la fecha. */
+        private static int diaEnSerie(LocalDateTime fecha) {
+                return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now().minusDays(6), fecha.toLocalDate());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Sin desde/hasta: un punto por día de los últimos 7, con los días sin datos en null")
+        @SuppressWarnings("null")
+        void getCohesion_sinRango_sieteDiasConDiasSinDatosEnNull() throws Exception {
+                Long vaca = crearAnimal("Vaca Cohesion", establecimientoId, rodeoLoteId);
+                Long companera = crearAnimal("Companera", establecimientoId, rodeoLoteId);
+                LocalDateTime corrida1 = LocalDateTime.now().minusDays(2).withNano(0);
+                LocalDateTime corrida2 = LocalDateTime.now().minusMinutes(1).withNano(0);
+                guardarCohesion(vaca, corrida1, 0.8);
+                guardarCohesion(companera, corrida1, 0.6);
+                guardarCohesion(vaca, corrida2, 0.4);
+                guardarCohesion(companera, corrida2, 1.0);
+                // Fuera de la ventana de 7 días: no debe aparecer
+                guardarCohesion(vaca, LocalDateTime.now().minusDays(10), 0.1);
+
+                int dia1 = diaEnSerie(corrida1);
+                int dia2 = diaEnSerie(corrida2);
+                int sinDatos = dia1 == 0 ? 1 : 0;
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.actual").value(40.0))
+                                .andExpect(jsonPath("$.serie.length()").value(7))
+                                .andExpect(jsonPath("$.serie[0].ts").value(org.hamcrest.Matchers.startsWith(
+                                                LocalDate.now().minusDays(6) + "T00:00")))
+                                .andExpect(jsonPath("$.serie[" + dia1 + "].valor").value(80.0))
+                                .andExpect(jsonPath("$.serie[" + dia1 + "].promedioRodeo").value(70.0))
+                                .andExpect(jsonPath("$.serie[" + dia2 + "].valor").value(40.0))
+                                .andExpect(jsonPath("$.serie[" + dia2 + "].promedioRodeo").value(70.0))
+                                .andExpect(jsonPath("$.serie[" + sinDatos + "].valor").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.serie[" + sinDatos + "].promedioRodeo").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.promedioRodeo").value(70.0));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Sin análisis en el período: actual y promedios en null, días en null")
+        @SuppressWarnings("null")
+        void getCohesion_sinDatos_actualNull() throws Exception {
+                Long vaca = crearAnimal("Vaca Sin Datos", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.actual").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.promedioRodeo").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.promedioPeriodoAnterior").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.serie.length()").value(7))
+                                .andExpect(jsonPath("$.serie[*].valor").value(org.hamcrest.Matchers.everyItem(
+                                                org.hamcrest.Matchers.nullValue())));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Rango de hasta 48 h con offset: un punto por hora")
+        @SuppressWarnings("null")
+        void getCohesion_rangoCortoConOffset_puntosPorHora() throws Exception {
+                Long vaca = crearAnimal("Vaca Horas", establecimientoId, rodeoLoteId);
+                java.time.ZonedDateTime hasta = java.time.ZonedDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.HOURS);
+                java.time.ZonedDateTime desde = hasta.minusHours(23);
+                guardarCohesion(vaca, hasta.toLocalDateTime().minusHours(2).plusMinutes(10), 0.5);
+
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .param("desde", desde.toOffsetDateTime().withOffsetSameInstant(java.time.ZoneOffset.UTC).toString())
+                                .param("hasta", hasta.toOffsetDateTime().withOffsetSameInstant(java.time.ZoneOffset.UTC).toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.serie.length()").value(24))
+                                .andExpect(jsonPath("$.serie[21].valor").value(50.0))
+                                .andExpect(jsonPath("$.serie[20].valor").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.actual").value(50.0));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Un veterinario del establecimiento puede consultarlo")
+        void getCohesion_veterinario_200() throws Exception {
+                Long vaca = crearAnimal("Vaca Vet", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .header("Authorization", "Bearer " + veterinarioToken))
+                                .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - ADMINISTRADOR no accede a datos operativos: 403")
+        void getCohesion_administrador_403() throws Exception {
+                Long vaca = crearAnimal("Vaca Admin", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + vaca + "/cohesion")
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Animal inexistente: 404")
+        void getCohesion_animalInexistente_404() throws Exception {
+                mockMvc.perform(get("/api/v1/animales/999999/cohesion")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - Usuario de otro establecimiento recibe 403")
+        @SuppressWarnings("null")
+        void getCohesion_usuarioAjeno_403() throws Exception {
+                Usuario otroProductor = new Usuario();
+                otroProductor.setEmail("otro-cohesion@vigia.dev");
+                otroProductor.setPasswordHash(passwordEncoder.encode("otro123"));
+                otroProductor.setNombre("Otro Productor");
+                otroProductor.setRol(Rol.PRODUCTOR);
+                otroProductor.setActivo(true);
+                otroProductor = usuarioRepository.save(otroProductor);
+
+                Establecimiento otroEst = new Establecimiento();
+                otroEst.setNombre("Otro Campo Cohesion");
+                otroEst.setLatitud(-35.0);
+                otroEst.setLongitud(-59.0);
+                otroEst.setActivo(true);
+                otroEst.setFechaAlta(LocalDate.now());
+                otroEst.setEmpleados(new ArrayList<>());
+                otroEst.getEmpleados().add(new Empleado(otroEst, otroProductor));
+                establecimientoRepository.save(otroEst);
+
+                String otroToken = getTokenFor("otro-cohesion@vigia.dev", "otro123");
+                Long animalId = crearAnimal("Vaca Ajena Cohesion", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/cohesion")
+                                .header("Authorization", "Bearer " + otroToken))
+                                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/animales/{id}/cohesion - desde posterior a hasta devuelve 400")
+        @SuppressWarnings("null")
+        void getCohesion_rangoInvertido_400() throws Exception {
+                Long animalId = crearAnimal("Vaca Rango", establecimientoId, rodeoLoteId);
+
+                mockMvc.perform(get("/api/v1/animales/" + animalId + "/cohesion")
+                                .param("desde", "2026-10-10T00:00:00Z")
+                                .param("hasta", "2026-10-01T00:00:00Z")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isBadRequest());
         }
 }

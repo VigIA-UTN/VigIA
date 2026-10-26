@@ -7,11 +7,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 public class AlertaArchivadorService {
 
     private final AlertaRepository alertaRepository;
-    private final RabbitTemplate rabbitTemplate;
+    private final PublicadorDeAlertas publicadorDeAlertas;
 
     @Scheduled(fixedRateString = "3600000") // 1 hora
     @Transactional
@@ -49,7 +49,7 @@ public class AlertaArchivadorService {
                 .tipo(alerta.getTipo())
                 .tsGeneracion(alerta.getTsGeneracion())
                 .build();
-            rabbitTemplate.convertAndSend("alertas.exchange", "alerta.update", eventDTO);
+            publicadorDeAlertas.publicar(eventDTO);
         }
         alertaRepository.saveAll(vencidas);
         log.info("Archivado de alertas finalizado exitosamente.");

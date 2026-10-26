@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import Form from 'react-bootstrap/Form';
-import { getAlertas, type AlertaResponse } from '../api/alertaApi';
+import { aplicarAlertaEnLista, coincideFiltroTipo, combinarAlerta, getAlertas, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
-import { useAuthStore } from '../store/authStore';
+import { useAlertasStream } from '../hooks/useAlertasStream';
 import AlertDetailSidebar from './AlertDetailSidebar';
 import AlertNotificationCard from './AlertNotificationCard';
 import IntervencionFormPanel from './IntervencionFormPanel';
@@ -29,13 +29,9 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
   const [filtroTipo, setFiltroTipo] = useState<string | null>(null);
   const [filtroSeveridad, setFiltroSeveridad] = useState<string>('');
 
-  // Ref to track the highest received ID for Last-Event-ID recovery
-  const maxAlertaIdRef = useRef<number>(0);
-
   useEffect(() => {
     if (!selectedId) return;
     let isMounted = true;
-    let eventSource: EventSource | null = null;
 
     const init = async () => {
       setLoading(true);
@@ -43,68 +39,36 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
         const data = await getAlertas(selectedId, undefined, undefined, 'PENDIENTE');
         if (!isMounted) return;
         setAlertas(data);
-        if (data.length > 0) {
-          maxAlertaIdRef.current = Math.max(...data.map(a => a.id));
-        }
       } catch (error) {
         console.error("Error fetching alertas:", error);
       } finally {
         if (isMounted) setLoading(false);
       }
-
-      if (!isMounted) return;
-
-      // Setup SSE connection AFTER fetching initial data
-      const token = useAuthStore.getState().token;
-      const API_URL = import.meta.env.VITE_API_URL as string;
-      let sseUrl = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
-      if (token) {
-        sseUrl += `&token=${token}`;
-      }
-      if (maxAlertaIdRef.current > 0) {
-        sseUrl += `&lastEventId=${maxAlertaIdRef.current}`;
-      }
-
-      eventSource = new EventSource(sseUrl);
-
-      eventSource.onmessage = (event) => {
-        if (!isMounted) return;
-        const newAlerta = JSON.parse(event.data) as AlertaResponse;
-        console.log("Alerta SSE recibida en sidebar:", newAlerta);
-
-        // Update max ID
-        if (newAlerta.id > maxAlertaIdRef.current) {
-          maxAlertaIdRef.current = newAlerta.id;
-        }
-
-        // Si la alerta ya existe, la actualizamos
-        setAlertas((prev) => {
-          if (prev.some(a => a.id === newAlerta.id)) {
-            return prev.map(a => a.id === newAlerta.id ? newAlerta : a);
-          }
-          // Solo guardamos si es PENDIENTE (al menos como alerta nueva)
-          if (newAlerta.estado !== 'PENDIENTE') return prev;
-          return [newAlerta, ...prev];
-        });
-
-        // Si la alerta actualizada es la que estamos viendo en detalle, actualizamos el estado
-        setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? newAlerta : prev));
-      };
-
-      eventSource.onerror = (error) => {
-        console.error("SSE connection error in sidebar:", error);
-      };
     };
 
     init();
 
     return () => {
       isMounted = false;
-      if (eventSource) {
-        eventSource.close();
-      }
     };
   }, [selectedId]);
+
+  // La suscripción arranca junto con la carga inicial: lo que llegue mientras tanto ya no se pierde.
+  useAlertasStream(selectedId, (newAlerta) => {
+    console.log("Alerta SSE recibida en sidebar:", newAlerta);
+
+    // El sidebar lista solo pendientes: una alerta resuelta sale de la lista
+    setAlertas((prev) => aplicarAlertaEnLista(prev, newAlerta, { tipo: '', severidad: '', estado: 'PENDIENTE' }));
+
+    // Si la alerta actualizada es la que estamos viendo en detalle, actualizamos el estado
+    setSelectedAlerta((prev) => (prev?.id === newAlerta.id ? combinarAlerta(prev, newAlerta) : prev));
+  }, () => {
+    // Al reconectar se recarga la lista: el replay del backend solo trae alertas nuevas, no cambios.
+    if (!selectedId) return;
+    getAlertas(selectedId, undefined, undefined, 'PENDIENTE')
+      .then(data => setAlertas(data))
+      .catch(error => console.error("Error recargando alertas:", error));
+  });
 
 
   const handleAlertClick = (alerta: AlertaResponse) => {
@@ -136,15 +100,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
 
   // Derived filtered alerts
   const alertasFiltradas = alertas.filter(a => {
-    if (filtroTipo) {
-      // 'GEO' es el valor interno que agrupa ABIGEATO y FUERA_DE_PERIMETRO
-      if (filtroTipo === 'GEO') {
-        const t = (a.tipo ?? '').toUpperCase();
-        if (!t.includes('FUERA') && !t.includes('PERIMETRO') && t !== 'ABIGEATO' && t !== 'GEOESPACIAL') return false;
-      } else if (a.tipo !== filtroTipo) {
-        return false;
-      }
-    }
+    if (filtroTipo && !coincideFiltroTipo(a, filtroTipo)) return false;
     if (filtroSeveridad && a.severidad !== filtroSeveridad) return false;
     return true;
   }).sort((a, b) => {
@@ -256,12 +212,12 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           <button
             className="btn rounded-pill px-2 py-1 fw-semibold d-flex align-items-center gap-1"
             style={{
-              backgroundColor: filtroTipo === 'GEO' ? '#13D4FB' : 'transparent',
+              backgroundColor: filtroTipo === 'GEOESPACIAL' ? '#13D4FB' : 'transparent',
               color: '#1E3A5F',
               border: '2px solid #1E3A5F',
               fontSize: '0.9rem'
             }}
-            onClick={() => setFiltroTipo(prev => prev === 'GEO' ? null : 'GEO')}
+            onClick={() => setFiltroTipo(prev => prev === 'GEOESPACIAL' ? null : 'GEOESPACIAL')}
           >
             <i className="bi bi-geo-alt-fill"></i> Geoespacial
           </button>

@@ -76,7 +76,7 @@ public class IngestaController {
         }
 
         Caravana caravana = caravanaOpt.get();
-        Optional<Animal> animalOpt = animalRepository.findByCaravanaId(caravana.getId());
+        Optional<Animal> animalOpt = animalRepository.findConLoteYCaravanaByCaravanaId(caravana.getId());
         if (animalOpt.isEmpty()) {
             log.warn("Webhook TTN recibido para devEui {} que no está asociado a ningún animal.", devEui);
             return ResponseEntity.ok("Ignorado: Sin animal asociado");
@@ -233,11 +233,11 @@ public class IngestaController {
      * GET /api/v1/ingesta/ultima-posicion/{deviceId}
      * <p>
      * Devuelve la última posición/batería conocida de una caravana. Usado por el
-     * simulador (ver {@code simulador/simulador_demo.py}) para arrancar
+     * simulador (ver {@code simulador/simulador.py}) para arrancar
      * continuando la última posición real que ya tiene el animal en la base
      * -sembrada por {@code DataInitializer} o dejada por una corrida anterior del
      * propio simulador- en vez de coordenadas hardcodeadas que pueden
-     * desincronizarse (ver el BUGFIX documentado en simulador.py: un salto de
+     * desincronizarse (un salto de
      * posición desconectado de la última fila real dispara una alerta de celo
      * falsa por la distancia anómala entre el punto sembrado y el primer paquete
      * en vivo).

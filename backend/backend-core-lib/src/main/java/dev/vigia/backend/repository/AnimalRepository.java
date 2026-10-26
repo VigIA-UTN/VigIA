@@ -24,6 +24,13 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
     @EntityGraph(attributePaths = { "rodeoLote", "estadosReproductivos", "caravana" })
     List<Animal> findByEstadoActualNot(EstadoAnimal estadoActual);
 
+    /**
+     * Detector de anestro: solo lo que lee la regla. perfilReferencia va en el join porque, del lado mappedBy del
+     * OneToOne, Hibernate lo carga igual con una consulta por animal.
+     */
+    @EntityGraph(attributePaths = { "estadosReproductivos", "perfilReferencia" })
+    List<Animal> findConEstadosByEstablecimientoIdAndEstadoActualNot(Long establecimientoId, EstadoAnimal estadoActual);
+
     Optional<Animal> findByIdCaravanaOficial(String idCaravanaOficial);
 
     Optional<Animal> findByIdCaravanaOficialAndEstablecimientoId(String idCaravanaOficial, Long establecimientoId);
@@ -32,5 +39,11 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
 
     boolean existsByIdCaravanaOficialAndEstablecimientoId(String idCaravanaOficial, Long establecimientoId);
 
+    boolean existsByAliasAndEstablecimientoId(String alias, Long establecimientoId);
+
     Optional<Animal> findByCaravanaId(Long caravanaId);
+
+    /** Webhook de ingesta: el geofence lee el lote y la caravana del animal en otra transacción. */
+    @EntityGraph(attributePaths = { "rodeoLote", "caravana" })
+    Optional<Animal> findConLoteYCaravanaByCaravanaId(Long caravanaId);
 }

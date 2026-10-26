@@ -6,7 +6,7 @@
         "identifiers": [
             {
                 "device_ids": {
-                    "device_id": "collar-0097",
+                    "device_id": "caravana-0097",
                     "application_ids": {
                         "application_id": "sensor-test"
                     },
@@ -19,7 +19,7 @@
         "data": {
             "@type": "type.googleapis.com/ttn.lorawan.v3.ApplicationUp",
             "end_device_ids": {
-                "device_id": "collar-0097",
+                "device_id": "caravana-0097",
                 "application_ids": {
                     "application_id": "sensor-test"
                 },
@@ -107,7 +107,7 @@
         "identifiers": [
             {
                 "device_ids": {
-                    "device_id": "collar-0097",
+                    "device_id": "caravana-0097",
                     "application_ids": {
                         "application_id": "sensor-test"
                     },
@@ -120,7 +120,7 @@
         "data": {
             "@type": "type.googleapis.com/ttn.lorawan.v3.ApplicationUp",
             "end_device_ids": {
-                "device_id": "collar-0097",
+                "device_id": "caravana-0097",
                 "application_ids": {
                     "application_id": "sensor-test"
                 },
@@ -208,7 +208,7 @@
         "identifiers": [
             {
                 "device_ids": {
-                    "device_id": "collar-9999",
+                    "device_id": "caravana-9999",
                     "application_ids": {
                         "application_id": "sensor-test"
                     },
@@ -221,7 +221,7 @@
         "data": {
             "@type": "type.googleapis.com/ttn.lorawan.v3.ApplicationUp",
             "end_device_ids": {
-                "device_id": "collar-9999",
+                "device_id": "caravana-9999",
                 "application_ids": {
                     "application_id": "sensor-test"
                 },
@@ -309,7 +309,7 @@
         "identifiers": [
             {
                 "device_ids": {
-                    "device_id": "collar-0150",
+                    "device_id": "caravana-0150",
                     "application_ids": {
                         "application_id": "sensor-test"
                     },
@@ -322,7 +322,7 @@
         "data": {
             "@type": "type.googleapis.com/ttn.lorawan.v3.ApplicationUp",
             "end_device_ids": {
-                "device_id": "collar-0150",
+                "device_id": "caravana-0150",
                 "application_ids": {
                     "application_id": "sensor-test"
                 },
@@ -410,7 +410,7 @@
         "identifiers": [
             {
                 "device_ids": {
-                    "device_id": "collar-0097",
+                    "device_id": "caravana-0097",
                     "application_ids": {
                         "application_id": "sensor-test"
                     },
@@ -423,7 +423,7 @@
         "data": {
             "@type": "type.googleapis.com/ttn.lorawan.v3.ApplicationUp",
             "end_device_ids": {
-                "device_id": "collar-0097",
+                "device_id": "caravana-0097",
                 "application_ids": {
                     "application_id": "sensor-test"
                 },

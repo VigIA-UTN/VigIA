@@ -1,9 +1,17 @@
 package dev.vigia.backend.controller;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,10 +35,12 @@ import dev.vigia.backend.dto.AnimalResponse;
 import dev.vigia.backend.dto.VincularCaravanaRequest;
 import dev.vigia.backend.dto.CargaMasivaEstadoResponse;
 import dev.vigia.backend.dto.CargaMasivaResponse;
+import dev.vigia.backend.dto.CohesionResponse;
 import dev.vigia.backend.dto.EstadoReproductivoRequest;
 import dev.vigia.backend.dto.EstadoReproductivoResponse;
 import dev.vigia.backend.dto.EstadoSaludRequest;
 import dev.vigia.backend.dto.EstadoSaludResponse;
+import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.dto.LineaTiempoEventoResponse;
 import dev.vigia.backend.dto.RegistroPesoRequest;
@@ -331,13 +341,45 @@ public class AnimalController {
     }
 
     /**
+     * POST /api/v1/animales/{id}/intervenciones
+     * <p>
+     * Registra una intervención (tratamiento, vacunación, revisión veterinaria u
+     * otra) sobre un animal, sin alerta asociada.
+     *
+     * @param animalId       ID del animal
+     * @param request        tipo, fecha/hora (opcional) y descripción
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 201 con la intervención creada, 400 si hay error, 403 si acceso
+     *         denegado, 404 si el animal no existe
+     */
+    @PostMapping("/{id}/intervenciones")
+    @PreAuthorize("hasRole('VETERINARIO')")
+    public ResponseEntity<?> registrarIntervencion(
+            @PathVariable("id") Long animalId,
+            @RequestBody IntervencionRequest request,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            IntervencionResponse response = animalService.registrarIntervencion(animalId, email, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Animal no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
      * POST /api/v1/animales/csv?establecimientoId={id}
      * <p>
      * Carga masiva de animales a partir de un archivo (CSV/Excel).
      *
-     * @param file               archivo con los animales a cargar
-     * @param establecimientoId  ID del establecimiento destino
-     * @param authentication     contexto de seguridad inyectado por Spring Security
+     * @param file              archivo con los animales a cargar
+     * @param establecimientoId ID del establecimiento destino
+     * @param authentication    contexto de seguridad inyectado por Spring Security
      * @return 201 con el resumen de la carga, 400 si hay error de validación o de
      *         lectura del archivo
      */
@@ -364,9 +406,9 @@ public class AnimalController {
      * <p>
      * Carga masiva de estados reproductivos a partir de un archivo (CSV/Excel).
      *
-     * @param file               archivo con los estados reproductivos a cargar
-     * @param establecimientoId  ID del establecimiento destino
-     * @param authentication     contexto de seguridad inyectado por Spring Security
+     * @param file              archivo con los estados reproductivos a cargar
+     * @param establecimientoId ID del establecimiento destino
+     * @param authentication    contexto de seguridad inyectado por Spring Security
      * @return 201 con el resumen de la carga, 400 si hay error de validación o de
      *         lectura del archivo
      */
@@ -621,16 +663,19 @@ public class AnimalController {
         }
     }
 
-    // ── Línea de tiempo de alertas ────────────────────────────────────────────────────
+    // ── Línea de tiempo de alertas
+    // ────────────────────────────────────────────────────
     /**
-     * GET /api/v1/animales/{id}/linea-tiempo-alertas?tipo={tipo}&desde={desde}&hasta={hasta}
+     * GET
+     * /api/v1/animales/{id}/linea-tiempo-alertas?tipo={tipo}&desde={desde}&hasta={hasta}
      * <p>
      * Devuelve la línea de tiempo unificada de alertas e intervenciones de un
      * animal, ordenada cronológicamente.
      *
      * @param animalId       ID del animal
-     * @param tipo           (opcional) filtro por tipo de alerta: celo, sanitario,
-     *                       geoespacial, perimetro (no filtra las intervenciones)
+     * @param tipo           (opcional) filtro por tipo de alerta, con los mismos
+     *                       valores que GET /alertas (no filtra las intervenciones);
+     *                       un valor desconocido responde 400
      * @param desde          (opcional) inicio del rango de fechas, inclusive
      * @param hasta          (opcional) fin del rango de fechas, inclusive
      * @param authentication contexto de seguridad inyectado por Spring Security
@@ -641,20 +686,14 @@ public class AnimalController {
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getLineaTiempoAlertas(
             @PathVariable("id") Long animalId,
-            @RequestParam(name = "tipo",  required = false) String tipo,
-            @RequestParam(name = "desde", required = false)
-            @org.springframework.format.annotation.DateTimeFormat(
-                    iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
-                    java.time.LocalDateTime desde,
-            @RequestParam(name = "hasta", required = false)
-            @org.springframework.format.annotation.DateTimeFormat(
-                    iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
-                    java.time.LocalDateTime hasta,
+            @RequestParam(name = "tipo", required = false) String tipo,
+            @RequestParam(name = "desde", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime desde,
+            @RequestParam(name = "hasta", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime hasta,
             Authentication authentication) {
         try {
             String email = authentication.getName();
-            List<LineaTiempoEventoResponse> response =
-                    alertaService.obtenerLineaTiempoAlertas(email, animalId, tipo, desde, hasta);
+            List<LineaTiempoEventoResponse> response = alertaService.obtenerLineaTiempoAlertas(email, animalId, tipo,
+                    desde, hasta);
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -700,5 +739,101 @@ public class AnimalController {
             }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    /**
+     * POST /api/v1/animales/asignar-caravanas?establecimientoId={id}[&rodeoLoteId={id}]
+     * <p>
+     * Asigna al azar las caravanas disponibles del establecimiento a los animales
+     * activos que no tienen caravana. Con rodeoLoteId, solo a los de ese rodeo/lote.
+     *
+     * @return 200 con los animales a los que se les asignó caravana (vacío si no
+     *         había nada para asignar), 404 si el establecimiento o el rodeo no
+     *         existen, 400 si el rodeo es de otro establecimiento, 403 si no tiene
+     *         permisos
+     */
+    @PostMapping("/asignar-caravanas")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('CAMPERO')")
+    public ResponseEntity<?> asignarCaravanasAleatoriamente(
+            @RequestParam("establecimientoId") Long establecimientoId,
+            @RequestParam(value = "rodeoLoteId", required = false) Long rodeoLoteId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<AnimalResponse> response = animalService.asignarCaravanasAleatoriamente(establecimientoId,
+                    rodeoLoteId, email);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Establecimiento no encontrado.".equals(e.getMessage())
+                    || "Rodeo lote no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * POST /api/v1/animales/asignaciones-caravanas/excel?establecimientoId={id}
+     * <p>
+     * Planilla .xlsx animal → sensor para colocar las caravanas en el campo. El body
+     * es la lista de ids de animales a incluir (por ejemplo, los que devolvió
+     * asignar-caravanas); vacío o ausente, exporta todos los que tienen caravana.
+     * Es POST porque la lista puede ser más larga de lo que entra en una URL.
+     *
+     * @return 200 con el archivo, 404 si el establecimiento no existe, 403 si no
+     *         tiene permisos
+     */
+    @PostMapping("/asignaciones-caravanas/excel")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('CAMPERO')")
+    public ResponseEntity<?> exportarAsignacionesCaravanas(
+            @RequestParam("establecimientoId") Long establecimientoId,
+            @RequestBody(required = false) List<Long> animalIds,
+            Authentication authentication) {
+        try {
+            byte[] excel = animalService.exportarAsignacionesCaravanas(establecimientoId, animalIds,
+                    authentication.getName());
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename("asignacion-caravanas-" + LocalDate.now() + ".xlsx").build().toString())
+                    .body(excel);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Establecimiento no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/cohesion")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> getCohesion(
+            @PathVariable("id") Long animalId,
+            @RequestParam(name = "desde", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime desde,
+            @RequestParam(name = "hasta", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime hasta,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            CohesionResponse response = animalService.obtenerCohesion(email, animalId, aHoraLocal(desde),
+                    aHoraLocal(hasta));
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Animal no encontrado.".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /** Los registros se guardan en la hora local del servidor: el instante recibido se lleva a esa zona. */
+    private static LocalDateTime aHoraLocal(OffsetDateTime fecha) {
+        return fecha == null ? null : fecha.atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
     }
 }

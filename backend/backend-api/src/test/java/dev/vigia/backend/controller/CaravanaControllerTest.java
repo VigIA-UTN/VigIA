@@ -181,7 +181,7 @@ class CaravanaControllerTest {
         void crearCaravana_asAdmin_sinCodigo_success() throws Exception {
                 Map<String, Object> body = Map.of(
                                 "dev_eui", "AA-BB-CC-DD-01",
-                                "alias", "Collar Norte",
+                                "alias", "Caravana Norte",
                                 "establecimientoId", establecimientoId);
 
                 mockMvc.perform(post("/api/v1/caravana")
@@ -190,7 +190,7 @@ class CaravanaControllerTest {
                                 .content(objectMapper.writeValueAsString(body)))
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.devEui").value("AA-BB-CC-DD-01"))
-                                .andExpect(jsonPath("$.alias").value("Collar Norte"))
+                                .andExpect(jsonPath("$.alias").value("Caravana Norte"))
                                 .andExpect(jsonPath("$.estadoSensor").value("DISPONIBLE"))
                                 .andExpect(jsonPath("$.establecimientoId").value(establecimientoId))
                                 .andExpect(jsonPath("$.codigo").doesNotExist())
@@ -469,7 +469,7 @@ class CaravanaControllerTest {
                 mockMvc.perform(patch("/api/v1/caravana/{id}/baja", disponible.getId())
                                 .header("Authorization", "Bearer " + adminToken)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(Map.of("motivo", "Collar dañado"))))
+                                .content(objectMapper.writeValueAsString(Map.of("motivo", "Caravana dañada"))))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.estadoSensor").value("INACTIVO"))
                                 .andExpect(jsonPath("$.activo").value(false));

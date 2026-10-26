@@ -4,7 +4,7 @@ test_gps_noise_and_movestate.py
 Guarda de regresión rápida (sin TensorFlow) para el ruido de medición GPS
 y la cuantización de moveState agregados a ambos generadores de dataset
 (ver ml-training/gps_noise_common.py y la investigación de causa raíz del
-falso positivo de celo en un collar físicamente quieto). Si alguien borra
+falso positivo de celo en una caravana físicamente quieta). Si alguien borra
 la llamada a inject_gps_noise/quantize_movestate, o cambia los defaults
 sin querer, estos tests deberían fallar antes de que llegue a producción.
 """
@@ -34,7 +34,7 @@ salud_gen = _load_module("salud_generate_dataset", ML_TRAINING_DIR / "salud" / "
 
 # Misma ancla empírica que ml-training/celo/calibracion_dataset.py
 # (REAL_STATIONARY_CONSECUTIVE_DIST_SCALED): distancias reales entre fixes
-# consecutivos de un collar quieto, en unidades escaladas (grados*100000).
+# consecutivos de una caravana quieta, en unidades escaladas (grados*100000).
 REAL_STATIONARY_MEAN_SCALED = 24.7
 RAYLEIGH_MEAN_FACTOR = 1.772
 

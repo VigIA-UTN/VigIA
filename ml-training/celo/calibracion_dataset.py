@@ -58,10 +58,10 @@ BEHAVIOR_DIRS = {
 # ----------------------------------------------------------------------
 # Validación del piso de ruido GPS (ver investigación de causa raíz del
 # falso positivo de celo): derivado de una muestra real de 12 lecturas
-# consecutivas de un collar físicamente quieto. Distancias entre fixes
+# consecutivas de una caravana físicamente quieta. Distancias entre fixes
 # consecutivos en unidades "escaladas" (grados*100000, mismo criterio que
 # DIST_SCALE_FACTOR en ml-celo/app/main.py y ml-salud/app/features_salud.py).
-# n=12, un solo collar -- ancla empírica débil pero es la única
+# n=12, una sola caravana -- ancla empírica débil pero es la única
 # disponible; agregar más muestras reales acá si se consiguen.
 REAL_STATIONARY_CONSECUTIVE_DIST_SCALED = np.array(
     [37.4, 20.3, 4.27, 31.6, 15.19, 16.63, 24.8, 37.3, 33.4, 23.5, 27.6]
@@ -129,7 +129,7 @@ def _consecutive_dist_scaled(df_sorted: pd.DataFrame) -> pd.Series:
 def validate_gps_noise_floor(sim_dataset_path: Path) -> dict:
     """Compara el piso de ruido GPS del dataset regenerado (distancia media
     entre fixes consecutivos EN TICKS DE REPOSO, moveState<=1) contra la
-    muestra real de un collar físicamente quieto. Gate tolerante (n=12,
+    muestra real de una caravana físicamente quieta. Gate tolerante (n=12,
     ver comentario en REAL_STATIONARY_CONSECUTIVE_DIST_SCALED): si esto
     falla en el futuro (ej. alguien borra la llamada a inject_gps_noise en
     generate_dataset.py), es una señal fuerte de que el ruido dejó de estar
@@ -152,7 +152,7 @@ def validate_gps_noise_floor(sim_dataset_path: Path) -> dict:
 
     ok = 0.5 <= ratio <= 2.0
     print(f"\n=== Piso de ruido GPS (ticks en reposo, moveState<=1) ===")
-    print(f"  Real (n=12, un collar quieto): media={real_mean:.2f} (sigma implícito~{real_sigma_implicito:.2f})")
+    print(f"  Real (n=12, una caravana quieta): media={real_mean:.2f} (sigma implícito~{real_sigma_implicito:.2f})")
     print(f"  Simulado (n={len(reposo)}): media={sim_mean:.2f} (sigma implícito~{sim_sigma_implicito:.2f})")
     print(f"  Ratio simulado/real: {ratio:.2f} (gate: 0.5-2.0) -> {'OK' if ok else 'FALLA'}")
     print(f"  KS-test (informativo, n real=12 -> poder estadístico bajo): stat={ks_stat:.4f}, p={ks_p:.2e}")

@@ -18,6 +18,8 @@ spring:
     username: sa
     password:
   jpa:
+    # Igual que en main: este archivo reemplaza al application.yaml de main en los tests.
+    open-in-view: false
     hibernate:
       ddl-auto: create-drop
     properties:
@@ -42,8 +44,6 @@ jwt:
 
 vigia:
   ml:
-    celo-url: http://localhost:8001
-    salud-url: http://localhost:8002
     geo-url: http://localhost:8003
 
 resilience4j:
@@ -68,3 +68,5 @@ app:
   frontend-url: http://localhost:5173
   oauth2:
     redirect-uri: http://localhost:5173/oauth2/callback
+  mail:
+    logo-url: ${MAIL_LOGO_URL:https://lh3.googleusercontent.com/d/1Xc2wYPMidzyNZEoA9zGhSlOr1lzOwCZ4}

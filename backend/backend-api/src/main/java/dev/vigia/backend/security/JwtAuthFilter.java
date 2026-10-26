@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -56,7 +57,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                             userDetails.getAuthorities()
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    // Un contexto nuevo por request: el de getContext() puede ser el que guarda la sesión HTTP y
+                    // comparten todos los requests con esa cookie; escribir ahí mezclaba usuarios simultáneos.
+                    SecurityContext contexto = SecurityContextHolder.createEmptyContext();
+                    contexto.setAuthentication(authToken);
+                    SecurityContextHolder.setContext(contexto);
                 }
             }
         } catch (Exception e) {

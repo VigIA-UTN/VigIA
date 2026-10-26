@@ -97,6 +97,16 @@
     gap: 0;
 }
 
+@media (max-width: 768px) {
+    .animal-tabs-bar {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        padding: 8px;
+        overflow-x: visible;
+    }
+}
+
 .animal-tab-btn {
     background: none;
     border: none;
@@ -137,7 +147,7 @@
 }
 
 .tab-content-animated {
-    animation: tab-fade-in 0.25s ease forwards;
+    animation: tab-fade-in 0.25s ease;
 }
 
 /* ── Historial: acento de origen del dato (auto vs manual) ── */

@@ -2,6 +2,7 @@ package dev.vigia.backend.controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -20,8 +22,11 @@ import org.springframework.http.MediaType;
 import dev.vigia.backend.dto.AlertaDetalleResponse;
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.AlertaResumenResponse;
+import dev.vigia.backend.dto.DiagnosticoRequest;
+import dev.vigia.backend.dto.DiagnosticoResponse;
 import dev.vigia.backend.dto.IntervencionRequest;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
+import dev.vigia.backend.exception.AlertaYaProcesadaException;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.service.AlertaService;
 import dev.vigia.backend.service.SseAlertaPublisher;
@@ -40,13 +45,17 @@ public class AlertaController {
      * /api/v1/alertas?establecimientoId={id}&tipo={tipo}&severidad={severidad}&estado={estado}
      * <p>
      * Obtiene las alertas de un establecimiento. Permite filtrar opcionalmente
-     * por tipo (reproductivo, sanitario, geoespacial), severidad (alta, media,
-     * baja) y estado.
+     * por tipo, severidad (alta, media, baja) y estado. El tipo "geoespacial"
+     * agrupa abigeato, fuera de perímetro y aislamiento social, como el contador
+     * "Geoespacial" del mapa.
      * Si no se envían filtros, devuelve todas las alertas.
      * Ordena por defecto por severidad descendente.
      *
      * @param establecimientoId ID del establecimiento
-     * @param tipo              (opcional) reproductivo, sanitario, geoespacial
+     * @param tipo              (opcional) celo/reproductivo, salud/sanitario,
+     *                          geoespacial, abigeato, perimetro/fuera_de_perimetro,
+     *                          aislamiento_social (sin distinguir mayúsculas); otro
+     *                          valor responde 400
      * @param severidad         (opcional) ALTA, MEDIA, BAJA
      * @param estado            (opcional) PENDIENTE, CONFIRMADA, DESCARTADA
      * @param authentication    contexto de seguridad inyectado por Spring Security
@@ -265,10 +274,10 @@ public class AlertaController {
      * @param notas          (opcional) notas asociadas al cambio de estado
      * @param authentication contexto de seguridad inyectado por Spring Security
      * @return 200 con la alerta actualizada, 400 si hay error, 403 si acceso
-     *         denegado
+     *         denegado, 409 si otro usuario ya la procesó
      */
     @PutMapping("/estado/{id}")
-    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> actualizarEstadoAlerta(
             @PathVariable("id") Long alertaId,
             @RequestParam(name = "estado") EstadoAlerta nuevoEstado,
@@ -280,6 +289,8 @@ public class AlertaController {
             return ResponseEntity.ok(response);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
+        } catch (AlertaYaProcesadaException e) {
+            return ResponseEntity.status(409).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -320,6 +331,68 @@ public class AlertaController {
     }
 
     /**
+     * POST /api/v1/alertas/{id}/diagnosticos
+     * <p>
+     * Registra un diagnóstico veterinario sobre una alerta sanitaria confirmada.
+     * No modifica el estado de la alerta.
+     *
+     * @param alertaId       ID de la alerta diagnosticada
+     * @param request        diagnóstico e indicación o tratamiento
+     * @param authentication contexto de seguridad inyectado por Spring Security
+     * @return 200 con el diagnóstico registrado, 400 si hay error, 403 si acceso
+     *         denegado, 404 si la alerta no existe
+     */
+    @PostMapping("/{id}/diagnosticos")
+    @PreAuthorize("hasRole('VETERINARIO')")
+    public ResponseEntity<?> registrarDiagnostico(
+            @PathVariable("id") Long alertaId,
+            @RequestBody DiagnosticoRequest request,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            DiagnosticoResponse response = alertaService.registrarDiagnostico(email, alertaId, request);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            if ("Alerta no encontrada".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * GET /api/v1/alertas/diagnosticos?animalId={id}&establecimientoId={id}
+     * <p>
+     * Lista los diagnósticos de los establecimientos a los que pertenece el
+     * usuario, del más reciente al más antiguo. Ambos filtros son opcionales.
+     *
+     * @param animalId          (opcional) solo los diagnósticos de este animal
+     * @param establecimientoId (opcional) solo los de este establecimiento
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return 200 con la lista, 403 si el usuario no pertenece al establecimiento
+     *         indicado
+     */
+    @GetMapping("/diagnosticos")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> listarDiagnosticos(
+            @RequestParam(name = "animalId", required = false) Long animalId,
+            @RequestParam(name = "establecimientoId", required = false) Long establecimientoId,
+            Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            List<DiagnosticoResponse> response = alertaService.listarDiagnosticos(email, animalId,
+                    establecimientoId);
+            return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
      * GET /api/v1/alertas/stream?establecimientoId={id}&lastEventId={id}
      * <p>
      * Abre un stream Server-Sent Events (SSE) que publica en tiempo real las
@@ -329,16 +402,29 @@ public class AlertaController {
      * @param lastEventId       (opcional) ID del último evento recibido por el
      *                          cliente, usado para reanudar el stream tras una
      *                          reconexión sin perder eventos
+     * @param lastEventIdHeader header Last-Event-ID que manda el navegador al
+     *                          reconectar solo (la URL conserva el lastEventId
+     *                          viejo); se usa el mayor de los dos
      * @param authentication    contexto de seguridad inyectado por Spring Security
-     * @return emisor SSE registrado para el establecimiento indicado
+     * @return emisor SSE registrado para el establecimiento indicado, o 403 si
+     *         el usuario no es miembro activo del establecimiento
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamAlertas(
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<SseEmitter> streamAlertas(
             @RequestParam(name = "establecimientoId") Long establecimientoId,
             @RequestParam(name = "lastEventId", required = false) Long lastEventId,
+            @RequestHeader(name = "Last-Event-ID", required = false) Long lastEventIdHeader,
             Authentication authentication) {
 
-        return sseAlertaPublisher.registrarClienteSse(establecimientoId, lastEventId);
+        if (!sseAlertaPublisher.puedeSuscribirse(authentication.getName(), establecimientoId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        Long desde = lastEventId;
+        if (lastEventIdHeader != null && (desde == null || lastEventIdHeader > desde)) {
+            desde = lastEventIdHeader;
+        }
+        return ResponseEntity.ok(sseAlertaPublisher.registrarClienteSse(establecimientoId, desde));
     }
 
     /**

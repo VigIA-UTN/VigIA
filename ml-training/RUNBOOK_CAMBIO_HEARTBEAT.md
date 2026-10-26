@@ -2,7 +2,7 @@
 
 Este documento está pensado para pegarse como prompt en una sesión futura
 de Claude Code (o para seguirlo a mano) cuando cambie la frecuencia real
-con la que los collares envían Heartbeat (el mensaje que trae `moveState`).
+con la que las caravanas envían Heartbeat (el mensaje que trae `moveState`).
 
 ## 1. Cuándo usar este runbook
 
@@ -76,8 +76,8 @@ python train_model.py --dataset-dir dataset --models-dir models --split-seed 42 
   `models/<run>/init<seed>/` a `ml-celo/app/models/`, releer
   `best_threshold_f1` de ese `run_summary.json` y actualizar
   `CELO_THRESHOLD` en `infra/.env.example` (línea con el comentario de
-  "Valor actual"), `infra/.env` local, y el comentario en
-  `simulador/simulador.py`.
+  "Valor actual"), `infra/.env` local, y el docstring y el banner de
+  `simulador/simulador_celo.py`.
 - **Salud**: `train_model.py` ya auto-exporta `init42` a
   `ml-salud/app/models/modelo_salud_rf.joblib` y copia
   `features_salud.py` — sin paso manual. No hay umbral configurable por
@@ -90,7 +90,7 @@ python train_model.py --dataset-dir dataset --models-dir models --split-seed 42 
 2. `pytest ml-training/tests/ -v` en verde.
 3. Antes/después con la muestra real de GPS quieto: cargar el modelo
    viejo y el nuevo directamente (sin pasar por la API) sobre un payload
-   sintético que replique el ruido real de un collar quieto y `moveState`
+   sintético que replique el ruido real de una caravana quieta y `moveState`
    bajo, cuantizado con el nuevo `<N>`; confirmar que ninguno de los dos
    dispara un falso positivo de celo, y que un input de alta actividad
    real sigue superando el umbral.

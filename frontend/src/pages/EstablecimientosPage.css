@@ -9,69 +9,263 @@
   font-weight: bold;
 }
 
+/* ── Card principal ─────────────────────────────────────────────────────── */
 .establecimiento-card {
-  background-color: #1E3A5F;
-  color: white;
-  border-radius: 10px;
-  padding: 1.5rem;
-  position: relative;
-  height: 100%;
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e8ecf0;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
-.establecimiento-card h4 {
-  margin-bottom: 0.5rem;
+.establecimiento-card--inactivo {
+  opacity: 0.75;
+  filter: grayscale(30%);
 }
 
-.establecimiento-card .location {
-  color: #a0aec0;
-  font-size: 0.9rem;
-  margin-bottom: 1.5rem;
+/* ── Imagen satelital ───────────────────────────────────────────────────── */
+.est-card-map {
+  position: relative;
+  height: 160px;
+  overflow: hidden;
+  background: #1E3A5F;
+  flex-shrink: 0;
+}
+
+.est-card-map-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Degradado inferior para legibilidad */
+.est-card-map-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.45) 100%);
+  pointer-events: none;
+}
+
+/* ── Punto de estado (a la altura del #id) ──────────────────────────────── */
+.est-card-id-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: #9ca3af;
+  letter-spacing: 0.05em;
+  user-select: none;
+}
+
+.est-status {
+  margin-left: auto;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.est-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.est-status-dot--active {
+  background: #22c55e;
+  box-shadow: 0 0 4px #22c55e;
+}
+
+.est-status-dot--inactive {
+  background: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
+}
+
+/* ── Botón editar (arriba a la derecha sobre la imagen) ─────────────────── */
+.est-card-top-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.est-icon-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); /* legible sobre la imagen satelital */
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.est-icon-btn:hover {
+  opacity: 0.75;
+}
+
+/* ── Menú de acciones (estilo iOS) ──────────────────────────────────────── */
+.est-menu {
+  min-width: 220px;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+}
+
+.est-menu .dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.7rem 1rem;
+  font-size: 0.95rem;
+  color: #1c1c1e;
+}
+
+.est-menu .dropdown-item + .dropdown-item {
+  border-top: 0.5px solid rgba(60, 60, 67, 0.2);
+}
+
+.est-menu .dropdown-item:hover,
+.est-menu .dropdown-item:focus,
+.est-menu .dropdown-item:active {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1c1c1e;
+}
+
+/* ── Body de la card (info + botones) ───────────────────────────────────── */
+.est-card-body {
+  padding: 1.1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+}
+
+.est-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.est-card-id {
+  font-weight: 600;
+}
+
+.est-card-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1E3A5F;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.est-card-coords {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0;
   display: flex;
   align-items: center;
 }
 
-.status-indicator {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  position: absolute;
-  top: 3.5rem;
-  right: 1.5rem;
+.est-card-coords i {
+  color: #3B8D99;
 }
 
-.card-id {
-  position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-  color: #a0aec0;
-  font-size: 1rem;
+/* ── Botones de acción ──────────────────────────────────────────────────── */
+.est-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+  align-items: center;
 }
 
-.edit-icon {
-  position: absolute;
-  top: 1.3rem;
-  right: 3rem;
+.est-btn {
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.83rem;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 15px;
-  color: #a0aec0;
-  transition: color 0.2s ease-in-out, transform 0.2s ease-in-out;
+  transition: background-color 0.15s, transform 0.1s;
+  white-space: nowrap;
 }
 
-.edit-icon:hover {
-  color: #8CC63F;
-  transform: scale(1.15);
+.est-btn:active {
+  transform: scale(0.96);
 }
 
-.status-active {
-  background-color: #4CAF50;
+/* Botón config: icono cuadrado */
+.est-btn-cfg {
+  background: #f0f4f8;
+  color: #1E3A5F;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.95rem;
+  flex-shrink: 0;
 }
 
-.status-inactive {
-  background-color: #F44336;
+.est-btn-cfg:hover {
+  background: #dce6f0;
 }
 
+/* Ver detalle: crece para llenar espacio */
+.est-btn-detail {
+  flex: 1;
+  background: #1E3A5F;
+  color: #fff;
+}
+
+.est-btn-detail:hover {
+  background: #152b47;
+}
+
+/* Desactivar */
+.est-btn-danger {
+  background: #F44336;
+  color: #fff;
+}
+
+.est-btn-danger:hover {
+  background: #d32f2f;
+}
+
+/* Cancelar (popover de confirmación) */
+.est-btn-cancel {
+  background: #f0f4f8;
+  color: #1E3A5F;
+}
+
+.est-btn-cancel:hover {
+  background: #dce6f0;
+}
+
+/* Activar */
+.est-btn-success {
+  background: #8CC63F;
+  color: #fff;
+}
+
+.est-btn-success:hover {
+  background: #7ab332;
+}
+
+/* ── Estilos legacy (usados en modales) ─────────────────────────────────── */
 .btn-vigia-primary {
   background-color: #8CC63F !important;
   border: none !important;
@@ -82,6 +276,19 @@
 }
 
 .btn-vigia-primary:hover {
+  background-color: #7ab332 !important;
+}
+
+.btn-vigia-success {
+  background-color: #8CC63F !important;
+  border: none !important;
+  color: white !important;
+  font-weight: bold !important;
+  border-radius: 5px !important;
+  padding: 0.5rem 1.5rem !important;
+}
+
+.btn-vigia-success:hover {
   background-color: #7ab332 !important;
 }
 
@@ -109,13 +316,6 @@
 
 .btn-vigia-secondary:hover {
   background-color: #152b47 !important;
-}
-
-.card-actions {
-  margin-top: auto;
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
 }
 
 .establishment-map {

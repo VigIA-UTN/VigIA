@@ -1,6 +1,7 @@
 package dev.vigia.backend.service.ml;
 
-import dev.vigia.backend.config.RabbitMQConfig;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
+import dev.vigia.backend.client.MlCeloClient;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.PuntoTelemetriaDTO;
 import dev.vigia.backend.dto.ml.CeloPredictResponseDTO;
@@ -17,13 +18,8 @@ import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -33,40 +29,43 @@ import java.util.stream.Collectors;
 @Service
 public class CeloDetectorStrategyImpl implements DetectorStrategy {
 
-        private final RestClient restClient;
+        private final MlCeloClient mlCeloClient;
         private final TelemetriaRepository telemetriaRepository;
         private final AlertaRepository alertaRepository;
         private final EstadoReproductivoRepository estadoReproductivoRepository;
-        private final RabbitTemplate rabbitTemplate;
+        private final PublicadorDeAlertas publicadorDeAlertas;
 
-        @SuppressWarnings("null")
         public CeloDetectorStrategyImpl(
-                        RestClient.Builder restClientBuilder,
-                        @Value("${vigia.ml.celo-url}") String celoUrl,
+                        MlCeloClient mlCeloClient,
                         TelemetriaRepository telemetriaRepository,
                         AlertaRepository alertaRepository,
                         EstadoReproductivoRepository estadoReproductivoRepository,
-                        RabbitTemplate rabbitTemplate) {
-                this.restClient = restClientBuilder.baseUrl(celoUrl).build();
+                        PublicadorDeAlertas publicadorDeAlertas) {
+                this.mlCeloClient = mlCeloClient;
                 this.telemetriaRepository = telemetriaRepository;
                 this.alertaRepository = alertaRepository;
                 this.estadoReproductivoRepository = estadoReproductivoRepository;
-                this.rabbitTemplate = rabbitTemplate;
+                this.publicadorDeAlertas = publicadorDeAlertas;
         }
 
         @Override
-        @CircuitBreaker(name = "celoML", fallbackMethod = "fallbackProcess")
-        @Retry(name = "celoML", fallbackMethod = "fallbackProcess")
-        @SuppressWarnings("null")
         public void process(List<Telemetria> telemetriaList, String correlationId) {
                 if (telemetriaList == null || telemetriaList.isEmpty()) {
                         return;
                 }
+                try {
+                        procesar(telemetriaList, correlationId);
+                } catch (RuntimeException e) {
+                        marcarInferenciaPendiente(telemetriaList, correlationId, e);
+                }
+        }
 
+        @SuppressWarnings("null")
+        private void procesar(List<Telemetria> telemetriaList, String correlationId) {
                 Animal animal = telemetriaList.get(0).getCaravana().getAnimal();
-                if (animal != null && alertaRepository.existsByAnimalAndDisparadorAndTsGeneracionAfter(animal,
-                                DisparadorAlerta.CELO, java.time.LocalDateTime.now().minusHours(24))) {
-                        log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente (últimas 24hs).",
+                if (animal != null && alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(animal,
+                                Alerta.TIPO_CELO, java.time.LocalDateTime.now().minusHours(24))) {
+                        log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente de celo (últimas 24hs).",
                                         animal.getId());
                         List<Telemetria> pendientes = telemetriaList.stream()
                                         .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
@@ -78,14 +77,7 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
 
                 List<PuntoTelemetriaDTO> requestDTO = buildRequest(telemetriaList);
 
-                log.info("Llamando a microservicio de celo con correlationId: {}", correlationId);
-
-                CeloPredictResponseDTO response = restClient.post()
-                                .uri("/api/internal/ml/celo/predict")
-                                .header("X-Correlation-ID", correlationId)
-                                .body(requestDTO)
-                                .retrieve()
-                                .body(CeloPredictResponseDTO.class);
+                CeloPredictResponseDTO response = mlCeloClient.predict(requestDTO, correlationId);
 
                 log.info("Respuesta de microservicio de celo recibida: {}", response);
 
@@ -100,7 +92,7 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
 
                         Alerta alerta = new Alerta();
                         alerta.setAnimal(animal);
-                        alerta.setTipo("Celo Detectado");
+                        alerta.setTipo(Alerta.TIPO_CELO);
                         alerta.setSeveridad(SeveridadAlerta.ALTA);
                         alerta.setTsGeneracion(java.time.LocalDateTime.now());
                         alerta.setDisparador(DisparadorAlerta.CELO);
@@ -155,12 +147,13 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
                                         .ventanaOptimaHoras(alerta.getVentanaOptimaHoras())
                                         .build();
 
-                        rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
-                        log.info("Alerta publicada en RabbitMQ con ID: {}", alerta.getId());
+                        publicadorDeAlertas.publicar(eventDTO);
+                        log.info("Alerta de celo {} generada; se publica al commitear", alerta.getId());
                 }
         }
 
-        public void fallbackProcess(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
+        /** ml-celo no respondió (o falló el procesamiento): se deja la telemetría para reintentar. */
+        void marcarInferenciaPendiente(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
                 log.error(
                                 "Fallo al comunicarse con el microservicio ML de celo (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
                                 correlationId, t.getMessage());

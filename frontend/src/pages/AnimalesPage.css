@@ -1,5 +1,3 @@
-
-
 /* Divider below header */
 .animales-divider {
     border: none;
@@ -62,9 +60,17 @@
     text-transform: uppercase;
 }
 
-.badge-activo    { color: #1E3A5F; }
-.badge-con-alerta { color: #d97706; }
-.badge-inactivo  { color: #888; }
+.badge-activo {
+    color: #1E3A5F;
+}
+
+.badge-con-alerta {
+    color: #d97706;
+}
+
+.badge-inactivo {
+    color: #888;
+}
 
 /* Badge tab Celo — mismo estilo que estado-badge (solo texto, sin fondo) */
 .estado-badge-celo {
@@ -75,10 +81,21 @@
     text-transform: uppercase;
 }
 
-.celo-gestante { color: #16a34a; }
-.celo-celo     { color: #dc2626; }
-.celo-vacia    { color: #888;    }
-.celo-otro     { color: #0284c7; }
+.celo-gestante {
+    color: #16a34a;
+}
+
+.celo-celo {
+    color: #dc2626;
+}
+
+.celo-vacia {
+    color: #888;
+}
+
+.celo-otro {
+    color: #0284c7;
+}
 
 /* Empty state */
 .animales-empty {
@@ -171,6 +188,24 @@
     background-color: #7ab332 !important;
 }
 
+/* Resultado de la asignación automática: la tabla scrollea y el encabezado queda fijo */
+.asignacion-resultado-wrapper {
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
+.asignacion-resultado-wrapper .vigia-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: white;
+    padding: 0.6rem 1rem;
+}
+
+.asignacion-resultado-wrapper .vigia-table tbody td {
+    padding: 0.55rem 1rem;
+}
+
 /* Botón rojo de confirmación destructiva, mismo estilo que btn-guardar-animal */
 .btn-confirmar-desvincular {
     background-color: #dc3545 !important;
@@ -196,40 +231,6 @@
     margin-right: 4px;
 }
 
-/* ── Undo toast (snackbar estilo Gmail) ── */
-.undo-toast-container {
-    position: fixed;
-    left: 50%;
-    bottom: 24px;
-    transform: translateX(-50%);
-    z-index: 2000;
-}
-
-.undo-toast {
-    background-color: #1E3A5F !important;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-    min-width: 320px;
-}
-
-.undo-toast .toast-body {
-    color: white;
-    font-size: 0.92rem;
-}
-
-.undo-toast-btn {
-    color: #8CC63F !important;
-    font-weight: 700 !important;
-    text-decoration: none !important;
-    white-space: nowrap;
-}
-
-.undo-toast-btn:hover {
-    color: #a6dc5f !important;
-}
-
 .btn-vigia-success {
     background-color: #8CC63F !important;
     border-color: #8CC63F !important;
@@ -241,8 +242,25 @@
     border-color: #7ab332 !important;
 }
 
+/* ── Responsive: botones de acción en dos filas ──────────────── */
+@media (max-width: 1000px) {
+    .animales-action-btns {
+        width: 100%;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+
+    .animales-action-btns .btn {
+        flex: 1 1 calc(50% - 6px);
+        min-width: 0;
+        text-align: center;
+    }
+}
+
 /* ── Responsive mobile ───────────────────────────────────────── */
 @media (max-width: 640px) {
+
     /* Ocultar columnas no esenciales */
     .col-mobile-hide {
         display: none !important;
@@ -256,30 +274,24 @@
     }
 
     /* Título toma fila completa → filtros quedan juntos en la siguiente línea */
-    .animales-header-mobile > div:first-child {
+    .animales-header-mobile>div:first-child {
         flex-wrap: wrap;
         align-items: center;
     }
 
-    .animales-header-mobile > div:first-child .vigia-page-title {
+    .animales-header-mobile>div:first-child .vigia-page-title {
         flex-basis: 100%;
     }
 
-    /* Botones verdes: todo el ancho, más altos, texto pequeño */
+    /* Botones verdes: mantener dos filas, texto más compacto */
     .animales-action-btns {
-        width: 100%;
-        display: flex !important;
         gap: 4px !important;
-        flex-wrap: nowrap !important;
     }
 
     .animales-action-btns .btn {
-        flex: 1 1 0;
         font-size: 0.82rem !important;
         padding: 8px 4px !important;
         white-space: nowrap;
-        text-align: center;
-        min-width: 0;
     }
 
     /* Barra de búsqueda full width */
@@ -305,4 +317,3 @@
         min-width: 60px;
     }
 }
-

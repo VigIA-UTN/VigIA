@@ -8,8 +8,8 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:422492479676-4g5t9nkp7fe5p7na244dfr4mjtmabm38.apps.googleusercontent.com}
-            client-secret: ${GOOGLE_CLIENT_SECRET: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}
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
             scope:
               - email
               - profile
@@ -18,6 +18,9 @@ spring:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:vigia}
     username: ${DB_USER:vigia_user}
     password: ${DB_PASSWORD:vigia_dev_password}
+    hikari:
+      # Loguea el stack de quien retenga una conexión más de 20 s. Solo diagnóstico.
+      leak-detection-threshold: 20000
   batch:
     jdbc:
       initialize-schema: always
@@ -25,6 +28,9 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
   jpa:
+    # Sin Open Session in View: la sesión (y su conexión) dura lo que la transacción del service, no todo
+    # el request. Con OSIV, cada stream SSE abierto retenía una conexión hasta 30 min y agotaba el pool.
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:
@@ -53,9 +59,12 @@ server:
 
 vigia:
   ml:
-    celo-url: ${ML_CELO_URL:http://localhost:8001}
-    salud-url: ${ML_SALUD_URL:http://localhost:8002}
     geo-url: ${ML_GEO_URL:http://localhost:8003}
+  celo:
+    horas-dato-desactualizado: ${CELO_HORAS_DATO_DESACTUALIZADO:2}
+  geo:
+    # Misma ventana que analiza el worker: rotula el tiempo acumulado fuera del grupo en el detalle.
+    ventana-horas: ${VIGIA_GEO_VENTANA_HORAS:24}
 
 cors:
   allowed-origins: ${CORS_ORIGINS}
@@ -90,3 +99,5 @@ app:
   frontend-url: ${FRONTEND_URL}
   oauth2:
     redirect-uri: ${OAUTH2_REDIRECT_URI}
+  mail:
+    logo-url: ${MAIL_LOGO_URL:https://lh3.googleusercontent.com/d/1Xc2wYPMidzyNZEoA9zGhSlOr1lzOwCZ4}

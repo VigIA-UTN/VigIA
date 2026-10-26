@@ -1,8 +1,9 @@
 package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
+import dev.vigia.backend.client.MlSaludClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.vigia.backend.config.RabbitMQConfig;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.PerfilCalibracionRequestDTO;
 import dev.vigia.backend.dto.ml.PerfilCalibracionResponseDTO;
@@ -23,13 +24,9 @@ import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.PerfilReferenciaRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,44 +39,48 @@ import java.util.stream.Collectors;
 @Service
 public class SaludDetectorStrategyImpl implements DetectorStrategy {
 
-    private final RestClient restClient;
+    private final MlSaludClient mlSaludClient;
     private final TelemetriaRepository telemetriaRepository;
     private final AlertaRepository alertaRepository;
     private final PerfilReferenciaRepository perfilReferenciaRepository;
-    private final RabbitTemplate rabbitTemplate;
+    private final PublicadorDeAlertas publicadorDeAlertas;
     private final ObjectMapper objectMapper;
     private final int calibracionDias;
     private final int recalibracionDias;
 
-    @SuppressWarnings("null")
     public SaludDetectorStrategyImpl(
-            RestClient.Builder restClientBuilder,
-            @Value("${vigia.ml.salud-url}") String saludUrl,
+            MlSaludClient mlSaludClient,
             TelemetriaRepository telemetriaRepository,
             AlertaRepository alertaRepository,
             PerfilReferenciaRepository perfilReferenciaRepository,
-            RabbitTemplate rabbitTemplate,
+            PublicadorDeAlertas publicadorDeAlertas,
             ObjectMapper objectMapper,
             @Value("${vigia.salud.calibracion-dias:7}") int calibracionDias,
             @Value("${vigia.salud.recalibracion-dias:30}") int recalibracionDias) {
-        this.restClient = restClientBuilder.baseUrl(saludUrl).build();
+        this.mlSaludClient = mlSaludClient;
         this.telemetriaRepository = telemetriaRepository;
         this.alertaRepository = alertaRepository;
         this.perfilReferenciaRepository = perfilReferenciaRepository;
-        this.rabbitTemplate = rabbitTemplate;
+        this.publicadorDeAlertas = publicadorDeAlertas;
         this.objectMapper = objectMapper;
         this.calibracionDias = calibracionDias;
         this.recalibracionDias = recalibracionDias;
     }
 
     @Override
-    @CircuitBreaker(name = "saludML", fallbackMethod = "fallbackProcess")
-    @Retry(name = "saludML", fallbackMethod = "fallbackProcess")
-    @SuppressWarnings("null")
     public void process(List<Telemetria> telemetriaList, String correlationId) {
         if (telemetriaList == null || telemetriaList.isEmpty()) {
             return;
         }
+        try {
+            procesar(telemetriaList, correlationId);
+        } catch (RuntimeException e) {
+            marcarInferenciaPendiente(telemetriaList, correlationId, e);
+        }
+    }
+
+    @SuppressWarnings("null")
+    private void procesar(List<Telemetria> telemetriaList, String correlationId) {
 
         Caravana caravana = telemetriaList.get(0).getCaravana();
         Animal animal = caravana != null ? caravana.getAnimal() : null;
@@ -99,46 +100,52 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
             return;
         }
 
-        LocalDate fechaBase = animal.getFechaAlta();
-        if (fechaBase == null) {
-            log.warn("Animal {} sin fecha de alta, no se puede calcular su ventana de calibración (RF03).",
-                    animal.getId());
-            marcarCompletados(telemetriaList);
-            return;
-        }
-
-        if (animal.getCaravana() != null && animal.getCaravana().getFechaAsignacion() != null) {
-            if (animal.getCaravana().getFechaAsignacion().isAfter(fechaBase)) {
-                fechaBase = animal.getCaravana().getFechaAsignacion();
-            }
-        }
-
-        LocalDateTime finCalibracionInicial = fechaBase.atStartOfDay().plusDays(calibracionDias);
-        if (ahora.isBefore(finCalibracionInicial)) {
-            log.info("Animal {} todavía en período de calibración (RF03, termina {}). No se generan predicciones.",
-                    animal.getId(), finCalibracionInicial);
-            marcarCompletados(telemetriaList);
-            return;
-        }
-
         Optional<PerfilReferencia> perfilExistente = perfilReferenciaRepository.findByAnimal(animal);
-        boolean necesitaPerfilNuevo = perfilExistente.isEmpty()
-                || perfilExistente.get().getFechaCalculo().isBefore(ahora.minusDays(recalibracionDias));
 
         PerfilReferencia perfilReferencia;
-        if (necesitaPerfilNuevo) {
-            perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana, fechaBase, ahora,
-                    correlationId);
-            if (perfilReferencia == null) {
-                // Todavía no hay suficiente telemetría para armar una
-                // ventana de calibración completa (ej. el dispositivo
-                // tuvo caídas). Se reintenta en el próximo ciclo del
-                // batch, no es un error.
+        if (perfilExistente.isEmpty()) {
+            // Primera calibración: los primeros N días de datos del animal, sin importar cuándo se dio de
+            // alta (decidido 2026-10-16, reemplaza los "7 días desde el alta" de RF03). Se cuenta desde el
+            // día en que se le asignó la caravana, para no usar datos de un animal anterior que la tuvo.
+            LocalDateTime desdeAsignacion = caravana.getFechaAsignacion() != null
+                    ? caravana.getFechaAsignacion().atStartOfDay()
+                    : LocalDate.EPOCH.atStartOfDay(); // sin fecha de asignación: el primer dato de la caravana
+            Optional<Telemetria> primerDato = telemetriaRepository
+                    .findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(caravana, desdeAsignacion);
+            if (primerDato.isEmpty()) {
+                log.info("Animal {} en calibración: su caravana no tiene datos desde {}.", animal.getId(),
+                        desdeAsignacion);
                 marcarCompletados(telemetriaList);
                 return;
             }
+            LocalDateTime inicio = primerDato.get().getFechaHora();
+            LocalDateTime fin = inicio.plusDays(calibracionDias);
+            if (ahora.isBefore(fin)) {
+                log.info("Animal {} en calibración: primer dato {}, termina {}. No se generan predicciones.",
+                        animal.getId(), inicio, fin);
+                marcarCompletados(telemetriaList);
+                return;
+            }
+            perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana, inicio, fin, ahora,
+                    correlationId);
+        } else if (perfilExistente.get().getFechaCalculo().isBefore(ahora.minusDays(recalibracionDias))) {
+            // Recalibración periódica: los últimos N días "recientes",
+            // para que el perfil se adapte a cambios legítimos de
+            // comportamiento con el tiempo (ver discusión de deriva del
+            // perfil).
+            perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana,
+                    ahora.minusDays(calibracionDias), ahora, ahora, correlationId);
         } else {
             perfilReferencia = perfilExistente.get();
+        }
+
+        if (perfilReferencia == null) {
+            // Todavía no hay suficiente telemetría para armar una
+            // ventana de calibración completa (ej. el dispositivo
+            // tuvo caídas). Se reintenta en el próximo ciclo del
+            // batch, no es un error.
+            marcarCompletados(telemetriaList);
+            return;
         }
 
         Map<String, Object> perfil = deserializarPerfil(perfilReferencia.getPerfilJson());
@@ -182,13 +189,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
                         .build())
                 .collect(Collectors.toList());
 
-        log.info("Llamando a microservicio de salud (predict) con correlationId: {}", correlationId);
-        SaludPredictResponseDTO response = restClient.post()
-                .uri("/api/internal/ml/salud/predict")
-                .header("X-Correlation-ID", correlationId)
-                .body(SaludPredictRequestDTO.builder().serie(serie).perfil(perfil).build())
-                .retrieve()
-                .body(SaludPredictResponseDTO.class);
+        SaludPredictResponseDTO response = mlSaludClient.predict(
+                SaludPredictRequestDTO.builder().serie(serie).perfil(perfil).build(), correlationId);
 
         log.info("Respuesta de microservicio de salud recibida: {}", response);
         marcarCompletados(telemetriaList);
@@ -200,24 +202,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
 
     @SuppressWarnings("null")
     private PerfilReferencia calcularYPersistirPerfil(Animal animal, Optional<PerfilReferencia> perfilExistente,
-            Caravana caravana, LocalDate fechaBase, LocalDateTime ahora, String correlationId) {
+            Caravana caravana, LocalDateTime desde, LocalDateTime hasta, LocalDateTime ahora, String correlationId) {
         boolean esPrimerCalculo = perfilExistente.isEmpty();
-
-        LocalDateTime desde;
-        LocalDateTime hasta;
-        if (esPrimerCalculo) {
-            // Primera calibración: los 7 días originales desde el alta
-            // del animal (RF03).
-            desde = fechaBase.atStartOfDay();
-            hasta = desde.plusDays(calibracionDias);
-        } else {
-            // Recalibración periódica: los últimos N días "recientes",
-            // para que el perfil se adapte a cambios legítimos de
-            // comportamiento con el tiempo (ver discusión de deriva del
-            // perfil).
-            hasta = ahora;
-            desde = ahora.minusDays(calibracionDias);
-        }
 
         List<Telemetria> calibracion = telemetriaRepository
                 .findByCaravanaAndFechaHoraBetweenOrderByFechaHoraAsc(caravana, desde, hasta);
@@ -237,15 +223,11 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
                         .build())
                 .collect(Collectors.toList());
 
-        log.info("Calculando perfil de salud para animal {} ({} puntos, primera calibración: {}, correlationId: {})",
-                animal.getId(), puntos.size(), esPrimerCalculo, correlationId);
+        log.info("Calculando perfil de salud para animal {} ({} puntos de [{}, {}), primera calibración: {}, correlationId: {})",
+                animal.getId(), puntos.size(), desde, hasta, esPrimerCalculo, correlationId);
 
-        PerfilCalibracionResponseDTO response = restClient.post()
-                .uri("/api/internal/ml/salud/perfil")
-                .header("X-Correlation-ID", correlationId)
-                .body(PerfilCalibracionRequestDTO.builder().calibracion(puntos).build())
-                .retrieve()
-                .body(PerfilCalibracionResponseDTO.class);
+        PerfilCalibracionResponseDTO response = mlSaludClient.calcularPerfil(
+                PerfilCalibracionRequestDTO.builder().calibracion(puntos).build(), correlationId);
 
         if (response == null || response.getPerfil() == null) {
             log.warn("ml-salud no devolvió un perfil válido para el animal {} (correlationId: {}).",
@@ -320,8 +302,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
                 .accionRecomendada(buildAccionRecomendada(alerta.getPosibleCausa(), alerta.getSeveridad()))
                 .build();
 
-        rabbitTemplate.convertAndSend(RabbitMQConfig.ALERTAS_EXCHANGE, "", eventDTO);
-        log.info("Alerta de salud publicada en RabbitMQ con ID: {}", alerta.getId());
+        publicadorDeAlertas.publicar(eventDTO);
+        log.info("Alerta de salud {} generada; se publica al commitear", alerta.getId());
     }
 
     private String serializarSerieComparativa(Animal animal, List<Telemetria> ventanaEvaluar,
@@ -361,7 +343,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         telemetriaRepository.saveAll(pendientes);
     }
 
-    public void fallbackProcess(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
+    /** ml-salud no respondió (o falló el procesamiento): se deja la telemetría para reintentar. */
+    void marcarInferenciaPendiente(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
         log.error(
                 "Fallo al comunicarse con el microservicio ML de salud (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
                 correlationId, t.getMessage());

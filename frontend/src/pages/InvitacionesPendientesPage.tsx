@@ -7,6 +7,7 @@ import {
 } from '../api/invitacionesApi';
 import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
+import { showAlert, showConfirm } from '../store/dialogStore';
 import { getEstablecimientos } from '../api/establecimientosApi';
 import { Container, Button, Alert, Spinner } from 'react-bootstrap';
 import './InvitacionesPendientesPage.css';
@@ -39,7 +40,11 @@ export default function InvitacionesPendientesPage() {
       await aceptarInvitacionRequest(id);
       const currentRol = useAuthStore.getState().rol;
       if (currentRol === 'PENDIENTE') {
-        alert('¡Invitación aceptada con éxito! Como tus permisos han cambiado, por favor iniciá sesión nuevamente.');
+        await showAlert('¡Invitación aceptada con éxito! Como tus permisos han cambiado, por favor iniciá sesión nuevamente.', {
+          variant: 'success',
+          title: 'Invitación aceptada',
+          confirmText: 'Ir al login',
+        });
         useAuthStore.getState().logout();
         window.location.href = '/login';
       } else {
@@ -50,18 +55,23 @@ export default function InvitacionesPendientesPage() {
     } catch (err) {
       const data = (err as { response?: { data?: { message?: string } | string } }).response?.data;
       const errorMessage = typeof data === 'string' ? data : data?.message;
-      alert(errorMessage || 'Error al aceptar invitación.');
+      showAlert(errorMessage || 'Error al aceptar invitación.', { variant: 'error' });
     }
   };
 
   const handleRechazar = async (id: number) => {
-    if (!confirm('¿Seguro que querés rechazar esta invitación?')) return;
+    const confirmado = await showConfirm('¿Seguro que querés rechazar esta invitación?', {
+      title: 'Rechazar invitación',
+      confirmText: 'Sí, rechazar',
+      danger: true,
+    });
+    if (!confirmado) return;
     try {
       await rechazarInvitacionRequest(id);
       fetchInvitaciones();
     } catch (err) {
       const errorResponse = (err as { response?: { data?: string } }).response;
-      alert(errorResponse?.data || 'Error al rechazar invitación.');
+      showAlert(errorResponse?.data || 'Error al rechazar invitación.', { variant: 'error' });
     }
   };
 
@@ -92,7 +102,10 @@ export default function InvitacionesPendientesPage() {
                     <h4>{inv.establecimiento}</h4>
                     <p><strong>Rol sugerido:</strong> {inv.rol}</p>
                     <p><strong>Enviado por:</strong> {inv.nombreCompleto}</p>
-                    <p><strong>Fecha:</strong> {new Date(inv.fechaCreacion || '').toLocaleDateString()}</p>
+                    <p><strong>Fecha de envío:</strong> {new Date(inv.fechaCreacion || '').toLocaleDateString()}</p>
+                    {inv.fechaExpiracion && (
+                      <p><strong>Vence el:</strong> {new Date(inv.fechaExpiracion).toLocaleDateString()}</p>
+                    )}
                   </div>
                   <div className="invitacion-actions">
                     <Button 

@@ -1,11 +1,15 @@
-import type { AlertaResponse } from '../api/alertaApi';
+import { esAislamiento, esAnestro, textoAccionRecomendada, volvioAlGrupo, type AlertaResponse } from '../api/alertaApi';
+import { formatMinutos } from '../utils/fechas';
 import SidebarCard, { type Categoria, type Severidad } from './SidebarCard';
+import DatoDesactualizadoBadge from './DatoDesactualizadoBadge';
 
 interface AlertNotificationCardProps {
   alerta: AlertaResponse;
   onClick: (alerta: AlertaResponse) => void;
   isMenuOpen?: boolean;
   isUnread?: boolean;
+  /** Animal desde el que se mira la alerta (panel del mapa): si ya volvió al grupo, la card lo dice. */
+  animalId?: number;
 }
 
 const ESTADO_ANIMAL: Record<Severidad, string> = { BAJA: 'NORMAL', MEDIA: 'BORDE', ALTA: 'CRITICO' };
@@ -14,6 +18,7 @@ const ICONO: Record<string, string> = {
   SALUD: 'bi-heart-pulse',
   GEOESPACIAL: 'bi-globe-americas',
   ABIGEATO: 'bi-globe-americas',
+  AISLAMIENTO_SOCIAL: 'bi-people-fill',
 };
 // Colores alineados con las tarjetas de resumen de MapPage (Reproductivo/Sanitario/Geoespacial).
 const CATEGORIA: Record<string, Categoria> = {
@@ -21,6 +26,7 @@ const CATEGORIA: Record<string, Categoria> = {
   SALUD: { label: 'Sanitario', color: '#198754', icono: 'bi-heart-pulse' },
   GEOESPACIAL: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
   ABIGEATO: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
+  AISLAMIENTO_SOCIAL: { label: 'Geoespacial', color: '#dc3545', icono: 'bi-globe-americas' },
 };
 
 function haceCuanto(ts: string) {
@@ -31,6 +37,8 @@ function haceCuanto(ts: string) {
   if (min < 1440) return `Hace ${Math.floor(min / 60)} h`;
   return `Hace ${Math.floor(min / 1440)} d`;
 }
+
+const minutosDesde = (ts: string) => Math.max(0, Math.floor((Date.now() - new Date(ts).getTime()) / 60000)) || 0;
 
 function tiempoFueraBadge(ts: string) {
   const min = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
@@ -43,31 +51,49 @@ function tiempoFueraBadge(ts: string) {
   return `Fuera hace ${h}h ${m}m`;
 }
 
-const textoAccionRecomendada = (alerta: AlertaResponse | null) => {
-  if (alerta?.accionRecomendada) {
-    return alerta.accionRecomendada;
-  } else if (alerta && alerta.tipo === 'SALUD') {
-    return 'Revisar al animal y realizar seguimiento clínico.';
-  } else if (alerta && alerta.tipo === 'CELO') {
-    return 'Realizar inseminación artificial dentro de la ventana óptima.';
-  } else {
-    return 'Revisar al animal y realizar seguimiento.';
-  }
-}
-
 export default function AlertNotificationCard({
   alerta,
   onClick,
   isMenuOpen = false,
   isUnread = false,
+  animalId,
 }: AlertNotificationCardProps) {
   const resuelta = alerta.estado === 'CONFIRMADA' || alerta.estado === 'DESCARTADA';
   // Severidad: el backend manda ALTA/MEDIA/BAJA. Fallback por tipo mientras no llegue.
   const severidad: Severidad = alerta.severidad ?? (alerta.tipo === 'CELO' ? 'MEDIA' : 'ALTA');
+  const anestro = esAnestro(alerta);
+  // El mapper de AnimalServiceImpl manda el tipo crudo; el anestro se estiliza como reproductivo igual.
+  const clave = anestro ? 'CELO' : alerta.tipo;
   const tipoNorm = (alerta.tipo ?? '').toUpperCase();
   const isGeoespacial = tipoNorm.includes('FUERA') || tipoNorm.includes('PERIMETRO') || tipoNorm === 'GEOESPACIAL';
+  const aislamiento = esAislamiento(alerta);
+  const aislados = alerta.animalesAislados ?? [];
 
-  const cuerpoPrincipal = isGeoespacial ? (
+  let titulo = anestro ? `#${alerta.animalId} en anestro` : `#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`;
+  if (aislamiento) {
+    titulo = aislados.length > 1 ? `${aislados.length} animales aislados del rodeo` : `#${aislados[0]?.identificador ?? alerta.animalId} aislado del rodeo`;
+  }
+  // Los que volvieron siguen listados ("estuvo afuera"), pero el tiempo de la card es el de los que siguen afuera.
+  const fuera = aislados.filter(a => !a.tsRegreso);
+  const volvieron = aislados.length - fuera.length;
+  const minutosAislado = fuera.length
+    ? Math.max(...fuera.map(a => a.minutosFueraSeguidos))
+    : minutosDesde(alerta.tsGeneracion);
+  let textoAislamiento = `Fuera del grupo hace ${formatMinutos(minutosAislado)}`;
+  if (animalId != null && volvioAlGrupo(alerta, animalId)) {
+    textoAislamiento = 'Este animal ya volvió al grupo';
+  } else if (aislados.length && !fuera.length) {
+    textoAislamiento = aislados.length > 1 ? 'Todos volvieron al grupo' : 'Volvió al grupo';
+  } else if (volvieron) {
+    textoAislamiento += ` · ${volvieron} ya ${volvieron > 1 ? 'volvieron' : 'volvió'}`;
+  }
+
+  const cuerpoPrincipal = aislamiento ? (
+    // Reserva las 3 líneas que ocupa la acción recomendada en las demás cards, para igualar la altura.
+    <div style={{ minHeight: 'calc(3 * 1.35em)' }}>
+      {textoAislamiento}
+    </div>
+  ) : isGeoespacial ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
       <i
         className="bi bi-geo-alt-fill"
@@ -78,21 +104,24 @@ export default function AlertNotificationCard({
       </span>
     </div>
   ) : (
-    <div
-      title={textoAccionRecomendada(alerta)}
-      style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-    >
-      {textoAccionRecomendada(alerta)}
-    </div>
+    <>
+      <DatoDesactualizadoBadge alerta={alerta} />
+      <div
+        title={textoAccionRecomendada(alerta)}
+        style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+      >
+        {textoAccionRecomendada(alerta)}
+      </div>
+    </>
   );
 
   return (
     <>
       <SidebarCard
         severidad={severidad}
-        icono={ICONO[alerta.tipo] ?? 'bi-exclamation-triangle-fill'}
-        categoria={CATEGORIA[alerta.tipo]}
-        titulo={`#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`}
+        icono={anestro ? 'bi-hourglass-split' : ICONO[clave] ?? 'bi-exclamation-triangle-fill'}
+        categoria={CATEGORIA[clave]}
+        titulo={titulo}
         cuerpo={cuerpoPrincipal}
         timestamp={haceCuanto(alerta.tsGeneracion)}
         acento={isUnread}

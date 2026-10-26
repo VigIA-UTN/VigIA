@@ -31,6 +31,7 @@ export interface AnimalResponse {
   diasRestantesCalibracion?: number;
   caravanaId: number | null;
   caravanaDevEui: string | null;
+  caravanaCodigo: string | null;
   caravanaAlias: string | null;
   caravanaEstado: 'DISPONIBLE' | 'VINCULADO' | 'INACTIVO' | null;
   caravanaUltimaSenial: string | null;
@@ -123,6 +124,24 @@ export async function vincularCaravana(animalId: number, caravanaId: number): Pr
 
 export async function desvincularCaravana(animalId: number): Promise<AnimalResponse> {
   const response = await axiosClient.delete<AnimalResponse>(`/animales/${animalId}/desvincular-caravana`);
+  return response.data;
+}
+
+/**
+ * Asigna al azar las caravanas disponibles a los animales sin caravana; con rodeoLoteId, solo a los de ese lote.
+ * Devuelve los animales que recibieron una.
+ */
+export async function asignarCaravanasAleatoriamente(establecimientoId: number, rodeoLoteId?: number): Promise<AnimalResponse[]> {
+  const response = await axiosClient.post<AnimalResponse[]>(`/animales/asignar-caravanas`, null, { params: { establecimientoId, rodeoLoteId } });
+  return response.data;
+}
+
+/** Planilla .xlsx animal → sensor. Sin animalIds incluye todos los animales con caravana del establecimiento. */
+export async function descargarAsignacionesCaravanasExcel(establecimientoId: number, animalIds?: number[]): Promise<Blob> {
+  const response = await axiosClient.post<Blob>(`/animales/asignaciones-caravanas/excel`, animalIds ?? null, {
+    params: { establecimientoId },
+    responseType: 'blob',
+  });
   return response.data;
 }
 
@@ -232,6 +251,12 @@ export async function getIntervenciones(animalId: number): Promise<IntervencionR
   return response.data;
 }
 
+/** Todas las intervenciones del establecimiento, de la más reciente a la más antigua. */
+export async function getIntervencionesEstablecimiento(establecimientoId: number): Promise<IntervencionResponse[]> {
+  const response = await axiosClient.get<IntervencionResponse[]>(`/establecimientos/${establecimientoId}/intervenciones`);
+  return response.data;
+}
+
 export interface AnimalMetricaResponse {
   fecha: string;
   actividadMotora: number | null;
@@ -309,6 +334,12 @@ export async function getHistorialPesos(animalId: number): Promise<RegistroPesoR
   return response.data;
 }
 
+/** Todas las pesadas de los animales del establecimiento, la más reciente primero. */
+export async function getPesosEstablecimiento(establecimientoId: number): Promise<RegistroPesoResponse[]> {
+  const response = await axiosClient.get<RegistroPesoResponse[]>(`/establecimientos/${establecimientoId}/pesos`);
+  return response.data;
+}
+
 export async function registrarPeso(
   animalId: number,
   data: RegistroPesoRequest
@@ -343,8 +374,16 @@ export interface LineaTiempoEventoResponse {
   id: number;
   fecha: string
   tipo: string | null;
+  /** Tipo crudo de la alerta ('Anestro Detectado', ...); `tipo` lleva el disparador. */
+  subtipo?: string | null;
   severidad: 'ALTA' | 'MEDIA' | 'BAJA' | null;
+  /** Valor medido y umbral del disparador (en el anestro: días sin ciclo y días configurados). */
+  valorDetectado?: number | null;
+  valorUmbral?: number | null;
   estadoResolucion: string | null;
+  /** Quién confirmó o descartó la alerta y cuándo; null mientras está pendiente. */
+  usuarioResolucion?: string | null;
+  tsResolucion?: string | null;
   tipoIntervencion: string | null;
   descripcion: string | null;
   interventor: string | null;

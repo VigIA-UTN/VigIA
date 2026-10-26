@@ -7,6 +7,8 @@ spring:
     username: sa
     password:
   jpa:
+    # Igual que en main: este archivo reemplaza al application.yaml de main en los tests.
+    open-in-view: false
     hibernate:
       ddl-auto: create-drop
     properties:
@@ -14,16 +16,14 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
-  mail:
-    host: localhost
-    port: 1025
+  # Igual que en main (este archivo lo reemplaza en los tests): los jobs los lanza BatchScheduler, no el arranque.
+  batch:
+    job:
+      enabled: false
   rabbitmq:
     listener:
       simple:
         auto-startup: false
-
-cors:
-  allowed-origins: http://localhost:3000
 
 jwt:
   secret: testSecretKeyForVigiaApplicationWhichNeedsToBeAtLeast256BitsLong123
@@ -39,6 +39,8 @@ vigia:
       api-key: test-api-key
 
 resilience4j:
+  # Un 4xx (p. ej. 422 por datos insuficientes) es una respuesta del servicio, no una
+  # caída: no se reintenta ni cuenta para abrir el circuito.
   circuitbreaker:
     instances:
       celoML:
@@ -46,22 +48,36 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
       saludML:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10000ms
         permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+      geoML:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
   retry:
     instances:
       celoML:
         maxAttempts: 2
         waitDuration: 500ms
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
       saludML:
         maxAttempts: 2
         waitDuration: 500ms
-  timelimiter:
-    instances:
-      celoML:
-        timeoutDuration: 2000ms
-      saludML:
-        timeoutDuration: 4000ms
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+      geoML:
+        maxAttempts: 2
+        waitDuration: 500ms
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException

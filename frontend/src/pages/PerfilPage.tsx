@@ -233,7 +233,7 @@ export default function PerfilPage() {
                                         </Form.Group>
 
                                         <div className="d-flex justify-content-end mt-4">
-                                            <Button type="submit" variant="outline-primary" className="btn-vigia-outline" disabled={savingPassword}>
+                                            <Button type="submit" variant="vigia-outline" disabled={savingPassword}>
                                                 {savingPassword ? <Spinner size="sm" animation="border" /> : 'Actualizar Contraseña'}
                                             </Button>
                                         </div>

@@ -2,17 +2,21 @@ import { MapContainer, TileLayer, Marker, useMap, ZoomControl, Polygon, Popup, u
 import 'leaflet/dist/leaflet.css';
 import './MapPage.css';
 import L from 'leaflet';
-import { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import { Modal, Button, Alert } from 'react-bootstrap';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAuthStore } from '../store/authStore';
 import AlertSidebar from '../components/AlertSidebar';
 import PerimetroSidebar from '../components/PerimetroSidebar';
 import { type AnimalMapa, getAnimalesMapa, getAnimales } from '../api/animalesApi';
-import { type AlertaResumenResponse, type AlertaResponse, getResumenAlertas } from '../api/alertaApi';
+import { type AlertaResumenResponse, type AlertaResponse, aplicarAlertaEnAnimales, getResumenAlertas } from '../api/alertaApi';
+import { useAlertasStream } from '../hooks/useAlertasStream';
 import {
   getPerimetros,
   activarPerimetro,
   desactivarPerimetro,
+  eliminarPerimetro,
   actualizarPerimetro,
   crearPerimetro,
   type PerimetroResponse,
@@ -29,6 +33,7 @@ import PerimetroRodeoLayer from '../components/heatmap/PerimetroRodeoLayer';
 import { useHeatPoints } from '../components/heatmap/useHeatPoints';
 import { defaultHeatFilter, perimetrosDeRodeo } from '../components/heatmap/heatmapFilters';
 import type { HeatAnimal, HeatFilter } from '../components/heatmap/types';
+import { determinarIcono } from '../utils/animalPins';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -69,26 +74,15 @@ function MapEditorEvents({
   return null;
 }
 
-const pinUrls = import.meta.glob('../assets/pins/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-
-// 1x + 2x (Leaflet elige el 2x en pantallas retina). Punta del pin = centro inferior.
-const makePin = (estado: string, selected: boolean) => {
-  const [w, h] = selected ? [60, 78] : [40, 52];
-  const base = `../assets/pins/pin-${estado}${selected ? '-sel' : ''}`;
-  return new L.Icon({
-    iconUrl: pinUrls[`${base}-1x.png`],
-    iconRetinaUrl: pinUrls[`${base}-2x.png`],
-    iconSize: [w, h],
-    iconAnchor: [w / 2, h],
-    popupAnchor: [0, -h],
-  });
-};
-
-const PIN_ICONS = Object.fromEntries(
-  ['normal', 'borde', 'critico', 'sindatos'].map(e => [e, [makePin(e, false), makePin(e, true)]])
-) as Record<string, [L.Icon, L.Icon]>;
-
 const CENTRO_CAMPO: [number, number] = [-34.6037, -58.3816];
+
+function MapRefCapture({ onMap }: { onMap: (map: L.Map) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    onMap(map);
+  }, [map, onMap]);
+  return null;
+}
 
 function MapUpdater({ center, trigger }: { center: [number, number], trigger: { lat: number, lng: number, t: number } | null }) {
   const map = useMap();
@@ -106,16 +100,8 @@ function MapUpdater({ center, trigger }: { center: [number, number], trigger: { 
   return null;
 }
 
-function determinarIcono(animal: AnimalMapa, selected: boolean) {
-  const severidades = animal.alertasAnimal.map(a => a.severidad);
-  const estado = animal.sinDatosRecientes ? 'sindatos'
-    : severidades.includes('ALTA') ? 'critico'
-      : severidades.includes('MEDIA') || severidades.includes('BAJA') ? 'borde'
-        : 'normal';
-  return PIN_ICONS[estado][selected ? 1 : 0];
-}
-
 export default function MapPage() {
+  const mapRef = useRef<L.Map | null>(null);
   const { establecimientos, selectedId } = useEstablecimientoStore();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [selectedAlertaMap, setSelectedAlertaMap] = useState<AlertaResponse | null>(null);
@@ -136,6 +122,10 @@ export default function MapPage() {
   const [editingPerimetro, setEditingPerimetro] = useState<PerimetroResponse | null>(null);
   const [coordenadasEditadas, setCoordenadasEditadas] = useState<CoordenadaDTO[]>([]);
   const [isSavingPerimetro, setIsSavingPerimetro] = useState(false);
+  const [perimetroAEliminar, setPerimetroAEliminar] = useState<PerimetroResponse | null>(null);
+  const [showConfirmDeletePerimetro, setShowConfirmDeletePerimetro] = useState(false);
+  const [isDeletingPerimetro, setIsDeletingPerimetro] = useState(false);
+  const [errorEliminarPerimetro, setErrorEliminarPerimetro] = useState<string | null>(null);
 
   // Mapa de calor
   const [heatEnabled, setHeatEnabled] = useState(false);
@@ -253,68 +243,26 @@ export default function MapPage() {
 
     eventSourceTelemetria.onerror = (error) => {
       console.error('SSE Error de telemetría', error);
-      eventSourceTelemetria.close();
-    };
-
-    // Alertas SSE
-    let sseUrlAlertas = `${API_URL}/alertas/stream?establecimientoId=${selectedId}`;
-    if (token) {
-      sseUrlAlertas += `&token=${token}`;
-    }
-    const eventSourceAlertas = new EventSource(sseUrlAlertas);
-
-    eventSourceAlertas.onmessage = async (event) => {
-      if (!isMounted) return;
-      try {
-        const newAlerta = JSON.parse(event.data) as AlertaResponse;
-
-        // Actualizar el array de alertas del animal
-        setAnimales(prevAnimales => {
-          return prevAnimales.map(animal => {
-            if (animal.id === newAlerta.animalId) {
-              if (animal.alertasAnimal.some(a => a.id === newAlerta.id)) {
-                return {
-                  ...animal,
-                  alertasAnimal: animal.alertasAnimal.map(a => a.id === newAlerta.id ? newAlerta : a)
-                };
-              }
-              return {
-                ...animal,
-                alertasAnimal: [newAlerta, ...animal.alertasAnimal]
-              };
-            }
-            return animal;
-          });
-        });
-
-        // Refrescamos el resumen de alertas con un pequeño retraso
-        // para dar tiempo a que la BD del worker commitee la transacción.
-        setTimeout(async () => {
-          if (!isMounted) return;
-          try {
-            const resumenData = await getResumenAlertas(selectedId);
-            if (isMounted) setResumenAlertas(resumenData);
-          } catch (e) {
-            console.error('Error refrescando resumen de alertas', e);
-          }
-        }, 1500);
-
-      } catch (error) {
-        console.error('Error parseando evento SSE de alertas', error);
-      }
-    };
-
-    eventSourceAlertas.onerror = (error) => {
-      console.error('SSE Error de alertas', error);
-      // eventSourceAlertas.close(); // No lo cerramos acá porque EventSource reintenta automáticamente
+      // No lo cerramos: EventSource reintenta solo; cerrarlo deja el mapa congelado hasta recargar
     };
 
     return () => {
       isMounted = false;
       eventSourceTelemetria.close();
-      eventSourceAlertas.close();
     };
   }, [selectedId]);
+
+  // Alertas SSE (conexión compartida con el sidebar y el detalle)
+  useAlertasStream(selectedId, (newAlerta) => {
+    // Actualizar las alertas de cada animal al que le corresponde (en aislamiento, todos los listados)
+    setAnimales(prevAnimales => aplicarAlertaEnAnimales(prevAnimales, newAlerta));
+
+    // Los eventos salen recién cuando la alerta ya está commiteada: el resumen se puede pedir al instante.
+    if (!selectedId) return;
+    getResumenAlertas(selectedId)
+      .then(resumenData => setResumenAlertas(resumenData))
+      .catch(e => console.error('Error refrescando resumen de alertas', e));
+  });
 
   const activeEstablecimiento = establecimientos.find(e => e.id === selectedId);
   const animalConPosicion = animales.find(a => a.latitud != null && a.longitud != null);
@@ -366,6 +314,33 @@ export default function MapPage() {
     }
   };
 
+  const handleToggleAllPerimetros = async () => {
+    const todosActivos = perimetros.every(p => p.activo);
+    const nuevoEstadoTodos = !todosActivos;
+
+    // Actualizar UI inmediatamente
+    setPerimetros(prev =>
+      prev.map(p => ({ ...p, activo: nuevoEstadoTodos }))
+    );
+
+    try {
+      // Activar todos
+      if (nuevoEstadoTodos) {
+        await Promise.all(perimetros.map(p => activarPerimetro(p.id)));
+      }
+      // Desactivar todos
+      else {
+        await Promise.all(perimetros.map(p => desactivarPerimetro(p.id)));
+      }
+    } catch (err) {
+      console.error("Error al cambiar estado de todos los perímetros", err);
+      // Revertir si falla
+      setPerimetros(prev =>
+        prev.map(p => ({ ...p, activo: !nuevoEstadoTodos }))
+      );
+    }
+  };
+
   const handleStartEditPerimetro = (perimetro: PerimetroResponse) => {
     setEditingPerimetro(perimetro);
     setCoordenadasEditadas(perimetro.coordenadas ? [...perimetro.coordenadas] : []);
@@ -378,13 +353,41 @@ export default function MapPage() {
 
   const handleCreateNewPerimetro = () => {
     if (!selectedId) return;
-    const [cLat, cLng] = center;
-    const delta = 0.003;
+
+    let cLat = center[0];
+    let cLng = center[1];
+    let deltaLat = 0.003;
+    let deltaLng = 0.003;
+
+    if (mapRef.current) {
+      const map = mapRef.current;
+      const mapSize = map.getSize();
+      // Si el sidebar de perímetros está abierto y hay suficiente ancho, centramos en la parte visible del mapa
+      const sidebarWidth = isPerimetrosOpen && mapSize.x > 600 ? 350 : 0;
+      const visibleCenterPoint = L.point(
+        sidebarWidth + (mapSize.x - sidebarWidth) / 2,
+        mapSize.y / 2
+      );
+      const visualCenter = map.containerPointToLatLng(visibleCenterPoint);
+      cLat = visualCenter.lat;
+      cLng = visualCenter.lng;
+
+      const bounds = map.getBounds();
+      const latSpan = Math.abs(bounds.getNorth() - bounds.getSouth());
+      const lngSpan = Math.abs(bounds.getEast() - bounds.getWest());
+
+      // Dimensionar el polígono inicial proporcional a la vista actual (~24% del span visible)
+      if (latSpan > 0 && lngSpan > 0) {
+        deltaLat = Math.min(Math.max(latSpan * 0.12, 0.0003), 0.02);
+        deltaLng = Math.min(Math.max(lngSpan * 0.12, 0.0003), 0.02);
+      }
+    }
+
     const defaultCoords: CoordenadaDTO[] = [
-      { latitud: cLat + delta, longitud: cLng - delta },
-      { latitud: cLat + delta, longitud: cLng + delta },
-      { latitud: cLat - delta, longitud: cLng + delta },
-      { latitud: cLat - delta, longitud: cLng - delta },
+      { latitud: cLat + deltaLat, longitud: cLng - deltaLng },
+      { latitud: cLat + deltaLat, longitud: cLng + deltaLng },
+      { latitud: cLat - deltaLat, longitud: cLng + deltaLng },
+      { latitud: cLat - deltaLat, longitud: cLng - deltaLng },
     ];
     const nuevo: PerimetroResponse = {
       id: 0,
@@ -439,13 +442,57 @@ export default function MapPage() {
     }
   };
 
+  const handleRequestDeletePerimetro = (perimetro: PerimetroResponse) => {
+    setErrorEliminarPerimetro(null);
+    setPerimetroAEliminar(perimetro);
+    setShowConfirmDeletePerimetro(true);
+  };
+
+  const handleCloseDeletePerimetro = () => {
+    if (isDeletingPerimetro) return;
+    setShowConfirmDeletePerimetro(false);
+  };
+
+  const handleConfirmDeletePerimetro = async () => {
+    if (!perimetroAEliminar) return;
+    const perimetro = perimetroAEliminar;
+    setIsDeletingPerimetro(true);
+    setErrorEliminarPerimetro(null);
+    try {
+      await eliminarPerimetro(perimetro.id);
+      setPerimetros(prev => prev.filter(p => p.id !== perimetro.id));
+      if (hoveredPerimetroId === perimetro.id) setHoveredPerimetroId(null);
+      if (editingPerimetro?.id === perimetro.id) handleCancelEditPerimetro();
+      setShowConfirmDeletePerimetro(false);
+    } catch (err) {
+      console.error("Error al eliminar perímetro", err);
+      setErrorEliminarPerimetro(
+        axios.isAxiosError(err) && typeof err.response?.data === 'string'
+          ? err.response.data
+          : 'No se pudo eliminar el perímetro.'
+      );
+    } finally {
+      setIsDeletingPerimetro(false);
+    }
+  };
+
   return (
     <div style={{ height: '100%', width: '100%', margin: 0, padding: 0, position: 'relative', overflow: 'hidden' }}>
-      <MapContainer center={center} zoom={15} zoomControl={false} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+      <MapContainer
+        ref={mapRef}
+        center={center}
+        zoom={15}
+        maxZoom={22}
+        zoomControl={false}
+        style={{ height: '100%', width: '100%', zIndex: 1 }}
+      >
+        <MapRefCapture onMap={(m) => { mapRef.current = m; }} />
         <ZoomControl position="bottomright" />
         <TileLayer
           attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          maxZoom={22}
+          maxNativeZoom={18}
         />
         <MapUpdater center={center} trigger={flyToTrigger} />
         {heatEnabled && <HeatmapLayer points={heatPoints} />}
@@ -575,22 +622,6 @@ export default function MapPage() {
         {animales.map(animal => {
           if (animal.latitud == null || animal.longitud == null) return null;
 
-          // Buscar alerta geoespacial pendiente para mostrar en el popup
-          const alertaGeo = animal.alertasAnimal.find(a => {
-            const t = (a.tipo ?? '').toUpperCase();
-            return (t.includes('FUERA') || t.includes('PERIMETRO') || t === 'ABIGEATO') && a.estado === 'PENDIENTE';
-          });
-
-          const tiempoFueraPopup = (ts: string) => {
-            const min = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-            if (isNaN(min) || min < 0) return 'Ahora';
-            if (min < 1) return '< 1 min';
-            if (min < 60) return `${min} min`;
-            const h = Math.floor(min / 60);
-            const m = min % 60;
-            return m === 0 ? `${h}h` : `${h}h ${m}m`;
-          };
-
           return (
             <Marker
               key={animal.id}
@@ -602,44 +633,7 @@ export default function MapPage() {
                   setSelectedAnimalMap(animal);
                 },
               }}
-            >
-              <Popup>
-                <div style={{ minWidth: '160px', fontFamily: 'inherit' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: '4px', color: '#1E3A5F' }}>
-                    {animal.identificador ?? `Animal #${animal.id}`}
-                  </div>
-                  {animal.tsUltimaPosicion && (
-                    <div style={{ fontSize: '0.75rem', color: '#6c757d', marginBottom: '6px' }}>
-                      Última pos.: {new Date(animal.tsUltimaPosicion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  )}
-                  {alertaGeo && (
-                    <div
-                      style={{
-                        marginTop: '6px',
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        background: 'linear-gradient(135deg, #FFF0F0, #FFD6D6)',
-                        border: '1px solid #dc3545',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <i className="bi bi-geo-alt-fill" style={{ color: '#dc3545', fontSize: '1rem' }} />
-                      <div>
-                        <div style={{ fontWeight: 700, color: '#B00020', fontSize: '0.85rem' }}>
-                          Fuera del perímetro
-                        </div>
-                        <div style={{ color: '#9B1C1C', fontSize: '0.78rem' }}>
-                          {tiempoFueraPopup(alertaGeo.tsGeneracion)}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
+            />
           );
         })}
       </MapContainer>
@@ -721,16 +715,7 @@ export default function MapPage() {
 
       {/* Resumen de Alertas Cards */}
       {resumenAlertas && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            zIndex: 1000,
-            display: 'flex',
-            gap: '10px'
-          }}
-        >
+        <div className="resumen-alertas">
           {/* Tarjeta Reproductivo */}
           <div className="card text-center" style={{ minWidth: '100px', backgroundColor: 'rgba(255, 255, 255, 0.9)', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>
             <div className="card-body p-2">
@@ -774,9 +759,11 @@ export default function MapPage() {
           rodeos={rodeos}
           loading={loadingPerimetros}
           onToggleActivo={handleToggleActivoPerimetro}
+          onToggleAll={handleToggleAllPerimetros}
           onStartEdit={handleStartEditPerimetro}
           onCancelEdit={handleCancelEditPerimetro}
           onSaveEdit={handleSaveEditPerimetro}
+          onDelete={handleRequestDeletePerimetro}
           onCreateNew={handleCreateNewPerimetro}
           editingPerimetro={editingPerimetro}
           coordenadasEditadas={coordenadasEditadas}
@@ -785,6 +772,37 @@ export default function MapPage() {
           isSaving={isSavingPerimetro}
         />
       ) : null}
+
+      {/* Modal Confirmar Eliminación de Perímetro */}
+      <Modal
+        show={showConfirmDeletePerimetro}
+        onHide={handleCloseDeletePerimetro}
+        onExited={() => {
+          setPerimetroAEliminar(null);
+          setErrorEliminarPerimetro(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton={!isDeletingPerimetro}>
+          <Modal.Title>Eliminar Perímetro</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          ¿Estás seguro de que deseas eliminar el perímetro <strong>{perimetroAEliminar?.nombre}</strong>? Esta acción no se puede deshacer.
+          {errorEliminarPerimetro && (
+            <Alert variant="danger" className="mt-3 mb-0">
+              {errorEliminarPerimetro}
+            </Alert>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseDeletePerimetro} disabled={isDeletingPerimetro}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleConfirmDeletePerimetro} disabled={isDeletingPerimetro}>
+            {isDeletingPerimetro ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Sidebar de Intervención */}
       {isIntervencionOpen && intervencionAlerta && (

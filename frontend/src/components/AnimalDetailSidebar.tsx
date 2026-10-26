@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { AnimalMapa } from '../api/animalesApi';
 import { getAnimalById, type AnimalResponse } from '../api/animalesApi';
-import type { AlertaResponse } from '../api/alertaApi';
+import { alertasVigentes, severidadParaAnimal, volvioAlGrupo, type AlertaResponse } from '../api/alertaApi';
 import AlertNotificationCard from './AlertNotificationCard';
+import { useAuthStore } from '../store/authStore';
 
 interface AnimalDetailSidebarProps {
   animalMapa: AnimalMapa;
@@ -16,6 +18,10 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
   const [animalDetail, setAnimalDetail] = useState<AnimalResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  // Mismos roles que la ruta /animales/:id
+  const rol = useAuthStore((s) => s.rol);
+  const puedeVerFicha = rol === 'PRODUCTOR' || rol === 'VETERINARIO' || rol === 'CAMPERO';
 
   useEffect(() => {
     let isMounted = true;
@@ -47,15 +53,18 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
   };
 
   const animalName = animalMapa.identificador || `Animal #${animalMapa.id}`;
-  const hasAlertas = animalMapa.alertasAnimal.length > 0;
+  // Las alertas resueltas siguen listadas, pero ya no tiñen el estado del animal (igual que su pin).
+  const alertasPendientes = alertasVigentes(animalMapa.alertasAnimal);
   
   // Status dot color
   let statusColor = '#38A169'; // Green (ACTIVO)
   if (animalMapa.sinDatosRecientes) {
     statusColor = '#718096'; // Gray
-  } else if (hasAlertas) {
+  } else if (alertasPendientes.length > 0) {
     // If it has alerts, pick color based on max severity
-    if (animalMapa.alertasAnimal.some(a => a.severidad === 'ALTA' || a.tipo !== 'CELO')) {
+    // Un aislamiento del que el animal ya volvió es solo un aviso, como en su pin.
+    if (alertasPendientes.some(a => severidadParaAnimal(a, animalMapa.id) === 'ALTA'
+      || (a.tipo !== 'CELO' && !volvioAlGrupo(a, animalMapa.id)))) {
       statusColor = '#E53E3E'; // Red
     } else {
       statusColor = '#D69E2E'; // Yellow/Orange
@@ -70,8 +79,10 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
 
   const formatHora = (iso: string | null) => {
     if (!iso) return '--:--';
-    const date = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
-    return date.toLocaleString();
+    // El backend manda LocalDateTime en hora local (sin zona): no forzar UTC.
+    return new Date(iso).toLocaleString('es-AR', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
   };
 
   return (
@@ -106,9 +117,20 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
           <div>
             <h2 className="m-0 fw-bold" style={{ color: '#1E3A5F' }}>{animalName}</h2>
             <p className="m-0 text-muted fs-6">#{animalMapa.id}</p>
+            {puedeVerFicha && (
+              // Mismo estilo que los links de acción de las otras barras laterales ("Ver en mapa")
+              <button
+                type="button"
+                className="btn btn-link p-0 mt-1 fw-semibold text-primary text-decoration-none d-flex align-items-center gap-1"
+                onClick={() => navigate(`/animales/${animalMapa.id}`)}
+              >
+                Ver ficha completa <i className="bi bi-chevron-right"></i>
+              </button>
+            )}
           </div>
           <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: statusColor, border: '2px solid white', boxShadow: '0 0 0 1px #CBD5E0' }}></div>
         </div>
+
       </div>
 
       <div className="p-4 d-flex flex-column gap-3 flex-grow-1 custom-scrollbar" style={{ overflowY: 'auto' }}>
@@ -181,6 +203,7 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
                 <AlertNotificationCard
                   key={alerta.id}
                   alerta={alerta}
+                  animalId={animalMapa.id}
                   onClick={onAlertClick}
                   isUnread={alerta.estado === 'PENDIENTE'}
                 />
