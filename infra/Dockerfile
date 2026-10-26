@@ -5,11 +5,19 @@ FROM postgis/postgis:16-3.4
 # bullseye-security esta rota (paquetes 404 tras el fin de soporte de
 # Debian 11) y no la necesitamos para instalar curl/gnupg/lsb-release:
 # la sacamos de la lista de fuentes antes de actualizar.
+# PGDG tambien saco bullseye-pgdg de apt.postgresql.org (404) y lo movio a
+# apt-archive.postgresql.org, que solo sirve por https: la primera
+# actualizacion va sin esa fuente (hasta tener ca-certificates) y despues
+# se vuelve a agregar apuntando al archivo.
 RUN (sed -i '/bullseye-security/d' /etc/apt/sources.list 2>/dev/null || true) \
     && (sed -i '/bullseye-security/d' /etc/apt/sources.list.d/*.list 2>/dev/null || true) \
     && (find /etc/apt/sources.list.d -name '*security*' -delete 2>/dev/null || true) \
+    && mv /etc/apt/sources.list.d/pgdg.list /tmp/pgdg.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends curl gnupg ca-certificates lsb-release \
+    && sed -e 's|https\?://apt\.postgresql\.org|https://apt-archive.postgresql.org|' /tmp/pgdg.list \
+       > /etc/apt/sources.list.d/pgdg.list \
+    && rm /tmp/pgdg.list \
     && curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey \
        | gpg --dearmor -o /usr/share/keyrings/timescaledb-archive-keyring.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/timescaledb-archive-keyring.gpg] https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_release -cs) main" \
