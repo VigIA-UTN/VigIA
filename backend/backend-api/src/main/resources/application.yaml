@@ -59,8 +59,6 @@ server:
 
 vigia:
   ml:
-    celo-url: ${ML_CELO_URL:http://localhost:8001}
-    salud-url: ${ML_SALUD_URL:http://localhost:8002}
     geo-url: ${ML_GEO_URL:http://localhost:8003}
   celo:
     horas-dato-desactualizado: ${CELO_HORAS_DATO_DESACTUALIZADO:2}

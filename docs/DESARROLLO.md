@@ -127,7 +127,7 @@ Si utiliza el plugin de PostgreSQL de Railway, este proveerá sus propias creden
 
 #### 3. Backend (API y Worker)
 - `SPRING_PROFILES_ACTIVE`: **producción → dejar sin setear o `prod`.** El default de la app ya es `prod`, así que un redeploy nunca ejecuta el `DataInitializer` (que limpia y re-siembra la base). **Solo el entorno de `develop` debe setear `SPRING_PROFILES_ACTIVE=dev`** para volver a tener datos de prueba en cada deploy.
-- `CORS_ORIGINS`: URLs de su frontend en producción (ej. `https://vigia-frontend.up.railway.app`).
+- `CORS_ORIGINS` (solo `backend-api`): URLs de su frontend en producción (ej. `https://vigia-frontend.up.railway.app`).
 - `TZ`: `America/Argentina/Buenos_Aires`
 - `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (solo `backend-api`): credenciales del cliente OAuth de Google para el login con SSO, de Google Cloud Console > APIs y servicios > Credenciales. **Son obligatorias**: el `application.yaml` no trae valores por defecto y la API no levanta sin ellas.
 
@@ -137,10 +137,10 @@ Si utiliza el plugin de PostgreSQL de Railway, este proveerá sus propias creden
 Asegúrese de configurar las URLs apuntando a la red interna de Railway.
 - `ML_CELO_URL`: URL interna del servicio (ej. `http://ml-celo.railway.internal:8001`)
 - `ML_SALUD_URL`: URL interna del servicio (ej. `http://ml-salud.railway.internal:8002`)
-- `ML_GEO_URL`: URL interna del servicio (ej. `http://ml-geo.railway.internal:8003`)
+- `ML_GEO_URL` (worker y `backend-api`): URL interna del servicio (ej. `http://ml-geo.railway.internal:8003`)
 
 #### 4. Servidor de Correos (SMTP)
-Para el envío de alertas reales en producción, configure un proveedor SMTP (SendGrid, AWS SES, Resend, Gmail, etc.):
+Solo en `backend-api`. Para el envío de alertas reales en producción, configure un proveedor SMTP (SendGrid, AWS SES, Resend, Gmail, etc.):
 - `MAIL_HOST`: Host del proveedor (ej. `smtp.sendgrid.net`).
 - `MAIL_PORT`: Puerto SMTP (ej. `587`).
 - `MAIL_USER`: Usuario SMTP.

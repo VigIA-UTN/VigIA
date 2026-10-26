@@ -44,18 +44,12 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - CELO_HORAS_DATO_DESACTUALIZADO=${CELO_HORAS_DATO_DESACTUALIZADO:-2}
       - VIGIA_GEO_VENTANA_HORAS=${VIGIA_GEO_VENTANA_HORAS:-24}
-      - ML_CELO_URL=http://ml-celo:8001
-      - ML_SALUD_URL=http://ml-salud:8002
       - ML_GEO_URL=http://ml-geo:8003
       - TZ=America/Argentina/Buenos_Aires
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
-      ml-celo:
-        condition: service_started
-      ml-salud:
         condition: service_started
       ml-geo:
         condition: service_started
@@ -97,11 +91,6 @@ services:
       - VIGIA_GEO_MINUTOS_FUERA_MINIMO=${VIGIA_GEO_MINUTOS_FUERA_MINIMO:-15}
       - VIGIA_GEO_HORAS_SIN_DATOS_CIERRE=${VIGIA_GEO_HORAS_SIN_DATOS_CIERRE:-6}
       - SPRING_RABBITMQ_HOST=rabbitmq
-      - MAIL_HOST=${MAIL_HOST:-mail}
-      - MAIL_PORT=${MAIL_PORT:-1025}
-      - MAIL_USER=${MAIL_USER:-user}
-      - MAIL_PASSWORD=${MAIL_PASSWORD:-pass}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       - TZ=America/Argentina/Buenos_Aires
     depends_on:
       db:

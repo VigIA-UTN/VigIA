@@ -29,17 +29,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-  mail:
-    host: ${MAIL_HOST}
-    port: ${MAIL_PORT:1025}
-    username: ${MAIL_USER:user}
-    password: ${MAIL_PASSWORD:pass}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
 
   servlet:
     multipart:
@@ -75,9 +64,6 @@ vigia:
   ttn:
     webhook:
       api-key: ${TTN_WEBHOOK_API_KEY:apiKey}
-
-cors:
-  allowed-origins: ${CORS_ORIGINS}
 
 resilience4j:
   # Un 4xx (p. ej. 422 por datos insuficientes) es una respuesta del servicio, no una
