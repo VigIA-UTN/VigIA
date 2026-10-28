@@ -36,20 +36,6 @@ jobs:
   backend-build:
     name: Build Backend
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: vigia_user
-          POSTGRES_PASSWORD: vigia_dev_password
-          POSTGRES_DB: vigia
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -68,8 +54,8 @@ jobs:
         if: ${{ github.actor == 'nektos/act' }}
         run: sudo apt-get update && sudo apt-get install -y maven
 
-      - name: Build with Maven
-        run: mvn -B clean package --file pom.xml
+      - name: Build and test with Maven
+        run: mvn -B clean verify --file pom.xml
 
   ml-checks:
     name: ML Checks
@@ -111,7 +97,6 @@ jobs:
   docker-build:
     name: Docker Compose Build
     runs-on: ubuntu-latest
-    # Wait for the other jobs to succeed before testing the full docker build
     needs: [frontend-build, backend-build, ml-checks]
     steps:
       - name: Checkout code
