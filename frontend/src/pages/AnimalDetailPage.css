@@ -1,6 +1,8 @@
 .animal-detail-container {
     max-width: 1000px;
     margin: 0 auto;
+    width: 100%;
+    min-width: 0;
 }
 
 .bateria-dot {
@@ -97,16 +99,6 @@
     gap: 0;
 }
 
-@media (max-width: 768px) {
-    .animal-tabs-bar {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 6px;
-        padding: 8px;
-        overflow-x: visible;
-    }
-}
-
 .animal-tab-btn {
     background: none;
     border: none;
@@ -118,7 +110,7 @@
     font-weight: 500;
     color: #718096;
     cursor: pointer;
-    transition: color 0.18s ease, border-color 0.18s ease;
+    transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
     white-space: nowrap;
     flex: 1;
     text-align: center;
@@ -132,6 +124,17 @@
     color: #1E3A5F;
     font-weight: 700;
     border-bottom-color: #66C6EB;
+}
+
+@media (max-width: 768px) {
+    .animal-tabs-bar {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        padding: 6px 0;
+        border-bottom: none;
+        margin-bottom: 1.25rem;
+    }
 }
 
 @keyframes tab-fade-in {
@@ -148,6 +151,9 @@
 
 .tab-content-animated {
     animation: tab-fade-in 0.25s ease;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
 }
 
 /* ── Historial: acento de origen del dato (auto vs manual) ── */

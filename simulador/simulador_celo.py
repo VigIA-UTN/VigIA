@@ -38,7 +38,13 @@ DETALLE TÉCNICO
 - Alcanza con que lleguen unos pocos puntos PENDIENTES para que el próximo
   ciclo del job de celo (BatchScheduler, cada 60 s) evalúe la ventana
   completa de 24 hs —ya con forma de celo de punta a punta— y dispare la
-  alerta (confianza por encima del umbral CELO_THRESHOLD, 0.943 en infra).
+  alerta (confianza por encima del umbral CELO_THRESHOLD, 0.947 en infra).
+  El margen es chico (el modelo satura cerca de P ~0.95), por eso
+  DataInitializer siembra esa ventana con una semilla fija
+  (SEMILLA_HISTORIAL_CELO): da P = 0.9534 y la primera evaluación con los
+  puntos de este script queda en >= 0.948. Los puntos de este script siguen
+  siendo aleatorios; si una evaluación quedara por debajo, el job vuelve a
+  evaluar al minuto siguiente con más puntos.
 - La vaca sale de FORZAR_CELO_DEVICE_ID (default VIGIA-ARG-001), la misma
   variable con la que simulador.py la excluye de su loop: nunca hay dos
   procesos mandando para el mismo device_id.
@@ -183,7 +189,7 @@ def main():
     print(f"  Device ID     : {DEVICE_ID}")
     print(f"  Target API    : {API_URL}")
     print(f"  Cadencia      : {INTERVALO_SEGUNDOS} s (ritmo de demo)")
-    print(f"  Detección     : job de celo cada 60 s (umbral de confianza 0.943)")
+    print(f"  Detección     : job de celo cada 60 s (umbral de confianza 0.947)")
     print()
     print("  El historial de 24 hs con patrón de celo ya está persistido por")
     print("  DataInitializer. Este script solo manda los puntos nuevos")

@@ -131,7 +131,7 @@ py simulador_fuga.py --intervalo 2
   `INTERVALO_SEGUNDOS`.
 - moveState se mantiene en 0-2 a propósito. Validado offline contra el modelo
   de `ml-celo`: caminar cientos de metros con moveState 4-7 dispara un celo
-  falso en las vacas que se escapan (P > 0.943); con 0-2 queda en ~0.55-0.66.
+  falso en las vacas que se escapan (P > 0.943 en esa validación); con 0-2 queda en ~0.55-0.66.
 - `simulador.py` excluye `FUGA_DEVICE_IDS`, así que nunca hay dos
   procesos moviendo la misma vaca.
 - El worker no vuelve a alertar la salida de una vaca con una alerta de
@@ -182,7 +182,7 @@ docstring del script):
   #208. La #104 tiene 6 días y queda en calibración: con perfil, sus 24 hs de
   celo darían alerta de salud en el Acto 2.
 - moveState 0-2 y la vaca quieta. Validado offline contra `ml-celo`
-  (umbral 0.943): P(celo) ~0.12. El rodeo vivo con la vuelta al centro queda
+  (umbral 0.947): P(celo) ~0.12. El rodeo vivo con la vuelta al centro queda
   en <= 0.23.
 - El worker no vuelve a alertar salud de una vaca con una alerta de salud en
   las últimas 24 hs: si se ensaya, reiniciar el backend antes de la demo.
