@@ -72,7 +72,7 @@ despiertan a los jobs:
   suma la #208 a esa alerta en vez de abrir una nueva.
 
 Celo falso: moveState 1-3 y pasos de ~2 m; validado offline contra ml-celo
-(umbral 0.943) y en Docker, sin alertas de celo.
+(umbral 0.947) y en Docker, sin alertas de celo.
 
 - simulador.py excluye a la #208 vía FORZAR_SALUD_DEVICE_ID: nunca hay
   dos procesos mandando para la misma vaca.

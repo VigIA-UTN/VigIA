@@ -47,7 +47,7 @@ DETALLE TÉCNICO
   propósito: cada paquete nuevo deja PENDIENTE la inferencia de celo y el job
   evalúa la ventana de 24 hs de la vaca. Validado offline contra
   ml-celo/app/models: caminar cientos de metros con moveState 4-7 hace que el
-  modelo dispare un celo falso (P > 0.943), mientras que con moveState 0-2 la
+  modelo dispare un celo falso (P > 0.943 en esa validación), mientras que con moveState 0-2 la
   probabilidad queda en ~0.55-0.66 aun con pasos de 80 m.
 - Cada corrida abre una sesión OTAA nueva (session_key_id distinto) y
   arranca f_cnt en 1, así no choca con el frame counter que dejó una corrida
