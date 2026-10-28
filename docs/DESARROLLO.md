@@ -97,6 +97,7 @@ VigIA cuenta con un pipeline de CI en GitHub Actions (`.github/workflows/ci.yml`
 - **Frontend:** Se valida la compilación y el linting.
 - **Backend:** `mvn verify` compila y corre los tests unitarios y los de integración (ver *Tests del backend*).
 - **Microservicios ML:** Cuentan con suites de pruebas unitarias y de integración (ej: `ml-celo/tests`) utilizando `pytest`, donde se valida el correcto funcionamiento de las inferencias (utilizando mocks de TensorFlow) y se aseguran los contratos HTTP.
+- **Cobertura:** cada run publica los reportes como artefactos del workflow: `cobertura-backend` (JaCoCo) y `cobertura-<servicio>` para cada ML (pytest-cov). Ver *Cobertura*.
 
 ### Tests del backend
 
@@ -126,6 +127,37 @@ mvn verify -pl backend-api -am -Dit.test=MigracionesIT -Dtest=NINGUNO -Dsurefire
 ```
 
 Un test nuevo de integración se nombra `AlgoIT` y extiende `IntegracionBase`; en el worker las migraciones se toman de `backend-api/src/main/resources/db/migration`.
+
+### Cobertura
+
+**Backend (JaCoCo).** `mvn verify` instrumenta los unitarios (`target/jacoco.exec`) y los de integración (`target/jacoco-it.exec`), los fusiona y deja un reporte por módulo en `<módulo>/target/site/jacoco/` (HTML, XML y CSV). Ese reporte cuenta solo los tests del propio módulo. El módulo `backend-coverage` arma además un reporte agregado en `backend-coverage/target/site/jacoco-aggregate/` que atribuye a cada módulo lo que cubren los tests de todos: es el número que vale para `backend-core-lib`, cuyas entidades y DTOs se ejercitan casi enteramente desde api y worker. El código que genera Lombok no se cuenta (`backend/lombok.config`). Con `mvn test` no se genera reporte.
+
+**Microservicios ML (pytest-cov).** Desde la carpeta de cada servicio:
+
+```bash
+python -m pytest tests/ --cov --cov-report=term --cov-report=html
+```
+
+Qué se mide está en el `.coveragerc` de cada servicio (`app/` en los servicios, los scripts de `celo/` y `salud/` más `gps_noise_common.py` en `ml-training`), con cobertura de ramas. El HTML queda en `htmlcov/`.
+
+En CI los reportes se publican como artefactos del run: `cobertura-backend` y `cobertura-ml-celo`, `cobertura-ml-salud`, `cobertura-ml-geo`, `cobertura-ml-training`.
+
+#### Línea base
+
+Medida el 2026-10-28 sobre `develop` (`87c9e7f`), antes de escribir tests nuevos para el informe final.
+
+| Módulo | Tests | Líneas | Ramas |
+| --- | --- | --- | --- |
+| backend-api | 520 unitarios + 14 integración | 66,6 % (3123/4686) | 60,4 % (1032/1708) |
+| backend-worker | 117 unitarios + 3 integración | 90,1 % (987/1095) | 69,9 % (274/392) |
+| backend-core-lib (agregado) | todos los del backend | 94,4 % (319/338) | 75,7 % (103/136) |
+| backend-core-lib (solo sus tests) | 19 unitarios | 30,8 % (104/338) | 25,7 % (35/136) |
+| ml-celo | 5 | 81,1 % (60/74) | 57,1 % (8/14) |
+| ml-salud | 12 | 92,1 % (151/164) | 73,1 % (19/26) |
+| ml-geo | 54 | 99,4 % (157/158) | 98,1 % (51/52) |
+| ml-training | 7 | 19,8 % (200/1012) | 13,6 % (21/154) |
+
+En `ml-training` los tests cubren la generación de datasets y el ruido GPS; los scripts de entrenamiento y calibración (`train_*`, `optimize_rnn_ga.py`, `calibracion_dataset.py`, `salud/features_salud.py`) están en 0 %. Los números del backend son del reporte fusionado: suman lo que cubren los unitarios y los de integración.
 
 ### Resiliencia (Circuit Breaker)
 

@@ -1,0 +1,14 @@
+[run]
+branch = True
+# Sin app/: lo testeable son los módulos de ruido GPS y los scripts de celo/salud
+source = gps_noise_common, celo, salud
+omit = tests/*
+
+[report]
+show_missing = True
+
+[xml]
+output = coverage.xml
+
+[html]
+directory = htmlcov
