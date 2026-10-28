@@ -33,5 +33,8 @@ Thumbs.db
 ml-training/celo/models
 ml-training/salud/models
 
+# Figuras del paper (se regeneran con ml-training/celo/reporte_paper.py)
+ml-training/celo/figuras
+
 # Logs
 *.log

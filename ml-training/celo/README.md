@@ -82,6 +82,19 @@ ratio se sale de un rango tolerante (0.5x-2.0x).
 4. **Reproducibilidad:** se corren 5 semillas de inicialización sobre la
    misma partición (`--init-seeds`), reportando media ± desvío estándar
    en `summary_5seeds.json`.
+5. **Umbral de decisión:** en cada corrida se elige el umbral que maximiza
+   el F1 de la clase celo sobre la curva Precision-Recall de
+   **validación** (`best_threshold_f1` en `run_summary.json`) y se aplica
+   fijo a prueba: el conjunto de prueba no interviene en ninguna decisión.
+   Elegirlo sobre prueba, como se hacía antes del 27/10/2026, es fuga de
+   información y sobreestima las métricas.
+
+Dos scripts de solo lectura complementan el entrenamiento (no reentrenan):
+
+- `reporte_paper.py --run models/<run>`: métricas agregadas, composición de
+  la partición, hiperparámetros y las figuras del paper en `figuras/`.
+- `importancia_permutacion.py --run models/<run>`: importancia por
+  permutación de cada feature sobre el conjunto de prueba.
 
 ## 5. Pasos para Entrenar el Modelo
 
@@ -116,8 +129,9 @@ Para reproducir el entrenamiento, seguí estos pasos en tu terminal (estando den
    `ml-training/salud/train_model.py`, este script **no** exporta
    automáticamente al microservicio. Mirá `models/<run>/summary_5seeds.json`
    y `models/<run>/init<seed>/run_summary.json`, elegí el seed con mejor
-   PR-AUC/F1 (el modelo actualmente desplegado se eligió así, no por
-   "primer seed"), y copiá manualmente:
+   PR-AUC de **validación** (`pr_auc_celo_val`; elegirlo por la PR-AUC de
+   prueba es la misma fuga que elegir ahí el umbral). El desplegado,
+   `init44`, es el mejor en validación (0.833). Copiá manualmente:
    ```powershell
    copy models\<run>\init<seed>\modelo_celo_lstm.keras ..\..\ml-celo\app\models\modelo_celo_lstm.keras
    copy models\<run>\init<seed>\scaler_celo.joblib     ..\..\ml-celo\app\models\scaler_celo.joblib
@@ -128,16 +142,38 @@ Para reproducir el entrenamiento, seguí estos pasos en tu terminal (estando den
 
 ## 6. Resultados de referencia
 
-Corrida `20260918_195223_split42` (200 animales, 90 días, dataset con
-ruido GPS + moveState cuantizado), semilla `init44` — la desplegada
-actualmente. Test set: 3600 ventanas de 24hs, 278 con celo real.
+Corrida `20261027_105620_split42` (200 animales, 90 días, dataset con
+ruido GPS + moveState cuantizado, umbral elegido en validación). Es un
+reentrenamiento de `20260918_195223_split42` con las mismas semillas: las
+predicciones de las 5 semillas son idénticas, así que el modelo desplegado
+(`init44`) es el mismo y solo cambió cómo se elige el umbral. Test set:
+3600 ventanas de 24hs, 278 con celo real.
+
+Semilla `init44` (la desplegada):
 
 | Métrica | Valor |
 |---|---|
 | PR-AUC | 0.8135 |
-| Precisión (umbral óptimo 0.943) | 0.869 |
-| Recall (umbral óptimo) | 0.784 |
-| F1 (umbral óptimo) | 0.824 |
+| Precisión (umbral elegido en validación, 0.947) | 0.868 |
+| Recall | 0.781 |
+| F1 | 0.822 |
+
+Media ± desvío de las 5 semillas: PR-AUC 0.770 ± 0.047, precisión
+0.723 ± 0.100, recall 0.794 ± 0.061, F1 0.752 ± 0.061, umbral
+0.794 ± 0.125.
+
+La importancia por permutación (`importancia_permutacion.py`) muestra que,
+con el ruido GPS actual, el modelo depende exclusivamente de `moveState`:
+permutarlo baja la PR-AUC a 0.078 (nivel aleatorio) y permutar la distancia
+no la cambia.
+
+**Margen del umbral en la demo:** el modelo satura cerca de P(celo) ≈ 0.95,
+así que el umbral queda muy cerca de su máximo. Con un `Random` sin semilla,
+~5% de las ventanas de celo que siembra `DataInitializer` para el Acto 2
+quedaban por debajo de 0.947; por eso se siembran con una semilla fija
+(`SEMILLA_HISTORIAL_CELO = 817`, P = 0.9534). **Si se reentrena el modelo o
+cambia `CELO_THRESHOLD`, hay que volver a elegir esa semilla** contra el
+modelo nuevo.
 
 **Por qué el número cambió durante el desarrollo de este fix:** la
 primera corrida post-ruido se midió sobre 60 animales (test set de solo
