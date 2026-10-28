@@ -1,0 +1,13 @@
+{
+  "password": "fixture123",
+  "usuarios": [
+    { "clave": "admin", "email": "admin@fixture.vigia.test", "rol": "ADMINISTRADOR", "establecimientos": [] },
+    { "clave": "productorA", "email": "productor.a@fixture.vigia.test", "rol": "PRODUCTOR", "establecimientos": ["Fixture A"] },
+    { "clave": "veterinarioA", "email": "veterinario.a@fixture.vigia.test", "rol": "VETERINARIO", "establecimientos": ["Fixture A"] },
+    { "clave": "camperoA", "email": "campero.a@fixture.vigia.test", "rol": "CAMPERO", "establecimientos": ["Fixture A"] },
+    { "clave": "productorB", "email": "productor.b@fixture.vigia.test", "rol": "PRODUCTOR", "establecimientos": ["Fixture B"] },
+    { "clave": "veterinarioB", "email": "veterinario.b@fixture.vigia.test", "rol": "VETERINARIO", "establecimientos": ["Fixture B"] },
+    { "clave": "camperoB", "email": "campero.b@fixture.vigia.test", "rol": "CAMPERO", "establecimientos": ["Fixture B"] },
+    { "clave": "productorAmbos", "email": "productor.ambos@fixture.vigia.test", "rol": "PRODUCTOR", "establecimientos": ["Fixture A", "Fixture B"] }
+  ]
+}
