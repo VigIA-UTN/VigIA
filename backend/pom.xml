@@ -25,6 +25,8 @@
 
 	<properties>
 		<java.version>17</java.version>
+		<!-- La 1.19.8 que trae Spring Boot 3.3 no habla con Docker Engine 29 (exige API >= 1.44). -->
+		<testcontainers.version>1.21.4</testcontainers.version>
 	</properties>
 
 	<dependencyManagement>

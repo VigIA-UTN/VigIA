@@ -94,8 +94,38 @@ py simulador.py
 ### Integración Continua
 
 VigIA cuenta con un pipeline de CI en GitHub Actions (`.github/workflows/ci.yml`). 
-- **Frontend y Backend:** Se valida la compilación y el linting.
+- **Frontend:** Se valida la compilación y el linting.
+- **Backend:** `mvn verify` compila y corre los tests unitarios y los de integración (ver *Tests del backend*).
 - **Microservicios ML:** Cuentan con suites de pruebas unitarias y de integración (ej: `ml-celo/tests`) utilizando `pytest`, donde se valida el correcto funcionamiento de las inferencias (utilizando mocks de TensorFlow) y se aseguran los contratos HTTP.
+
+### Tests del backend
+
+Hay dos tipos de tests en `backend-api` y `backend-worker`:
+
+- **Unitarios** (`*Test`): corren con surefire sobre H2 en memoria, sin Flyway ni RabbitMQ. No necesitan Docker.
+- **De integración** (`*IT`): corren con failsafe y extienden `IntegracionBase` (en `src/test/java/dev/vigia/backend` de cada módulo). Levantan con Testcontainers una TimescaleDB (`timescale/timescaledb-ha:pg16`, la misma imagen que `infra/`) y un RabbitMQ reales, Flyway aplica todas las migraciones y Hibernate valida las entidades contra el esquema (`ddl-auto: validate`). Cubren lo que H2 no puede: la hypertable de `telemetria`, los triggers de inmutabilidad y el Fanout de RabbitMQ. El perfil `it` (`application-it.yaml`) es el que pisa la configuración de H2.
+
+Desde `/backend`:
+
+```bash
+mvn test
+```
+
+corre solo los unitarios.
+
+```bash
+mvn verify
+```
+
+corre los unitarios y después los de integración. Necesita Docker corriendo (Docker Desktop en Windows/Mac). La primera vez descarga las imágenes (la de TimescaleDB pesa más de 1 GB), después quedan en caché. No hace falta tener levantado `infra/`: los contenedores son propios, arrancan una vez por módulo, los comparten todos sus `*IT` y se borran al terminar. Por eso los `*IT` no pueden asumir una base vacía: cada uno crea los datos que usa.
+
+Para correr un solo test de integración:
+
+```bash
+mvn verify -pl backend-api -am -Dit.test=MigracionesIT -Dtest=NINGUNO -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+Un test nuevo de integración se nombra `AlgoIT` y extiende `IntegracionBase`; en el worker las migraciones se toman de `backend-api/src/main/resources/db/migration`.
 
 ### Resiliencia (Circuit Breaker)
 

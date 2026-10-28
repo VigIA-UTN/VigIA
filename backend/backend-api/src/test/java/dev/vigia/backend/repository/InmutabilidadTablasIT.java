@@ -1,13 +1,14 @@
 package dev.vigia.backend.repository;
 
+import dev.vigia.backend.IntegracionBase;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -17,47 +18,30 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @DisplayName("Validación de bloqueos de Update y Delete (Inmutabilidad en BD)")
-public class InmutabilidadTablasTest {
+class InmutabilidadTablasIT extends IntegracionBase {
 
-    private static final String DB_URL = System.getProperty("DB_URL", "jdbc:postgresql://localhost:5432/vigia");
-    private static final String DB_USER = System.getProperty("DB_USER", "vigia_user");
-    private static final String DB_PASS = System.getProperty("DB_PASSWORD", "vigia_dev_password");
+    @Autowired
+    private DataSource dataSource;
 
     private Connection connection;
 
-    @BeforeAll
-    static void verificarDisponibilidadPostgreSQL() {
-        boolean disponible = false;
-        try (Connection c = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            disponible = true;
-        } catch (Exception e) {
-            disponible = false;
-        }
-        assumeTrue(disponible, "Base de datos PostgreSQL no disponible en " + DB_URL + " - Se omite el test");
-    }
+    private long usuarioDePrueba;
+    private long animalDePrueba;
+    private long alertaDePrueba;
 
     @BeforeEach
     void setUp() throws SQLException {
-        connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+        connection = dataSource.getConnection();
         connection.setAutoCommit(true);
 
-        // Verificar que las tablas requeridas existen (pueden no existir si Flyway no corrió, ej: CI sin schema)
-        try (Statement st = connection.createStatement()) {
-            ResultSet rs = st.executeQuery(
-                    "SELECT COUNT(*) FROM information_schema.tables " +
-                    "WHERE table_schema = 'public' AND table_name IN ('intervenciones', 'diagnosticos', 'estados_salud')");
-            rs.next();
-            int tablesFound = rs.getInt(1);
-            assumeTrue(tablesFound == 3,
-                    "Las tablas 'intervenciones', 'diagnosticos' y/o 'estados_salud' no existen en la BD - " +
-                    "Ejecutar las migraciones Flyway antes de correr este test");
-        }
+        usuarioDePrueba = insertarDevolviendoId(
+                "INSERT INTO usuarios (email) VALUES ('inmutabilidad-' || gen_random_uuid() || '@vigia.test') RETURNING id");
+        animalDePrueba = insertarDevolviendoId(
+                "INSERT INTO animales (alias) VALUES ('Animal inmutabilidad') RETURNING id");
+        alertaDePrueba = insertarAlerta("PENDIENTE");
 
-        // Los triggers tienen que venir de las migraciones Flyway (V12, V15 y V16): el test no los crea,
-        // así falla si una migración no los instaló.
         try (Statement st = connection.createStatement()) {
             ResultSet rs = st.executeQuery(
                     "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname IN (" +
@@ -89,8 +73,8 @@ public class InmutabilidadTablasTest {
     @Test
     @DisplayName("Intervenciones: INSERT permitido, UPDATE bloqueado con mensaje de acción prohibida")
     void testIntervencionesBloqueoUpdate() throws SQLException {
-        Long animalId = obtenerAnimalValido();
-        Long usuarioId = obtenerUsuarioValido();
+        long animalId = animalDePrueba;
+        long usuarioId = usuarioDePrueba;
 
         long idGenerado;
         try (PreparedStatement ps = connection.prepareStatement(
@@ -119,8 +103,8 @@ public class InmutabilidadTablasTest {
     @Test
     @DisplayName("Intervenciones: INSERT permitido, DELETE bloqueado con mensaje de acción prohibida")
     void testIntervencionesBloqueoDelete() throws SQLException {
-        Long animalId = obtenerAnimalValido();
-        Long usuarioId = obtenerUsuarioValido();
+        long animalId = animalDePrueba;
+        long usuarioId = usuarioDePrueba;
 
         long idGenerado;
         try (PreparedStatement ps = connection.prepareStatement(
@@ -149,9 +133,9 @@ public class InmutabilidadTablasTest {
     @Test
     @DisplayName("Diagnósticos: INSERT permitido, UPDATE bloqueado con mensaje de acción prohibida")
     void testDiagnosticosBloqueoUpdate() throws SQLException {
-        Long animalId = obtenerAnimalValido();
-        Long alertaId = obtenerAlertaValida();
-        Long veterinarioId = obtenerUsuarioValido();
+        long animalId = animalDePrueba;
+        long alertaId = alertaDePrueba;
+        long veterinarioId = usuarioDePrueba;
 
         long idGenerado;
         try (PreparedStatement ps = connection.prepareStatement(
@@ -181,9 +165,9 @@ public class InmutabilidadTablasTest {
     @Test
     @DisplayName("Diagnósticos: INSERT permitido, DELETE bloqueado con mensaje de acción prohibida")
     void testDiagnosticosBloqueoDelete() throws SQLException {
-        Long animalId = obtenerAnimalValido();
-        Long alertaId = obtenerAlertaValida();
-        Long veterinarioId = obtenerUsuarioValido();
+        long animalId = animalDePrueba;
+        long alertaId = alertaDePrueba;
+        long veterinarioId = usuarioDePrueba;
 
         long idGenerado;
         try (PreparedStatement ps = connection.prepareStatement(
@@ -247,9 +231,9 @@ public class InmutabilidadTablasTest {
     @Test
     @DisplayName("Bypass opcional: permite UPDATE y DELETE cuando la variable de sesión está activa")
     void testBypassPermiteModificaciones() throws SQLException {
-        Long animalId = obtenerAnimalValido();
-        Long alertaId = obtenerAlertaValida();
-        Long veterinarioId = obtenerUsuarioValido();
+        long animalId = animalDePrueba;
+        long alertaId = alertaDePrueba;
+        long veterinarioId = usuarioDePrueba;
 
         long idGenerado;
         try (PreparedStatement ps = connection.prepareStatement(
@@ -346,38 +330,19 @@ public class InmutabilidadTablasTest {
         limpiarAlerta(alertaId);
     }
 
-    private Long obtenerAnimalValido() throws SQLException {
+    private long insertarDevolviendoId(String sql) throws SQLException {
         try (Statement st = connection.createStatement();
-                ResultSet rs = st.executeQuery("SELECT id FROM animales LIMIT 1")) {
-            if (rs.next())
-                return rs.getLong(1);
+                ResultSet rs = st.executeQuery(sql)) {
+            assertThat(rs.next()).isTrue();
+            return rs.getLong(1);
         }
-        return 1L;
-    }
-
-    private Long obtenerUsuarioValido() throws SQLException {
-        try (Statement st = connection.createStatement();
-                ResultSet rs = st.executeQuery("SELECT id FROM usuarios LIMIT 1")) {
-            if (rs.next())
-                return rs.getLong(1);
-        }
-        return 1L;
-    }
-
-    private Long obtenerAlertaValida() throws SQLException {
-        try (Statement st = connection.createStatement();
-                ResultSet rs = st.executeQuery("SELECT id FROM alertas LIMIT 1")) {
-            if (rs.next())
-                return rs.getLong(1);
-        }
-        return 1L;
     }
 
     private long insertarEstadoSalud(String notas) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement(
                 "INSERT INTO estados_salud (animal_id, estado, diagnostico_notas, origen, fecha_registro) " +
                         "VALUES (?, 'SANO', ?, 'MANUAL', NOW()) RETURNING estado_salud_id")) {
-            ps.setLong(1, obtenerAnimalValido());
+            ps.setLong(1, animalDePrueba);
             ps.setString(2, notas);
             ResultSet rs = ps.executeQuery();
             assertThat(rs.next()).isTrue();
@@ -390,7 +355,7 @@ public class InmutabilidadTablasTest {
                 "INSERT INTO alertas (animal_id, tipo, ts_generacion, disparador, valor_umbral, estado, " +
                         "confianza_modelo, serie_comparativa_json) " +
                         "VALUES (?, 'SALUD', NOW(), 'SALUD', 0.5, ?, 0.9, '{\"serie\":[]}') RETURNING id")) {
-            ps.setLong(1, obtenerAnimalValido());
+            ps.setLong(1, animalDePrueba);
             ps.setString(2, estado);
             ResultSet rs = ps.executeQuery();
             assertThat(rs.next()).isTrue();
