@@ -38,3 +38,8 @@ ml-training/celo/figuras
 
 # Logs
 *.log
+
+# Cobertura (pytest-cov)
+.coverage
+coverage.xml
+htmlcov/

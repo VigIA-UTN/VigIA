@@ -57,6 +57,17 @@ jobs:
       - name: Build and test with Maven
         run: mvn -B clean verify --file pom.xml
 
+      # upload-artifact no usa el working-directory: los paths van desde la raíz del repo
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-backend
+          path: |
+            backend/*/target/site/jacoco/
+            backend/backend-coverage/target/site/jacoco-aggregate/
+          if-no-files-found: ignore
+
   ml-checks:
     name: ML Checks
     runs-on: ubuntu-latest
@@ -89,10 +100,20 @@ jobs:
       - name: Run Tests
         run: |
           if [ -d "tests" ]; then
-            python -m pytest tests/ -v
+            python -m pytest tests/ -v --cov --cov-report=term --cov-report=xml --cov-report=html
           else
             echo "No tests found."
           fi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-${{ matrix.service }}
+          path: |
+            ${{ matrix.service }}/coverage.xml
+            ${{ matrix.service }}/htmlcov/
+          if-no-files-found: ignore
 
   docker-build:
     name: Docker Compose Build
