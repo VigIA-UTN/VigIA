@@ -4,8 +4,8 @@ train_multiseed.py
 Fase 1 del plan de revisión del paper VigIA:
 
 1. Manejo del desbalance de clases: class_weight='balanced' + PR-AUC +
-   umbral óptimo elegido sobre la curva Precision-Recall (en vez de 0.5
-   fijo).
+   umbral óptimo elegido sobre la curva Precision-Recall de VALIDACIÓN
+   (en vez de 0.5 fijo) y aplicado sin modificar al conjunto de prueba.
 2. Reproducibilidad: se fijan TODAS las semillas (random, np.random,
    tf.random) y se corren 5 entrenamientos con distintas semillas de
    INICIALIZACIÓN de la red sobre la MISMA partición de datos
@@ -209,8 +209,16 @@ def main():
             verbose=0,
         )
 
+        # El umbral se elige sobre VALIDACIÓN y se aplica fijo a prueba: el
+        # conjunto de prueba no interviene en ninguna decisión (elegirlo sobre
+        # prueba sería fuga de información y sobreestimaría las métricas).
+        y_proba_val = model.predict(X_val, verbose=0).ravel()
+        best_thr, pr_auc_val, _, _, _ = best_threshold_from_pr(y_val, y_proba_val)
+
         y_proba = model.predict(X_test, verbose=0).ravel()
-        best_thr, pr_auc, precisions, recalls, thresholds = best_threshold_from_pr(y_test, y_proba)
+        # PR-AUC de prueba: no depende del umbral, se calcula igual que antes
+        precisions, recalls, _ = precision_recall_curve(y_test, y_proba)
+        pr_auc = auc(recalls, precisions)
         y_pred_default = (y_proba > 0.5).astype(int)
         y_pred_best = (y_proba > best_thr).astype(int)
 
@@ -235,10 +243,13 @@ def main():
             "init_seed": init_seed,
             "epochs_configuradas": args.epochs,
             "epochs_reales": len(history.history["loss"]),
+            "mejor_epoch_val_loss": int(np.argmin(history.history["val_loss"])) + 1,
             "n_train": len(X_train), "n_val": len(X_val), "n_test": len(X_test),
             "class_weight": class_weight,
             "pr_auc_celo": pr_auc,
+            "pr_auc_celo_val": pr_auc_val,
             "best_threshold_f1": best_thr,
+            "best_threshold_f1_elegido_en": "validacion",
             "test_classification_report_thr0.5": report_default,
             "test_classification_report_thr_best": report_best,
             "test_confusion_matrix_thr0.5": cm_default.tolist(),
@@ -248,7 +259,7 @@ def main():
             json.dump(run_summary, f, indent=2, ensure_ascii=False)
 
         print(f"  epochs reales: {len(history.history['loss'])}")
-        print(f"  PR-AUC (celo): {pr_auc:.4f} | umbral óptimo (F1): {best_thr:.3f}")
+        print(f"  PR-AUC (celo, test): {pr_auc:.4f} | umbral óptimo (F1, elegido en val): {best_thr:.3f}")
         print(f"  thr=0.5   -> precision={report_default['celo']['precision']:.3f} "
               f"recall={report_default['celo']['recall']:.3f} f1={report_default['celo']['f1-score']:.3f}")
         print(f"  thr=best  -> precision={report_best['celo']['precision']:.3f} "
@@ -256,7 +267,9 @@ def main():
 
         per_run_metrics.append({
             "init_seed": init_seed,
+            "epochs_reales": len(history.history["loss"]),
             "pr_auc": pr_auc,
+            "pr_auc_val": pr_auc_val,
             "best_threshold": best_thr,
             "precision_thr05": report_default["celo"]["precision"],
             "recall_thr05": report_default["celo"]["recall"],
@@ -268,6 +281,7 @@ def main():
             "cm_thr05": cm_default.tolist(),
             "cm_best": cm_best.tolist(),
             "y_proba": y_proba.tolist(),
+            "y_proba_val": y_proba_val.tolist(),
         })
 
     # ------------------------------------------------------------------
@@ -284,8 +298,11 @@ def main():
         "class_weight": class_weight,
         "n_test": len(X_test),
         "n_pos_test": int(y_test.sum()),
+        "umbral_elegido_en": "validacion",
+        "y_test": y_test.tolist(),
+        "y_val": y_val.tolist(),
     }
-    for key in ["pr_auc", "best_threshold", "precision_thr05", "recall_thr05", "f1_thr05",
+    for key in ["pr_auc", "pr_auc_val", "best_threshold", "precision_thr05", "recall_thr05", "f1_thr05",
                 "precision_best", "recall_best", "f1_best", "accuracy_thr05"]:
         mean_v, std_v = agg(key)
         summary_agg[key] = {"mean": mean_v, "std": std_v}
@@ -294,7 +311,7 @@ def main():
         json.dump({"aggregate": summary_agg, "per_run": per_run_metrics}, f, indent=2, ensure_ascii=False)
 
     print("\n\n================ RESUMEN 5 CORRIDAS (media ± desvío) ================")
-    for key in ["pr_auc", "precision_thr05", "recall_thr05", "f1_thr05",
+    for key in ["pr_auc", "pr_auc_val", "precision_thr05", "recall_thr05", "f1_thr05",
                 "precision_best", "recall_best", "f1_best", "accuracy_thr05", "best_threshold"]:
         m = summary_agg[key]
         print(f"{key:20s}: {m['mean']:.4f} ± {m['std']:.4f}")

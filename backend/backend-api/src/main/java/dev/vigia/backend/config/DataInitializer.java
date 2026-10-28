@@ -111,6 +111,14 @@ public class DataInitializer implements CommandLineRunner {
         private static final double LON_RODEO = LON_CENTRO + 0.0004;
         private static final double RADIO_RODEO = 0.00035;
 
+        // Acto 2: semilla fija de las 24 hs de celo de la #104. El modelo de ml-celo satura cerca de
+        // P(celo) ~0.95 y CELO_THRESHOLD (0.947) queda pegado a ese techo: con un Random sin semilla, ~5%
+        // de las siembras daban P por debajo del umbral y la alerta de la demo no saltaba. Con 817 la
+        // ventana sembrada da P = 0.9534 y, con los puntos en vivo de simulador_celo.py, la primera
+        // evaluacion del job queda en >= 0.948 (validado contra ml-celo/app/models). Si se reentrena el
+        // modelo o cambia el umbral, hay que volver a elegirla.
+        private static final long SEMILLA_HISTORIAL_CELO = 817L;
+
         // Acto 4: la #208 termina su historial apartada del rodeo y sin transmitir hace un rato. ml-geo
         // solo mira animales con posicion de los ultimos 30 min (contra el dato mas nuevo, que el seed
         // deja ~3 min antes del arranque): con 35 min no la ve hasta que simulador_salud.py vuelve a
@@ -943,7 +951,7 @@ public class DataInitializer implements CommandLineRunner {
                 final int MS_MIN = 7;
                 final int MS_MAX = 9;
 
-                Random rnd = new Random();
+                Random rnd = new Random(SEMILLA_HISTORIAL_CELO);
                 double lat = LAT_CENTRO - 0.001;
                 double lon = LON_CENTRO - 0.001;
                 double heading = rnd.nextDouble() * 2 * Math.PI;
