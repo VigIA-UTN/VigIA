@@ -7,6 +7,8 @@ el inicio de un evento reproductivo
 # pyrefly: ignore [missing-import]
 from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
+from fastapi.responses import JSONResponse
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from typing import List
 import math
@@ -81,7 +83,12 @@ class PrediccionCeloResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "ml-celo"}
+    # Sin modelo todas las predicciones fallan con 503: el health lo refleja
+    # para que el healthcheck no dé por sano un servicio que no puede predecir.
+    if model is None:
+        return JSONResponse(status_code=503,
+                            content={"status": "degraded", "service": "ml-celo", "model_loaded": False})
+    return {"status": "ok", "service": "ml-celo", "model_loaded": True}
 
 @app.post("/api/internal/ml/celo/predict", response_model=PrediccionCeloResponse)
 async def predict(serie: List[PuntoTelemetria]):

@@ -53,7 +53,7 @@ def mock_dependencies():
 def test_health():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "ml-celo"}
+    assert response.json() == {"status": "ok", "service": "ml-celo", "model_loaded": True}
 
 def test_predict_evento_celo_true(mock_dependencies):
     # Payload válido con alta actividad (moveState = 9, el máximo del protocolo)

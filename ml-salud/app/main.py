@@ -32,6 +32,7 @@ porque asumía datos de rumia que el dispositivo IoT de VigIA no emite.
 """
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 import math
@@ -156,7 +157,12 @@ def get_posible_causa(severidad: int) -> Optional[str]:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "ml-salud", "feature_version": FEATURE_VERSION}
+    # Sin modelo todas las predicciones fallan con 503: el health lo refleja
+    # para que el healthcheck no dé por sano un servicio que no puede predecir.
+    if model is None:
+        return JSONResponse(status_code=503, content={
+            "status": "degraded", "service": "ml-salud", "feature_version": FEATURE_VERSION, "model_loaded": False})
+    return {"status": "ok", "service": "ml-salud", "feature_version": FEATURE_VERSION, "model_loaded": True}
 
 
 @app.post("/api/internal/ml/salud/perfil")
