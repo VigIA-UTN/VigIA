@@ -761,7 +761,7 @@ class SaludDetectorStrategyImplTest {
             filas.add(t);
         }
 
-        List<PuntoTelemetriaDTO> puntos = SaludDetectorStrategyImpl.puntosParaMl(filas, desde, 4, 0.5, 60);
+        List<PuntoTelemetriaDTO> puntos = VentanaTelemetria.puntosParaMl(filas, desde, 4, 0.5, 60);
 
         assertEquals(List.of(1, 1, 2, 2), puntos.stream().map(PuntoTelemetriaDTO::getMoveState).toList());
         assertEquals(List.of(-34.0, -34.0, -34.2, -34.2), puntos.stream().map(PuntoTelemetriaDTO::getLatitud).toList());

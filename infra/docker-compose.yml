@@ -52,7 +52,7 @@ services:
       rabbitmq:
         condition: service_started
       ml-geo:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: [ "CMD", "wget", "--quiet", "--spider", "http://localhost:8080/actuator/health" ]
       interval: 5s
@@ -96,11 +96,11 @@ services:
       db:
         condition: service_healthy
       ml-celo:
-        condition: service_started
+        condition: service_healthy
       ml-salud:
-        condition: service_started
+        condition: service_healthy
       ml-geo:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_started
       backend-api:
@@ -121,6 +121,14 @@ services:
     volumes:
       - ../ml-celo/app:/app/app
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload" ]
+    # La imagen slim no trae wget ni curl. urlopen lanza error ante el 503 de /health sin modelo cargado.
+    # start_period largo: TensorFlow y la LSTM tardan en cargar.
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3)" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
 
   ml-salud:
     build: ../ml-salud
@@ -130,6 +138,12 @@ services:
     volumes:
       - ../ml-salud/app:/app/app
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload" ]
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health', timeout=3)" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   ml-geo:
     build: ../ml-geo
@@ -142,6 +156,12 @@ services:
     volumes:
       - ../ml-geo/app:/app/app
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload" ]
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health', timeout=3)" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   mail:
     image: axllent/mailpit
