@@ -90,12 +90,16 @@ async def predict(serie: List[PuntoTelemetria]):
     """
     log.info("Request recibida para predicción de celo con %d puntos.", len(serie))
 
+    # Un problema de los datos es 422 (el backend no reintenta); el 503 queda
+    # para fallas del servicio, como el modelo sin cargar.
+    if not serie:
+        mensaje = "serie: no puede estar vacía"
+        log.warning("Payload inválido: %s", mensaje)
+        return respuesta_error(422, "Payload Invalido", mensaje)
+
     try:
         if model is None:
             raise ValueError("El modelo de machine learning no está cargado.")
-
-        if not serie:
-            raise ValueError("La serie de telemetría está vacía.")
 
         features = []
         for i in range(len(serie)):

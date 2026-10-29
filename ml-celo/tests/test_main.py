@@ -98,15 +98,14 @@ def test_predict_invalid_payload():
     assert data["detail"][0]["loc"] == ["body", 0, "moveState"]
 
 def test_predict_empty_payload(mock_dependencies):
-    # Payload vacío -> debe retornar error interno según lógica en main.py
+    # Payload vacío -> es un problema de los datos, no del servicio: 422
     payload = []
     response = client.post("/api/internal/ml/celo/predict", json=payload)
 
-    # El código devuelve 503 ante errores no manejados/ValueErrors
-    assert response.status_code == 503
+    assert response.status_code == 422
     data = response.json()
 
     # Formato de error estándar verificado
-    assert data["error"] == "Internal Server Error"
-    assert "La serie de telemetría está vacía" in data["mensaje"]
+    assert data["error"] == "Payload Invalido"
+    assert "serie: no puede estar vacía" in data["mensaje"]
     assert "trace_id" in data

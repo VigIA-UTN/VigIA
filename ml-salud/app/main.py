@@ -34,6 +34,7 @@ porque asumía datos de rumia que el dispositivo IoT de VigIA no emite.
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
+import math
 import numpy as np
 from pathlib import Path
 import joblib
@@ -45,6 +46,7 @@ from .features_salud import (
     CALIB_DIAS_MINIMO,
     SAMPLES_PER_DAY,
     FEATURE_VERSION,
+    N_QUARTERS,
 )
 from .correlacion import get_logger, instalar_middleware
 from .errores import instalar_handlers, respuesta_error
@@ -92,6 +94,54 @@ class PrediccionSaludResponse(BaseModel):
     severidad: int
     posible_causa: Optional[str]
     confianza_modelo: float
+
+
+# Claves del perfil que usa compute_features (ver compute_baseline en
+# features_salud.py): un número por cada una de las escalares y una lista de
+# N_QUARTERS números por cada una de las de cuartos.
+_PERFIL_ESCALARES = [
+    f"{feature}_{estadistico}"
+    for feature in ("mean_moveState", "std_moveState", "pct_reposo", "mean_distancia", "std_distancia")
+    for estadistico in ("mean", "std")
+]
+_PERFIL_CUARTOS = [
+    "quarter_moveState_mean", "quarter_moveState_std",
+    "quarter_distancia_mean", "quarter_distancia_std",
+]
+
+
+def _es_numero(valor) -> bool:
+    return isinstance(valor, (int, float)) and not isinstance(valor, bool) and math.isfinite(valor)
+
+
+def _problemas_de_entrada(body: PredictRequest) -> List[str]:
+    """
+    Lo que hace que la request no se pueda evaluar por culpa de los datos:
+    se responde 422 (el backend no reintenta) y no 503, que es para fallas
+    del servicio.
+    """
+    problemas = []
+    if len(body.serie) != SAMPLES_PER_DAY:
+        problemas.append(f"serie: debe tener exactamente {SAMPLES_PER_DAY} puntos (24 hs a 5 min); "
+                         f"se recibieron {len(body.serie)}")
+    if not body.perfil:
+        problemas.append("perfil: no se recibió el perfil de referencia; "
+                         "llamar primero a /api/internal/ml/salud/perfil")
+        return problemas
+
+    faltantes = [k for k in _PERFIL_ESCALARES + _PERFIL_CUARTOS if k not in body.perfil]
+    if faltantes:
+        problemas.append(f"perfil: faltan las claves {', '.join(faltantes)}; "
+                         "recalcularlo con /api/internal/ml/salud/perfil")
+    for k in _PERFIL_ESCALARES:
+        if k in body.perfil and not _es_numero(body.perfil[k]):
+            problemas.append(f"perfil.{k}: debe ser un número finito")
+    for k in _PERFIL_CUARTOS:
+        valor = body.perfil.get(k)
+        if k in body.perfil and not (isinstance(valor, list) and len(valor) == N_QUARTERS
+                                     and all(_es_numero(v) for v in valor)):
+            problemas.append(f"perfil.{k}: debe ser una lista de {N_QUARTERS} números finitos")
+    return problemas
 
 
 def get_posible_causa(severidad: int) -> Optional[str]:
@@ -150,16 +200,15 @@ async def predict(body: PredictRequest):
     log.info("Request recibida: serie=%d puntos, perfil provisto (feature_version=%s).",
              len(body.serie), body.perfil.get("feature_version", "?"))
 
+    problemas = _problemas_de_entrada(body)
+    if problemas:
+        mensaje = "; ".join(problemas)
+        log.warning("Payload inválido: %s", mensaje)
+        return respuesta_error(422, "Payload Invalido", mensaje)
+
     try:
         if model is None:
             raise ValueError("El modelo de machine learning no está cargado.")
-
-        if not body.serie:
-            raise ValueError("La serie a evaluar está vacía.")
-
-        if not body.perfil:
-            raise ValueError("No se recibió un perfil de referencia. "
-                              "Llamar primero a /api/internal/ml/salud/perfil.")
 
         move_state = [p.moveState for p in body.serie]
         lat = [p.latitud for p in body.serie]
@@ -187,10 +236,7 @@ async def predict(body: PredictRequest):
             confianza_modelo=confianza
         )
     except Exception as e:
-        # Un perfil malformado (ej. faltan claves porque vino de una
-        # versión vieja de /perfil) también cae acá: compute_features
-        # lanza KeyError/ValueError, y se reporta como 503 igual que
-        # cualquier otra falla de inferencia -- no hay forma de servir
-        # una predicción sin un perfil válido.
+        # Los problemas de los datos (serie o perfil) ya salieron como 422
+        # en _problemas_de_entrada; lo que llega acá es una falla del servicio.
         log.error("Error durante la inferencia: %s", e)
         return respuesta_error(503, "Internal Server Error", str(e))
