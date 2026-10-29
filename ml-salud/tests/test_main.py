@@ -150,15 +150,15 @@ def test_predict_perfil_vacio():
     de predecir -- debe fallar, no inferir con datos incompletos."""
     payload = {"serie": generate_serie_payload(), "perfil": {}}
     response = client.post("/api/internal/ml/salud/predict", json=payload)
-    assert response.status_code == 503
+    assert response.status_code == 422
 
 
 def test_predict_perfil_malformado():
     """Un perfil sin las claves esperadas (ej. de una versión vieja de
-    /perfil) no debe romper el proceso silenciosamente -- 503 explícito."""
+    /perfil) no debe romper el proceso silenciosamente -- 422 explícito."""
     payload = {"serie": generate_serie_payload(), "perfil": {"algo_que_no_es": 1}}
     response = client.post("/api/internal/ml/salud/predict", json=payload)
-    assert response.status_code == 503
+    assert response.status_code == 422
 
 
 def test_serie_incompleta():
@@ -168,7 +168,7 @@ def test_serie_incompleta():
         "perfil": generate_perfil(),
     }
     response = client.post("/api/internal/ml/salud/predict", json=payload)
-    assert response.status_code == 503
+    assert response.status_code == 422
 
 
 def test_invalid_payload():

@@ -5,11 +5,11 @@ el inicio de un evento reproductivo
 """
 
 # pyrefly: ignore [missing-import]
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
 # pyrefly: ignore [missing-import]
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 import math
 import os
@@ -20,6 +20,9 @@ import joblib
 from pathlib import Path
 from contextlib import asynccontextmanager
 
+from .correlacion import get_logger, instalar_middleware
+from .errores import instalar_handlers, respuesta_error
+
 try:
     import tensorflow as tf
 except ImportError:
@@ -28,8 +31,15 @@ except ImportError:
 model = None
 scaler = None
 
+log = get_logger("ml-celo")
+
 # Debe coincidir con la escala usada en generate_dataset.py / train_baseline_rnn.py
 DIST_SCALE_FACTOR = 100000
+
+# La LSTM se entrenó solo con ventanas de 24hs a 5 min (train_multiseed.py
+# descarta los días que no tienen exactamente 288 puntos): otro largo es una
+# entrada que el modelo nunca vio. El backend arma la ventana (VentanaTelemetria).
+SAMPLES_PER_DAY = 288
 
 # Umbral de decisión sobre la probabilidad del modelo (P(celo) > CELO_THRESHOLD).
 # Se saca a config en lugar de hardcodear 0.5 porque, con class_weight balanceado,
@@ -43,7 +53,7 @@ CELO_THRESHOLD = float(os.getenv("CELO_THRESHOLD", "0.5"))
 async def lifespan(app: FastAPI):
     global model, scaler
     if tf is None:
-        print("ADVERTENCIA: tensorflow no está instalado. No se podrá cargar el modelo.")
+        log.warning("tensorflow no está instalado. No se podrá cargar el modelo.")
     else:
         models_dir = Path(__file__).parent / "models"
         model_path = models_dir / "modelo_celo_lstm.keras"
@@ -52,18 +62,24 @@ async def lifespan(app: FastAPI):
         if model_path.exists() and scaler_path.exists():
             model = tf.keras.models.load_model(model_path)
             scaler = joblib.load(scaler_path)
-            print(f"Modelo y scaler de normalización cargados correctamente. "
-                  f"Umbral de decisión (CELO_THRESHOLD) = {CELO_THRESHOLD}")
+            log.info("Modelo y scaler de normalización cargados correctamente. "
+                     "Umbral de decisión (CELO_THRESHOLD) = %s", CELO_THRESHOLD)
         else:
-            print(f"ADVERTENCIA: No se encontró el modelo en {models_dir}. Ejecute el script de entrenamiento primero.")
+            log.warning("No se encontró el modelo en %s. Ejecute el script de entrenamiento primero.", models_dir)
     yield
 
 app = FastAPI(title="VigIA - Microservicio de Detección de Celo", lifespan=lifespan)
+instalar_middleware(app, log)
+instalar_handlers(app, log)
 
 class PuntoTelemetria(BaseModel):
-    moveState: int  # 0-9, según protocolo real de la caravana Lansitec
-    latitud: float
-    longitud: float
+    # 0-9, según protocolo real de la caravana Lansitec. Fuera de rango el modelo
+    # recibiría un valor que nunca vio en el entrenamiento.
+    moveState: int = Field(ge=0, le=9)
+    # Una posición imposible (GPS roto) mete distancias enormes que el modelo
+    # lee como actividad.
+    latitud: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitud: float = Field(ge=-180, le=180, allow_inf_nan=False)
 
 class PrediccionCeloResponse(BaseModel):
     evento_celo: bool
@@ -72,23 +88,32 @@ class PrediccionCeloResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "ml-celo"}
+    # Sin modelo todas las predicciones fallan con 503: el health lo refleja
+    # para que el healthcheck no dé por sano un servicio que no puede predecir.
+    if model is None:
+        return JSONResponse(status_code=503,
+                            content={"status": "degraded", "service": "ml-celo", "model_loaded": False})
+    return {"status": "ok", "service": "ml-celo", "model_loaded": True}
 
 @app.post("/api/internal/ml/celo/predict", response_model=PrediccionCeloResponse)
-async def predict(request: Request, response: Response, serie: List[PuntoTelemetria]):
+async def predict(serie: List[PuntoTelemetria]):
     """
-    Request: serie temporal de la telemetría del animal de las últimas 24 horas.
+    Request: serie temporal de la telemetría del animal de las últimas 24 horas
+    (SAMPLES_PER_DAY puntos, 1 cada 5 min).
     """
-    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
-    print(f"[{correlation_id}] Request recibida para predicción de celo con {len(serie)} puntos.")
-    response.headers["X-Correlation-ID"] = correlation_id
+    log.info("Request recibida para predicción de celo con %d puntos.", len(serie))
+
+    # Un problema de los datos es 422 (el backend no reintenta); el 503 queda
+    # para fallas del servicio, como el modelo sin cargar.
+    if len(serie) != SAMPLES_PER_DAY:
+        mensaje = (f"serie: debe tener exactamente {SAMPLES_PER_DAY} puntos (24 hs a 5 min); "
+                   f"se recibieron {len(serie)}")
+        log.warning("Payload inválido: %s", mensaje)
+        return respuesta_error(422, "Payload Invalido", mensaje)
 
     try:
         if model is None:
             raise ValueError("El modelo de machine learning no está cargado.")
-
-        if not serie:
-            raise ValueError("La serie de telemetría está vacía.")
 
         features = []
         for i in range(len(serie)):
@@ -117,7 +142,7 @@ async def predict(request: Request, response: Response, serie: List[PuntoTelemet
         evento = prob > CELO_THRESHOLD
         ventana = 12 if evento else 0
 
-        print(f"[{correlation_id}] Inferencia exitosa: celo={evento}, confianza={prob:.4f}")
+        log.info("Inferencia exitosa: celo=%s, confianza=%.4f", evento, prob)
 
         return PrediccionCeloResponse(
             evento_celo=evento,
@@ -125,13 +150,5 @@ async def predict(request: Request, response: Response, serie: List[PuntoTelemet
             ventana_optima_horas=ventana
         )
     except Exception as e:
-        print(f"[{correlation_id}] Error durante la inferencia: {str(e)}")
-        return JSONResponse(
-            status_code=503,
-            content={
-                "error": "Internal Server Error",
-                "mensaje": str(e),
-                "trace_id": correlation_id
-            },
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        log.error("Error durante la inferencia: %s", e)
+        return respuesta_error(503, "Internal Server Error", str(e))

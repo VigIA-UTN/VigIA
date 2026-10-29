@@ -19,11 +19,16 @@ import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.repository.EstadoReproductivoRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static dev.vigia.backend.service.ml.VentanaTelemetria.SAMPLES_PER_DAY;
+import static dev.vigia.backend.service.ml.VentanaTelemetria.puntosParaMl;
 
 @Slf4j
 @Service
@@ -34,18 +39,24 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
         private final AlertaRepository alertaRepository;
         private final EstadoReproductivoRepository estadoReproductivoRepository;
         private final PublicadorDeAlertas publicadorDeAlertas;
+        private final double coberturaMinima;
+        private final int huecoMaximoMinutos;
 
         public CeloDetectorStrategyImpl(
                         MlCeloClient mlCeloClient,
                         TelemetriaRepository telemetriaRepository,
                         AlertaRepository alertaRepository,
                         EstadoReproductivoRepository estadoReproductivoRepository,
-                        PublicadorDeAlertas publicadorDeAlertas) {
+                        PublicadorDeAlertas publicadorDeAlertas,
+                        @Value("${vigia.celo.cobertura-minima:0.9}") double coberturaMinima,
+                        @Value("${vigia.celo.hueco-maximo-minutos:60}") int huecoMaximoMinutos) {
                 this.mlCeloClient = mlCeloClient;
                 this.telemetriaRepository = telemetriaRepository;
                 this.alertaRepository = alertaRepository;
                 this.estadoReproductivoRepository = estadoReproductivoRepository;
                 this.publicadorDeAlertas = publicadorDeAlertas;
+                this.coberturaMinima = coberturaMinima;
+                this.huecoMaximoMinutos = huecoMaximoMinutos;
         }
 
         @Override
@@ -67,25 +78,34 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
                                 Alerta.TIPO_CELO, java.time.LocalDateTime.now().minusHours(24))) {
                         log.info("Omitiendo inferencia de celo para animal {} porque ya tiene una alerta reciente de celo (últimas 24hs).",
                                         animal.getId());
-                        List<Telemetria> pendientes = telemetriaList.stream()
-                                        .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
-                                        .collect(Collectors.toList());
-                        pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO));
-                        telemetriaRepository.saveAll(pendientes);
+                        marcarCompletados(telemetriaList);
                         return;
                 }
 
-                List<PuntoTelemetriaDTO> requestDTO = buildRequest(telemetriaList);
+                // La LSTM de ml-celo se entrenó con ventanas de SAMPLES_PER_DAY (288) puntos, 24hs a 5 min, y
+                // ml-celo rechaza otro largo con 422. Mismo criterio que salud: telemetriaList son todas las
+                // lecturas de las ultimas 24hs (CeloBatchConfig), ordenadas por fechaHora; con mas de 288 van
+                // las 288 mas recientes y con menos (uplinks perdidos) puntosParaMl rellena los huecos o, si
+                // faltan demasiados, se reintenta con la proxima lectura.
+                List<PuntoTelemetriaDTO> serie = puntosParaMl(telemetriaList, LocalDateTime.now().minusHours(24),
+                                SAMPLES_PER_DAY, coberturaMinima, huecoMaximoMinutos);
+                if (serie.isEmpty()) {
+                        log.info(
+                                        "Animal {} todavia no tiene una ventana completa de 24hs para evaluar celo ({} lecturas; se exige el {} % de los slots de 5 min y ningun hueco de mas de {} min); se reintenta con la proxima lectura.",
+                                        animal != null ? animal.getId() : null, telemetriaList.size(),
+                                        Math.round(coberturaMinima * 100), huecoMaximoMinutos);
+                        marcarCompletados(telemetriaList);
+                        return;
+                }
+                if (serie.size() > SAMPLES_PER_DAY) {
+                        serie = serie.subList(serie.size() - SAMPLES_PER_DAY, serie.size());
+                }
 
-                CeloPredictResponseDTO response = mlCeloClient.predict(requestDTO, correlationId);
+                CeloPredictResponseDTO response = mlCeloClient.predict(serie, correlationId);
 
                 log.info("Respuesta de microservicio de celo recibida: {}", response);
 
-                List<Telemetria> pendientes = telemetriaList.stream()
-                                .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
-                                .collect(Collectors.toList());
-                pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO));
-                telemetriaRepository.saveAll(pendientes);
+                marcarCompletados(telemetriaList);
 
                 if (response != null && response.isEventoCelo()) {
                         log.info("¡Evento de celo detectado con confianza {}!", response.getConfianzaModelo());
@@ -162,15 +182,12 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
                 telemetriaRepository.saveAll(telemetriaList);
         }
 
-        private List<PuntoTelemetriaDTO> buildRequest(List<Telemetria> telemetriaList) {
-                return telemetriaList.stream()
-                                .filter(t -> t.getLatitud() != null && t.getLongitud() != null
-                                                && t.getMoveState() != null)
-                                .map(t -> PuntoTelemetriaDTO.builder()
-                                                .moveState(t.getMoveState())
-                                                .latitud(t.getLatitud())
-                                                .longitud(t.getLongitud())
-                                                .build())
+        /** Solo las lecturas que estaban pendientes: las demás ya se evaluaron en otro ciclo. */
+        private void marcarCompletados(List<Telemetria> telemetriaList) {
+                List<Telemetria> pendientes = telemetriaList.stream()
+                                .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
                                 .collect(Collectors.toList());
+                pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.COMPLETADO));
+                telemetriaRepository.saveAll(pendientes);
         }
 }

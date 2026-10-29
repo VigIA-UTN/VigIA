@@ -58,9 +58,17 @@ vigia:
     minutos-fuera-minimo: ${VIGIA_GEO_MINUTOS_FUERA_MINIMO:15}
     # Horas sin telemetría tras las que se cierra un aislamiento abierto como "sin datos".
     horas-sin-datos-cierre: ${VIGIA_GEO_HORAS_SIN_DATOS_CIERRE:6}
+  celo:
+    # Mismo criterio que salud para las ventanas con uplinks perdidos (ver VentanaTelemetria.puntosParaMl).
+    cobertura-minima: ${VIGIA_CELO_COBERTURA_MINIMA:0.9}
+    hueco-maximo-minutos: ${VIGIA_CELO_HUECO_MAXIMO_MINUTOS:60}
   salud:
     calibracion-dias: ${VIGIA_SALUD_CALIBRACION_DIAS:7}
     recalibracion-dias: ${VIGIA_SALUD_RECALIBRACION_DIAS:30}
+    # Ventanas con uplinks perdidos: fracción mínima de los slots de 5 min con una lectura real, y el hueco
+    # más largo que se rellena (ver VentanaTelemetria.puntosParaMl).
+    cobertura-minima: ${VIGIA_SALUD_COBERTURA_MINIMA:0.9}
+    hueco-maximo-minutos: ${VIGIA_SALUD_HUECO_MAXIMO_MINUTOS:60}
   ttn:
     webhook:
       api-key: ${TTN_WEBHOOK_API_KEY:apiKey}

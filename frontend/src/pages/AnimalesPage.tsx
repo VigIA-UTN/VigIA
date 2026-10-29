@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Container, Spinner, Alert, Modal, Form, Button, Toast } from 'react-bootstrap';
+import { Container, Spinner, Alert, Modal, Form, Button, Toast, Dropdown } from 'react-bootstrap';
 import { cargarAnimalesExcel, cargarEstadosExcel, crearAnimal, getAnimales, desactivarAnimal, vincularCaravana, desvincularCaravana, asignarCaravanasAleatoriamente, descargarAsignacionesCaravanasExcel, ESTADO_REPRODUCTIVO_LABEL, ESTADO_SALUD_LABEL } from '../api/animalesApi';
 import type { AnimalResponse, AnimalRequest, CargaMasivaResponse, CargaMasivaEstadoResponse } from '../api/animalesApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
@@ -559,42 +559,60 @@ export default function AnimalesPage() {
                     </div>
                     <div>
                         {(esProductor || (puedeGestionarCaravanas && selectedId)) && (
-                            <div className="animales-action-btns d-flex align-items-center gap-2">
-                                {puedeGestionarCaravanas && selectedId && (
-                                    <>
-                                        <Button className="btn-vigia-success" onClick={openAsignarAutoModal}>
-                                            <i className="bi bi-shuffle" /> Asignar Caravanas
-                                        </Button>
-                                        <Button
-                                            className="btn-vigia-success"
-                                            onClick={handleExportarSensores}
-                                            disabled={exportandoSensores || idsConSensorEnLista.length === 0}
-                                            title={idsConSensorEnLista.length === 1
-                                                ? 'Descarga la planilla del animal con sensor que estás viendo'
-                                                : `Descarga la planilla de los ${idsConSensorEnLista.length} animales con sensor que estás viendo`}
-                                        >
-                                            {exportandoSensores
-                                                ? <Spinner as="span" animation="border" size="sm" />
-                                                : <><i className="bi bi-file-earmark-excel" /> Exportar Sensores ({idsConSensorEnLista.length})</>}
-                                        </Button>
-                                    </>
-                                )}
+                            <div className="d-flex justify-content-end align-items-center gap-2">
                                 {esProductor && (
-                                    <>
-                                        <Button className="btn-vigia-success" onClick={() => setCreateRodeoModal(true)}>
-                                            <i className="bi bi-plus-lg" /> Rodeo
-                                        </Button>
-                                        <Button className="btn-vigia-success" onClick={() => { setUploadEstadosModal(true) }}>
-                                            <i className="bi bi-upload" /> Cargar Estados
-                                        </Button>
-                                        <Button className="btn-vigia-success" onClick={openUploadModal}>
-                                            <i className="bi bi-upload" /> Cargar Animales
-                                        </Button>
-                                        <Button className="btn-vigia-success" onClick={openModal}>
-                                            <i className="bi bi-plus-lg" /> Animal
-                                        </Button>
-                                    </>
+                                    <Button className="btn-vigia-success" onClick={openModal}>
+                                        <i className="bi bi-plus-lg" /> Animal
+                                    </Button>
                                 )}
+                                <Dropdown align="end">
+                                    {/* bsPrefix propio: saca el caret de .dropdown-toggle */}
+                                    <Dropdown.Toggle as="button" bsPrefix="animales-more-btn" title="Más acciones" aria-label="Más acciones">
+                                        {exportandoSensores
+                                            ? <Spinner as="span" animation="border" size="sm" />
+                                            : <i className="bi bi-three-dots-vertical" />}
+                                    </Dropdown.Toggle>
+                                    <Dropdown.Menu className="est-menu">
+                                        {esProductor && (
+                                            <>
+                                                <Dropdown.Header>Crear</Dropdown.Header>
+                                                <Dropdown.Item as="button" onClick={() => setCreateRodeoModal(true)}>
+                                                    Rodeo
+                                                    <i className="bi bi-plus-lg" />
+                                                </Dropdown.Item>
+                                                <Dropdown.Header>Importar Excel</Dropdown.Header>
+                                                <Dropdown.Item as="button" onClick={openUploadModal}>
+                                                    Cargar animales
+                                                    <i className="bi bi-upload" />
+                                                </Dropdown.Item>
+                                                <Dropdown.Item as="button" onClick={() => setUploadEstadosModal(true)}>
+                                                    Cargar estados
+                                                    <i className="bi bi-upload" />
+                                                </Dropdown.Item>
+                                            </>
+                                        )}
+                                        {puedeGestionarCaravanas && selectedId && (
+                                            <>
+                                                <Dropdown.Header>Caravanas</Dropdown.Header>
+                                                <Dropdown.Item as="button" onClick={openAsignarAutoModal}>
+                                                    Asignar caravanas
+                                                    <i className="bi bi-shuffle" />
+                                                </Dropdown.Item>
+                                                <Dropdown.Item
+                                                    as="button"
+                                                    onClick={handleExportarSensores}
+                                                    disabled={exportandoSensores || idsConSensorEnLista.length === 0}
+                                                    title={idsConSensorEnLista.length === 1
+                                                        ? 'Descarga la planilla del animal con sensor que estás viendo'
+                                                        : `Descarga la planilla de los ${idsConSensorEnLista.length} animales con sensor que estás viendo`}
+                                                >
+                                                    Exportar sensores ({idsConSensorEnLista.length})
+                                                    <i className="bi bi-file-earmark-excel" />
+                                                </Dropdown.Item>
+                                            </>
+                                        )}
+                                    </Dropdown.Menu>
+                                </Dropdown>
                             </div>
                         )}
                     </div>
