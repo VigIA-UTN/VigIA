@@ -7,8 +7,6 @@ el inicio de un evento reproductivo
 # pyrefly: ignore [missing-import]
 from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
-from fastapi.responses import JSONResponse
-# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 from typing import List
 import math
@@ -20,7 +18,8 @@ import joblib
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from .correlacion import correlation_id_actual, get_logger, instalar_middleware
+from .correlacion import get_logger, instalar_middleware
+from .errores import instalar_handlers, respuesta_error
 
 try:
     import tensorflow as tf
@@ -64,6 +63,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="VigIA - Microservicio de Detección de Celo", lifespan=lifespan)
 instalar_middleware(app, log)
+instalar_handlers(app, log)
 
 class PuntoTelemetria(BaseModel):
     moveState: int  # 0-9, según protocolo real de la caravana Lansitec
@@ -129,11 +129,4 @@ async def predict(serie: List[PuntoTelemetria]):
         )
     except Exception as e:
         log.error("Error durante la inferencia: %s", e)
-        return JSONResponse(
-            status_code=503,
-            content={
-                "error": "Internal Server Error",
-                "mensaje": str(e),
-                "trace_id": correlation_id_actual()
-            }
-        )
+        return respuesta_error(503, "Internal Server Error", str(e))

@@ -32,7 +32,6 @@ porque asumía datos de rumia que el dispositivo IoT de VigIA no emite.
 """
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 import numpy as np
@@ -47,12 +46,14 @@ from .features_salud import (
     SAMPLES_PER_DAY,
     FEATURE_VERSION,
 )
-from .correlacion import correlation_id_actual, get_logger, instalar_middleware
+from .correlacion import get_logger, instalar_middleware
+from .errores import instalar_handlers, respuesta_error
 
 log = get_logger("ml-salud")
 
 app = FastAPI(title="VigIA - Microservicio de Detección de Desvíos Sanitarios")
 instalar_middleware(app, log)
+instalar_handlers(app, log)
 
 model = None
 
@@ -129,26 +130,11 @@ async def calcular_perfil(body: PerfilRequest):
         return {"perfil": perfil}
     except ErrorCalibracionInsuficiente as e:
         log.warning("Calibración insuficiente: %s", e)
-        return JSONResponse(
-            status_code=422,
-            content={
-                "error": "Calibracion Insuficiente",
-                "mensaje": str(e),
-                "calib_dias_minimo": CALIB_DIAS_MINIMO,
-                "samples_per_day": SAMPLES_PER_DAY,
-                "trace_id": correlation_id_actual()
-            }
-        )
+        return respuesta_error(422, "Calibracion Insuficiente", str(e),
+                               calib_dias_minimo=CALIB_DIAS_MINIMO, samples_per_day=SAMPLES_PER_DAY)
     except Exception as e:
         log.error("Error calculando el perfil: %s", e)
-        return JSONResponse(
-            status_code=503,
-            content={
-                "error": "Internal Server Error",
-                "mensaje": str(e),
-                "trace_id": correlation_id_actual()
-            }
-        )
+        return respuesta_error(503, "Internal Server Error", str(e))
 
 
 @app.post("/api/internal/ml/salud/predict", response_model=PrediccionSaludResponse)
@@ -206,11 +192,4 @@ async def predict(body: PredictRequest):
         # cualquier otra falla de inferencia -- no hay forma de servir
         # una predicción sin un perfil válido.
         log.error("Error durante la inferencia: %s", e)
-        return JSONResponse(
-            status_code=503,
-            content={
-                "error": "Internal Server Error",
-                "mensaje": str(e),
-                "trace_id": correlation_id_actual()
-            }
-        )
+        return respuesta_error(503, "Internal Server Error", str(e))

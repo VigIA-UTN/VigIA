@@ -7,8 +7,6 @@ calcula el mapa de calor de pastoreo y el índice de aislamiento
 # pyrefly: ignore [missing-import]
 from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
-from fastapi.responses import JSONResponse
-# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from collections import defaultdict, deque
@@ -16,12 +14,14 @@ from datetime import datetime, timezone
 import math
 import os
 
-from .correlacion import correlation_id_actual, get_logger, instalar_middleware
+from .correlacion import get_logger, instalar_middleware
+from .errores import instalar_handlers, respuesta_error
 
 log = get_logger("ml-geo")
 
 app = FastAPI(title="VigIA - Microservicio de Análisis Geoespacial")
 instalar_middleware(app, log)
+instalar_handlers(app, log)
 
 class CoordenadaGPS(BaseModel):
     animal_id: str
@@ -351,11 +351,4 @@ def analyze(payload: GeoAnalyzeRequest):
 
     except Exception as e:
         log.error("Error durante el análisis: %s", e)
-        return JSONResponse(
-            status_code=503,
-            content={
-                "error": "Internal Server Error",
-                "mensaje": str(e),
-                "trace_id": correlation_id_actual()
-            }
-        )
+        return respuesta_error(503, "Internal Server Error", str(e))
