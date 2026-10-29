@@ -28,8 +28,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,6 +41,10 @@ import java.util.stream.Collectors;
 @Service
 public class SaludDetectorStrategyImpl implements DetectorStrategy {
 
+    /** 24hs a 5 min: el largo de ventana que exige ml-salud (features_salud.py). */
+    private static final int SAMPLES_PER_DAY = 288;
+    private static final int MINUTOS_POR_SLOT = 5;
+
     private final MlSaludClient mlSaludClient;
     private final TelemetriaRepository telemetriaRepository;
     private final AlertaRepository alertaRepository;
@@ -47,6 +53,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
     private final ObjectMapper objectMapper;
     private final int calibracionDias;
     private final int recalibracionDias;
+    private final double coberturaMinima;
+    private final int huecoMaximoMinutos;
 
     public SaludDetectorStrategyImpl(
             MlSaludClient mlSaludClient,
@@ -56,7 +64,9 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
             PublicadorDeAlertas publicadorDeAlertas,
             ObjectMapper objectMapper,
             @Value("${vigia.salud.calibracion-dias:7}") int calibracionDias,
-            @Value("${vigia.salud.recalibracion-dias:30}") int recalibracionDias) {
+            @Value("${vigia.salud.recalibracion-dias:30}") int recalibracionDias,
+            @Value("${vigia.salud.cobertura-minima:0.9}") double coberturaMinima,
+            @Value("${vigia.salud.hueco-maximo-minutos:60}") int huecoMaximoMinutos) {
         this.mlSaludClient = mlSaludClient;
         this.telemetriaRepository = telemetriaRepository;
         this.alertaRepository = alertaRepository;
@@ -65,6 +75,8 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         this.objectMapper = objectMapper;
         this.calibracionDias = calibracionDias;
         this.recalibracionDias = recalibracionDias;
+        this.coberturaMinima = coberturaMinima;
+        this.huecoMaximoMinutos = huecoMaximoMinutos;
     }
 
     @Override
@@ -128,13 +140,23 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
             }
             perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana, inicio, fin, ahora,
                     correlationId);
+            if (perfilReferencia == null) {
+                // Los primeros N días no alcanzan (p. ej. el tag estuvo sin cobertura esa semana): en vez de
+                // reintentar siempre la misma ventana, los últimos N días. Igual empiezan después del primer
+                // dato, porque ahora >= fin = inicio + N días (decidido 2026-10-29, tasks/plan-salud.md).
+                perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana,
+                        ahora.minusDays(calibracionDias), ahora, ahora, correlationId);
+            }
         } else if (perfilExistente.get().getFechaCalculo().isBefore(ahora.minusDays(recalibracionDias))) {
             // Recalibración periódica: los últimos N días "recientes",
             // para que el perfil se adapte a cambios legítimos de
             // comportamiento con el tiempo (ver discusión de deriva del
             // perfil).
-            perfilReferencia = calcularYPersistirPerfil(animal, perfilExistente, caravana,
+            PerfilReferencia recalculado = calcularYPersistirPerfil(animal, perfilExistente, caravana,
                     ahora.minusDays(calibracionDias), ahora, ahora, correlationId);
+            // Sin datos suficientes para recalibrar se sigue evaluando con el perfil anterior; su fechaCalculo
+            // no cambia, así que se reintenta en el próximo ciclo.
+            perfilReferencia = recalculado != null ? recalculado : perfilExistente.get();
         } else {
             perfilReferencia = perfilExistente.get();
         }
@@ -150,44 +172,28 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
 
         Map<String, Object> perfil = deserializarPerfil(perfilReferencia.getPerfilJson());
 
-        // ml-salud exige que la ventana a evaluar tenga EXACTAMENTE
-        // SAMPLES_PER_DAY (288) puntos -- 24hs a 5 min, ver
-        // features_salud.py::compute_features. telemetriaList son TODAS
-        // las lecturas de las ultimas 24hs (SaludBatchConfig), que pueden
-        // ser mas de 288 si el dispositivo/simulador mando con mas
-        // frecuencia que cada 5 min, o menos si todavia no se completo un
-        // dia entero. Antes se mandaba telemetriaList tal cual, y
-        // /predict fallaba con 503 apenas el conteo se corria de 288 (algo
-        // que pasa solo, ya que el loop en vivo sigue sumando puntos por
-        // encima de los del historial). Nos quedamos con los 288 mas
-        // recientes (telemetriaList viene ordenada ascendente por
-        // fechaHora) y si todavia no hay 288, se reintenta en el proximo
-        // ciclo en vez de mandar una ventana invalida.
-        // Primero filtramos puntos con datos nulos para evitar errores 422 en el
-        // microservicio ML
-        List<Telemetria> telemetriaValida = telemetriaList.stream()
-                .filter(t -> t.getLatitud() != null && t.getLongitud() != null && t.getMoveState() != null)
-                .collect(Collectors.toList());
-
-        final int SAMPLES_PER_DAY = 288;
-        if (telemetriaValida.size() < SAMPLES_PER_DAY) {
+        // ml-salud exige EXACTAMENTE SAMPLES_PER_DAY (288) puntos: 24hs a 5 min, ver
+        // features_salud.py::compute_features. telemetriaList son todas las lecturas de las ultimas 24hs
+        // (SaludBatchConfig), ordenadas por fechaHora. Con mas de 288 (los simuladores de la demo mandan
+        // cada 5 s) van las 288 mas recientes, como siempre; con menos (uplinks perdidos), puntosParaMl
+        // rellena los huecos o, si faltan demasiados, se reintenta en el proximo ciclo.
+        List<PuntoTelemetriaDTO> serie = puntosParaMl(telemetriaList, ahora.minusHours(24), SAMPLES_PER_DAY,
+                coberturaMinima, huecoMaximoMinutos);
+        if (serie.isEmpty()) {
             log.info(
-                    "Animal {} todavia no tiene una ventana completa de 24hs para evaluar ({} de {} puntos); se reintenta en el proximo ciclo.",
-                    animal.getId(), telemetriaValida.size(), SAMPLES_PER_DAY);
+                    "Animal {} todavia no tiene una ventana completa de 24hs para evaluar ({} lecturas; se exige el {} % de los slots de 5 min y ningun hueco de mas de {} min); se reintenta en el proximo ciclo.",
+                    animal.getId(), telemetriaList.size(), Math.round(coberturaMinima * 100), huecoMaximoMinutos);
             marcarCompletados(telemetriaList);
             return;
         }
-        List<Telemetria> ventanaEvaluar = telemetriaValida.size() > SAMPLES_PER_DAY
-                ? telemetriaValida.subList(telemetriaValida.size() - SAMPLES_PER_DAY, telemetriaValida.size())
-                : telemetriaValida;
-
-        List<PuntoTelemetriaDTO> serie = ventanaEvaluar.stream()
-                .map(t -> PuntoTelemetriaDTO.builder()
-                        .moveState(t.getMoveState())
-                        .latitud(t.getLatitud())
-                        .longitud(t.getLongitud())
-                        .build())
-                .collect(Collectors.toList());
+        if (serie.size() > SAMPLES_PER_DAY) {
+            serie = serie.subList(serie.size() - SAMPLES_PER_DAY, serie.size());
+        }
+        // El grafico comparativo de la alerta muestra las lecturas reales, no los puntos rellenados.
+        List<Telemetria> ventanaEvaluar = conDatos(telemetriaList);
+        if (ventanaEvaluar.size() > SAMPLES_PER_DAY) {
+            ventanaEvaluar = ventanaEvaluar.subList(ventanaEvaluar.size() - SAMPLES_PER_DAY, ventanaEvaluar.size());
+        }
 
         SaludPredictResponseDTO response = mlSaludClient.predict(
                 SaludPredictRequestDTO.builder().serie(serie).perfil(perfil).build(), correlationId);
@@ -208,20 +214,17 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         List<Telemetria> calibracion = telemetriaRepository
                 .findByCaravanaAndFechaHoraBetweenOrderByFechaHoraAsc(caravana, desde, hasta);
 
-        if (calibracion.isEmpty()) {
+        // Mismo criterio que la ventana evaluada: los huecos chicos se rellenan; sin cobertura suficiente no
+        // se llama a ml-salud, que respondería 422 por no tener 7 días completos.
+        List<PuntoTelemetriaDTO> puntos = puntosParaMl(calibracion, desde, calibracionDias * SAMPLES_PER_DAY,
+                coberturaMinima, huecoMaximoMinutos);
+        if (puntos.isEmpty()) {
             log.warn(
-                    "Animal {} sin telemetría en la ventana de calibración [{}, {}), se reintenta en el próximo ciclo.",
-                    animal.getId(), desde, hasta);
+                    "Animal {} sin cobertura suficiente en la ventana de calibración [{}, {}) ({} lecturas; se exige el {} % de los slots de 5 min y ningún hueco de más de {} min), se reintenta en el próximo ciclo.",
+                    animal.getId(), desde, hasta, calibracion.size(), Math.round(coberturaMinima * 100),
+                    huecoMaximoMinutos);
             return null;
         }
-
-        List<PuntoTelemetriaDTO> puntos = calibracion.stream()
-                .map(t -> PuntoTelemetriaDTO.builder()
-                        .moveState(t.getMoveState())
-                        .latitud(t.getLatitud())
-                        .longitud(t.getLongitud())
-                        .build())
-                .collect(Collectors.toList());
 
         log.info("Calculando perfil de salud para animal {} ({} puntos de [{}, {}), primera calibración: {}, correlationId: {})",
                 animal.getId(), puntos.size(), desde, hasta, esPrimerCalculo, correlationId);
@@ -244,6 +247,84 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
         } catch (Exception e) {
             throw new IllegalStateException("No se pudo serializar el perfil de salud del animal " + animal.getId(), e);
         }
+    }
+
+    /** Lecturas con posición y moveState: las demás ml-salud las rechaza con 422. */
+    private static List<Telemetria> conDatos(List<Telemetria> filas) {
+        return filas.stream()
+                .filter(t -> t.getLatitud() != null && t.getLongitud() != null && t.getMoveState() != null)
+                .collect(Collectors.toList());
+    }
+
+    private static PuntoTelemetriaDTO punto(Telemetria t) {
+        return PuntoTelemetriaDTO.builder()
+                .moveState(t.getMoveState())
+                .latitud(t.getLatitud())
+                .longitud(t.getLongitud())
+                .build();
+    }
+
+    /**
+     * Los puntos a mandar a ml-salud para la ventana [desde, desde + slots × 5 min), o vacío si no alcanzan.
+     * Con al menos `slots` lecturas van todas, como siempre. Con menos (uplinks perdidos), una lectura por slot
+     * de 5 min (la última si hay varias) y los slots vacíos se rellenan: moveState repite la lectura anterior,
+     * como el tag, que solo lo cambia con el heartbeat; la posición va en línea recta entre las lecturas de cada
+     * lado del hueco, para no congelar al animal (moverse menos es señal de enfermedad); en los bordes, la
+     * lectura más cercana. Vacío si menos de `coberturaMinima` de los slots tiene lectura o si algún hueco,
+     * bordes incluidos, dura más de `huecoMaximoMinutos`. Validado contra el modelo en
+     * ml-training/salud/check_perdida.py (ver tasks/todo-salud.md, Task 2).
+     */
+    static List<PuntoTelemetriaDTO> puntosParaMl(List<Telemetria> filas, LocalDateTime desde, int slots,
+            double coberturaMinima, int huecoMaximoMinutos) {
+        List<Telemetria> validas = conDatos(filas);
+        if (validas.size() >= slots) {
+            return validas.stream().map(SaludDetectorStrategyImpl::punto).collect(Collectors.toList());
+        }
+
+        Telemetria[] porSlot = new Telemetria[slots];
+        int conLectura = 0;
+        for (Telemetria t : validas) { // ascendentes por fechaHora: queda la última de cada slot
+            long i = Math.floorDiv(Duration.between(desde, t.getFechaHora()).getSeconds(), MINUTOS_POR_SLOT * 60L);
+            if (i >= 0 && i < slots) {
+                if (porSlot[(int) i] == null) {
+                    conLectura++;
+                }
+                porSlot[(int) i] = t;
+            }
+        }
+        if (conLectura == 0 || conLectura < coberturaMinima * slots) {
+            return List.of();
+        }
+
+        List<PuntoTelemetriaDTO> puntos = new ArrayList<>(slots);
+        int previo = -1;
+        for (int i = 0; i < slots; i++) {
+            if (porSlot[i] != null) {
+                previo = i;
+                puntos.add(punto(porSlot[i]));
+                continue;
+            }
+            int siguiente = i + 1;
+            while (siguiente < slots && porSlot[siguiente] == null) {
+                siguiente++;
+            }
+            if ((siguiente - previo - 1) * MINUTOS_POR_SLOT > huecoMaximoMinutos) {
+                return List.of();
+            }
+            Telemetria a = previo >= 0 ? porSlot[previo] : null;
+            Telemetria b = siguiente < slots ? porSlot[siguiente] : null;
+            if (a == null || b == null) {
+                puntos.add(punto(a != null ? a : b));
+                continue;
+            }
+            double f = (double) (i - previo) / (siguiente - previo);
+            puntos.add(PuntoTelemetriaDTO.builder()
+                    .moveState(a.getMoveState())
+                    .latitud(a.getLatitud() + f * (b.getLatitud() - a.getLatitud()))
+                    .longitud(a.getLongitud() + f * (b.getLongitud() - a.getLongitud()))
+                    .build());
+        }
+        return puntos;
     }
 
     private Map<String, Object> deserializarPerfil(String perfilJson) {

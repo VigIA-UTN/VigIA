@@ -61,6 +61,10 @@ vigia:
   salud:
     calibracion-dias: ${VIGIA_SALUD_CALIBRACION_DIAS:7}
     recalibracion-dias: ${VIGIA_SALUD_RECALIBRACION_DIAS:30}
+    # Ventanas con uplinks perdidos: fracción mínima de los slots de 5 min con una lectura real, y el hueco
+    # más largo que se rellena (ver SaludDetectorStrategyImpl.puntosParaMl).
+    cobertura-minima: ${VIGIA_SALUD_COBERTURA_MINIMA:0.9}
+    hueco-maximo-minutos: ${VIGIA_SALUD_HUECO_MAXIMO_MINUTOS:60}
   ttn:
     webhook:
       api-key: ${TTN_WEBHOOK_API_KEY:apiKey}

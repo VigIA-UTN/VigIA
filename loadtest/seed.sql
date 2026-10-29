@@ -15,6 +15,20 @@
 \else
 \set pendientes_h 6
 \endif
+-- Para medir salud con uplinks perdidos (ver tasks/todo-salud.md): días de historial, fracción de filas de telemetría
+-- que se pierden al azar y fracción de animales sin perfil de salud (con -v dias=8 les toca su primera calibración).
+\if :{?dias}
+\else
+\set dias 1
+\endif
+\if :{?perdida}
+\else
+\set perdida 0
+\endif
+\if :{?sin_perfil}
+\else
+\set sin_perfil 0
+\endif
 \set ON_ERROR_STOP on
 \timing on
 
@@ -88,14 +102,12 @@ FROM animales a JOIN carga_sensor s ON s.caravana_id = a.caravana_id;
 -- El perfil de perfil.json para todos (ver README): ninguno queda en calibración ni recalibra durante la corrida.
 INSERT INTO perfiles_referencia (animal_id, perfil_json, fecha_calculo)
 SELECT a.id, :'perfil', now() - interval '1 day'
-FROM animales a JOIN carga_sensor s ON s.caravana_id = a.caravana_id;
+FROM animales a JOIN carga_sensor s ON s.caravana_id = a.caravana_id
+WHERE random() >= :sin_perfil;
 
--- 24 h cada 5 minutos (ticks k) hasta ahora, y 3 ticks (15 min) más hacia adelante, sobre la misma trayectoria.
--- Salud solo evalúa con la ventana de 24 h completa (>= 288 puntos): sin esos 3, el hueco entre el último punto de la
--- semilla y el primero de k6 (que arranca minutos después, y cada sensor en su lugar de la ronda) deja 287 puntos
--- durante 24 h y salteaba todas las predicciones. Cubren el empalme si k6 arranca dentro de los ~10 min.
--- Geo, que corre cada 15 min, ya procesó todo; celo y salud tienen pendientes las últimas :pendientes_h horas (12
--- ticks por hora) y los 3 de adelante.
+-- :dias días (24 h por defecto) cada 5 minutos (ticks k) hasta ahora, sobre la misma trayectoria, menos la fracción
+-- :perdida de las filas. Geo, que corre cada 15 min, ya procesó todo; celo y salud tienen pendientes las últimas
+-- :pendientes_h horas (12 ticks por hora).
 INSERT INTO telemetria (fecha_hora, caravana_id, latitud, longitud, move_state, bateria,
                         estado_inferencia_celo, estado_inferencia_salud, estado_inferencia_geo)
 SELECT to_timestamp(k * 300)::timestamp, s.caravana_id,
@@ -103,9 +115,10 @@ SELECT to_timestamp(k * 300)::timestamp, s.caravana_id,
        pg_temp.carga_move_state(), 90, x.estado, x.estado, 'COMPLETADO'
 FROM carga_sensor s
 CROSS JOIN (SELECT floor(extract(epoch FROM now()) / 300)::int AS ahora) a
-CROSS JOIN generate_series(a.ahora - 287, a.ahora + 3) k
+CROSS JOIN generate_series(a.ahora - (:dias * 288 - 1), a.ahora) k
 CROSS JOIN LATERAL (SELECT CASE WHEN k > a.ahora - :pendientes_h * 12 THEN 'PENDIENTE' ELSE 'COMPLETADO' END
-                    AS estado) x;
+                    AS estado) x
+WHERE random() >= :perdida;
 
 COMMIT;
 
