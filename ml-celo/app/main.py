@@ -7,7 +7,7 @@ el inicio de un evento reproductivo
 # pyrefly: ignore [missing-import]
 from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 import math
 import os
@@ -66,9 +66,13 @@ instalar_middleware(app, log)
 instalar_handlers(app, log)
 
 class PuntoTelemetria(BaseModel):
-    moveState: int  # 0-9, según protocolo real de la caravana Lansitec
-    latitud: float
-    longitud: float
+    # 0-9, según protocolo real de la caravana Lansitec. Fuera de rango el modelo
+    # recibiría un valor que nunca vio en el entrenamiento.
+    moveState: int = Field(ge=0, le=9)
+    # Una posición imposible (GPS roto) mete distancias enormes que el modelo
+    # lee como actividad.
+    latitud: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitud: float = Field(ge=-180, le=180, allow_inf_nan=False)
 
 class PrediccionCeloResponse(BaseModel):
     evento_celo: bool

@@ -11,6 +11,7 @@ Mismo archivo en ml-celo, ml-salud y ml-geo: cada servicio se buildea por
 separado y no comparten código.
 """
 import logging
+import math
 
 # pyrefly: ignore [missing-import]
 from fastapi import FastAPI, Request
@@ -73,6 +74,21 @@ def _campo(loc) -> str:
     return texto or "body"
 
 
+def _json_seguro(valor):
+    """
+    El `input` de un error puede traer NaN/Infinity (Python los acepta en el
+    JSON de entrada) y JSONResponse no los serializa: sin esto el 422 terminaba
+    en un 500 sin formato ni X-Correlation-ID.
+    """
+    if isinstance(valor, float) and not math.isfinite(valor):
+        return str(valor)
+    if isinstance(valor, dict):
+        return {k: _json_seguro(v) for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [_json_seguro(v) for v in valor]
+    return valor
+
+
 def _describir(error: dict) -> str:
     if error.get("type") == "json_invalid":
         # Acá loc es ("body", posición del carácter), no un campo.
@@ -99,4 +115,4 @@ def instalar_handlers(app: FastAPI, logger: logging.Logger) -> None:
         if len(errores) > MAX_ERRORES_EN_MENSAJE:
             mensaje += f" (y {len(errores) - MAX_ERRORES_EN_MENSAJE} errores más)"
         logger.warning("Payload inválido: %s", mensaje)
-        return respuesta_error(422, "Payload Invalido", mensaje, detail=jsonable_encoder(errores))
+        return respuesta_error(422, "Payload Invalido", mensaje, detail=_json_seguro(jsonable_encoder(errores)))

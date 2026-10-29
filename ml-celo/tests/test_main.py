@@ -56,10 +56,10 @@ def test_health():
     assert response.json() == {"status": "ok", "service": "ml-celo"}
 
 def test_predict_evento_celo_true(mock_dependencies):
-    # Payload válido con alta actividad (moveState = 10)
+    # Payload válido con alta actividad (moveState = 9, el máximo del protocolo)
     payload = [
-        {"moveState": 10, "latitud": -34.0, "longitud": -59.0},
-        {"moveState": 10, "latitud": -34.001, "longitud": -59.001}
+        {"moveState": 9, "latitud": -34.0, "longitud": -59.0},
+        {"moveState": 9, "latitud": -34.001, "longitud": -59.001}
     ]
     response = client.post("/api/internal/ml/celo/predict", json=payload)
 

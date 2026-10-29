@@ -25,8 +25,8 @@ instalar_handlers(app, log)
 
 class CoordenadaGPS(BaseModel):
     animal_id: str
-    lat: float
-    lng: float
+    lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    lng: float = Field(ge=-180, le=180, allow_inf_nan=False)
     # Pydantic parsea ISO-8601 con o sin 'Z'/offset y rechaza el resto con 422.
     # En el cable sigue siendo el mismo string que manda el backend.
     timestamp: datetime

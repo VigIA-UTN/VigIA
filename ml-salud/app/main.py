@@ -32,7 +32,7 @@ porque asumía datos de rumia que el dispositivo IoT de VigIA no emite.
 """
 
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 import numpy as np
 from pathlib import Path
@@ -72,9 +72,10 @@ def load_ml_model():
 
 
 class PuntoTelemetria(BaseModel):
-    moveState: int
-    latitud: float
-    longitud: float
+    # 0-9, según protocolo real de la caravana Lansitec.
+    moveState: int = Field(ge=0, le=9)
+    latitud: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitud: float = Field(ge=-180, le=180, allow_inf_nan=False)
 
 
 class PerfilRequest(BaseModel):
