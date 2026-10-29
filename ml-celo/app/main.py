@@ -5,7 +5,7 @@ el inicio de un evento reproductivo
 """
 
 # pyrefly: ignore [missing-import]
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
 # pyrefly: ignore [missing-import]
@@ -20,6 +20,8 @@ import joblib
 from pathlib import Path
 from contextlib import asynccontextmanager
 
+from .correlacion import correlation_id_actual, get_logger, instalar_middleware
+
 try:
     import tensorflow as tf
 except ImportError:
@@ -27,6 +29,8 @@ except ImportError:
 
 model = None
 scaler = None
+
+log = get_logger("ml-celo")
 
 # Debe coincidir con la escala usada en generate_dataset.py / train_baseline_rnn.py
 DIST_SCALE_FACTOR = 100000
@@ -43,7 +47,7 @@ CELO_THRESHOLD = float(os.getenv("CELO_THRESHOLD", "0.5"))
 async def lifespan(app: FastAPI):
     global model, scaler
     if tf is None:
-        print("ADVERTENCIA: tensorflow no está instalado. No se podrá cargar el modelo.")
+        log.warning("tensorflow no está instalado. No se podrá cargar el modelo.")
     else:
         models_dir = Path(__file__).parent / "models"
         model_path = models_dir / "modelo_celo_lstm.keras"
@@ -52,13 +56,14 @@ async def lifespan(app: FastAPI):
         if model_path.exists() and scaler_path.exists():
             model = tf.keras.models.load_model(model_path)
             scaler = joblib.load(scaler_path)
-            print(f"Modelo y scaler de normalización cargados correctamente. "
-                  f"Umbral de decisión (CELO_THRESHOLD) = {CELO_THRESHOLD}")
+            log.info("Modelo y scaler de normalización cargados correctamente. "
+                     "Umbral de decisión (CELO_THRESHOLD) = %s", CELO_THRESHOLD)
         else:
-            print(f"ADVERTENCIA: No se encontró el modelo en {models_dir}. Ejecute el script de entrenamiento primero.")
+            log.warning("No se encontró el modelo en %s. Ejecute el script de entrenamiento primero.", models_dir)
     yield
 
 app = FastAPI(title="VigIA - Microservicio de Detección de Celo", lifespan=lifespan)
+instalar_middleware(app, log)
 
 class PuntoTelemetria(BaseModel):
     moveState: int  # 0-9, según protocolo real de la caravana Lansitec
@@ -75,13 +80,11 @@ def health():
     return {"status": "ok", "service": "ml-celo"}
 
 @app.post("/api/internal/ml/celo/predict", response_model=PrediccionCeloResponse)
-async def predict(request: Request, response: Response, serie: List[PuntoTelemetria]):
+async def predict(serie: List[PuntoTelemetria]):
     """
     Request: serie temporal de la telemetría del animal de las últimas 24 horas.
     """
-    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
-    print(f"[{correlation_id}] Request recibida para predicción de celo con {len(serie)} puntos.")
-    response.headers["X-Correlation-ID"] = correlation_id
+    log.info("Request recibida para predicción de celo con %d puntos.", len(serie))
 
     try:
         if model is None:
@@ -117,7 +120,7 @@ async def predict(request: Request, response: Response, serie: List[PuntoTelemet
         evento = prob > CELO_THRESHOLD
         ventana = 12 if evento else 0
 
-        print(f"[{correlation_id}] Inferencia exitosa: celo={evento}, confianza={prob:.4f}")
+        log.info("Inferencia exitosa: celo=%s, confianza=%.4f", evento, prob)
 
         return PrediccionCeloResponse(
             evento_celo=evento,
@@ -125,13 +128,12 @@ async def predict(request: Request, response: Response, serie: List[PuntoTelemet
             ventana_optima_horas=ventana
         )
     except Exception as e:
-        print(f"[{correlation_id}] Error durante la inferencia: {str(e)}")
+        log.error("Error durante la inferencia: %s", e)
         return JSONResponse(
             status_code=503,
             content={
                 "error": "Internal Server Error",
                 "mensaje": str(e),
-                "trace_id": correlation_id
-            },
-            headers={"X-Correlation-ID": correlation_id}
+                "trace_id": correlation_id_actual()
+            }
         )

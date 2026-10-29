@@ -31,7 +31,7 @@ microservicio: se eliminó por completo (no se documenta como "pendiente")
 porque asumía datos de rumia que el dispositivo IoT de VigIA no emite.
 """
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
@@ -47,8 +47,12 @@ from .features_salud import (
     SAMPLES_PER_DAY,
     FEATURE_VERSION,
 )
+from .correlacion import correlation_id_actual, get_logger, instalar_middleware
+
+log = get_logger("ml-salud")
 
 app = FastAPI(title="VigIA - Microservicio de Detección de Desvíos Sanitarios")
+instalar_middleware(app, log)
 
 model = None
 
@@ -61,9 +65,9 @@ def load_ml_model():
 
     if model_path.exists():
         model = joblib.load(model_path)
-        print("Modelo (RandomForest) cargado correctamente.")
+        log.info("Modelo (RandomForest) cargado correctamente.")
     else:
-        print(f"ADVERTENCIA: No se encontró el modelo en {model_path}.")
+        log.warning("No se encontró el modelo en %s.", model_path)
 
 
 class PuntoTelemetria(BaseModel):
@@ -104,7 +108,7 @@ def health():
 
 
 @app.post("/api/internal/ml/salud/perfil")
-async def calcular_perfil(request: Request, response: Response, body: PerfilRequest):
+async def calcular_perfil(body: PerfilRequest):
     """
     Calcula el perfil de referencia individual (RF03) a partir de la
     telemetría cruda de calibración. Se llama UNA vez cuando el animal
@@ -112,10 +116,7 @@ async def calcular_perfil(request: Request, response: Response, body: PerfilRequ
     recalibrarlo); el resultado se persiste del lado del backend y se
     reenvía en cada /predict posterior en vez de la telemetría cruda.
     """
-    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
-    print(f"[{correlation_id}] Request de cálculo de perfil: "
-          f"calibracion={len(body.calibracion)} puntos.")
-    response.headers["X-Correlation-ID"] = correlation_id
+    log.info("Request de cálculo de perfil: calibracion=%d puntos.", len(body.calibracion))
 
     try:
         calib_move_state = [p.moveState for p in body.calibracion]
@@ -124,11 +125,10 @@ async def calcular_perfil(request: Request, response: Response, body: PerfilRequ
 
         perfil = compute_baseline(calib_move_state, calib_lat, calib_lon)
 
-        print(f"[{correlation_id}] Perfil calculado correctamente "
-              f"({perfil['n_dias_calibracion']} días de calibración).")
+        log.info("Perfil calculado correctamente (%d días de calibración).", perfil["n_dias_calibracion"])
         return {"perfil": perfil}
     except ErrorCalibracionInsuficiente as e:
-        print(f"[{correlation_id}] Calibración insuficiente: {str(e)}")
+        log.warning("Calibración insuficiente: %s", e)
         return JSONResponse(
             status_code=422,
             content={
@@ -136,25 +136,23 @@ async def calcular_perfil(request: Request, response: Response, body: PerfilRequ
                 "mensaje": str(e),
                 "calib_dias_minimo": CALIB_DIAS_MINIMO,
                 "samples_per_day": SAMPLES_PER_DAY,
-                "trace_id": correlation_id
-            },
-            headers={"X-Correlation-ID": correlation_id}
+                "trace_id": correlation_id_actual()
+            }
         )
     except Exception as e:
-        print(f"[{correlation_id}] Error calculando el perfil: {str(e)}")
+        log.error("Error calculando el perfil: %s", e)
         return JSONResponse(
             status_code=503,
             content={
                 "error": "Internal Server Error",
                 "mensaje": str(e),
-                "trace_id": correlation_id
-            },
-            headers={"X-Correlation-ID": correlation_id}
+                "trace_id": correlation_id_actual()
+            }
         )
 
 
 @app.post("/api/internal/ml/salud/predict", response_model=PrediccionSaludResponse)
-async def predict(request: Request, response: Response, body: PredictRequest):
+async def predict(body: PredictRequest):
     """
     Request:
       - serie: ventana de 24hs (288 puntos, 1 cada 5 min) a evaluar.
@@ -162,10 +160,8 @@ async def predict(request: Request, response: Response, body: PredictRequest):
         animal. No se recalcula acá -- si el backend necesita
         recalibrar, debe llamar primero a /perfil.
     """
-    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
-    print(f"[{correlation_id}] Request recibida: serie={len(body.serie)} puntos, "
-          f"perfil provisto (feature_version={body.perfil.get('feature_version', '?')}).")
-    response.headers["X-Correlation-ID"] = correlation_id
+    log.info("Request recibida: serie=%d puntos, perfil provisto (feature_version=%s).",
+             len(body.serie), body.perfil.get("feature_version", "?"))
 
     try:
         if model is None:
@@ -195,7 +191,7 @@ async def predict(request: Request, response: Response, body: PredictRequest):
         desvio = severidad > 0
         causa = get_posible_causa(severidad)
 
-        print(f"[{correlation_id}] Inferencia exitosa: severidad={severidad}, confianza={confianza:.4f}")
+        log.info("Inferencia exitosa: severidad=%d, confianza=%.4f", severidad, confianza)
 
         return PrediccionSaludResponse(
             desvio_detectado=desvio,
@@ -209,13 +205,12 @@ async def predict(request: Request, response: Response, body: PredictRequest):
         # lanza KeyError/ValueError, y se reporta como 503 igual que
         # cualquier otra falla de inferencia -- no hay forma de servir
         # una predicción sin un perfil válido.
-        print(f"[{correlation_id}] Error durante la inferencia: {str(e)}")
+        log.error("Error durante la inferencia: %s", e)
         return JSONResponse(
             status_code=503,
             content={
                 "error": "Internal Server Error",
                 "mensaje": str(e),
-                "trace_id": correlation_id
-            },
-            headers={"X-Correlation-ID": correlation_id}
+                "trace_id": correlation_id_actual()
+            }
         )

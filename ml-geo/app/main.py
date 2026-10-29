@@ -5,7 +5,7 @@ calcula el mapa de calor de pastoreo y el índice de aislamiento
 (Documento de Arquitectura, sección 3.3).
 """
 # pyrefly: ignore [missing-import]
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
 # pyrefly: ignore [missing-import]
@@ -16,7 +16,12 @@ from datetime import datetime, timezone
 import math
 import os
 
+from .correlacion import correlation_id_actual, get_logger, instalar_middleware
+
+log = get_logger("ml-geo")
+
 app = FastAPI(title="VigIA - Microservicio de Análisis Geoespacial")
+instalar_middleware(app, log)
 
 class CoordenadaGPS(BaseModel):
     animal_id: str
@@ -271,7 +276,7 @@ def health():
     return {"status": "ok", "service": "ml-geo"}
 
 @app.post("/api/internal/ml/geo/analyze", response_model=GeoAnalyzeResponse)
-def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
+def analyze(payload: GeoAnalyzeRequest):
     """
     Request: historial de coordenadas GPS (lat/lng) del rodeo en los últimos 7 días.
 
@@ -279,16 +284,14 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
     configurado para el establecimiento. Si se omite, se usa el valor por defecto
     de la variable de entorno UMBRAL_AISLAMIENTO_METROS (100 m).
     """
-    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
     # Umbral efectivo: el del request tiene prioridad; si no viene, se usa el global.
     umbral_efectivo = payload.umbral_aislamiento_m if payload.umbral_aislamiento_m is not None else UMBRAL_AISLAMIENTO_METROS
-    print(f"[{correlation_id}] Request recibida para análisis geoespacial con {len(payload.historial_7d)} puntos "
-          f"(umbral={umbral_efectivo} m).")
-    response.headers["X-Correlation-ID"] = correlation_id
+    log.info("Request recibida para análisis geoespacial con %d puntos (umbral=%s m).",
+             len(payload.historial_7d), umbral_efectivo)
 
     try:
         if not payload.historial_7d:
-            print(f"[{correlation_id}] Historial vacío: se devuelve respuesta vacía.")
+            log.info("Historial vacío: se devuelve respuesta vacía.")
             return GeoAnalyzeResponse(mapa_calor=[], alertas=[])
 
         # Animales cuyo mapa de calor se pide; None = todos los del historial
@@ -341,19 +344,18 @@ def analyze(request: Request, response: Response, payload: GeoAnalyzeRequest):
         ]
 
         aisladas = sum(1 for a in alertas if a.alerta_aislamiento)
-        print(f"[{correlation_id}] Análisis exitoso: {len(mapa_calor)} celdas, "
-              f"{len(alertas)} animales ({aisladas} aislados).")
+        log.info("Análisis exitoso: %d celdas, %d animales (%d aislados).",
+                 len(mapa_calor), len(alertas), aisladas)
 
         return GeoAnalyzeResponse(mapa_calor=mapa_calor, alertas=alertas)
 
     except Exception as e:
-        print(f"[{correlation_id}] Error durante el análisis: {str(e)}")
+        log.error("Error durante el análisis: %s", e)
         return JSONResponse(
             status_code=503,
             content={
                 "error": "Internal Server Error",
                 "mensaje": str(e),
-                "trace_id": correlation_id
-            },
-            headers={"X-Correlation-ID": correlation_id}
+                "trace_id": correlation_id_actual()
+            }
         )
