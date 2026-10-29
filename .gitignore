@@ -43,3 +43,6 @@ ml-training/celo/figuras
 .coverage
 coverage.xml
 htmlcov/
+
+# Cobertura (vitest/v8)
+frontend/coverage/
