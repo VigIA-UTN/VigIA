@@ -40,9 +40,16 @@ Tarda ~1 minuto (63 s en esta máquina; 61 s son la telemetría). Deja el sistem
 | Caravanas `LT-00001` … `LT-25000` (`dev_eui` = código), asignadas hace 30 días; animales activos | 25.000 |
 | Perfiles de salud (`perfil.json`), calculados ayer: nadie está en calibración ni recalibra | 25.000 |
 | Estado reproductivo `GESTANTE`: el job de anestro las recorre pero no alerta (sin esto alertaría a todas) | 25.000 |
-| Telemetría: 24 h cada 5 min hasta el momento de la semilla, y 15 min (3 puntos) hacia adelante para que la ventana de 24 h de salud no quede en 287 puntos en el empalme con k6. Geo ya la procesó toda; celo y salud tienen pendientes las últimas 6 h y esos 3 puntos (lo que procesa cada ciclo de Railway) | 7.275.000 (1.875.000 pendientes) |
+| Telemetría: 24 h cada 5 min hasta el momento de la semilla. Geo ya la procesó toda; celo y salud tienen pendientes las últimas 6 h (lo que procesa cada ciclo de Railway) | 7.200.000 (1.800.000 pendientes) |
 
 Otro tamaño: `-v clientes=10 -v sensores=5`. Otras horas pendientes: `-v pendientes_h=0` deja todo procesado.
+
+Para medir salud con uplinks perdidos:
+- `-v dias=8`: 8 días de historial en vez de 24 h.
+- `-v perdida=0.02`: pierde al azar ese 2 % de las filas de telemetría.
+- `-v sin_perfil=0.2`: ese 20 % de los animales queda sin perfil de salud; con `dias=8`, el próximo ciclo de salud los calibra.
+
+Sin estas variables la semilla queda igual.
 
 **Movimiento.** `trayectoria.sql` define la posición de cada sensor en función del tiempo (dos círculos superpuestos alrededor de su lugar en el rodeo) y un `moveState` como el pastoreo normal del simulador. Historial, perfil y k6 usan la misma fórmula, así que empalman. Con ventanas de 24 h generadas así, ml-salud no detectó desvío en 40 de 40 y ml-celo no detectó celo en 40 de 40 (confianza máxima 0,39): la carga no genera alertas falsas.
 
