@@ -44,7 +44,7 @@ Tarda ~1 minuto (63 s en esta máquina; 61 s son la telemetría). Deja el sistem
 
 Otro tamaño: `-v clientes=10 -v sensores=5`. Otras horas pendientes: `-v pendientes_h=0` deja todo procesado.
 
-Para medir salud con uplinks perdidos (`tasks/todo-salud.md`):
+Para medir salud con uplinks perdidos:
 - `-v dias=8`: 8 días de historial en vez de 24 h.
 - `-v perdida=0.02`: pierde al azar ese 2 % de las filas de telemetría.
 - `-v sin_perfil=0.2`: ese 20 % de los animales queda sin perfil de salud; con `dias=8`, el próximo ciclo de salud los calibra.

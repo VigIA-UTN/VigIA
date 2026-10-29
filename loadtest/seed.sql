@@ -15,7 +15,7 @@
 \else
 \set pendientes_h 6
 \endif
--- Para medir salud con uplinks perdidos (ver tasks/todo-salud.md): días de historial, fracción de filas de telemetría
+-- Para medir salud con uplinks perdidos: días de historial, fracción de filas de telemetría
 -- que se pierden al azar y fracción de animales sin perfil de salud (con -v dias=8 les toca su primera calibración).
 \if :{?dias}
 \else
