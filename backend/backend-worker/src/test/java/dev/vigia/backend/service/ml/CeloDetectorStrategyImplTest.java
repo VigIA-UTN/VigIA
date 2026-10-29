@@ -77,7 +77,9 @@ class CeloDetectorStrategyImplTest {
                 telemetriaRepository,
                 alertaRepository,
                 estadoReproductivoRepository,
-                publicadorDeAlertas);
+                publicadorDeAlertas,
+                0.9,
+                60);
     }
 
     private Telemetria crearTelemetria(Animal animal, Double lat, Double lon, Integer moveState, EstadoInferencia estado) {
@@ -92,6 +94,28 @@ class CeloDetectorStrategyImplTest {
         t.setLongitud(lon);
         t.setFechaHora(LocalDateTime.now());
         return t;
+    }
+
+    /**
+     * 24 hs a 5 min terminando ahora, todas pendientes y de la misma caravana: el largo que exige ml-celo
+     * (VentanaTelemetria.SAMPLES_PER_DAY). moveState va de 0 a 9 con i para poder ubicar los puntos.
+     */
+    private List<Telemetria> ventana24h(Animal animal, int lecturas) {
+        Caravana caravana = new Caravana();
+        caravana.setAnimal(animal);
+        LocalDateTime desde = LocalDateTime.now().minusHours(24);
+        List<Telemetria> lista = new ArrayList<>();
+        for (int i = 0; i < lecturas; i++) {
+            Telemetria t = new Telemetria();
+            t.setCaravana(caravana);
+            t.setEstadoInferenciaCelo(EstadoInferencia.PENDIENTE);
+            t.setMoveState(i % 10);
+            t.setLatitud(-34.0 + 0.00001 * i);
+            t.setLongitud(-60.0);
+            t.setFechaHora(desde.plusMinutes(5L * i + 1));
+            lista.add(t);
+        }
+        return lista;
     }
 
     @Test
@@ -140,8 +164,8 @@ class CeloDetectorStrategyImplTest {
         Animal animal = new Animal();
         animal.setId(11L);
 
-        Telemetria t = crearTelemetria(animal, -34.5, -58.5, 2, EstadoInferencia.PENDIENTE);
-        List<Telemetria> lista = List.of(t);
+        List<Telemetria> lista = ventana24h(animal, 288);
+        Telemetria t = lista.get(lista.size() - 1);
 
         when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
                 eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
@@ -182,8 +206,8 @@ class CeloDetectorStrategyImplTest {
         estadosPrevios.add(estadoPrevio);
         animal.setEstadosReproductivos(estadosPrevios);
 
-        Telemetria t = crearTelemetria(animal, -34.6, -58.4, 4, EstadoInferencia.PENDIENTE);
-        List<Telemetria> lista = List.of(t);
+        List<Telemetria> lista = ventana24h(animal, 288);
+        Telemetria t = lista.get(lista.size() - 1);
 
         when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
                 eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
@@ -269,8 +293,8 @@ class CeloDetectorStrategyImplTest {
         animal.setId(15L);
         animal.setEstadosReproductivos(null); // Sin historial previo
 
-        Telemetria t = crearTelemetria(animal, -34.6, -58.4, 4, EstadoInferencia.PENDIENTE);
-        List<Telemetria> lista = List.of(t);
+        List<Telemetria> lista = ventana24h(animal, 288);
+        Telemetria t = lista.get(lista.size() - 1);
 
         when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
                 eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
@@ -311,13 +335,10 @@ class CeloDetectorStrategyImplTest {
         Animal animal = new Animal();
         animal.setId(20L);
 
-        Telemetria tValida1 = crearTelemetria(animal, -34.0, -60.0, 3, EstadoInferencia.PENDIENTE);
-        Telemetria tSinLat = crearTelemetria(animal, null, -60.0, 3, EstadoInferencia.PENDIENTE);
-        Telemetria tSinLon = crearTelemetria(animal, -34.0, null, 3, EstadoInferencia.PENDIENTE);
-        Telemetria tSinMoveState = crearTelemetria(animal, -34.0, -60.0, null, EstadoInferencia.PENDIENTE);
-        Telemetria tValida2 = crearTelemetria(animal, -34.1, -60.1, 5, EstadoInferencia.PENDIENTE);
-
-        List<Telemetria> lista = List.of(tValida1, tSinLat, tSinLon, tSinMoveState, tValida2);
+        List<Telemetria> lista = ventana24h(animal, 288);
+        lista.add(100, crearTelemetria(animal, null, -60.0, 3, EstadoInferencia.PENDIENTE));
+        lista.add(200, crearTelemetria(animal, -34.0, null, 3, EstadoInferencia.PENDIENTE));
+        lista.add(250, crearTelemetria(animal, -34.0, -60.0, null, EstadoInferencia.PENDIENTE));
 
         when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
                 eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
@@ -329,10 +350,10 @@ class CeloDetectorStrategyImplTest {
                 .ventanaOptimaHoras(0)
                 .build();
 
-        // Verificamos que el cuerpo enviado contenga exactamente 2 elementos
+        // Las 3 lecturas incompletas no se mandan: quedan las 288 válidas
         mockServer.expect(requestTo("http://localhost:8000/api/internal/ml/celo/predict"))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$.length()").value(288))
                 .andRespond(withSuccess(objectMapper.writeValueAsString(predictResponse), MediaType.APPLICATION_JSON));
 
         celoDetectorStrategy.process(lista, "corr-filtrado");
@@ -345,8 +366,8 @@ class CeloDetectorStrategyImplTest {
     void testProcess_mlCeloFalla_marcaInferenciaPendienteSinPropagar() {
         Animal animal = new Animal();
         animal.setId(30L);
-        Telemetria t = crearTelemetria(animal, -34.0, -60.0, 3, EstadoInferencia.PENDIENTE);
-        List<Telemetria> lista = List.of(t);
+        List<Telemetria> lista = ventana24h(animal, 288);
+        Telemetria t = lista.get(lista.size() - 1);
 
         when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
                 eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
@@ -360,6 +381,82 @@ class CeloDetectorStrategyImplTest {
         mockServer.verify();
         assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t.getEstadoInferenciaCelo());
         verify(alertaRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void testProcess_masDe288Lecturas_mandaLas288MasRecientes() throws Exception {
+        Animal animal = new Animal();
+        animal.setId(40L);
+        // 300 lecturas: las 12 primeras quedan afuera; la primera que se manda es la i = 12 (moveState 2)
+        List<Telemetria> lista = ventana24h(animal, 300);
+
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
+                .thenReturn(false);
+
+        CeloPredictResponseDTO predictResponse = CeloPredictResponseDTO.builder()
+                .eventoCelo(false)
+                .confianzaModelo(0.1f)
+                .ventanaOptimaHoras(0)
+                .build();
+
+        mockServer.expect(requestTo("http://localhost:8000/api/internal/ml/celo/predict"))
+                .andExpect(jsonPath("$.length()").value(288))
+                .andExpect(jsonPath("$[0].moveState").value(2))
+                .andRespond(withSuccess(objectMapper.writeValueAsString(predictResponse), MediaType.APPLICATION_JSON));
+
+        celoDetectorStrategy.process(lista, "corr-recorte");
+
+        mockServer.verify();
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void testProcess_ventanaSinCobertura_noLlamaAMlCeloYMarcaCompletado() {
+        Animal animal = new Animal();
+        animal.setId(41L);
+        // 10 lecturas de 288 slots: muy por debajo del 90 % de cobertura
+        List<Telemetria> lista = ventana24h(animal, 10);
+
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
+                .thenReturn(false);
+
+        celoDetectorStrategy.process(lista, "corr-sin-cobertura");
+
+        mockServer.verify(); // No se realizan llamadas HTTP
+        lista.forEach(t -> assertEquals(EstadoInferencia.COMPLETADO, t.getEstadoInferenciaCelo()));
+        verify(alertaRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void testProcess_ventanaConHuecosChicos_rellenaYMandaLos288Slots() throws Exception {
+        Animal animal = new Animal();
+        animal.setId(42L);
+        List<Telemetria> lista = ventana24h(animal, 288);
+        lista.remove(150); // un uplink perdido: 287 lecturas, 99,7 % de cobertura
+
+        when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(
+                eq(animal), eq(Alerta.TIPO_CELO), any(LocalDateTime.class)))
+                .thenReturn(false);
+
+        CeloPredictResponseDTO predictResponse = CeloPredictResponseDTO.builder()
+                .eventoCelo(false)
+                .confianzaModelo(0.1f)
+                .ventanaOptimaHoras(0)
+                .build();
+
+        mockServer.expect(requestTo("http://localhost:8000/api/internal/ml/celo/predict"))
+                .andExpect(jsonPath("$.length()").value(288))
+                // el slot 150 repite el moveState de la lectura anterior (i = 149)
+                .andExpect(jsonPath("$[150].moveState").value(149 % 10))
+                .andRespond(withSuccess(objectMapper.writeValueAsString(predictResponse), MediaType.APPLICATION_JSON));
+
+        celoDetectorStrategy.process(lista, "corr-hueco");
+
+        mockServer.verify();
     }
 
     @Test
@@ -382,8 +479,8 @@ class CeloDetectorStrategyImplTest {
         Animal animal = new Animal();
         animal.setId(99L);
 
-        Telemetria t = crearTelemetria(animal, -34.6, -58.4, 4, EstadoInferencia.PENDIENTE);
-        List<Telemetria> lista = List.of(t);
+        List<Telemetria> lista = ventana24h(animal, 288);
+        Telemetria t = lista.get(lista.size() - 1);
 
         // No existe alerta previa de CELO (aunque pudiera existir de Anestro con DisparadorAlerta.CELO)
         when(alertaRepository.existsByAnimalAndTipoAndTsGeneracionAfter(

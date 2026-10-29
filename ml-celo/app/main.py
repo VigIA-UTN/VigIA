@@ -36,6 +36,11 @@ log = get_logger("ml-celo")
 # Debe coincidir con la escala usada en generate_dataset.py / train_baseline_rnn.py
 DIST_SCALE_FACTOR = 100000
 
+# La LSTM se entrenó solo con ventanas de 24hs a 5 min (train_multiseed.py
+# descarta los días que no tienen exactamente 288 puntos): otro largo es una
+# entrada que el modelo nunca vio. El backend arma la ventana (VentanaTelemetria).
+SAMPLES_PER_DAY = 288
+
 # Umbral de decisión sobre la probabilidad del modelo (P(celo) > CELO_THRESHOLD).
 # Se saca a config en lugar de hardcodear 0.5 porque, con class_weight balanceado,
 # el umbral que maximiza F1 sobre la curva Precision-Recall NO es 0.5 (ver
@@ -93,14 +98,16 @@ def health():
 @app.post("/api/internal/ml/celo/predict", response_model=PrediccionCeloResponse)
 async def predict(serie: List[PuntoTelemetria]):
     """
-    Request: serie temporal de la telemetría del animal de las últimas 24 horas.
+    Request: serie temporal de la telemetría del animal de las últimas 24 horas
+    (SAMPLES_PER_DAY puntos, 1 cada 5 min).
     """
     log.info("Request recibida para predicción de celo con %d puntos.", len(serie))
 
     # Un problema de los datos es 422 (el backend no reintenta); el 503 queda
     # para fallas del servicio, como el modelo sin cargar.
-    if not serie:
-        mensaje = "serie: no puede estar vacía"
+    if len(serie) != SAMPLES_PER_DAY:
+        mensaje = (f"serie: debe tener exactamente {SAMPLES_PER_DAY} puntos (24 hs a 5 min); "
+                   f"se recibieron {len(serie)}")
         log.warning("Payload inválido: %s", mensaje)
         return respuesta_error(422, "Payload Invalido", mensaje)
 

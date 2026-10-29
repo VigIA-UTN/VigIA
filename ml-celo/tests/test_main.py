@@ -55,12 +55,14 @@ def test_health():
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "ml-celo", "model_loaded": True}
 
+def serie_24h(moveState, paso=0.0):
+    """Ventana de 24 hs a 5 min (288 puntos), el largo que exige ml-celo."""
+    return [{"moveState": moveState, "latitud": -34.0 - i * paso, "longitud": -59.0 - i * paso}
+            for i in range(288)]
+
 def test_predict_evento_celo_true(mock_dependencies):
     # Payload válido con alta actividad (moveState = 9, el máximo del protocolo)
-    payload = [
-        {"moveState": 9, "latitud": -34.0, "longitud": -59.0},
-        {"moveState": 9, "latitud": -34.001, "longitud": -59.001}
-    ]
+    payload = serie_24h(9, paso=0.001)
     response = client.post("/api/internal/ml/celo/predict", json=payload)
 
     assert response.status_code == 200
@@ -71,10 +73,7 @@ def test_predict_evento_celo_true(mock_dependencies):
 
 def test_predict_evento_celo_false(mock_dependencies):
     # Payload válido con baja actividad (moveState = 1)
-    payload = [
-        {"moveState": 1, "latitud": -34.0, "longitud": -59.0},
-        {"moveState": 1, "latitud": -34.0, "longitud": -59.0}
-    ]
+    payload = serie_24h(1)
     response = client.post("/api/internal/ml/celo/predict", json=payload)
 
     assert response.status_code == 200
@@ -107,5 +106,5 @@ def test_predict_empty_payload(mock_dependencies):
 
     # Formato de error estándar verificado
     assert data["error"] == "Payload Invalido"
-    assert "serie: no puede estar vacía" in data["mensaje"]
+    assert "serie: debe tener exactamente 288 puntos" in data["mensaje"]
     assert "trace_id" in data
