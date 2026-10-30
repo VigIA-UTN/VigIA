@@ -91,7 +91,8 @@ public class UsuarioController {
     /**
      * GET /api/v1/usuarios/empleados?establecimientoId={id}
      * <p>
-     * Lista los empleados (VETERINARIO/CAMPERO) del productor autenticado,
+     * Lista los usuarios activos vinculados a los establecimientos del productor
+     * autenticado (productores, incluido él mismo, veterinarios y camperos),
      * opcionalmente filtrados por establecimiento.
      *
      * @param establecimientoId (opcional) ID del establecimiento a filtrar

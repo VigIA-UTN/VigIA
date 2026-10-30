@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -173,7 +174,7 @@ class UsuarioControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/usuarios/empleados - Productor ve lista de sus empleados activos")
+    @DisplayName("GET /api/v1/usuarios/empleados - Productor ve a los usuarios activos del establecimiento, productores incluidos")
     @SuppressWarnings("null")
     void getEmpleados_asProductor_success() throws Exception {
         Usuario empleado = new Usuario();
@@ -198,9 +199,46 @@ class UsuarioControllerTest {
         mockMvc.perform(get("/api/v1/usuarios/empleados")
                 .header("Authorization", "Bearer " + productorToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].nombre").value("Empleado 1"))
-                .andExpect(jsonPath("$[0].activo").value(true));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[*].nombre", containsInAnyOrder("Juan", "Empleado 1")))
+                .andExpect(jsonPath("$[*].rol", containsInAnyOrder("PRODUCTOR", "CAMPERO")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/usuarios/empleados/{id} - Un productor no puede quitar a otro productor")
+    @SuppressWarnings("null")
+    void removerEmpleado_otroProductor_badRequest() throws Exception {
+        Usuario otroProductor = new Usuario();
+        otroProductor.setEmail("otro.productor@vigia.dev");
+        otroProductor.setPasswordHash(passwordEncoder.encode("prod123"));
+        otroProductor.setNombre("Socio");
+        otroProductor.setRol(Rol.PRODUCTOR);
+        otroProductor.setActivo(true);
+        otroProductor = usuarioRepository.save(otroProductor);
+
+        Establecimiento est = new Establecimiento();
+        est.setNombre("Estancia Compartida");
+        est.setLatitud(-34.0);
+        est.setLongitud(-58.0);
+        est.setActivo(true);
+        est.setFechaAlta(LocalDate.now());
+        Empleado vinculoProd = new Empleado(est, usuarioRepository.findById(productorId).orElseThrow());
+        Empleado vinculoOtro = new Empleado(est, otroProductor);
+        est.setEmpleados(new ArrayList<>(List.of(vinculoProd, vinculoOtro)));
+        est = establecimientoRepository.save(est);
+
+        mockMvc.perform(delete("/api/v1/usuarios/empleados/" + est.getId() + "/" + otroProductor.getId())
+                .header("Authorization", "Bearer " + productorToken))
+                .andExpect(status().isBadRequest());
+
+        final Long estId = est.getId();
+        final Long otroId = otroProductor.getId();
+        Boolean sigueVinculado = new TransactionTemplate(transactionManager).execute(status -> {
+            Establecimiento updatedEst = establecimientoRepository.findById(estId).orElseThrow();
+            return updatedEst.getEmpleados().stream()
+                    .anyMatch(v -> v.getUsuario().getId().equals(otroId) && v.isActivo());
+        });
+        assertThat(sigueVinculado).isTrue();
     }
 
     @Test
