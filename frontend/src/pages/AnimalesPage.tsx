@@ -989,6 +989,7 @@ export default function AnimalesPage() {
                                         <li><strong>FechaNacimiento</strong> (obligatoria, formato YYYY-MM-DD, no puede ser futura)</li>
                                         <li><strong>Raza</strong> (opcional)</li>
                                         <li><strong>RodeoLote</strong> (obligatorio, nombre de un lote existente y activo del establecimiento)</li>
+                                        <li><strong>Sensor</strong> (opcional, DevEUI, código o alias de una caravana libre del establecimiento; no puede repetirse)</li>
                                     </ul>
                                     <Alert variant={rodeoLotes.length > 0 ? 'info' : 'warning'} className="py-2 mb-2">
                                         <i className="bi bi-info-circle me-1" />

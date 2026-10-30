@@ -5,9 +5,9 @@ import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Form, InputGroup } from 'react-bootstrap';
 import { MapContainer, TileLayer, Marker, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import MapInvalidator from '../components/MapInvalidator';
-import { PIN_NORMAL } from '../utils/animalPins';
 import { SEVERIDAD } from '../utils/severidadColores';
 import {
   getConfigAnestro, updateConfigAnestro,
@@ -26,6 +26,17 @@ import type { FormData, SeccionId } from './configuracionEstablecimientoSchema';
 import './ConfiguracionEstablecimientoPage.css';
 
 type Severidad = FormData['severidadAnestro'];
+
+// Pin propio del casco: los de animalPins tienen el logo y el color de estado de una vaca.
+const PIN_CASCO = L.divIcon({
+  className: 'cfg-pin-casco',
+  html: `<svg viewBox="0 0 36 48" width="36" height="48" aria-hidden="true">
+    <path d="M18 1.5C8.9 1.5 1.5 8.9 1.5 18c0 12.4 16.5 28.5 16.5 28.5S34.5 30.4 34.5 18C34.5 8.9 27.1 1.5 18 1.5z"
+      fill="#1E3A5F" stroke="#fff" stroke-width="2.5"/>
+  </svg><i class="bi bi-house-door-fill"></i>`,
+  iconSize: [36, 48],
+  iconAnchor: [18, 47],
+});
 
 // Texto sobre el color plano de la rampa: oscuro sobre verde/amarillo, blanco sobre rojo (contraste AA).
 const SEVERIDAD_OPCION = {
@@ -428,7 +439,7 @@ export default function ConfiguracionEstablecimientoPage() {
                     url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                   />
                   {/* interactive=false: el click sobre el pin también llega al mapa */}
-                  {posicion && <Marker position={posicion} icon={PIN_NORMAL} interactive={false} />}
+                  {posicion && <Marker position={posicion} icon={PIN_CASCO} interactive={false} />}
                   {editaDatos && <SelectorUbicacion onElegir={elegirUbicacion} />}
                   <SeguirPosicion lat={posicion?.[0]} lng={posicion?.[1]} />
                   <MapInvalidator smooth />
