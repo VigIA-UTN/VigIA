@@ -75,7 +75,8 @@ public class UsuarioServiceImpl implements UsuarioService {
             List<UsuarioResponse> emps = est.getEmpleados().stream()
                     .filter(Empleado::isActivo)
                     .map(Empleado::getUsuario)
-                    .filter(u -> u.getRol() != Rol.PRODUCTOR && u.isActivo())
+                    // Incluye a los productores (también al autenticado): la pestaña muestra quién tiene acceso al campo.
+                    .filter(Usuario::isActivo)
                     .map(u -> {
                         UsuarioResponse resp = mapToResponse(u);
                         resp.setEstablecimiento(est.getNombre());

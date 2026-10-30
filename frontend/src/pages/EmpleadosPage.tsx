@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Container, Spinner, Alert, Button, Form } from 'react-bootstrap';
+import { Container, Spinner, Alert, Button, Form, Badge } from 'react-bootstrap';
 import { getEmpleados, removerEmpleado } from '../api/usuariosApi';
 import type { UsuarioResponse } from '../api/usuariosApi';
+import { useAuthStore } from '../store/authStore';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { showAlert, showConfirm } from '../store/dialogStore';
 import './EmpleadosPage.css';
 
 export default function EmpleadosPage() {
     const selectedId = useEstablecimientoStore((s) => s.selectedId);
+    const emailLogueado = useAuthStore((s) => s.email);
     const [empleados, setEmpleados] = useState<UsuarioResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -162,7 +164,10 @@ export default function EmpleadosPage() {
                                 ) : (
                                     sortedEmpleados.map((u) => (
                                         <tr key={`${u.id}-${u.establecimientoId}`}>
-                                            <td className="fw-medium text-dark">{u.nombre} {u.apellido}</td>
+                                            <td className="fw-medium text-dark">
+                                                {u.nombre} {u.apellido}
+                                                {u.email === emailLogueado && <Badge bg="secondary" className="ms-2 fw-normal">Vos</Badge>}
+                                            </td>
                                             <td>
                                                 <a href={`mailto:${u.email}`} className="text-decoration-none text-muted">
                                                     {u.email}
@@ -171,19 +176,24 @@ export default function EmpleadosPage() {
                                             <td>{u.rol}</td>
                                             <td>{u.establecimiento}</td>
                                             <td>
-                                                <Button
-                                                    variant="outline-danger"
-                                                    size="sm"
-                                                    className="border-0 fw-semibold"
-                                                    onClick={() => u.establecimientoId && handleRemoverEmpleado(u.id, u.establecimientoId)}
-                                                    disabled={togglingId === u.id}
-                                                >
-                                                    {togglingId === u.id ? (
-                                                        <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
-                                                    ) : (
-                                                        'Quitar'
-                                                    )}
-                                                </Button>
+                                                {/* A los productores solo los da de baja el administrador. */}
+                                                {u.rol === 'PRODUCTOR' ? (
+                                                    <span className="text-muted" title="Los productores los gestiona el administrador">—</span>
+                                                ) : (
+                                                    <Button
+                                                        variant="outline-danger"
+                                                        size="sm"
+                                                        className="border-0 fw-semibold"
+                                                        onClick={() => u.establecimientoId && handleRemoverEmpleado(u.id, u.establecimientoId)}
+                                                        disabled={togglingId === u.id}
+                                                    >
+                                                        {togglingId === u.id ? (
+                                                            <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
+                                                        ) : (
+                                                            'Quitar'
+                                                        )}
+                                                    </Button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))

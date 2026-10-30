@@ -255,6 +255,21 @@
   color: #A0AEC0;
 }
 
+.cfg-pin-casco {
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+
+.cfg-pin-casco i {
+  position: absolute;
+  top: 7px;
+  left: 0;
+  width: 36px;
+  text-align: center;
+  font-size: 18px;
+  line-height: 1;
+  color: #fff;
+}
+
 .cfg-map-preview--editable .leaflet-container {
   cursor: crosshair;
 }
