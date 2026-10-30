@@ -4,9 +4,6 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  test: {
-    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
-  },
   server: {
     proxy: {
       '/api': {
@@ -37,6 +34,8 @@ export default defineConfig({
     }
   },
   test: {
+    // Excluye los tests E2E de Playwright para que Vitest no los procese
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
     // Usa un tsconfig dedicado que incluye los archivos de test y los tipos de jest-dom
     typecheck: { tsconfig: './tsconfig.test.json' },
     // Entorno DOM completo para tests de componentes React
