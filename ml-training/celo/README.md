@@ -142,6 +142,12 @@ Para reproducir el entrenamiento, seguí estos pasos en tu terminal (estando den
 
 ## 6. Resultados de referencia
 
+> Los resultados finales para el informe (media ± desvío muestral,
+> matriz de confusión media ± desvío y verificación de que el modelo de
+> `ml-celo` es el evaluado) están en
+> [`../resultados_finales/`](../resultados_finales/README.md) y se generan
+> con `python evaluar_final.py`.
+
 Corrida `20261027_105620_split42` (200 animales, 90 días, dataset con
 ruido GPS + moveState cuantizado, umbral elegido en validación). Es un
 reentrenamiento de `20260918_195223_split42` con las mismas semillas: las
