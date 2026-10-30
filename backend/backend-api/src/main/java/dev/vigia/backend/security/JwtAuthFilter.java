@@ -50,7 +50,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             userEmail = jwtUtil.extractUsername(jwt);
             if (userEmail != null) {
                 UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(userEmail);
-                if (jwtUtil.validateToken(jwt, userDetails)) {
+                // isEnabled() refleja usuarios.activo: un usuario desactivado pierde el acceso en el momento, no
+                // cuando vence su JWT (hasta 24 h después).
+                if (jwtUtil.validateToken(jwt, userDetails) && userDetails.isEnabled()) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,

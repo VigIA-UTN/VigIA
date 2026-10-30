@@ -18,6 +18,7 @@ frontend/.env.local
 .idea/
 *.iml
 .vscode/
+.claude
 
 # Docker / OS / Env
 infra/postgres-init/*.bak
@@ -28,6 +29,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+CLAUDE.md
 
 # Modelos entrenados (historial)
 ml-training/celo/models

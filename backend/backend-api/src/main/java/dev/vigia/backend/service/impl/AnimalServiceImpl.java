@@ -145,7 +145,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -214,7 +214,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!esProductorOEmpleadoDelEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -303,7 +303,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!esProductorOEmpleadoDelEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -338,7 +338,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!esProductorOEmpleadoDelEstablecimiento && !productorUser.getRol().equals(Rol.ADMINISTRADOR)) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -575,7 +575,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -654,7 +654,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -886,7 +886,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 || usuario.getRol().equals(Rol.ADMINISTRADOR);
 
                 if (!tieneAcceso) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "No tiene acceso a los datos de este animal.");
                 }
 

@@ -120,16 +120,22 @@ public class AnimalController {
      * actualizaciones de posición de los animales del establecimiento indicado.
      *
      * @param establecimientoId ID del establecimiento a suscribir
-     * @return emisor SSE registrado para el establecimiento indicado
+     * @param authentication    contexto de seguridad inyectado por Spring Security
+     * @return emisor SSE registrado para el establecimiento indicado, 403 si el
+     *         usuario no pertenece a ese establecimiento
      */
     @GetMapping(value = "/mapa/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
-    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter streamPosicionesMapa(
-            @RequestParam(name = "establecimientoId") Long establecimientoId) {
-        // En una app real, aquí también se debería verificar que el usuario actual
-        // (authentication)
-        // tiene acceso a ese establecimiento. Se asume validado por simplicidad en esta
-        // demo.
-        return sseTelemetriaPublisher.registrarClienteSse(establecimientoId);
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.SseEmitter> streamPosicionesMapa(
+            @RequestParam(name = "establecimientoId") Long establecimientoId,
+            Authentication authentication) {
+        // Mismo alcance que GET /mapa: el administrador ve cualquier establecimiento, el resto solo los suyos.
+        boolean esAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR"));
+        if (!esAdmin && !sseTelemetriaPublisher.puedeSuscribirse(authentication.getName(), establecimientoId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(sseTelemetriaPublisher.registrarClienteSse(establecimientoId));
     }
 
     /**

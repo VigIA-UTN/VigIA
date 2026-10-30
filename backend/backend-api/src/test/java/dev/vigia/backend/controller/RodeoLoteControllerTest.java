@@ -203,9 +203,9 @@ class RodeoLoteControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeo-lotes - Productor no pertenece al establecimiento retorna 400")
+        @DisplayName("POST /api/v1/rodeo-lotes - Productor no pertenece al establecimiento retorna 403")
         @SuppressWarnings("null")
-        void crearRodeoLote_productorNoPertenece_badRequest() throws Exception {
+        void crearRodeoLote_productorNoPertenece_forbidden() throws Exception {
                 // Crear otro establecimiento sin vincular al productor
                 Establecimiento otroEst = new Establecimiento();
                 otroEst.setNombre("Otro Establecimiento");
@@ -224,13 +224,13 @@ class RodeoLoteControllerTest {
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("POST /api/v1/rodeo-lotes - Productor inactivo en establecimiento retorna 400")
+        @DisplayName("POST /api/v1/rodeo-lotes - Productor inactivo en establecimiento retorna 403")
         @SuppressWarnings("null")
-        void crearRodeoLote_productorInactivo_badRequest() throws Exception {
+        void crearRodeoLote_productorInactivo_forbidden() throws Exception {
                 // Crear un segundo productor inactivo en el establecimiento
                 Usuario productorInactivo = new Usuario();
                 productorInactivo.setEmail("inactivo@vigia.dev");
@@ -256,7 +256,7 @@ class RodeoLoteControllerTest {
                                 .header("Authorization", "Bearer " + tokenInactivo)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
         }
 
         @Test
@@ -397,9 +397,9 @@ class RodeoLoteControllerTest {
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/rodeo-lotes/{id} - Productor no pertenece al establecimiento retorna 400")
+        @DisplayName("DELETE /api/v1/rodeo-lotes/{id} - Productor no pertenece al establecimiento retorna 403")
         @SuppressWarnings("null")
-        void desactivarRodeoLote_productorAjeno_badRequest() throws Exception {
+        void desactivarRodeoLote_productorAjeno_forbidden() throws Exception {
                 // Crear otro productor y vincularlo al establecimiento base
                 Usuario otroProductor = new Usuario();
                 otroProductor.setEmail("otro@vigia.dev");
@@ -442,6 +442,6 @@ class RodeoLoteControllerTest {
                 // "otro" intenta borrar el rodeoLote del primer productor
                 mockMvc.perform(delete("/api/v1/rodeo-lotes/" + rodeoId)
                                 .header("Authorization", "Bearer " + otroToken))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
         }
 }

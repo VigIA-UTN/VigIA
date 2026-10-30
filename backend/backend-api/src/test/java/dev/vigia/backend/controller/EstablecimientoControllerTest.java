@@ -509,7 +509,7 @@ class EstablecimientoControllerTest {
         // otro@vigia.dev (creado en setUp) NO pertenece al establecimiento
         mockMvc.perform(get("/api/v1/establecimientos/" + establecimientoId + "/intervenciones")
                 .header("Authorization", "Bearer " + otroProductorToken))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -524,7 +524,7 @@ class EstablecimientoControllerTest {
     void obtenerIntervenciones_establecimientoInexistente_retornaError() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/99999/intervenciones")
                 .header("Authorization", "Bearer " + userToken))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isForbidden());
     }
 
     // ── Tests para GET /{id}/pesos ──────────────────────────────────────────────
@@ -610,7 +610,7 @@ class EstablecimientoControllerTest {
     void obtenerPesos_usuarioNoPerteneceAlEstablecimiento_retornaError() throws Exception {
         mockMvc.perform(get("/api/v1/establecimientos/" + establecimientoId + "/pesos")
                 .header("Authorization", "Bearer " + otroProductorToken))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isForbidden());
     }
 
     @Test

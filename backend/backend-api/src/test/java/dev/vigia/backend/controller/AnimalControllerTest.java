@@ -388,9 +388,9 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/animales/crear - Productor no pertenece al establecimiento retorna 400")
+        @DisplayName("POST /api/v1/animales/crear - Productor no pertenece al establecimiento retorna 403")
         @SuppressWarnings("null")
-        void cargarAnimal_productorNoPertenece_badRequest() throws Exception {
+        void cargarAnimal_productorNoPertenece_forbidden() throws Exception {
                 // Crear otro establecimiento sin el productor
                 Establecimiento otroEst = new Establecimiento();
                 otroEst.setNombre("Otro Campo");
@@ -413,7 +413,7 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(req)))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
         }
 
         @Test
@@ -912,9 +912,9 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/animales/{id} - Productor ajeno al establecimiento recibe 400")
+        @DisplayName("DELETE /api/v1/animales/{id} - Productor ajeno al establecimiento recibe 403")
         @SuppressWarnings("null")
-        void desactivarAnimal_productorAjeno_badRequest() throws Exception {
+        void desactivarAnimal_productorAjeno_forbidden() throws Exception {
                 Long animalId = crearAnimal("Toro Ajeno", establecimientoId, rodeoLoteId);
 
                 // Crear segundo productor SIN vínculo con el establecimiento
@@ -941,7 +941,7 @@ class AnimalControllerTest {
 
                 mockMvc.perform(delete("/api/v1/animales/" + animalId)
                                 .header("Authorization", "Bearer " + otroToken))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
         }
 
         @Test

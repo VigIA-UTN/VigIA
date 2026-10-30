@@ -124,7 +124,7 @@ public class InvitacionServiceImpl implements InvitacionService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new org.springframework.security.access.AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -225,6 +225,14 @@ public class InvitacionServiceImpl implements InvitacionService {
         public List<InvitacionResponse> listarInvitacionesEmpleado(String emailProductor, Long establecimientoId) {
                 List<Invitacion> invitaciones;
                 if (establecimientoId != null) {
+                        // Pedir las invitaciones de un establecimiento ajeno es un acceso denegado, aunque el filtro
+                        // por creador ya devolvería una lista vacía.
+                        boolean pertenece = establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(emailProductor)
+                                        .stream().anyMatch(e -> e.getId().equals(establecimientoId));
+                        if (!pertenece) {
+                                throw new org.springframework.security.access.AccessDeniedException(
+                                                "El productor no pertenece a este establecimiento o no está activo.");
+                        }
                         invitaciones = invitacionRepository.findByCreador_EmailAndEstablecimiento_IdAndTipoInvitacionOrderByFechaCreacionDesc(
                                         emailProductor, establecimientoId, TipoInvitacion.EMPLEADO);
                 } else {
@@ -294,6 +302,10 @@ public class InvitacionServiceImpl implements InvitacionService {
                 }
                 if (invitacion.getEstadoInvitacion() != EstadoInvitacion.PENDIENTE) {
                         throw new IllegalArgumentException("La invitación ya no está pendiente");
+                }
+                if (invitacion.getFechaExpiracion() != null
+                                && invitacion.getFechaExpiracion().isBefore(LocalDateTime.now())) {
+                        throw new IllegalArgumentException("La invitación ha expirado");
                 }
 
                 Usuario usuario = usuarioRepository.findByEmail(email)

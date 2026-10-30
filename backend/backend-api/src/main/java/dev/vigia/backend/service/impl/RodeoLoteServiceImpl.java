@@ -39,7 +39,7 @@ public class RodeoLoteServiceImpl implements RodeoLoteService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new org.springframework.security.access.AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -73,7 +73,7 @@ public class RodeoLoteServiceImpl implements RodeoLoteService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new org.springframework.security.access.AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -95,7 +95,7 @@ public class RodeoLoteServiceImpl implements RodeoLoteService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new org.springframework.security.access.AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
