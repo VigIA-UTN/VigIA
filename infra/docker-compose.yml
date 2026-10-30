@@ -13,10 +13,10 @@ services:
       - vigia_pgdata:/var/lib/pgdata/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vigia_user} -d ${POSTGRES_DB:-vigia}" ]
+      test: [ "CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER:-vigia_user} -d ${POSTGRES_DB:-vigia}" ]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
 
   backend-api:
     build:
@@ -58,7 +58,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
-      start_period: 60s
+      start_period: 120s
 
   backend-worker:
     build:
