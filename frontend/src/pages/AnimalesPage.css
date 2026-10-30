@@ -242,20 +242,24 @@
     border-color: #7ab332 !important;
 }
 
-/* ── Responsive: botones de acción en dos filas ──────────────── */
-@media (max-width: 1000px) {
-    .animales-action-btns {
-        width: 100%;
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 6px !important;
-    }
+/* ⋮ de acciones secundarias: icono sin fondo, para no competir con el botón verde */
+.animales-more-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #1E3A5F;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-    .animales-action-btns .btn {
-        flex: 1 1 calc(50% - 6px);
-        min-width: 0;
-        text-align: center;
-    }
+.animales-more-btn:hover,
+.animales-more-btn[aria-expanded="true"] {
+    background: rgba(30, 58, 95, 0.08);
 }
 
 /* ── Responsive mobile ───────────────────────────────────────── */
@@ -281,17 +285,6 @@
 
     .animales-header-mobile>div:first-child .vigia-page-title {
         flex-basis: 100%;
-    }
-
-    /* Botones verdes: mantener dos filas, texto más compacto */
-    .animales-action-btns {
-        gap: 4px !important;
-    }
-
-    .animales-action-btns .btn {
-        font-size: 0.82rem !important;
-        padding: 8px 4px !important;
-        white-space: nowrap;
     }
 
     /* Barra de búsqueda full width */

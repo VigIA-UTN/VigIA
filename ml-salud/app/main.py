@@ -31,10 +31,11 @@ microservicio: se eliminó por completo (no se documenta como "pendiente")
 porque asumía datos de rumia que el dispositivo IoT de VigIA no emite.
 """
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
+import math
 import numpy as np
 from pathlib import Path
 import joblib
@@ -46,9 +47,16 @@ from .features_salud import (
     CALIB_DIAS_MINIMO,
     SAMPLES_PER_DAY,
     FEATURE_VERSION,
+    N_QUARTERS,
 )
+from .correlacion import get_logger, instalar_middleware
+from .errores import instalar_handlers, respuesta_error
+
+log = get_logger("ml-salud")
 
 app = FastAPI(title="VigIA - Microservicio de Detección de Desvíos Sanitarios")
+instalar_middleware(app, log)
+instalar_handlers(app, log)
 
 model = None
 
@@ -61,15 +69,16 @@ def load_ml_model():
 
     if model_path.exists():
         model = joblib.load(model_path)
-        print("Modelo (RandomForest) cargado correctamente.")
+        log.info("Modelo (RandomForest) cargado correctamente.")
     else:
-        print(f"ADVERTENCIA: No se encontró el modelo en {model_path}.")
+        log.warning("No se encontró el modelo en %s.", model_path)
 
 
 class PuntoTelemetria(BaseModel):
-    moveState: int
-    latitud: float
-    longitud: float
+    # 0-9, según protocolo real de la caravana Lansitec.
+    moveState: int = Field(ge=0, le=9)
+    latitud: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitud: float = Field(ge=-180, le=180, allow_inf_nan=False)
 
 
 class PerfilRequest(BaseModel):
@@ -88,6 +97,54 @@ class PrediccionSaludResponse(BaseModel):
     confianza_modelo: float
 
 
+# Claves del perfil que usa compute_features (ver compute_baseline en
+# features_salud.py): un número por cada una de las escalares y una lista de
+# N_QUARTERS números por cada una de las de cuartos.
+_PERFIL_ESCALARES = [
+    f"{feature}_{estadistico}"
+    for feature in ("mean_moveState", "std_moveState", "pct_reposo", "mean_distancia", "std_distancia")
+    for estadistico in ("mean", "std")
+]
+_PERFIL_CUARTOS = [
+    "quarter_moveState_mean", "quarter_moveState_std",
+    "quarter_distancia_mean", "quarter_distancia_std",
+]
+
+
+def _es_numero(valor) -> bool:
+    return isinstance(valor, (int, float)) and not isinstance(valor, bool) and math.isfinite(valor)
+
+
+def _problemas_de_entrada(body: PredictRequest) -> List[str]:
+    """
+    Lo que hace que la request no se pueda evaluar por culpa de los datos:
+    se responde 422 (el backend no reintenta) y no 503, que es para fallas
+    del servicio.
+    """
+    problemas = []
+    if len(body.serie) != SAMPLES_PER_DAY:
+        problemas.append(f"serie: debe tener exactamente {SAMPLES_PER_DAY} puntos (24 hs a 5 min); "
+                         f"se recibieron {len(body.serie)}")
+    if not body.perfil:
+        problemas.append("perfil: no se recibió el perfil de referencia; "
+                         "llamar primero a /api/internal/ml/salud/perfil")
+        return problemas
+
+    faltantes = [k for k in _PERFIL_ESCALARES + _PERFIL_CUARTOS if k not in body.perfil]
+    if faltantes:
+        problemas.append(f"perfil: faltan las claves {', '.join(faltantes)}; "
+                         "recalcularlo con /api/internal/ml/salud/perfil")
+    for k in _PERFIL_ESCALARES:
+        if k in body.perfil and not _es_numero(body.perfil[k]):
+            problemas.append(f"perfil.{k}: debe ser un número finito")
+    for k in _PERFIL_CUARTOS:
+        valor = body.perfil.get(k)
+        if k in body.perfil and not (isinstance(valor, list) and len(valor) == N_QUARTERS
+                                     and all(_es_numero(v) for v in valor)):
+            problemas.append(f"perfil.{k}: debe ser una lista de {N_QUARTERS} números finitos")
+    return problemas
+
+
 def get_posible_causa(severidad: int) -> Optional[str]:
     causas = {
         0: None,
@@ -100,11 +157,16 @@ def get_posible_causa(severidad: int) -> Optional[str]:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "ml-salud", "feature_version": FEATURE_VERSION}
+    # Sin modelo todas las predicciones fallan con 503: el health lo refleja
+    # para que el healthcheck no dé por sano un servicio que no puede predecir.
+    if model is None:
+        return JSONResponse(status_code=503, content={
+            "status": "degraded", "service": "ml-salud", "feature_version": FEATURE_VERSION, "model_loaded": False})
+    return {"status": "ok", "service": "ml-salud", "feature_version": FEATURE_VERSION, "model_loaded": True}
 
 
 @app.post("/api/internal/ml/salud/perfil")
-async def calcular_perfil(request: Request, response: Response, body: PerfilRequest):
+async def calcular_perfil(body: PerfilRequest):
     """
     Calcula el perfil de referencia individual (RF03) a partir de la
     telemetría cruda de calibración. Se llama UNA vez cuando el animal
@@ -112,10 +174,7 @@ async def calcular_perfil(request: Request, response: Response, body: PerfilRequ
     recalibrarlo); el resultado se persiste del lado del backend y se
     reenvía en cada /predict posterior en vez de la telemetría cruda.
     """
-    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
-    print(f"[{correlation_id}] Request de cálculo de perfil: "
-          f"calibracion={len(body.calibracion)} puntos.")
-    response.headers["X-Correlation-ID"] = correlation_id
+    log.info("Request de cálculo de perfil: calibracion=%d puntos.", len(body.calibracion))
 
     try:
         calib_move_state = [p.moveState for p in body.calibracion]
@@ -124,37 +183,19 @@ async def calcular_perfil(request: Request, response: Response, body: PerfilRequ
 
         perfil = compute_baseline(calib_move_state, calib_lat, calib_lon)
 
-        print(f"[{correlation_id}] Perfil calculado correctamente "
-              f"({perfil['n_dias_calibracion']} días de calibración).")
+        log.info("Perfil calculado correctamente (%d días de calibración).", perfil["n_dias_calibracion"])
         return {"perfil": perfil}
     except ErrorCalibracionInsuficiente as e:
-        print(f"[{correlation_id}] Calibración insuficiente: {str(e)}")
-        return JSONResponse(
-            status_code=422,
-            content={
-                "error": "Calibracion Insuficiente",
-                "mensaje": str(e),
-                "calib_dias_minimo": CALIB_DIAS_MINIMO,
-                "samples_per_day": SAMPLES_PER_DAY,
-                "trace_id": correlation_id
-            },
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        log.warning("Calibración insuficiente: %s", e)
+        return respuesta_error(422, "Calibracion Insuficiente", str(e),
+                               calib_dias_minimo=CALIB_DIAS_MINIMO, samples_per_day=SAMPLES_PER_DAY)
     except Exception as e:
-        print(f"[{correlation_id}] Error calculando el perfil: {str(e)}")
-        return JSONResponse(
-            status_code=503,
-            content={
-                "error": "Internal Server Error",
-                "mensaje": str(e),
-                "trace_id": correlation_id
-            },
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        log.error("Error calculando el perfil: %s", e)
+        return respuesta_error(503, "Internal Server Error", str(e))
 
 
 @app.post("/api/internal/ml/salud/predict", response_model=PrediccionSaludResponse)
-async def predict(request: Request, response: Response, body: PredictRequest):
+async def predict(body: PredictRequest):
     """
     Request:
       - serie: ventana de 24hs (288 puntos, 1 cada 5 min) a evaluar.
@@ -162,21 +203,18 @@ async def predict(request: Request, response: Response, body: PredictRequest):
         animal. No se recalcula acá -- si el backend necesita
         recalibrar, debe llamar primero a /perfil.
     """
-    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
-    print(f"[{correlation_id}] Request recibida: serie={len(body.serie)} puntos, "
-          f"perfil provisto (feature_version={body.perfil.get('feature_version', '?')}).")
-    response.headers["X-Correlation-ID"] = correlation_id
+    log.info("Request recibida: serie=%d puntos, perfil provisto (feature_version=%s).",
+             len(body.serie), body.perfil.get("feature_version", "?"))
+
+    problemas = _problemas_de_entrada(body)
+    if problemas:
+        mensaje = "; ".join(problemas)
+        log.warning("Payload inválido: %s", mensaje)
+        return respuesta_error(422, "Payload Invalido", mensaje)
 
     try:
         if model is None:
             raise ValueError("El modelo de machine learning no está cargado.")
-
-        if not body.serie:
-            raise ValueError("La serie a evaluar está vacía.")
-
-        if not body.perfil:
-            raise ValueError("No se recibió un perfil de referencia. "
-                              "Llamar primero a /api/internal/ml/salud/perfil.")
 
         move_state = [p.moveState for p in body.serie]
         lat = [p.latitud for p in body.serie]
@@ -195,7 +233,7 @@ async def predict(request: Request, response: Response, body: PredictRequest):
         desvio = severidad > 0
         causa = get_posible_causa(severidad)
 
-        print(f"[{correlation_id}] Inferencia exitosa: severidad={severidad}, confianza={confianza:.4f}")
+        log.info("Inferencia exitosa: severidad=%d, confianza=%.4f", severidad, confianza)
 
         return PrediccionSaludResponse(
             desvio_detectado=desvio,
@@ -204,18 +242,7 @@ async def predict(request: Request, response: Response, body: PredictRequest):
             confianza_modelo=confianza
         )
     except Exception as e:
-        # Un perfil malformado (ej. faltan claves porque vino de una
-        # versión vieja de /perfil) también cae acá: compute_features
-        # lanza KeyError/ValueError, y se reporta como 503 igual que
-        # cualquier otra falla de inferencia -- no hay forma de servir
-        # una predicción sin un perfil válido.
-        print(f"[{correlation_id}] Error durante la inferencia: {str(e)}")
-        return JSONResponse(
-            status_code=503,
-            content={
-                "error": "Internal Server Error",
-                "mensaje": str(e),
-                "trace_id": correlation_id
-            },
-            headers={"X-Correlation-ID": correlation_id}
-        )
+        # Los problemas de los datos (serie o perfil) ya salieron como 422
+        # en _problemas_de_entrada; lo que llega acá es una falla del servicio.
+        log.error("Error durante la inferencia: %s", e)
+        return respuesta_error(503, "Internal Server Error", str(e))

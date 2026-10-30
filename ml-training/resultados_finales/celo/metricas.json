@@ -1,0 +1,209 @@
+{
+  "generado": "2026-10-29T20:54:49",
+  "modelo": "celo (LSTM)",
+  "comando": "python evaluar_final.py",
+  "run_evaluado": "20261027_105620_split42",
+  "split_seed": 42,
+  "conjunto_prueba": {
+    "n": 3600,
+    "positivos": 278,
+    "animales": 40
+  },
+  "conjunto_validacion": {
+    "n": 2880,
+    "positivos": 221
+  },
+  "umbral_elegido_en": "validacion",
+  "desvio": "muestral (n-1)",
+  "por_semilla": [
+    {
+      "init_seed": 42,
+      "umbral": 0.8923915028572083,
+      "precision": 0.6139896373056994,
+      "recall": 0.8525179856115108,
+      "f1": 0.713855421686747,
+      "pr_auc": 0.7220863641960679,
+      "matriz_confusion": [
+        [
+          3173,
+          149
+        ],
+        [
+          41,
+          237
+        ]
+      ],
+      "consistente_con_entrenamiento": true
+    },
+    {
+      "init_seed": 43,
+      "umbral": 0.587979793548584,
+      "precision": 0.7873134328358209,
+      "recall": 0.7589928057553957,
+      "f1": 0.7728937728937729,
+      "pr_auc": 0.7960098037003709,
+      "matriz_confusion": [
+        [
+          3265,
+          57
+        ],
+        [
+          67,
+          211
+        ]
+      ],
+      "consistente_con_entrenamiento": true
+    },
+    {
+      "init_seed": 44,
+      "umbral": 0.9469696283340454,
+      "precision": 0.868,
+      "recall": 0.7805755395683454,
+      "f1": 0.821969696969697,
+      "pr_auc": 0.8135496475213064,
+      "matriz_confusion": [
+        [
+          3289,
+          33
+        ],
+        [
+          61,
+          217
+        ]
+      ],
+      "consistente_con_entrenamiento": true
+    },
+    {
+      "init_seed": 45,
+      "umbral": 0.7440807819366455,
+      "precision": 0.6086956521739131,
+      "recall": 0.7050359712230215,
+      "f1": 0.6533333333333333,
+      "pr_auc": 0.7032599490227417,
+      "matriz_confusion": [
+        [
+          3196,
+          126
+        ],
+        [
+          82,
+          196
+        ]
+      ],
+      "consistente_con_entrenamiento": true
+    },
+    {
+      "init_seed": 46,
+      "umbral": 0.7965667247772217,
+      "precision": 0.7378048780487805,
+      "recall": 0.8705035971223022,
+      "f1": 0.7986798679867987,
+      "pr_auc": 0.8129732142566497,
+      "matriz_confusion": [
+        [
+          3236,
+          86
+        ],
+        [
+          36,
+          242
+        ]
+      ],
+      "consistente_con_entrenamiento": true
+    }
+  ],
+  "agregado": {
+    "precision": {
+      "mean": 0.7231607200728428,
+      "std": 0.1121706467944576
+    },
+    "recall": {
+      "mean": 0.7935251798561151,
+      "std": 0.06818420994780772
+    },
+    "f1": {
+      "mean": 0.7521464185740697,
+      "std": 0.06837640508400099
+    },
+    "pr_auc": {
+      "mean": 0.7695757957394274,
+      "std": 0.052841342681264315
+    },
+    "umbral": {
+      "mean": 0.793597686290741,
+      "std": 0.13966265393795824
+    },
+    "matriz_confusion": {
+      "mean": [
+        [
+          3231.8,
+          90.2
+        ],
+        [
+          57.4,
+          220.6
+        ]
+      ],
+      "std": [
+        [
+          47.77760981882622,
+          47.77760981882622
+        ],
+        [
+          18.95521036549054,
+          18.95521036549054
+        ]
+      ]
+    }
+  },
+  "modelo_desplegado": {
+    "init_seed": 44,
+    "celo_threshold": 0.947,
+    "umbral": 0.947,
+    "precision": 0.868,
+    "recall": 0.7805755395683454,
+    "f1": 0.821969696969697,
+    "pr_auc": 0.8135496475213064,
+    "matriz_confusion": [
+      [
+        3289,
+        33
+      ],
+      [
+        61,
+        217
+      ]
+    ]
+  },
+  "verificacion_empaquetado": {
+    "modelo_servicio": "ml-celo/app/models/modelo_celo_lstm.keras",
+    "sha256_pesos_servicio": "c05f9cb7d8ddda56a11cd245345e67f9701f10b8bfeed8547a11ec15243be034",
+    "sha256_pesos_por_semilla": {
+      "init42": "acb63f43475e4f1370b4dc63397cacf7fb90e15d58ee5b8fd0ded975b921490a",
+      "init43": "050da50a6d546db36717e97a638cd85d0fc610f5d2f49a6797a4109f9612f355",
+      "init44": "c05f9cb7d8ddda56a11cd245345e67f9701f10b8bfeed8547a11ec15243be034",
+      "init45": "ac6927652922d09e6f811c9ee37aa578c46ef5e5b9b35aeec8faf5d71874786a",
+      "init46": "8ee3877c5716bde6340b0c0eaf71cbd2bd404162b7014a7f2374a7c393c8e118"
+    },
+    "semilla_coincidente": 44,
+    "scaler_coincide": true,
+    "sha256_scaler": "658c662a60fe9ea40ff63511c42e5139a3545ea385a612d278debc2df052014e",
+    "predicciones_test_identicas": true,
+    "max_diferencia_probabilidad": 0.0,
+    "coincide": true
+  },
+  "criterio": {
+    "f1_min": 0.7,
+    "f1_media": 0.7521464185740697,
+    "cumple_f1": true,
+    "modelo_coincide": true,
+    "cumple": true
+  },
+  "versiones": {
+    "python": "3.11.9",
+    "numpy": "2.4.6",
+    "sklearn": "1.9.0",
+    "tensorflow": "2.21.0",
+    "keras": "3.15.1"
+  }
+}

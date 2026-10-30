@@ -71,6 +71,13 @@ ruido del dataset regenerado sigue siendo realista.
 
 ## Resultados de referencia (dataset sintético, 300 animales, 90 días de evaluación, seed 42)
 
+> Los resultados finales para el informe están en
+> [`../resultados_finales/`](../resultados_finales/README.md) y se generan
+> con `python evaluar_final.py`. Se miden como decide `ml-salud`
+> (argmax, desvío = severidad > 0): F1 de desvío **0.525 ± 0.008**. Las
+> filas "umbral óptimo" de la tabla de abajo usan un umbral elegido sobre
+> prueba que el servicio no aplica, así que quedan como históricas.
+
 Media ± desvío estándar sobre 5 corridas con distinta semilla del
 estimador, misma partición de datos (80/20 por animal). Corrida
 `20260918_195113_split42`, dataset regenerado con ruido GPS realista +
