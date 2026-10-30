@@ -153,7 +153,11 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Start Docker Compose stack
-        run: docker compose -f infra/docker-compose.yml up -d --build --wait
+        run: >
+          docker compose
+          --env-file infra/.env.example
+          -f infra/docker-compose.yml
+          up -d --build --wait --wait-timeout 300
 
       - name: Wait for Backend API readiness
         run: |
