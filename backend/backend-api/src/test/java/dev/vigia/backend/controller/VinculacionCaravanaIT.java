@@ -52,11 +52,7 @@ class VinculacionCaravanaIT extends GestionRodeoItBase {
         assertThat(estadoCaravana("FX-A-01")).isEqualTo("DISPONIBLE");
         assertThat(codigosDisponibles("productorA", EST_A)).contains("FX-A-01");
 
-        // Con estadoActual explícito, como el frontend: sin él el alta deja el estado en null (defecto de H0004-01)
-        // y la vinculación falla por eso, no por lo que prueba este caso.
-        Map<String, Object> alta = cuerpoAnimal("A-501", EST_A, "Rodeo A1");
-        alta.put("estadoActual", "ACTIVO");
-        Long nuevo = leer(altaAnimal("productorA", alta)).get("id").asLong();
+        Long nuevo = leer(altaAnimal("productorA", cuerpoAnimal("A-501", EST_A, "Rodeo A1"))).get("id").asLong();
         resultado = vincular(nuevo, "FX-A-01");
         assertThat(resultado.getResponse().getStatus()).as(texto(resultado)).isEqualTo(200);
         assertThat(caravanaDe("A-501")).isEqualTo(idCaravana("FX-A-01"));

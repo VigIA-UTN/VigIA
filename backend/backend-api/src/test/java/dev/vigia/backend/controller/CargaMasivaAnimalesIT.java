@@ -47,6 +47,7 @@ class CargaMasivaAnimalesIT extends GestionRodeoItBase {
                 + "A-302,Masiva 2,2999-01-01,Angus,Rodeo A1,\n"
                 + "A-303,Masiva 3,2024-03-10,Angus,Rodeo Inexistente,\n");
 
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
         JsonNode respuesta = leer(resultado);
         assertThat(respuesta.get("procesados").asInt()).isEqualTo(3);
         assertThat(respuesta.get("fallidos").asInt()).isEqualTo(2);
@@ -68,6 +69,7 @@ class CargaMasivaAnimalesIT extends GestionRodeoItBase {
                 + "A-302,Uno,2024-01-10,Angus,Rodeo A1,\n"
                 + "A-303,Cuatro,2024-01-10,Angus,Rodeo A1,FX-A-L1\n");
 
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
         JsonNode respuesta = leer(resultado);
         assertThat(respuesta.get("fallidos").asInt()).isEqualTo(4);
         assertThat(respuesta.get("exitosos").asInt()).isZero();

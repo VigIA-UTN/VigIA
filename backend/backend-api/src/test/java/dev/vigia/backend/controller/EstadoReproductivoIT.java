@@ -155,6 +155,7 @@ class EstadoReproductivoIT extends GestionRodeoItBase {
                 + "NO-EXISTE,,VACIA,,\n"
                 + "A-103,,POSIBLE_CELO,,\n"
                 + "A-102,,GESTANTE,,\n");
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
         JsonNode respuesta = leer(resultado);
         assertThat(respuesta.get("exitosos").asInt()).isZero();
         assertThat(respuesta.get("fallidos").asInt()).isEqualTo(3);

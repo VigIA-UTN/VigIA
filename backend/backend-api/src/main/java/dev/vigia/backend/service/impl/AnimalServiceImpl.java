@@ -178,7 +178,9 @@ public class AnimalServiceImpl implements AnimalService {
                 animal.setAlias(request.getAlias());
                 animal.setFechaNacimiento(request.getFechaNacimiento());
                 animal.setRaza(request.getRaza());
-                animal.setEstadoActual(request.getEstadoActual());
+                // Sin estado, el alta es un animal activo: un estado null lo dejaría fuera del listado.
+                animal.setEstadoActual(request.getEstadoActual() != null ? request.getEstadoActual()
+                                : EstadoAnimal.ACTIVO);
 
                 Animal savedAnimal = animalRepository.save(animal);
 
