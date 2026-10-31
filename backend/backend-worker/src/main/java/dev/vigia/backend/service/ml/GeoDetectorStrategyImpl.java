@@ -221,7 +221,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
             log.info("Aislamiento del animal {} cerrado sin datos (última posición: {})", animal.getId(), ultima);
         }
         afectadas.values().forEach(alerta -> publicar(alerta,
-                alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId())));
+                alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId()), false));
     }
 
     /**
@@ -261,7 +261,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
         }
         // Un regreso re-publica la alerta (mismo id) para que la tarjeta abierta lo muestre; no cambia su estado.
         conRegresos.values().forEach(alerta -> publicar(alerta,
-                alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId())));
+                alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId()), false));
         if (nuevos.isEmpty()) {
             return;
         }
@@ -298,7 +298,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
             abiertos.put(episodio.getAnimal().getId(), episodio);
         }
         log.info("Generada alerta de AISLAMIENTO_SOCIAL {} con {} animales", guardada.getId(), episodios.size());
-        publicar(guardada, episodios);
+        publicar(guardada, episodios, true);
     }
 
     /**
@@ -333,7 +333,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
         resumir(pendiente, episodios, umbral, telemetriaDelRodeo);
         alertaRepository.save(pendiente);
         log.info("Alerta de AISLAMIENTO_SOCIAL {} actualizada: {} animales nuevos", pendiente.getId(), nuevos.size());
-        publicar(pendiente, episodios);
+        publicar(pendiente, episodios, false);
     }
 
     private static AlertaAnimalAislado nuevoEpisodio(Analizado analizado, LocalDateTime ahora) {
@@ -382,8 +382,11 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
         alerta.setLongitud(ultima != null ? ultima.getLongitud() : null);
     }
 
-    /** Publica la alerta con su lista de animales (sale recién cuando commitea el chunk). */
-    private void publicar(Alerta alerta, List<AlertaAnimalAislado> episodios) {
+    /**
+     * Publica la alerta con su lista de animales (sale recién cuando commitea el chunk). nueva solo
+     * cuando se acaba de crear: sumar animales o registrar regresos re-publica la misma alerta.
+     */
+    private void publicar(Alerta alerta, List<AlertaAnimalAislado> episodios, boolean nueva) {
         try {
             List<AnimalAisladoResponse> animalesAislados = episodios.stream()
                     .sorted(Comparator.comparing(AlertaAnimalAislado::getSegundosFuera).reversed())
@@ -403,6 +406,7 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
                     .latitud(alerta.getLatitud())
                     .longitud(alerta.getLongitud())
                     .animalesAislados(animalesAislados)
+                    .nueva(nueva)
                     .build();
             publicadorDeAlertas.publicar(eventDTO);
         } catch (Exception e) {

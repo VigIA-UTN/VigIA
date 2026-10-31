@@ -1,11 +1,13 @@
 package dev.vigia.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,10 +17,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import dev.vigia.backend.dto.AnimalAisladoResponse;
+import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.AlertaAnimalAislado;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
+import dev.vigia.backend.model.Establecimiento;
+import dev.vigia.backend.model.EstadoAlerta;
+import dev.vigia.backend.model.Usuario;
 import dev.vigia.backend.repository.AlertaAnimalAisladoRepository;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
@@ -99,5 +105,44 @@ class SseAlertaPublisherTest {
     void otroDisparador_noTieneAnimalesAislados() {
         assertThat(publisher.animalesAislados(900L, DisparadorAlerta.CELO, null)).isNull();
         verifyNoInteractions(alertaAnimalAisladoRepository);
+    }
+
+    @Test
+    void alertaNueva_sinClientesConectados_igualMandaMail() {
+        Establecimiento establecimiento = animalDelEstablecimiento(1L);
+        Alerta alerta = new Alerta();
+        alerta.setId(900L);
+        Usuario usuario = new Usuario();
+        usuario.setEmail("campero@vigia.dev");
+        when(usuarioRepository.findEmpleadosByEstablecimientoId(1L)).thenReturn(List.of(usuario));
+        when(establecimientoRepository.findById(1L)).thenReturn(Optional.of(establecimiento));
+        when(alertaRepository.findById(900L)).thenReturn(Optional.of(alerta));
+
+        publisher.handleAlertaEvent(AlertaEventDTO.builder().id(900L).animalId(10L)
+                .estado(EstadoAlerta.PENDIENTE).nueva(true).build());
+
+        verify(emailService).enviarAlerta("campero@vigia.dev", "La Esperanza", alerta);
+    }
+
+    @Test
+    void cambioDeEstado_noMandaMail() {
+        animalDelEstablecimiento(1L);
+        publisher.registrarClienteSse(1L, null);
+
+        publisher.handleAlertaEvent(AlertaEventDTO.builder().id(900L).animalId(10L)
+                .estado(EstadoAlerta.CONFIRMADA).build());
+
+        verifyNoInteractions(emailService);
+    }
+
+    private Establecimiento animalDelEstablecimiento(Long establecimientoId) {
+        Establecimiento establecimiento = new Establecimiento();
+        establecimiento.setId(establecimientoId);
+        establecimiento.setNombre("La Esperanza");
+        Animal animal = new Animal();
+        animal.setId(10L);
+        animal.setEstablecimiento(establecimiento);
+        when(animalRepository.findById(10L)).thenReturn(Optional.of(animal));
+        return establecimiento;
     }
 }

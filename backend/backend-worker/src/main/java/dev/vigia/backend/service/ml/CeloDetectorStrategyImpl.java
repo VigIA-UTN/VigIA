@@ -165,6 +165,7 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
                                         .estado(alerta.getEstado())
                                         .confianzaModelo(alerta.getConfianzaModelo())
                                         .ventanaOptimaHoras(alerta.getVentanaOptimaHoras())
+                                        .nueva(true)
                                         .build();
 
                         publicadorDeAlertas.publicar(eventDTO);

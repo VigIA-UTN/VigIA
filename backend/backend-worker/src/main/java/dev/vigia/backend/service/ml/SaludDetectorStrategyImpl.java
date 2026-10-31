@@ -301,6 +301,7 @@ public class SaludDetectorStrategyImpl implements DetectorStrategy {
                 .desvioDetectado(alerta.getDesvioDetectado())
                 .posibleCausa(alerta.getPosibleCausa())
                 .accionRecomendada(buildAccionRecomendada(alerta.getPosibleCausa(), alerta.getSeveridad()))
+                .nueva(true)
                 .build();
 
         publicadorDeAlertas.publicar(eventDTO);
