@@ -198,6 +198,7 @@ public class AnestroDetectorService {
                 .valorDetectado(alerta.getValorDetectado())
                 .estado(alerta.getEstado())
                 .accionRecomendada(alerta.getAccionRecomendada())
+                .nueva(true)
                 .build();
 
         publicadorDeAlertas.publicar(eventDTO);
