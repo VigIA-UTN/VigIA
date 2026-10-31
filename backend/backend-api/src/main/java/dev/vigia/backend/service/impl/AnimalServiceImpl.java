@@ -1045,7 +1045,12 @@ public class AnimalServiceImpl implements AnimalService {
                         return result;
                 }
 
-                LocalDateTime desde = hace7Dias.atStartOfDay();
+                // La telemetría es de la caravana: lo anterior a su asignación puede ser de otro animal. Con el
+                // cambio de caravana arranca un período nuevo y esos días quedan sin datos.
+                LocalDate fechaAsignacion = animal.getCaravana().getFechaAsignacion();
+                LocalDateTime desde = fechaAsignacion != null && fechaAsignacion.isAfter(hace7Dias)
+                                ? fechaAsignacion.atStartOfDay()
+                                : hace7Dias.atStartOfDay();
                 LocalDateTime hasta = hoy.atTime(23, 59, 59);
 
                 List<Telemetria> telemetrias = telemetriaRepository
@@ -1639,7 +1644,12 @@ public class AnimalServiceImpl implements AnimalService {
                                         "La caravana ya se encuentra vinculada. Debe desvincularla antes de asignarla nuevamente.");
                 }
 
-                if (animal.getCaravana() != null && !animal.getCaravana().getId().equals(nuevaCaravana.getId())) {
+                // Si ya la tiene no cambia nada: ni la fecha de asignación ni la calibración.
+                if (animal.getCaravana() != null && animal.getCaravana().getId().equals(nuevaCaravana.getId())) {
+                        return;
+                }
+
+                if (animal.getCaravana() != null) {
                         Caravana caravanaAnterior = animal.getCaravana();
                         caravanaAnterior.setEstadoSensor(EstadoSensor.DISPONIBLE);
                         caravanaAnterior.setActivo(false);
@@ -1652,6 +1662,13 @@ public class AnimalServiceImpl implements AnimalService {
                 nuevaCaravana.setFechaAsignacion(LocalDate.now());
 
                 caravanaRepository.save(nuevaCaravana);
+
+                // Otra caravana es otro sensor y otra colocación en la oreja: el perfil de salud deja de valer y
+                // el worker vuelve a calibrar con los primeros días de esta caravana desde su asignación.
+                perfilReferenciaRepository.findByAnimal(animal).ifPresent(perfil -> {
+                        animal.setPerfilReferencia(null);
+                        perfilReferenciaRepository.delete(perfil);
+                });
         }
 
         private void validarPermisoGestionCaravana(Usuario usuario, Establecimiento establecimiento) {

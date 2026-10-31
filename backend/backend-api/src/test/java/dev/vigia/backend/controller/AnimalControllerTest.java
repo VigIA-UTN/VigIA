@@ -1787,6 +1787,29 @@ class AnimalControllerTest {
         }
 
         @Test
+        @DisplayName("GET /api/v1/animales/{id}/metricas - Solo cuenta la telemetría desde la asignación de la caravana")
+        @SuppressWarnings("null")
+        void getMetricasAnimal_soloDesdeLaAsignacion() throws Exception {
+                // La caravana tiene datos de los 7 días, pero se le asignó a este animal hace 2: lo anterior es de
+                // otro animal.
+                Animal animal = animalConCaravana("Vaca Caravana Reasignada", LocalDate.now().minusYears(2),
+                                LocalDate.now().minusDays(2), "DEV-MET-ASIG");
+                LocalDate hoy = LocalDate.now();
+                for (int i = 0; i < 7; i++) {
+                        telemetriaEn(animal, hoy.minusDays(i).atTime(12, 0));
+                }
+
+                mockMvc.perform(get("/api/v1/animales/" + animal.getId() + "/metricas")
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(7))
+                                .andExpect(jsonPath("$[0].sinDatos").value(true))
+                                .andExpect(jsonPath("$[3].sinDatos").value(true))
+                                .andExpect(jsonPath("$[4].sinDatos").value(false))
+                                .andExpect(jsonPath("$[6].sinDatos").value(false));
+        }
+
+        @Test
         @DisplayName("GET /api/v1/animales/{id}/metricas - Aislamiento por establecimiento")
         @SuppressWarnings("null")
         void getMetricasAnimal_aislamientoEstablecimiento() throws Exception {
@@ -2551,6 +2574,64 @@ class AnimalControllerTest {
                 Animal animalEnDb = animalRepository.findById(animalId).orElseThrow();
                 assertThat(animalEnDb.getCaravana()).isNotNull();
                 assertThat(animalEnDb.getCaravana().getId()).isEqualTo(caravana.getId());
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/vincular-caravana - Cambiar de caravana borra el perfil de salud para recalibrar")
+        void vincularCaravana_otraCaravana_borraPerfilDeSalud() throws Exception {
+                Caravana anterior = crearCaravanaDisponible("TEST-RECAL-01");
+                Caravana nueva = crearCaravanaDisponible("TEST-RECAL-02");
+                Long animalId = crearAnimal("Vaca Recalibra", establecimientoId, rodeoLoteId);
+                vincular(animalId, anterior.getId());
+                guardarPerfil(animalId);
+
+                vincular(animalId, nueva.getId())
+                                .andExpect(jsonPath("$.caravanaId").value(nueva.getId()))
+                                .andExpect(jsonPath("$.enCalibracion").value(true));
+
+                assertThat(perfilReferenciaRepository.existsByAnimal(animalRepository.findById(animalId).orElseThrow()))
+                                .isFalse();
+                assertThat(caravanaRepository.findById(anterior.getId()).orElseThrow().getEstadoSensor())
+                                .isEqualTo(EstadoSensor.DISPONIBLE);
+        }
+
+        @SuppressWarnings("null")
+        @Test
+        @DisplayName("POST /api/v1/animales/{id}/vincular-caravana - Volver a vincular la misma caravana no reinicia la calibración")
+        void vincularCaravana_mismaCaravana_noReiniciaCalibracion() throws Exception {
+                Caravana caravana = crearCaravanaDisponible("TEST-RECAL-03");
+                Long animalId = crearAnimal("Vaca Misma Caravana", establecimientoId, rodeoLoteId);
+                vincular(animalId, caravana.getId());
+                caravana = caravanaRepository.findById(caravana.getId()).orElseThrow();
+                caravana.setFechaAsignacion(LocalDate.now().minusDays(20));
+                caravanaRepository.save(caravana);
+                guardarPerfil(animalId);
+
+                vincular(animalId, caravana.getId());
+
+                assertThat(perfilReferenciaRepository.existsByAnimal(animalRepository.findById(animalId).orElseThrow()))
+                                .isTrue();
+                assertThat(caravanaRepository.findById(caravana.getId()).orElseThrow().getFechaAsignacion())
+                                .isEqualTo(LocalDate.now().minusDays(20));
+        }
+
+        private org.springframework.test.web.servlet.ResultActions vincular(Long animalId, Long caravanaId)
+                        throws Exception {
+                return mockMvc.perform(post("/api/v1/animales/" + animalId + "/vincular-caravana")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(new VincularCaravanaRequest(caravanaId))))
+                                .andExpect(status().isOk());
+        }
+
+        @SuppressWarnings("null")
+        private void guardarPerfil(Long animalId) {
+                PerfilReferencia perfil = new PerfilReferencia();
+                perfil.setAnimal(animalRepository.findById(animalId).orElseThrow());
+                perfil.setPerfilJson("{}");
+                perfil.setFechaCalculo(LocalDateTime.now());
+                perfilReferenciaRepository.save(perfil);
         }
 
         @SuppressWarnings("null")
