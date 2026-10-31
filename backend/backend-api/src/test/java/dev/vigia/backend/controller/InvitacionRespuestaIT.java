@@ -58,10 +58,10 @@ class InvitacionRespuestaIT extends SeguridadItBase {
 
         int estado = responder("camperoA", token, "aceptar");
 
-        assertThat(estado).isIn(400, 403);
+        assertThat(estado).isEqualTo(403);
         assertThat(estadoInvitacion(token)).isEqualTo("PENDIENTE");
         assertThat(esEmpleadoActivo(email("camperoA"), EST_B)).isFalse();
-        assertThat(responder("camperoA", token, "rechazar")).isIn(400, 403);
+        assertThat(responder("camperoA", token, "rechazar")).isEqualTo(403);
     }
 
     @Test

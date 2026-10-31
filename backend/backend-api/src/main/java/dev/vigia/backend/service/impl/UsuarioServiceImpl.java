@@ -110,8 +110,13 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .findFirst();
 
         if (vinculoOpt.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "El empleado no pertenece al establecimiento del productor o ya está desvinculado");
+            // Sin ningún vínculo con este establecimiento es un usuario ajeno (403); con un vínculo inactivo, ya
+            // estaba desvinculado (400).
+            boolean tuvoVinculo = establecimiento.getEmpleados().stream().anyMatch(v -> v.getUsuario().equals(empleado));
+            if (!tuvoVinculo) {
+                throw new AccessDeniedException("El empleado no pertenece al establecimiento del productor");
+            }
+            throw new IllegalArgumentException("El empleado ya está desvinculado del establecimiento");
         }
 
         if (empleado.getRol() == Rol.PRODUCTOR) {

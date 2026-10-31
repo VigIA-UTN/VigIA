@@ -474,9 +474,9 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/animales - Rodeo de otro establecimiento retorna 400")
+        @DisplayName("POST /api/v1/animales - Rodeo de otro establecimiento retorna 403")
         @SuppressWarnings("null")
-        void cargarAnimal_rodeoDeOtroEstablecimiento_badRequest() throws Exception {
+        void cargarAnimal_rodeoDeOtroEstablecimiento_forbidden() throws Exception {
                 Establecimiento otroEst = new Establecimiento();
                 otroEst.setNombre("Otro Campo Rodeo");
                 otroEst.setLatitud(-35.0);
@@ -491,7 +491,13 @@ class AnimalControllerTest {
 
                 AnimalRequest req = animalRequestValido("Vaca Rodeo Ajeno");
                 req.setRodeoLoteId(rodeoAjeno.getId());
-                esperarBadRequest(req);
+                mockMvc.perform(post("/api/v1/animales")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isForbidden());
+                assertThat(animalRepository.findAll())
+                                .noneMatch(a -> req.getIdCaravanaOficial().equals(a.getIdCaravanaOficial()));
         }
 
         @Test
@@ -2883,8 +2889,8 @@ class AnimalControllerTest {
 
         @SuppressWarnings("null")
         @Test
-        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 400 si el rodeo es de otro establecimiento, sin asignar nada")
-        void asignarCaravanasAleatoriamente_loteDeOtroEstablecimiento_retornaBadRequest() throws Exception {
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 403 si el rodeo es de otro establecimiento, sin asignar nada")
+        void asignarCaravanasAleatoriamente_loteDeOtroEstablecimiento_retornaForbidden() throws Exception {
                 Establecimiento otro = new Establecimiento();
                 otro.setNombre("Otro Establecimiento Test");
                 otro = establecimientoRepository.save(otro);
@@ -2898,7 +2904,7 @@ class AnimalControllerTest {
                                 .param("establecimientoId", establecimientoId.toString())
                                 .param("rodeoLoteId", ajeno.getId().toString())
                                 .header("Authorization", "Bearer " + productorToken))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
 
                 assertThat(caravanaRepository.findById(caravana.getId()).orElseThrow().getEstadoSensor())
                                 .isEqualTo(EstadoSensor.DISPONIBLE);

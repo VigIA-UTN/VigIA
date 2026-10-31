@@ -84,8 +84,9 @@ class AltaAnimalIT extends GestionRodeoItBase {
         Map<String, Object> rodeoAjeno = cuerpoAnimal("A-207", EST_A, "Rodeo A1");
         rodeoAjeno.put("rodeoLoteId", idRodeo(EST_B, "Rodeo B1"));
         MvcResult resultado = altaAnimal("productorA", rodeoAjeno);
-        assertThat(resultado.getResponse().getStatus()).isEqualTo(400);
-        assertThat(texto(resultado)).isEqualTo("El rodeo no pertenece al establecimiento.");
+        // Un rodeo de otro establecimiento es un acceso cruzado: 403, como pide RNF03 (ver AccesoCruzadoIT).
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(403);
+        assertThat(texto(resultado)).contains("El rodeo no pertenece al establecimiento.");
 
         jdbcTemplate.update("UPDATE rodeo_lote SET activo = 0 WHERE id = ?", idRodeo(EST_A, "Rodeo A2"));
         resultado = altaAnimal("productorA", cuerpoAnimal("A-208", EST_A, "Rodeo A2"));

@@ -153,7 +153,7 @@ class PerimetroServiceImplTest {
         when(rodeoLoteRepository.findAllById(List.of(200L))).thenReturn(List.of(loteAjeno));
 
         assertThatThrownBy(() -> perimetroService.crearPerimetro(request, "productor@vigia.dev"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("no pertenece al establecimiento");
 
         verify(perimetroRepository, never()).save(any());

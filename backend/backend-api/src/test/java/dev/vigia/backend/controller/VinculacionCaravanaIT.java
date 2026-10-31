@@ -63,8 +63,9 @@ class VinculacionCaravanaIT extends GestionRodeoItBase {
     @DisplayName("H0041-04 - Vinculación - Restricciones")
     void H0041_04_restricciones() throws Exception {
         MvcResult resultado = vincular(idAnimal(EST_A, "A-101"), "FX-B-L1");
-        assertThat(resultado.getResponse().getStatus()).isEqualTo(400);
-        assertThat(texto(resultado)).isEqualTo("La caravana no pertenece al mismo establecimiento que el animal.");
+        // Una caravana de otro establecimiento es un acceso cruzado: 403, como pide RNF03 (ver AccesoCruzadoIT).
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(403);
+        assertThat(texto(resultado)).contains("La caravana no pertenece al mismo establecimiento que el animal.");
 
         jdbcTemplate.update("UPDATE caravanas SET estado_sensor = 'INACTIVO' WHERE codigo = 'FX-A-L1'");
         resultado = vincular(idAnimal(EST_A, "A-102"), "FX-A-L1");

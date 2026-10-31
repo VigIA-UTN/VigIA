@@ -254,27 +254,44 @@ class MatrizPermisosIT extends SeguridadItBase {
     @DisplayName("H0002-06 - RBAC - Acceso no permitido devuelve 403")
     void H0002_06_accesoNoPermitidoDevuelve403(String rol, String metodo, String patron, Endpoint endpoint)
             throws Exception {
-        Map<String, Object> ids = idsDelEscenario();
-        String url = agregarEstablecimiento(resolver(endpoint.url(), ids), ids);
-
-        MockHttpServletRequestBuilder request;
-        if (endpoint.multipart()) {
-            request = MockMvcRequestBuilders.multipart(HttpMethod.POST, url)
-                    .file(new MockMultipartFile("file", "datos.csv", "text/csv",
-                            "idCaravanaOficial\n".getBytes(StandardCharsets.UTF_8)));
-        } else {
-            request = MockMvcRequestBuilders.request(HttpMethod.valueOf(metodo), url);
-            if (endpoint.cuerpo() != null) {
-                request.contentType(MediaType.APPLICATION_JSON).content(resolver(endpoint.cuerpo(), ids));
-            }
-        }
+        MockHttpServletRequestBuilder request = armarRequest(endpoint);
         request.header("Authorization", "Bearer " + tokenPorRol(rol));
 
         MvcResult resultado = mockMvc.perform(request).andReturn();
 
         assertThat(resultado.getResponse().getStatus())
-                .as("%s %s con rol %s; respuesta: %s", metodo, url, rol, resultado.getResponse().getContentAsString())
+                .as("%s %s con rol %s; respuesta: %s", metodo, patron, rol, resultado.getResponse().getContentAsString())
                 .isEqualTo(403);
+    }
+
+    static Stream<Arguments> todosLosEndpoints() {
+        return matriz().stream().map(e -> Arguments.of(e.metodo(), e.patron(), e));
+    }
+
+    @ParameterizedTest(name = "H0002-06 [SIN TOKEN] {0} {1}")
+    @MethodSource("todosLosEndpoints")
+    @DisplayName("H0002-06 - RBAC - Acceso sin autenticar devuelve 401")
+    void H0002_06_sinAutenticarDevuelve401(String metodo, String patron, Endpoint endpoint) throws Exception {
+        MvcResult resultado = mockMvc.perform(armarRequest(endpoint)).andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("%s %s sin token; respuesta: %s", metodo, patron, resultado.getResponse().getContentAsString())
+                .isEqualTo(401);
+    }
+
+    private MockHttpServletRequestBuilder armarRequest(Endpoint endpoint) throws Exception {
+        Map<String, Object> ids = idsDelEscenario();
+        String url = agregarEstablecimiento(resolver(endpoint.url(), ids), ids);
+        if (endpoint.multipart()) {
+            return MockMvcRequestBuilders.multipart(HttpMethod.POST, url)
+                    .file(new MockMultipartFile("file", "datos.csv", "text/csv",
+                            "idCaravanaOficial\n".getBytes(StandardCharsets.UTF_8)));
+        }
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders.request(HttpMethod.valueOf(endpoint.metodo()), url);
+        if (endpoint.cuerpo() != null) {
+            request.contentType(MediaType.APPLICATION_JSON).content(resolver(endpoint.cuerpo(), ids));
+        }
+        return request;
     }
 
     @Test

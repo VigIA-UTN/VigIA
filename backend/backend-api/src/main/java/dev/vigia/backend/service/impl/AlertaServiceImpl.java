@@ -888,6 +888,17 @@ public class AlertaServiceImpl implements AlertaService {
                         return List.of();
                 }
 
+                // Filtrar por un animal de otro establecimiento es un acceso cruzado (403), no una lista vacía.
+                if (animalId != null) {
+                        List<Long> visibles = ids;
+                        boolean animalVisible = animalRepository.findById(animalId)
+                                        .map(a -> visibles.contains(a.getEstablecimiento().getId()))
+                                        .orElse(true);
+                        if (!animalVisible) {
+                                throw new AccessDeniedException("El animal no pertenece al establecimiento indicado.");
+                        }
+                }
+
                 // ponytail: sin paginación, agregar Pageable cuando un veterinario tenga cientos de diagnósticos
                 return diagnosticoRepository.findVisibles(ids, animalId).stream()
                                 .map(this::toDiagnosticoResponse)
