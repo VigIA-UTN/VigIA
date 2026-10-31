@@ -8,7 +8,10 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -31,6 +34,13 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvService {
+
+    // POSIBLE_CELO lo registra solo la detección automática; el productor carga el celo confirmado (CELO).
+    private static final Set<TipoReproductivo> ESTADOS_PERMITIDOS = EnumSet.complementOf(
+            EnumSet.of(TipoReproductivo.POSIBLE_CELO));
+
+    private static final String MENSAJE_ESTADO_INVALIDO = "Estado inválido. Valores permitidos: "
+            + ESTADOS_PERMITIDOS.stream().map(Enum::name).collect(Collectors.joining(", "));
 
     @Override
     public EstadoReproductivoParseResult parseAndValidate(MultipartFile file) throws IOException, IllegalArgumentException {
@@ -93,6 +103,7 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
                 
                 try {
                     EstadoReproductivoCsvRequest request = parseRow(cols);
+                    request.setFila(rowIndex + 1);
                     validos.add(request);
                 } catch (Exception e) {
                     invalidos.add(new FilaEstadoInvalida(rowIndex + 1, e.getMessage()));
@@ -140,6 +151,7 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
                 
                 try {
                     EstadoReproductivoCsvRequest request = parseRow(cols);
+                    request.setFila(rowNumber);
                     validos.add(request);
                 } catch (Exception e) {
                     invalidos.add(new FilaEstadoInvalida(rowNumber, e.getMessage()));
@@ -169,7 +181,10 @@ public class EstadoReproductivoCsvServiceImpl implements EstadoReproductivoCsvSe
         try {
             estado = TipoReproductivo.valueOf(estadoStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Estado inválido. Valores permitidos: VACIA, GESTANTE, CELO, ANESTRO");
+            throw new IllegalArgumentException(MENSAJE_ESTADO_INVALIDO);
+        }
+        if (!ESTADOS_PERMITIDOS.contains(estado)) {
+            throw new IllegalArgumentException(MENSAJE_ESTADO_INVALIDO);
         }
         
         LocalDate fechaParto = null;

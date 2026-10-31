@@ -127,4 +127,22 @@ class EstadoReproductivoCsvServiceTest {
         assertTrue(result.getInvalidos().get(1).getError().contains("Estado es obligatorio"));
         assertTrue(result.getInvalidos().get(2).getError().contains("Estado inválido"));
     }
+
+    @Test
+    @DisplayName("POSIBLE_CELO no se puede cargar por archivo y el mensaje lista los estados permitidos")
+    void testEstadosPermitidos() throws IOException {
+        String content = "IdCaravana,Alias,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+                "1,,INSEMINADA,,\n" +
+                "2,,PARIDA,,\n" +
+                "3,,POSIBLE_CELO,,\n";
+
+        MockMultipartFile file = createCsv("test.csv", content);
+        EstadoReproductivoParseResult result = service.parseAndValidate(file);
+
+        assertEquals(2, result.getValidos().size());
+        assertEquals(1, result.getInvalidos().size());
+        assertEquals(4, result.getInvalidos().get(0).getFila());
+        assertEquals("Estado inválido. Valores permitidos: VACIA, GESTANTE, CELO, ANESTRO, INSEMINADA, PARIDA",
+                result.getInvalidos().get(0).getError());
+    }
 }
