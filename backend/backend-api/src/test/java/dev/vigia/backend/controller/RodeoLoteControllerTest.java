@@ -15,6 +15,9 @@ import dev.vigia.backend.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -185,6 +188,41 @@ class RodeoLoteControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isUnauthorized());
+        }
+
+        @ParameterizedTest
+        @NullAndEmptySource
+        @ValueSource(strings = "   ")
+        @DisplayName("POST /api/v1/rodeo-lotes - Sin nombre retorna 400 y no crea el rodeoLote")
+        @SuppressWarnings("null")
+        void crearRodeoLote_sinNombre_badRequest(String nombre) throws Exception {
+                RodeoLoteRequest request = new RodeoLoteRequest();
+                request.setNombre(nombre);
+                request.setEstablecimientoId(establecimientoId);
+
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+
+                assertThat(rodeoLoteRepository.findAll()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("POST /api/v1/rodeo-lotes - Sin establecimiento retorna 400")
+        @SuppressWarnings("null")
+        void crearRodeoLote_sinEstablecimiento_badRequest() throws Exception {
+                RodeoLoteRequest request = new RodeoLoteRequest();
+                request.setNombre("Rodeo Sin Est.");
+
+                mockMvc.perform(post("/api/v1/rodeo-lotes")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+
+                assertThat(rodeoLoteRepository.findAll()).isEmpty();
         }
 
         @Test
