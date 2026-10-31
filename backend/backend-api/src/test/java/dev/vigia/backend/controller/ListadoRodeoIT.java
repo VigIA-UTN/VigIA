@@ -49,7 +49,7 @@ class ListadoRodeoIT extends GestionRodeoItBase {
     }
 
     @ParameterizedTest(name = "H0006-03 - Listado - Acceso por rol: {0}")
-    @ValueSource(strings = { "veterinarioA", "camperoA", "admin" })
+    @ValueSource(strings = { "veterinarioA", "camperoA" })
     @DisplayName("H0006-03 - Listado - Acceso por rol")
     void H0006_03_accesoPorRol(String clave) throws Exception {
         MvcResult resultado = listar(clave, EST_A);
@@ -57,6 +57,18 @@ class ListadoRodeoIT extends GestionRodeoItBase {
         assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
         assertThat(identificadores(leer(resultado)))
                 .containsExactlyInAnyOrder("A-101", "A-102", "A-103", "A-104", "A-105", "A-106");
+    }
+
+    @Test
+    @DisplayName("H0006-03 - Listado - Acceso por rol: el administrador ve los animales de todos los establecimientos")
+    void H0006_03_administradorVeTodos() throws Exception {
+        // El administrador no filtra por establecimiento: lo hace el frontend con el establecimiento seleccionado.
+        MvcResult resultado = listar("admin", EST_A);
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+        assertThat(identificadores(leer(resultado))).contains(
+                "A-101", "A-102", "A-103", "A-104", "A-105", "A-106",
+                "B-101", "B-102", "B-103", "B-104", "B-105", "B-106");
     }
 
     private MvcResult listar(String clave, String establecimiento) throws Exception {
