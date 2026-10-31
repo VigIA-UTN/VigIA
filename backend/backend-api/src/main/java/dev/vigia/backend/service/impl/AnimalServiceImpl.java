@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -793,9 +794,13 @@ public class AnimalServiceImpl implements AnimalService {
                         } catch (Exception e) {
                                 String animalIdentifier = fila.getIdCaravana() != null ? fila.getIdCaravana()
                                                 : fila.getAlias();
-                                errores.add(new FilaEstadoInvalida(0, animalIdentifier + ": " + e.getMessage()));
+                                errores.add(new FilaEstadoInvalida(fila.getFila(),
+                                                animalIdentifier + ": " + e.getMessage()));
                         }
                 }
+
+                // Los errores del parseo y los del registro quedan juntos, en el orden del archivo.
+                errores.sort(Comparator.comparingInt(FilaEstadoInvalida::getFila));
 
                 if (!errores.isEmpty()) {
                         try {

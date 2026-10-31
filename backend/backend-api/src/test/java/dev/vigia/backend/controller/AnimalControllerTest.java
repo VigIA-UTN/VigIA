@@ -1429,6 +1429,40 @@ class AnimalControllerTest {
         }
 
         @Test
+        @DisplayName("POST /api/v1/animales/estado-reproductivo/csv - Los errores informan la fila real del archivo")
+        @SuppressWarnings("null")
+        void cargarEstadosExcel_errores_informanFilaDelArchivo() throws Exception {
+                Animal animal = new Animal();
+                animal.setEstablecimiento(establecimientoRepository.findById(establecimientoId).get());
+                animal.setEstadoActual(EstadoAnimal.ACTIVO);
+                animal.setIdCaravanaOficial("CARAVANA-123");
+                animal.setRaza("Angus");
+                animal = animalRepository.save(animal);
+
+                // Fila 2 válida, fila 3 con animal inexistente (falla al registrar), fila 4 con estado inválido
+                // (falla al parsear).
+                String csvContent = "IdCaravana,Alias,Estado,FechaUltimoParto,FechaUltimaInseminacion\n" +
+                                animal.getIdCaravanaOficial() + ",,GESTANTE,,\n" +
+                                "NO-EXISTE,,VACIA,,\n" +
+                                animal.getIdCaravanaOficial() + ",,ESTADO_FALSO,,\n";
+
+                MockMultipartFile file = new MockMultipartFile("file", "estados.csv", "text/csv",
+                                csvContent.getBytes());
+
+                mockMvc.perform(multipart("/api/v1/animales/estado-reproductivo/csv")
+                                .file(file)
+                                .param("establecimientoId", establecimientoId.toString())
+                                .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(jsonPath("$.procesados").value(3))
+                                .andExpect(jsonPath("$.exitosos").value(0))
+                                .andExpect(jsonPath("$.fallidos").value(2))
+                                .andExpect(jsonPath("$.errores[0].fila").value(3))
+                                .andExpect(jsonPath("$.errores[0].error").value(
+                                                org.hamcrest.Matchers.startsWith("NO-EXISTE: Animal no encontrado")))
+                                .andExpect(jsonPath("$.errores[1].fila").value(4));
+        }
+
+        @Test
         @DisplayName("POST /api/v1/animales/estado-reproductivo/csv - Rechazo por Rol Incorrecto (Admin)")
         @SuppressWarnings("null")
         void cargarEstadosExcel_asAdmin_forbidden() throws Exception {

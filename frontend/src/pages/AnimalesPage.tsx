@@ -1062,7 +1062,7 @@ export default function AnimalesPage() {
                                     <ul>
                                         <li><strong>IdCaravana</strong> (al menos IdCaravana o Alias debe estar presente)</li>
                                         <li><strong>Alias</strong> (al menos IdCaravana o Alias debe estar presente)</li>
-                                        <li><strong>Estado</strong> (VACIA, GESTANTE, CELO, ANESTRO)</li>
+                                        <li><strong>Estado</strong> (VACIA, GESTANTE, CELO, ANESTRO, INSEMINADA, PARIDA)</li>
                                         <li><strong>FechaUltimoParto</strong> (opcional, formato YYYY-MM-DD)</li>
                                         <li><strong>FechaUltimaInseminacion</strong> (opcional, formato YYYY-MM-DD)</li>
                                     </ul>

@@ -13,6 +13,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EstadoReproductivoCsvRequest {
+    // Número de fila en el archivo (la 1 es el encabezado), para informar los errores que surgen al registrar.
+    private int fila;
     private String idCaravana;
     private String alias;
     private TipoReproductivo estado;
