@@ -5,9 +5,13 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
@@ -68,6 +72,19 @@ abstract class GestionRodeoItBase extends SeguridadItBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(cuerpo)))
                 .andReturn();
+    }
+
+    // ── Caravanas por la API ─────────────────────────────────────────────────
+
+    protected List<String> codigosDisponibles(String clave, String establecimiento) throws Exception {
+        MvcResult resultado = mockMvc.perform(get("/api/v1/caravana/disponibles")
+                        .param("establecimientoId", idEstablecimiento(establecimiento).toString())
+                        .header("Authorization", bearer(clave)))
+                .andReturn();
+        assertThat(resultado.getResponse().getStatus()).as(texto(resultado)).isEqualTo(200);
+        List<String> codigos = new ArrayList<>();
+        leer(resultado).forEach(c -> codigos.add(c.get("codigo").asText()));
+        return codigos;
     }
 
     /** Cuerpo de la respuesta como texto: los errores de negocio de estos endpoints vuelven como mensaje plano. */
