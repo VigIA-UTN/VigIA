@@ -163,11 +163,19 @@ public class SseAlertaPublisher {
 
         Long establecimientoId = animalOpt.get().getEstablecimiento().getId();
 
+        enviarPorSse(alertaEvent, animalOpt.get(), establecimientoId);
+
+        // El mail avisa lo mismo que una tarjeta nueva en el sidebar: solo alertas recién creadas, y
+        // aunque nadie tenga la app abierta. Los cambios de estado y las actualizaciones no mandan mail.
+        if (alertaEvent.isNueva()) {
+            enviarMails(alertaEvent.getId(), establecimientoId);
+        }
+    }
+
+    private void enviarPorSse(AlertaEventDTO alertaEvent, Animal animal, Long establecimientoId) {
         CopyOnWriteArrayList<SseEmitter> list = emitters.get(establecimientoId);
         if (list == null || list.isEmpty()) {
-            log.info(
-                    "No hay clientes SSE conectados localmente para el establecimiento {}. Ignorando mensaje de deduplicación.",
-                    establecimientoId);
+            log.info("No hay clientes SSE conectados localmente para el establecimiento {}.", establecimientoId);
             return;
         }
 
@@ -188,18 +196,20 @@ public class SseAlertaPublisher {
                         alertaEvent.getLatitud(),
                         alertaEvent.getLongitud(),
                         alertaEvent.getAccionRecomendada(),
-                        animalOpt.get(),
+                        animal,
                         aislados);
             } catch (Exception e) {
                 log.error("Error enviando alerta por SSE a un cliente, removiendo emitter.", e);
                 list.remove(emitter);
             }
         }
+    }
 
+    private void enviarMails(Long alertaId, Long establecimientoId) {
         List<Usuario> usuarios = usuarioRepository.findEmpleadosByEstablecimientoId(establecimientoId);
         Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
                 .orElseThrow(() -> new RuntimeException("Establecimiento no encontrado"));
-        Alerta alerta = alertaRepository.findById(alertaEvent.getId())
+        Alerta alerta = alertaRepository.findById(alertaId)
                 .orElseThrow(() -> new RuntimeException("Alerta no encontrada"));
 
         for (Usuario usuario : usuarios) {

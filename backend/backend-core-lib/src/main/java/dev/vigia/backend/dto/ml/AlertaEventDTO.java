@@ -39,4 +39,10 @@ public class AlertaEventDTO {
 
     /** Solo AISLAMIENTO_SOCIAL: la lista de animales, armada por el worker al publicar. */
     private List<AnimalAisladoResponse> animalesAislados;
+
+    /**
+     * true solo en el evento que crea la alerta. Los re-envíos de una alerta existente (cambio de
+     * estado, animales que se suman o vuelven) van en false: actualizan la tarjeta pero no avisan por mail.
+     */
+    private boolean nueva;
 }

@@ -110,6 +110,7 @@ public class GeofenceVerificationService {
                 .posibleCausa(alerta.getPosibleCausa())
                 .latitud(alerta.getLatitud())
                 .longitud(alerta.getLongitud())
+                .nueva(true)
                 .build();
 
         publicadorDeAlertas.publicar(eventDTO);
