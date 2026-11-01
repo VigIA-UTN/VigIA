@@ -26,9 +26,10 @@ const LOTE_DEMO = 'Lote Cuarentena';
 /** Contenido del CSV de demo con IdCaravana y Alias únicos para esta corrida. */
 function csvDemoUnico(): { contenido: string; filas: number } {
   const marca = `E2E${sufijoUnico()}-`;
-  const [encabezado, ...filas] = fs
-    .readFileSync(CSV_DEMO, 'utf-8')
-    .replace(/^﻿/, '')
+  const texto = fs.readFileSync(CSV_DEMO, 'utf-8');
+  // El CSV de demo empieza con BOM (U+FEFF): se saca para que no quede pegado al nombre de la primera columna
+  const sinBom = texto.charCodeAt(0) === 0xfeff ? texto.slice(1) : texto;
+  const [encabezado, ...filas] = sinBom
     .split(/\r?\n/)
     .filter((linea) => linea.trim() !== '');
   const datos = filas.map((linea) => {
