@@ -54,17 +54,19 @@ export async function loginPorClave(page: Page, clave: string): Promise<UsuarioF
  * Cierra la sesión activa a través de la UI.
  */
 export async function logout(page: Page): Promise<void> {
-  // En desktop: dropdown de usuario en navbar
-  const userDropdown = page.locator('#navbar-user-dropdown');
+  // En desktop el navbar tiene el botón "Salir"; en mobile, "Cerrar sesión" dentro del drawer.
   const hamburger = page.locator('button[aria-label="Abrir menú"]:visible');
 
   if (await hamburger.isVisible()) {
     await hamburger.click();
     await page.getByRole('button', { name: /Cerrar sesión/i }).click();
-  } else if (await userDropdown.isVisible()) {
-    await userDropdown.click();
-    await page.getByRole('button', { name: /Cerrar sesión/i }).click();
+  } else {
+    await page.locator('.btn-salir-navbar').click();
   }
 
   await page.waitForURL('**/login', { timeout: 10000 });
+  // Los pedidos que quedaron en curso vuelven con 401 y el interceptor recarga /login: se espera a que terminen
+  // para que la próxima navegación del test no quede interrumpida.
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('#email')).toBeVisible();
 }

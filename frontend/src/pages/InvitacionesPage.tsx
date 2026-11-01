@@ -303,7 +303,7 @@ export default function InvitacionesPage() {
           <Modal.Body>
             {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
 
-            <Form.Group className="mb-3">
+            <Form.Group controlId="invitacion-email" className="mb-3">
               <Form.Label>Email del Productor</Form.Label>
               <div className="email-input-wrapper">
                 <Form.Control
@@ -327,7 +327,7 @@ export default function InvitacionesPage() {
               </div>
             </Form.Group>
 
-            <Form.Group className="mb-4">
+            <Form.Group controlId="invitacion-establecimiento" className="mb-4">
               <Form.Label>Nombre de Establecimiento</Form.Label>
               <Form.Select
                 {...register('establecimientoId', { valueAsNumber: true })}

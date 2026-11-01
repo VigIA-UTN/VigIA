@@ -19,7 +19,7 @@ export default defineConfig({
   /* Reintentos en CI */
   retries: process.env.CI ? 1 : 0,
   /* Workers en CI */
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 2,
   /* Timeout por test */
   timeout: 30 * 1000,
   expect: {
@@ -69,7 +69,11 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: 'npm run dev',
+        // --host :: hace que Vite escuche en IPv4 e IPv6. Sin esto, en Windows escucha solo en [::1] y Firefox,
+        // que a veces resuelve localhost a 127.0.0.1 sin reintentar por IPv6, falla con NS_ERROR_CONNECTION_REFUSED.
+        // Ojo: '::' son todas las interfaces, así que mientras corren los tests el dev server es accesible desde la
+        // red local. Si ya hay un `npm run dev` abierto, Playwright reutiliza ese (sin este flag).
+        command: 'npm run dev -- --host ::',
         url: BASE_URL,
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,

@@ -10,12 +10,18 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -119,12 +125,30 @@ class LoginSesionIT extends SeguridadItBase {
         assertThat(pedirPerfil("Bearer " + manipulado)).isEqualTo(401);
 
         assertThat(pedirPerfil(null)).isEqualTo(401);
+
+        // Una sesión HTTP con la autenticación guardada (lo que queda en el servidor con la cookie JSESSIONID) no
+        // reemplaza al JWT: sin token, o con uno inválido, la API sigue respondiendo 401.
+        var principal = new org.springframework.security.core.userdetails.User(email("productorA"), "",
+                List.of(new SimpleGrantedAuthority("ROLE_PRODUCTOR")));
+        var contexto = new SecurityContextImpl(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+        MockHttpSession sesion = new MockHttpSession();
+        sesion.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, contexto);
+        assertThat(pedirPerfil(null, sesion)).isEqualTo(401);
+        assertThat(pedirPerfil("Bearer " + manipulado, sesion)).isEqualTo(401);
     }
 
     private int pedirPerfil(String authorization) throws Exception {
+        return pedirPerfil(authorization, null);
+    }
+
+    private int pedirPerfil(String authorization, MockHttpSession sesion) throws Exception {
         var request = get("/api/v1/usuarios/me");
         if (authorization != null) {
             request.header("Authorization", authorization);
+        }
+        if (sesion != null) {
+            request.session(sesion);
         }
         return mockMvc.perform(request).andReturn().getResponse().getStatus();
     }
