@@ -130,9 +130,26 @@ jobs:
         run: docker compose -f infra/docker-compose.yml build
 
   e2e-tests:
-    name: E2E Tests (Playwright)
+    name: E2E Tests (Playwright - ${{ matrix.project }})
     runs-on: ubuntu-latest
     needs: [frontend-build, backend-build, ml-checks]
+    # Un job por navegador, en paralelo y cada uno con su propio stack y base: los specs modifican el escenario,
+    # así que no comparten datos. Si falla un navegador, los demás terminan igual.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: chromium
+            browser: chromium
+          - project: firefox
+            browser: firefox
+          - project: webkit
+            browser: webkit
+          - project: edge
+            browser: msedge
+    env:
+      # Sin esto el proyecto edge corre en Chromium con el user agent de Edge, no en Edge.
+      PLAYWRIGHT_CHANNEL_EDGE: ${{ matrix.project == 'edge' && '1' || '' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -148,9 +165,9 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Install Playwright browsers and dependencies
+      - name: Install Playwright browser and dependencies
         working-directory: frontend
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Start Docker Compose stack
         run: >
@@ -178,7 +195,7 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend
-        run: npm run test:e2e
+        run: npm run test:e2e -- --project=${{ matrix.project }}
 
       - name: Dump Docker logs on failure
         if: failure()
@@ -188,7 +205,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: |
             frontend/playwright-report/
             frontend/test-results/
