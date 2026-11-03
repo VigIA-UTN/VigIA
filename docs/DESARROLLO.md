@@ -8,13 +8,33 @@ Si querés probar la plataforma completa de una sola vez (Base de datos, Backend
 
 1. Abrí una terminal en la carpeta `/infra`.
 
-2. Ejecutá el comando para construir y levantar todos los servicios en segundo plano:
+2. Generá el secreto con el que la API firma los JWT. Es obligatorio: sin él, o con menos de 32 caracteres, `backend-api` no levanta.
+
+   ```bash
+   openssl rand -base64 48
+   ```
+
+   Si no tenés `openssl` (por ejemplo, en PowerShell), podés generarlo con Node:
+
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
+   ```
+
+   Pegá el resultado en `infra/.env` (si todavía no tenés ese archivo, crealo a partir de `infra/.env.example`):
+
+   ```bash
+   JWT_SECRET=el-valor-que-generaste
+   ```
+
+   Ese valor es solo para tu máquina: no lo commitees ni lo reutilices en otro entorno.
+
+3. Ejecutá el comando para construir y levantar todos los servicios en segundo plano:
 
    ```bash
    docker-compose up -d --build
    ```
 
-3. Para el Frontend, abrí otra terminal en `/frontend` y ejecutá:
+4. Para el Frontend, abrí otra terminal en `/frontend` y ejecutá:
 
    ```bash
    npm install && npm run dev
@@ -53,7 +73,7 @@ docker-compose up -d db mail
 
 El backend de VigIA está dividido en módulos: `backend-api` (para las APIs REST del frontend), `backend-worker` (Batch jobs y colas asíncronas) y `backend-core-lib` (librerías compartidas).
 
-- **Opción Recomendada (IDE):** Abrí la carpeta `/backend` en tu IDE (IntelliJ, Eclipse). Podés darle 'Run' tanto a la clase principal de `backend-api` como a la de `backend-worker` al mismo tiempo. El IDE no lee `infra/.env`: cargá en la configuración de ejecución las variables que el `application.yaml` de cada módulo usa sin valor por defecto (las `${VAR}` sin `:`), por ejemplo `DB_HOST`, `MAIL_HOST` o `CORS_ORIGINS`; en `backend-api` incluyen `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`.
+- **Opción Recomendada (IDE):** Abrí la carpeta `/backend` en tu IDE (IntelliJ, Eclipse). Podés darle 'Run' tanto a la clase principal de `backend-api` como a la de `backend-worker` al mismo tiempo. El IDE no lee `infra/.env`: cargá en la configuración de ejecución las variables que el `application.yaml` de cada módulo usa sin valor por defecto (las `${VAR}` sin `:`), por ejemplo `DB_HOST`, `MAIL_HOST` o `CORS_ORIGINS`; en `backend-api` incluyen `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `JWT_SECRET` (cómo generarlo está en *Inicio Rápido*).
 - **Opción Alternativa:** Si solo vas a tocar frontend y no querés usar el IDE para Java, podés levantar el backend por Docker como se explica en la sección de *Inicio Rápido*.
 
 ### 3. Levantar el Frontend
@@ -130,6 +150,7 @@ Si utiliza el plugin de PostgreSQL de Railway, este proveerá sus propias creden
 - `CORS_ORIGINS` (solo `backend-api`): URLs de su frontend en producción (ej. `https://vigia-frontend.up.railway.app`).
 - `TZ`: `America/Argentina/Buenos_Aires`
 - `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (solo `backend-api`): credenciales del cliente OAuth de Google para el login con SSO, de Google Cloud Console > APIs y servicios > Credenciales. **Son obligatorias**: el `application.yaml` no trae valores por defecto y la API no levanta sin ellas.
+- `JWT_SECRET` (solo `backend-api`): secreto con el que se firman los JWT. **Es obligatorio** y debe tener al menos 32 caracteres: la API no levanta sin él. Generar uno distinto por entorno con `openssl rand -base64 48`; al cambiarlo se invalidan las sesiones abiertas.
 
 > **Datos iniciales de producción:** la base de prod se puebla a mano con `infra/prod/seed_prod.sql` (y se limpia con `infra/prod/wipe_prod.sql`). Ver `infra/prod/README.md`.
 

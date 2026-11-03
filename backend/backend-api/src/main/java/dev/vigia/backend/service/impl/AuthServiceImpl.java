@@ -137,6 +137,10 @@ public class AuthServiceImpl implements AuthService {
             return savedUser;
         });
 
+        if (!usuario.isActivo()) {
+            throw new IllegalArgumentException("La cuenta no está activa.");
+        }
+
         if (usuario.getProveedorAuth() == null || usuario.getProveedorAuth().isBlank()) {
             usuario.setProveedorAuth(providerName);
             usuarioRepository.save(usuario);

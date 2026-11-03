@@ -95,6 +95,9 @@ resilience4j:
       celoML:
         timeoutDuration: 2000ms
 
+jwt:
+  secret: ${JWT_SECRET}
+
 app:
   frontend-url: ${FRONTEND_URL}
   oauth2:

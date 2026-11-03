@@ -187,4 +187,20 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(correctBody)))
                 .andExpect(status().isLocked());
     }
+
+    // ─── SSO: el token solo sale del flujo con Google ────────────────────────
+
+    @Test
+    @DisplayName("Rutas OAuth2 con solo el email → responden 404 y no entregan token")
+    void oauth2_soloConEmail_noEntregaToken() throws Exception {
+        for (String ruta : java.util.List.of("/api/v1/auth/oauth2", "/api/v1/auth/oauth2/google")) {
+            MvcResult resultado = mockMvc.perform(post(ruta)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"email\":\"" + EMAIL + "\",\"provider\":\"GOOGLE\"}"))
+                    .andExpect(status().isNotFound())
+                    .andReturn();
+
+            assertThat(resultado.getResponse().getContentAsString()).as(ruta).doesNotContain("token");
+        }
+    }
 }

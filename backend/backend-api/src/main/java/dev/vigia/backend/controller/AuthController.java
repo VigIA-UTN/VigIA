@@ -112,42 +112,4 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Email o contraseña incorrectos");
         }
     }
-
-    /**
-     * POST /api/v1/auth/oauth2/google
-     * <p>
-     * Autentica o registra un usuario a partir de datos de Google OAuth2.
-     *
-     * @param request email, nombre, apellido y proveedor (GOOGLE por defecto)
-     * @return 200 con el token JWT, 400 si hay error de validación
-     */
-    @PostMapping("/oauth2/google")
-    public ResponseEntity<?> oauth2Google(@RequestBody dev.vigia.backend.dto.OAuth2Request request) {
-        try {
-            String provider = request.getProvider() != null ? request.getProvider() : "GOOGLE";
-            AuthResponse response = authService.processOAuth2User(request.getEmail(), request.getNombre(), request.getApellido(), provider);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
-
-    /**
-     * POST /api/v1/auth/oauth2
-     * <p>
-     * Autentica o registra un usuario a partir de datos OAuth2 de un
-     * proveedor genérico.
-     *
-     * @param request email, nombre, apellido y proveedor OAuth2
-     * @return 200 con el token JWT, 400 si hay error de validación
-     */
-    @PostMapping("/oauth2")
-    public ResponseEntity<?> oauth2Login(@RequestBody dev.vigia.backend.dto.OAuth2Request request) {
-        try {
-            AuthResponse response = authService.processOAuth2User(request.getEmail(), request.getNombre(), request.getApellido(), request.getProvider());
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
 }
