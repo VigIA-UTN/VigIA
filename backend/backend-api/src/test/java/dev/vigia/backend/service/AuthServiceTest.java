@@ -244,6 +244,21 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("Debe rechazar vía OAuth2 a un usuario desactivado sin emitirle token")
+    void processOAuth2User_UsuarioDesactivado_ThrowsException() {
+        Usuario desactivado = new Usuario();
+        desactivado.setEmail("inactivo@google.com");
+        desactivado.setRol(Rol.CAMPERO);
+        desactivado.setActivo(false);
+        when(usuarioRepository.findByEmail("inactivo@google.com")).thenReturn(Optional.of(desactivado));
+
+        assertThatThrownBy(() -> authService.processOAuth2User("inactivo@google.com", "Juan", "Pérez", "GOOGLE"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("La cuenta no está activa.");
+        verifyNoInteractions(jwtUtil);
+    }
+
+    @Test
     @DisplayName("Debe reconocer usuario existente vía OAuth2 manteniendo su rol asignado")
     void processOAuth2User_ExistingUser_RecognizesRole() {
         Usuario usuarioExistente = new Usuario();

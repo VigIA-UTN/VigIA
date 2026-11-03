@@ -37,6 +37,21 @@ class JwtUtilTest {
                 List.of(new SimpleGrantedAuthority("ROLE_" + role)));
     }
 
+    // ─── Secreto ─────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("validarSecreto() acepta un secreto de 32 caracteres o más y rechaza uno vacío o corto")
+    void validarSecreto_rechazaSecretoVacioOCorto() throws Exception {
+        Assertions.assertDoesNotThrow(jwtUtil::validarSecreto);
+
+        var secretField = JwtUtil.class.getDeclaredField("secret");
+        secretField.setAccessible(true);
+        for (String debil : List.of("", "corto")) {
+            secretField.set(jwtUtil, debil);
+            Assertions.assertThrows(io.jsonwebtoken.security.WeakKeyException.class, jwtUtil::validarSecreto);
+        }
+    }
+
     // ─── Generación ──────────────────────────────────────────────────────────
 
     @Test
