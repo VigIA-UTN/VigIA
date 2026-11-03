@@ -153,8 +153,25 @@ def test_ML01_10_payload_invalido_responde_422_con_mensaje_claro(modelo, cuerpo,
     assert data["trace_id"] == "ml01-10"
 
 
+@pytest.mark.parametrize("endpoint", [PREDICT, PERFIL])
+def test_ML01_10_json_mal_formado_responde_422(modelo, endpoint):
+    response = client.post(endpoint, content=b"[{roto", headers={"Content-Type": "application/json"})
+
+    assert response.status_code == 422
+    assert "el cuerpo no es un JSON válido" in response.json()["mensaje"]
+
+
+@pytest.mark.parametrize("endpoint", [PREDICT, PERFIL])
+def test_ML01_10_body_que_no_es_objeto_responde_422(modelo, endpoint):
+    response = client.post(endpoint, json=[1, 2])
+
+    assert response.status_code == 422
+    assert "body: debe ser un objeto" in response.json()["mensaje"]
+
+
 @pytest.mark.parametrize("campo, valor, en_mensaje", [
     ("moveState", 10, "serie[0].moveState: debe ser menor o igual que 9"),
+    ("moveState", -1, "serie[0].moveState: debe ser mayor o igual que 0"),
     ("latitud", 95.0, "serie[0].latitud: debe ser menor o igual que 90"),
     ("longitud", -181.0, "serie[0].longitud: debe ser mayor o igual que -180"),
 ])
@@ -174,6 +191,16 @@ def test_ML01_11_coordenada_no_finita_responde_422(modelo):
 
     assert response.status_code == 422
     assert "serie[0].longitud: debe ser un número finito" in response.json()["mensaje"]
+
+
+def test_ML01_11_valores_en_el_limite_del_rango_son_validos(modelo):
+    serie = serie_24h()
+    serie[0] = {"moveState": 0, "latitud": -90.0, "longitud": -180.0}
+    serie[1] = {"moveState": 9, "latitud": 90.0, "longitud": 180.0}
+
+    response = client.post(PREDICT, json={"serie": serie, "perfil": perfil_valido()})
+
+    assert response.status_code == 200
 
 
 @pytest.mark.parametrize("puntos", [0, 287, 289])

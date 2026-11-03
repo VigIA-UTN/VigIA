@@ -226,6 +226,20 @@ def test_ML01_10_payload_invalido_responde_422_con_mensaje_claro(cuerpo, en_mens
     assert data["trace_id"] == "ml01-10"
 
 
+def test_ML01_10_json_mal_formado_responde_422():
+    response = client.post(ENDPOINT, content=b"[{roto", headers={"Content-Type": "application/json"})
+
+    assert response.status_code == 422
+    assert "el cuerpo no es un JSON válido" in response.json()["mensaje"]
+
+
+def test_ML01_10_body_que_no_es_objeto_responde_422():
+    response = client.post(ENDPOINT, json=[1, 2])
+
+    assert response.status_code == 422
+    assert "body: debe ser un objeto" in response.json()["mensaje"]
+
+
 @pytest.mark.parametrize("cuerpo, en_mensaje", [
     ({"historial_7d": [punto("A1", lat=91.0)]}, "historial_7d[0].lat: debe ser menor o igual que 90"),
     ({"historial_7d": [punto("A1", lng=-200.0)]}, "historial_7d[0].lng: debe ser mayor o igual que -180"),
@@ -246,6 +260,12 @@ def test_ML01_11_coordenada_no_finita_responde_422():
 
     assert response.status_code == 422
     assert "historial_7d[0].lat: debe ser un número finito" in response.json()["mensaje"]
+
+
+def test_ML01_11_valores_en_el_limite_del_rango_son_validos():
+    historial = [punto("A1", -90.0, -180.0), punto("A2", 90.0, 180.0)]
+
+    assert client.post(ENDPOINT, json={"historial_7d": historial}).status_code == 200
 
 
 # ---------------------------------------------------------------------------
