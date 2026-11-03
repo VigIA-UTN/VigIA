@@ -1,8 +1,17 @@
 import { test, expect, type Page } from '@playwright/test';
-import { crearEmpleado, emailUnico, login, loginPorRol, logout, obtenerUsuarioPorClave } from '../helpers';
+import {
+  crearEmpleado,
+  emailUnico,
+  idEstablecimiento,
+  login,
+  loginPorRol,
+  logout,
+  obtenerUsuarioPorClave,
+  tokenPorClave,
+} from '../helpers';
 
 /**
- * Flujos del administrador: alta de establecimiento (H0003), alta de productor por invitación (H0032) y
+ * Flujos del administrador: alta y edición de establecimiento (H0003), alta de productor por invitación (H0032) y
  * activación/desactivación de usuarios (H0036). Lo que se crea lleva nombres y emails únicos del dominio del
  * escenario, así limpiar.sql lo borra y el test se puede repetir.
  */
@@ -14,7 +23,7 @@ async function intentarLogin(page: Page, email: string, password: string) {
   await page.locator('#btn-login').click();
 }
 
-test.describe('H0003 - Alta de establecimiento (UI)', () => {
+test.describe('H0003 - Alta y edición de establecimiento (UI)', () => {
   test('H0003-01 - El administrador da de alta un establecimiento', async ({ page }) => {
     const nombre = `Fixture E2E ${Date.now()}`;
     await loginPorRol(page, 'ADMINISTRADOR');
@@ -41,6 +50,51 @@ test.describe('H0003 - Alta de establecimiento (UI)', () => {
     await expect(page.getByLabel('Latitud')).toHaveClass(/is-invalid/);
     await expect(page.getByLabel('Longitud')).toHaveClass(/is-invalid/);
     await expect(page.getByText('El nombre es obligatorio')).toHaveCount(1);
+  });
+
+  test('H0003-05 - El administrador edita el nombre y la ubicación de un establecimiento', async ({ page, request }) => {
+    // Se edita uno creado por el test: Fixture A y B los usan el resto de los specs y los otros navegadores.
+    const nombre = `Fixture E2E ${Date.now()}`;
+    const editado = `${nombre} editado`;
+    const token = await tokenPorClave(request, 'admin');
+    const alta = await request.post('/api/v1/establecimientos', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { nombre, latitud: -36.7, longitud: -61.7 },
+    });
+    expect(alta.status()).toBe(201);
+
+    await loginPorRol(page, 'ADMINISTRADOR');
+    await page.getByPlaceholder('Buscar por nombre o #id...').fill(nombre);
+    await page.locator('.establecimiento-card', { hasText: nombre }).getByTitle('Más acciones').click();
+    await page.locator('.est-menu').getByText('Configuración').click();
+    await expect(page).toHaveURL(/\/establecimientos\/\d+\/configuracion/);
+    await expect(page.locator('#nombre')).toHaveValue(nombre);
+
+    await page.locator('#nombre').fill(editado);
+    await page.locator('#latitud').fill('-35.25');
+    await page.locator('#longitud').fill('-60.75');
+    await page.getByRole('button', { name: 'Guardar Cambios' }).click();
+    await expect(page.locator('.cfg-toast-visible')).toContainText('Cambios guardados correctamente');
+
+    // Al volver a entrar los datos son los guardados.
+    await page.reload();
+    await expect(page.locator('#nombre')).toHaveValue(editado);
+    await expect(page.locator('#latitud')).toHaveValue('-35.25');
+    await expect(page.locator('#longitud')).toHaveValue('-60.75');
+    await page.goto('/establecimientos');
+    await expect(page.locator('.est-card-name', { hasText: editado })).toBeVisible();
+  });
+
+  test('H0003-07 - El veterinario ve los datos del establecimiento sin poder editarlos', async ({ page, request }) => {
+    const id = await idEstablecimiento(request, await tokenPorClave(request, 'veterinarioA'), 'Fixture A');
+    await loginPorRol(page, 'VETERINARIO', { establecimiento: 'Fixture A' });
+    await page.goto(`/establecimientos/${id}/configuracion`);
+
+    await expect(page.locator('#nombre')).toHaveValue('Fixture A');
+    for (const campo of ['#nombre', '#latitud', '#longitud']) {
+      await expect(page.locator(campo)).toHaveAttribute('readonly', '');
+    }
+    await expect(page.getByText('Solo el productor puede editar estos datos')).toHaveCount(2);
   });
 });
 
