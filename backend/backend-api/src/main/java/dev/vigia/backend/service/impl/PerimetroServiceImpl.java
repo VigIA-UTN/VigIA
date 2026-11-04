@@ -57,7 +57,7 @@ public class PerimetroServiceImpl implements PerimetroService {
             List<RodeoLote> lotes = rodeoLoteRepository.findAllById(request.getLoteIds());
             for (RodeoLote lote : lotes) {
                 if (!lote.getEstablecimiento().getId().equals(establecimiento.getId())) {
-                    throw new IllegalArgumentException(
+                    throw new AccessDeniedException(
                             "El lote " + lote.getId() + " no pertenece al establecimiento indicado.");
                 }
                 perimetro.asignarLote(lote);

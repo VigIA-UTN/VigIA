@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.multipart.MultipartFile;
 import dev.vigia.backend.dto.CargaMasivaResult;
 import dev.vigia.backend.model.Animal;
@@ -62,7 +63,7 @@ public class CargaMasivaServiceImpl implements CargaMasivaService {
                 .anyMatch(v -> v.getUsuario().getEmail().equals(email) && v.isActivo());
 
         if (!activoEnEstablecimiento) {
-            throw new IllegalArgumentException(
+            throw new AccessDeniedException(
                     "El productor no pertenece al establecimiento destino o no está activo.");
         }
 

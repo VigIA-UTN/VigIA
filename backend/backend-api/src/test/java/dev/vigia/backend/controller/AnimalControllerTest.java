@@ -388,9 +388,9 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/animales/crear - Productor no pertenece al establecimiento retorna 400")
+        @DisplayName("POST /api/v1/animales/crear - Productor no pertenece al establecimiento retorna 403")
         @SuppressWarnings("null")
-        void cargarAnimal_productorNoPertenece_badRequest() throws Exception {
+        void cargarAnimal_productorNoPertenece_forbidden() throws Exception {
                 // Crear otro establecimiento sin el productor
                 Establecimiento otroEst = new Establecimiento();
                 otroEst.setNombre("Otro Campo");
@@ -413,7 +413,7 @@ class AnimalControllerTest {
                                 .header("Authorization", "Bearer " + productorToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(req)))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
         }
 
         @Test
@@ -474,9 +474,9 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/animales - Rodeo de otro establecimiento retorna 400")
+        @DisplayName("POST /api/v1/animales - Rodeo de otro establecimiento retorna 403")
         @SuppressWarnings("null")
-        void cargarAnimal_rodeoDeOtroEstablecimiento_badRequest() throws Exception {
+        void cargarAnimal_rodeoDeOtroEstablecimiento_forbidden() throws Exception {
                 Establecimiento otroEst = new Establecimiento();
                 otroEst.setNombre("Otro Campo Rodeo");
                 otroEst.setLatitud(-35.0);
@@ -491,7 +491,13 @@ class AnimalControllerTest {
 
                 AnimalRequest req = animalRequestValido("Vaca Rodeo Ajeno");
                 req.setRodeoLoteId(rodeoAjeno.getId());
-                esperarBadRequest(req);
+                mockMvc.perform(post("/api/v1/animales")
+                                .header("Authorization", "Bearer " + productorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(req)))
+                                .andExpect(status().isForbidden());
+                assertThat(animalRepository.findAll())
+                                .noneMatch(a -> req.getIdCaravanaOficial().equals(a.getIdCaravanaOficial()));
         }
 
         @Test
@@ -912,9 +918,9 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("DELETE /api/v1/animales/{id} - Productor ajeno al establecimiento recibe 400")
+        @DisplayName("DELETE /api/v1/animales/{id} - Productor ajeno al establecimiento recibe 403")
         @SuppressWarnings("null")
-        void desactivarAnimal_productorAjeno_badRequest() throws Exception {
+        void desactivarAnimal_productorAjeno_forbidden() throws Exception {
                 Long animalId = crearAnimal("Toro Ajeno", establecimientoId, rodeoLoteId);
 
                 // Crear segundo productor SIN vínculo con el establecimiento
@@ -941,7 +947,7 @@ class AnimalControllerTest {
 
                 mockMvc.perform(delete("/api/v1/animales/" + animalId)
                                 .header("Authorization", "Bearer " + otroToken))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
         }
 
         @Test
@@ -1351,7 +1357,7 @@ class AnimalControllerTest {
                                 .file(file)
                                 .param("establecimientoId", establecimientoId.toString())
                                 .header("Authorization", "Bearer " + productorToken))
-                                .andExpect(status().isCreated())
+                                .andExpect(status().isUnprocessableEntity())
                                 .andExpect(jsonPath("$.procesados").value(4))
                                 .andExpect(jsonPath("$.exitosos").value(0))
                                 .andExpect(jsonPath("$.fallidos").value(3))
@@ -1453,6 +1459,7 @@ class AnimalControllerTest {
                                 .file(file)
                                 .param("establecimientoId", establecimientoId.toString())
                                 .header("Authorization", "Bearer " + productorToken))
+                                .andExpect(status().isUnprocessableEntity())
                                 .andExpect(jsonPath("$.procesados").value(3))
                                 .andExpect(jsonPath("$.exitosos").value(0))
                                 .andExpect(jsonPath("$.fallidos").value(2))
@@ -2882,8 +2889,8 @@ class AnimalControllerTest {
 
         @SuppressWarnings("null")
         @Test
-        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 400 si el rodeo es de otro establecimiento, sin asignar nada")
-        void asignarCaravanasAleatoriamente_loteDeOtroEstablecimiento_retornaBadRequest() throws Exception {
+        @DisplayName("POST /api/v1/animales/asignar-caravanas - Falla con 403 si el rodeo es de otro establecimiento, sin asignar nada")
+        void asignarCaravanasAleatoriamente_loteDeOtroEstablecimiento_retornaForbidden() throws Exception {
                 Establecimiento otro = new Establecimiento();
                 otro.setNombre("Otro Establecimiento Test");
                 otro = establecimientoRepository.save(otro);
@@ -2897,7 +2904,7 @@ class AnimalControllerTest {
                                 .param("establecimientoId", establecimientoId.toString())
                                 .param("rodeoLoteId", ajeno.getId().toString())
                                 .header("Authorization", "Bearer " + productorToken))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
 
                 assertThat(caravanaRepository.findById(caravana.getId()).orElseThrow().getEstadoSensor())
                                 .isEqualTo(EstadoSensor.DISPONIBLE);

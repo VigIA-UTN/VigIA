@@ -295,7 +295,7 @@ class UsuarioControllerTest {
     @Test
     @DisplayName("DELETE /api/v1/usuarios/empleados/{id} - Falla si empleado no pertenece al establecimiento")
     @SuppressWarnings("null")
-    void desactivarEmpleado_wrongEstablecimiento_badRequest() throws Exception {
+    void desactivarEmpleado_wrongEstablecimiento_forbidden() throws Exception {
         Usuario empleado = new Usuario();
         empleado.setEmail("empleado3@vigia.dev");
         empleado.setPasswordHash(passwordEncoder.encode("emp123"));
@@ -326,7 +326,7 @@ class UsuarioControllerTest {
 
         mockMvc.perform(delete("/api/v1/usuarios/empleados/" + estProd.getId() + "/" + empleado.getId())
                 .header("Authorization", "Bearer " + productorToken))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isForbidden());
     }
 
     @Test

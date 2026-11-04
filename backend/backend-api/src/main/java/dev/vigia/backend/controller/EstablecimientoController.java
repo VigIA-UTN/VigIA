@@ -140,6 +140,9 @@ public class EstablecimientoController {
             String email = authentication.getName();
             List<IntervencionResponse> response = establecimientoService.obtenerIntervenciones(email, id);
             return ResponseEntity.ok(response);
+        } catch (AccessDeniedException e) {
+            // Establecimiento ajeno: 403 como el resto de la API, no el 400 genérico de abajo.
+            return ResponseEntity.status(403).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error al obtener intervenciones: " + e.getMessage());
         }
@@ -156,6 +159,8 @@ public class EstablecimientoController {
     public ResponseEntity<?> obtenerPesos(@PathVariable Long id, Authentication authentication) {
         try {
             return ResponseEntity.ok(establecimientoService.obtenerPesos(authentication.getName(), id));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error al obtener pesadas: " + e.getMessage());
         }

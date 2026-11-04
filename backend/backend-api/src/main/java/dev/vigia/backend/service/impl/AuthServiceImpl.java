@@ -51,7 +51,10 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
-    @Transactional
+    // noRollbackFor: si el token venció, validateAndGetInvitacion guarda la invitación como EXPIRADA y después lanza
+    // la excepción; con el rollback por defecto ese cambio se perdía. Es seguro porque todas las validaciones que
+    // lanzan IllegalArgumentException corren antes de crear el usuario.
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public AuthResponse register(RegisterRequest request) {
         Invitacion invitacion = validateAndGetInvitacion(request.getToken(), request.getEmail());
         String emailToUse = invitacion.getEmailDestino();
@@ -106,9 +109,14 @@ public class AuthServiceImpl implements AuthService {
         String providerName = (provider != null && !provider.isBlank()) ? provider.toUpperCase() : "GOOGLE";
 
         Usuario usuario = usuarioRepository.findByEmail(cleanEmail).orElseGet(() -> {
+            // Solo invitaciones vigentes: una pendiente pero vencida no habilita el alta, igual que en register.
+            LocalDateTime ahora = LocalDateTime.now();
             List<Invitacion> invitaciones = invitacionRepository
                     .findByEmailDestinoAndEstadoInvitacionOrderByFechaCreacionDesc(cleanEmail,
-                            EstadoInvitacion.PENDIENTE);
+                            EstadoInvitacion.PENDIENTE)
+                    .stream()
+                    .filter(i -> i.getFechaExpiracion() == null || i.getFechaExpiracion().isAfter(ahora))
+                    .toList();
             if (invitaciones.isEmpty()) {
                 throw new IllegalArgumentException("No se puede registrar mediante SSO sin una invitación previa.");
             }

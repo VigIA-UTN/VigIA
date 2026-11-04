@@ -137,7 +137,7 @@ export default function PerfilPage() {
 
                                 <div className="row">
                                     <div className="col-md-6 mb-3">
-                                        <Form.Group>
+                                        <Form.Group controlId="perfil-nombre">
                                             <Form.Label>Nombre</Form.Label>
                                             <Form.Control
                                                 type="text"
@@ -148,7 +148,7 @@ export default function PerfilPage() {
                                         </Form.Group>
                                     </div>
                                     <div className="col-md-6 mb-3">
-                                        <Form.Group>
+                                        <Form.Group controlId="perfil-apellido">
                                             <Form.Label>Apellido</Form.Label>
                                             <Form.Control
                                                 type="text"
@@ -199,7 +199,7 @@ export default function PerfilPage() {
                                     {pwdError && <Alert variant="danger" className="py-2 text-sm">{pwdError}</Alert>}
                                     {pwdSuccess && <Alert variant="success" className="py-2 text-sm">{pwdSuccess}</Alert>}
                                     <Form onSubmit={handleCambiarPassword}>
-                                        <Form.Group className="mb-3">
+                                        <Form.Group controlId="perfil-password-actual" className="mb-3">
                                             <Form.Label>Contraseña Actual</Form.Label>
                                             <Form.Control
                                                 type="password"
@@ -209,7 +209,7 @@ export default function PerfilPage() {
                                             />
                                         </Form.Group>
 
-                                        <Form.Group className="mb-3">
+                                        <Form.Group controlId="perfil-password-nueva" className="mb-3">
                                             <Form.Label>Nueva Contraseña</Form.Label>
                                             <Form.Control
                                                 type="password"
@@ -222,7 +222,7 @@ export default function PerfilPage() {
                                             </Form.Text>
                                         </Form.Group>
 
-                                        <Form.Group className="mb-3">
+                                        <Form.Group controlId="perfil-password-confirmar" className="mb-3">
                                             <Form.Label>Confirmar Nueva Contraseña</Form.Label>
                                             <Form.Control
                                                 type="password"

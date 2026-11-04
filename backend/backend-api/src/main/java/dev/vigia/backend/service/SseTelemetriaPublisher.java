@@ -1,6 +1,7 @@
 package dev.vigia.backend.service;
 
 import dev.vigia.backend.dto.ml.TelemetriaEventDTO;
+import dev.vigia.backend.repository.EstablecimientoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -17,7 +18,18 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @RequiredArgsConstructor
 public class SseTelemetriaPublisher {
 
+    private final EstablecimientoRepository establecimientoRepository;
+
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
+
+    /**
+     * Solo los miembros activos del establecimiento reciben sus posiciones en tiempo real (misma regla que
+     * {@link SseAlertaPublisher#puedeSuscribirse}).
+     */
+    public boolean puedeSuscribirse(String email, Long establecimientoId) {
+        return establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(email).stream()
+                .anyMatch(e -> e.getId().equals(establecimientoId));
+    }
 
     public SseEmitter registrarClienteSse(Long establecimientoId) {
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
