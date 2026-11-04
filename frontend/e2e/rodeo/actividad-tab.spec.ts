@@ -53,7 +53,7 @@ test.describe('H0015 - Pestaña Actividad muestra los últimos 7 días (UI)', ()
     await expect(page.getByText(/últimos 7 días/i)).toBeVisible({ timeout: 15000 });
   });
 
-  test('H0017-05 - El campero ve el gráfico de actividad motora', async ({ page, request }) => {
+  test('H0015-08 - El campero ve el gráfico de actividad motora', async ({ page, request }) => {
     const animal = await crearAnimal(request, await contextoRodeo(request));
     await loginPorClave(page, 'camperoA');
     await page.goto(`/animales/${animal.id}?tab=actividad`);
@@ -63,7 +63,7 @@ test.describe('H0015 - Pestaña Actividad muestra los últimos 7 días (UI)', ()
     await expect(page.getByText('No se pudo cargar la actividad motora.')).toHaveCount(0);
   });
 
-  test('H0017-06 - Si falla la carga se avisa en pantalla', async ({ page, request }) => {
+  test('H0015-09 - Si falla la carga se avisa en pantalla', async ({ page, request }) => {
     // Se simula el error: no hay forma de provocarlo con datos reales.
     await page.route('**/api/v1/animales/*/metricas', (ruta) => ruta.fulfill({ status: 500, body: 'error' }));
 
