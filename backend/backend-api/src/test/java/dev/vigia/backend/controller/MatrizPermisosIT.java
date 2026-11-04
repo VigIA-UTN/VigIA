@@ -171,7 +171,7 @@ class MatrizPermisosIT extends SeguridadItBase {
         m.add(new Endpoint("POST", "/api/v1/animales/csv", "/api/v1/animales/csv", Set.of(P), null, true));
         m.add(new Endpoint("POST", "/api/v1/animales/estado-reproductivo/csv", "/api/v1/animales/estado-reproductivo/csv",
                 Set.of(P), null, true));
-        m.add(ep("GET", "/api/v1/animales/{id}/metricas", "/api/v1/animales/{animalA}/metricas", Set.of(P, V)));
+        m.add(ep("GET", "/api/v1/animales/{id}/metricas", "/api/v1/animales/{animalA}/metricas", pvc));
         m.add(ep("POST", "/api/v1/animales/{id}/estado-salud", "/api/v1/animales/{animalA}/estado-salud", Set.of(P, V),
                 "{\"estado\":\"SANO\"}"));
         m.add(ep("GET", "/api/v1/animales/{id}/estado-salud", "/api/v1/animales/{animalA}/estado-salud", apvc));
