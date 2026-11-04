@@ -41,8 +41,13 @@ public class InvitacionServiceImpl implements InvitacionService {
                                 .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado."));
 
                 var usuarioExistente = usuarioRepository.findByEmail(request.getEmail());
-                if (usuarioExistente.isPresent()) {
+                // Un usuario con rol pendiente sigue el flujo de invitación: al aceptarla pasa a ser productor.
+                if (usuarioExistente.isPresent() && usuarioExistente.get().getRol() != Rol.PENDIENTE) {
                         Usuario productor = usuarioExistente.get();
+
+                        if (productor.getRol() != Rol.PRODUCTOR) {
+                                throw new IllegalArgumentException("El email pertenece a un usuario con otro rol.");
+                        }
 
                         Optional<Empleado> vinculoActivoOpt = establecimiento.getEmpleados().stream()
                                         .filter(v -> v.getUsuario().equals(productor) && v.isActivo())
@@ -94,7 +99,13 @@ public class InvitacionServiceImpl implements InvitacionService {
 
                 Invitacion saved = invitacionRepository.save(invitacion);
 
-                emailService.enviarInvitacionProductor(saved.getEmailDestino(), token, establecimiento.getNombre());
+                if (usuarioExistente.isEmpty()) {
+                        emailService.enviarInvitacionProductor(saved.getEmailDestino(), token, establecimiento.getNombre());
+                } else {
+                        emailService.enviarInvitacionPendienteUsuarioExistente(saved.getEmailDestino(),
+                                        establecimiento.getNombre(),
+                                        saved.getRol().name());
+                }
 
                 return InvitacionResponse.builder()
                                 .id(saved.getId())
