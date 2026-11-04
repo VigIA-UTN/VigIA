@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { loginPorRol, contextoRodeo, crearAnimal, ESTABLECIMIENTO_E2 } from '../helpers';
 
 /**
- * H0014 - Alta y edición de rodeos/lotes; edición y baja de animal.
+ * H0038 y H0039 - Alta y edición de rodeos/lotes; edición y baja de animal.
  *
  * Precondiciones:
  *   - Usuario PRODUCTOR con "Fixture A".
@@ -35,8 +35,8 @@ async function buscarAnimal(page: Page, identificador: string) {
   return fila;
 }
 
-test.describe('H0014 - Gestión de rodeos y animales (UI)', () => {
-  test('H0014-01 - Alta de rodeo/lote nuevo', async ({ page }) => {
+test.describe('H0038 y H0039 - Gestión de rodeos y animales (UI)', () => {
+  test('H0038-04 - Alta de rodeo/lote nuevo', async ({ page }) => {
     const nombreRodeo = `Rodeo E2E ${Date.now()}`;
     await irAAnimales(page);
     await abrirModalNuevoRodeo(page);
@@ -53,7 +53,7 @@ test.describe('H0014 - Gestión de rodeos y animales (UI)', () => {
     await expect(loteSelect.locator('option', { hasText: nombreRodeo })).toHaveCount(1);
   });
 
-  test('H0014-02 - Alta de rodeo sin nombre muestra validación', async ({ page }) => {
+  test('H0038-05 - Alta de rodeo sin nombre muestra validación', async ({ page }) => {
     await irAAnimales(page);
     await abrirModalNuevoRodeo(page);
 
@@ -68,7 +68,7 @@ test.describe('H0014 - Gestión de rodeos y animales (UI)', () => {
   // La app todavía no permite editar un rodeo/lote: el backend solo expone GET, POST y DELETE en /api/v1/rodeo-lotes
   // y el frontend no tiene pantalla de edición. Se deja el caso escrito para activarlo cuando exista la funcionalidad
   // (hay que ajustar el acceso a la edición en la UI).
-  test.fixme('H0014-05 - Edición del nombre de un rodeo/lote', async ({ page }) => {
+  test.fixme('H0038-06 - Edición del nombre de un rodeo/lote', async ({ page }) => {
     const nombreOriginal = `Rodeo E2E ${Date.now()}`;
     const nombreEditado = `${nombreOriginal} editado`;
     await irAAnimales(page);
@@ -87,7 +87,7 @@ test.describe('H0014 - Gestión de rodeos y animales (UI)', () => {
     await expect(page.getByText(nombreOriginal, { exact: true })).toHaveCount(0);
   });
 
-  test('H0014-03 - Edición de animal desde su detalle', async ({ page, request }) => {
+  test('H0039-05 - Edición de animal desde su detalle', async ({ page, request }) => {
     const animal = await crearAnimal(request, await contextoRodeo(request));
     const nuevoAlias = `EditadoE2E-${Date.now()}`;
 
@@ -115,7 +115,7 @@ test.describe('H0014 - Gestión de rodeos y animales (UI)', () => {
     await expect(page.getByRole('heading', { name: nuevoAlias })).toBeVisible({ timeout: 10000 });
   });
 
-  test('H0014-04 - Baja de animal desde el listado', async ({ page, request }) => {
+  test('H0039-06 - Baja de animal desde el listado', async ({ page, request }) => {
     const animal = await crearAnimal(request, await contextoRodeo(request));
 
     await irAAnimales(page);

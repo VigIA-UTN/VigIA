@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * H0011 - Carga masiva de animales con demo/nuevas_vaquillonas.csv y con un archivo con errores.
+ * H0005 - Carga masiva de animales con demo/nuevas_vaquillonas.csv y con un archivo con errores.
  *
  * Precondiciones:
  *   - Usuario PRODUCTOR con "Fixture A" (productorA).
@@ -67,12 +67,12 @@ async function abrirModalCargaMasiva(page: Page) {
   await expect(page.getByText('Cargar Animales con Excel')).toBeVisible();
 }
 
-test.describe('H0011 - Carga masiva de animales (UI)', () => {
+test.describe('H0005 - Carga masiva de animales (UI)', () => {
   test.beforeEach(async ({ request }) => {
     await asegurarRodeo(request, await contextoRodeo(request), LOTE_DEMO);
   });
 
-  test('H0011-01 - Carga masiva con demo/nuevas_vaquillonas.csv procesa correctamente', async ({ page }) => {
+  test('H0005-05 - Carga masiva con demo/nuevas_vaquillonas.csv procesa correctamente', async ({ page }) => {
     const { contenido, filas } = csvDemoUnico();
     await irAAnimales(page);
     await abrirModalCargaMasiva(page);
@@ -92,7 +92,7 @@ test.describe('H0011 - Carga masiva de animales (UI)', () => {
     await expect(reporte.getByText('Detalle de errores:')).toHaveCount(0);
   });
 
-  test('H0011-02 - Carga masiva con archivo con errores muestra reporte de fallos', async ({ page }) => {
+  test('H0005-06 - Carga masiva con archivo con errores muestra reporte de fallos', async ({ page }) => {
     await irAAnimales(page);
     await abrirModalCargaMasiva(page);
 
@@ -114,7 +114,7 @@ test.describe('H0011 - Carga masiva de animales (UI)', () => {
     await expect(reporte.getByText(/Fila 4: .*RodeoInexistente/)).toBeVisible();
   });
 
-  test('H0011-03 - Carga masiva sin seleccionar archivo muestra validación', async ({ page }) => {
+  test('H0005-07 - Carga masiva sin seleccionar archivo muestra validación', async ({ page }) => {
     await irAAnimales(page);
     await abrirModalCargaMasiva(page);
 
