@@ -1469,6 +1469,10 @@ public class AlertaServiceImplTest {
                 assertEquals("FUTURA", result.getEstado());
                 assertEquals(0.0, result.getPorcentajeTranscurrido());
                 assertFalse(result.getProximaAVencer());
+                // Tiempo hasta que abre (2 h), no hasta que cierra (20 h).
+                assertTrue(result.getTiempoRestanteSegundos() > 2 * 3600 - 60
+                                && result.getTiempoRestanteSegundos() <= 2 * 3600,
+                                "tiempoRestanteSegundos: " + result.getTiempoRestanteSegundos());
         }
 
         @Test

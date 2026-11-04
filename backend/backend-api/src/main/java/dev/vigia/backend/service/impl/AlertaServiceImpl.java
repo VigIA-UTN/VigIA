@@ -719,7 +719,9 @@ public class AlertaServiceImpl implements AlertaService {
                         proximaAVencer = false;
                 } else if (now.isBefore(inicio)) {
                         estado = "FUTURA";
-                        tiempoRestanteSegundos = Duration.between(now, fin).getSeconds();
+                        // Hasta que abre: así lo muestran el detalle de la alerta ("Tiempo hasta inicio de ventana
+                        // óptima"), su contador y el Dashboard ("Abre en ...").
+                        tiempoRestanteSegundos = Duration.between(now, inicio).getSeconds();
                         porcentajeTranscurrido = 0.0;
                         proximaAVencer = false;
                 } else {
