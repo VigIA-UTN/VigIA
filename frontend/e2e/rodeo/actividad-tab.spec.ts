@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { abrirDetalleAnimal, contextoRodeo, crearAnimal, pestanaAnimal } from '../helpers';
+import { abrirDetalleAnimal, contextoRodeo, crearAnimal, loginPorClave, pestanaAnimal } from '../helpers';
 
 /**
  * H0015 - Pestaña Actividad muestra los últimos 7 días.
@@ -51,5 +51,24 @@ test.describe('H0015 - Pestaña Actividad muestra los últimos 7 días (UI)', ()
     await expect(pestanaAnimal(page, 'Actividad')).toHaveClass(/active/);
     await expect(pestanaAnimal(page, 'Ficha')).not.toHaveClass(/active/);
     await expect(page.getByText(/últimos 7 días/i)).toBeVisible({ timeout: 15000 });
+  });
+
+  test('H0017-05 - El campero ve el gráfico de actividad motora', async ({ page, request }) => {
+    const animal = await crearAnimal(request, await contextoRodeo(request));
+    await loginPorClave(page, 'camperoA');
+    await page.goto(`/animales/${animal.id}?tab=actividad`);
+
+    const ticks = page.locator('.recharts-wrapper').first().locator('.recharts-xAxis .recharts-cartesian-axis-tick');
+    await expect(ticks).toHaveCount(7, { timeout: 15000 });
+    await expect(page.getByText('No se pudo cargar la actividad motora.')).toHaveCount(0);
+  });
+
+  test('H0017-06 - Si falla la carga se avisa en pantalla', async ({ page, request }) => {
+    // Se simula el error: no hay forma de provocarlo con datos reales.
+    await page.route('**/api/v1/animales/*/metricas', (ruta) => ruta.fulfill({ status: 500, body: 'error' }));
+
+    await irAlDetalleDeUnAnimalNuevo(page, request);
+
+    await expect(page.getByText('No se pudo cargar la actividad motora.')).toBeVisible({ timeout: 15000 });
   });
 });

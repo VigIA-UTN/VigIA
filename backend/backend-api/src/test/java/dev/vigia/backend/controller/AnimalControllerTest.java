@@ -1851,15 +1851,16 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/animales/{id}/metricas - Rechazo por rol incorrecto (Campero)")
+        @DisplayName("GET /api/v1/animales/{id}/metricas - El campero puede consultarlas")
         @SuppressWarnings("null")
-        void getMetricasAnimal_rechazoPorRolIncorrecto() throws Exception {
-                Long animalId = crearAnimal("Vaca Rol Incorrecto", establecimientoId, rodeoLoteId);
+        void getMetricasAnimal_campero() throws Exception {
+                Long animalId = crearAnimal("Vaca Metricas Campero", establecimientoId, rodeoLoteId);
 
-                // Campero no tiene acceso a métricas
+                // Son de solo lectura y la pestaña Actividad se las pide a todos los roles del establecimiento.
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/metricas")
                                 .header("Authorization", "Bearer " + camperoToken))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(7));
         }
 
         @Test

@@ -451,7 +451,7 @@ public class AnimalController {
      *         denegado
      */
     @GetMapping("/{id}/metricas")
-    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getMetricasAnimal(
             @PathVariable("id") Long animalId,
             Authentication authentication) {

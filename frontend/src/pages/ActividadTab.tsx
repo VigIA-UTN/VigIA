@@ -151,6 +151,7 @@ interface ActividadTabProps {
 export default function ActividadTab({ animalId, establecimientoId }: ActividadTabProps) {
     const [metricas, setMetricas] = useState<AnimalMetricaResponse[]>([]);
     const [loading, setLoading] = useState(true);
+    const [errorMetricas, setErrorMetricas] = useState(false);
 
     // Historial de pesos
     const [pesos, setPesos] = useState<RegistroPesoResponse[]>([]);
@@ -173,10 +174,13 @@ export default function ActividadTab({ animalId, establecimientoId }: ActividadT
         const fetchMetricas = async () => {
             try {
                 setLoading(true);
+                setErrorMetricas(false);
                 const data = await getMetricasAnimal(animalId);
                 if (mounted) setMetricas(data);
             } catch (err) {
                 console.error("Error al cargar historial de actividad:", err);
+                // Se avisa en pantalla: un gráfico vacío se confunde con un animal sin actividad.
+                if (mounted) setErrorMetricas(true);
             } finally {
                 if (mounted) setLoading(false);
             }
@@ -295,6 +299,7 @@ export default function ActividadTab({ animalId, establecimientoId }: ActividadT
                 title="Actividad Motora"
                 subtitle="Impulsos de movimiento registrados por día · últimos 7 días - Aca un moveState promedio diario"
             >
+                {errorMetricas && <Alert variant="danger">No se pudo cargar la actividad motora.</Alert>}
                 <div style={{ marginBottom: '0.5rem' }}>
                     <LegendDot color="#8CC63F" label="Impulsos de movimiento" />
                     <LegendDot color="#E2E8F0" label="Sin datos" />
