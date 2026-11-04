@@ -6,18 +6,18 @@ import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-import { getAnimales, getIntervencionesEstablecimiento, getPesosEstablecimiento, ESTADO_REPRODUCTIVO_LABEL } from '../api/animalesApi';
+import { getAnimales, getPesosEstablecimiento, ESTADO_REPRODUCTIVO_LABEL } from '../api/animalesApi';
 import type { AnimalResponse, IntervencionResponse, RegistroPesoResponse } from '../api/animalesApi';
 import {
     calcularGananciaPeso, ADPV_PIERDE, COBERTURA_BAJA_PCT, DIAS_COBERTURA, DIAS_COMPARACION, DIAS_PESADA_VIGENTE,
 } from '../utils/gananciaPeso';
-import { getAlertas, getVentanaInseminacion, esAnestro, tieneDatoDesactualizado, textoAccionRecomendada } from '../api/alertaApi';
-import type { AlertaResponse, VentanaInseminacionResponse } from '../api/alertaApi';
+import { getAlertas, esAnestro, tieneDatoDesactualizado, textoAccionRecomendada } from '../api/alertaApi';
+import type { AlertaResponse } from '../api/alertaApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { getAnimalesMapa } from '../api/animalesApi';
-import { getCentroMando } from '../api/dashboardApi';
-import type { CentroMandoResponse } from '../api/dashboardApi';
+import { getCentroMando, getSaludReproduccion } from '../api/dashboardApi';
+import type { AnimalResumen, CentroMandoResponse, SaludReproduccionResponse } from '../api/dashboardApi';
 import type { AnimalMapa } from '../api/animalesApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { determinarIcono } from '../utils/animalPins';
@@ -29,11 +29,6 @@ import './DashboardPage.css';
 
 const SILENCIO_THRESHOLD_H = 6;     // caravana sin señal > 6h = silenciosa
 const BATERIA_BAJA_PCT = 20;        // batería ≤ 20% = crítica
-const DIAS_ABIERTOS_URGENTE = 90;   // días abiertos para mostrar en embudo
-const INSEMINADA_DIAS_DIAG = 35;    // inseminada > 35d sin confirmación
-const DIAS_GESTACION = 283;         // parto esperado a 283 días de la inseminación
-// Estados en los que la vaca sigue "abierta" (sin preñez confirmada) desde el último parto.
-const ESTADOS_ABIERTOS = new Set(['VACIA', 'CELO', 'POSIBLE_CELO', 'INSEMINADA', 'PARIDA', 'ANESTRO']);
 const PERIODOS_DIAS = [7, 30, 90];  // opciones del selector de período (Salud y Resumen ejecutivo)
 const PERIODO_DEFAULT_DIAS = 30;
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -73,14 +68,8 @@ function nombreAnimal(a: { id: number; alias?: string | null; idCaravanaOficial?
     return a.alias || a.idCaravanaOficial || `#${a.id}`;
 }
 
-// Fecha de parto esperada en hora local (evita el corrimiento de día al parsear 'YYYY-MM-DD' como UTC)
-function fechaPartoEsperada(fechaInseminacion: string): Date {
-    const [y, m, d] = fechaInseminacion.slice(0, 10).split('-').map(Number);
-    return new Date(y, m - 1, d + DIAS_GESTACION);
-}
-
 // Tooltip de partos: encabezado + hasta 5 nombres
-function tooltipPartos(header: string, animales: AnimalResponse[]): string {
+function tooltipPartos(header: string, animales: AnimalResumen[]): string {
     const MAX_SHOW = 5;
     const lineas = animales.slice(0, MAX_SHOW).map(a => `• ${nombreAnimal(a)}`);
     if (animales.length > MAX_SHOW) lineas.push(`• …y ${animales.length - MAX_SHOW} más`);
@@ -124,12 +113,6 @@ function MapFitter({ animales }: { animales: AnimalMapa[] }) {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface VentanaItem {
-    alerta: AlertaResponse;
-    animal: AnimalResponse | undefined;
-    ventana: VentanaInseminacionResponse;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -302,14 +285,8 @@ export default function DashboardPage() {
     const [rodeos, setRodeos] = useState<RodeoLoteResponse[]>([]);
     const [animalesMapa, setAnimalesMapa] = useState<AnimalMapa[]>([]);
 
-    // Ventanas de celo (mapa alertaId → ventana)
-    const [ventanas, setVentanas] = useState<Map<number, VentanaInseminacionResponse>>(new Map());
-
     // Alertas generadas dentro del período más largo del selector (cubre también la tendencia de 8 semanas)
     const [alertasRecientes, setAlertasRecientes] = useState<AlertaResponse[]>([]);
-
-    // Intervenciones del establecimiento (null si no se pudieron cargar)
-    const [intervenciones, setIntervenciones] = useState<IntervencionResponse[] | null>([]);
 
     // Pesadas del establecimiento (null si no se pudieron cargar)
     const [pesos, setPesos] = useState<RegistroPesoResponse[] | null>([]);
@@ -323,12 +300,17 @@ export default function DashboardPage() {
     const [loadingMando, setLoadingMando] = useState(true);
     const [errorMando, setErrorMando] = useState<string | null>(null);
 
+    // Salud y reproducción, calculado en el backend
+    const [saludRepro, setSaludRepro] = useState<SaludReproduccionResponse | null>(null);
+    const [loadingSalud, setLoadingSalud] = useState(true);
+    const [errorSalud, setErrorSalud] = useState<string | null>(null);
+
     const fetchDashboard = useCallback(async () => {
         if (!selectedId) return;
         setLoading(true);
         setError(null);
         try {
-            const [anim, pendientes, celoArchivadas, rodeosData, mapaData, confirmadas, descartadas, interv, pesosData] = await Promise.all([
+            const [anim, pendientes, celoArchivadas, rodeosData, mapaData, confirmadas, descartadas, pesosData] = await Promise.all([
                 getAnimales(selectedId),
                 getAlertas(selectedId, undefined, undefined, 'PENDIENTE'),
                 getAlertas(selectedId, 'CELO', undefined, 'ARCHIVADA'),
@@ -337,11 +319,9 @@ export default function DashboardPage() {
                 getAlertas(selectedId, undefined, undefined, 'CONFIRMADA'),
                 getAlertas(selectedId, undefined, undefined, 'DESCARTADA'),
                 // Si falla, el resto del dashboard sigue funcionando.
-                getIntervencionesEstablecimiento(selectedId).catch(() => null),
                 getPesosEstablecimiento(selectedId).catch(() => null),
             ]);
             setAnimales(anim);
-            setIntervenciones(interv);
             setPesos(pesosData);
             setAlertasPendientes(pendientes);
             setAlertasArchivadasCelo(celoArchivadas);
@@ -353,17 +333,6 @@ export default function DashboardPage() {
                 a => Date.now() - new Date(a.tsGeneracion).getTime() <= ventanaMs
             );
             setAlertasRecientes(todas);
-
-            // Fetch ventanas para cada alerta de celo PENDIENTE
-            const celoPendientes = pendientes.filter(esCeloConVentana);
-            const ventanaResults = await Promise.allSettled(
-                celoPendientes.map(a => getVentanaInseminacion(a.id, selectedId))
-            );
-            const vm = new Map<number, VentanaInseminacionResponse>();
-            ventanaResults.forEach((r, i) => {
-                if (r.status === 'fulfilled') vm.set(celoPendientes[i].id, r.value);
-            });
-            setVentanas(vm);
         } catch (e) {
             const err = e as { response?: { data?: { message?: string } } };
             setError(err.response?.data?.message || 'Error al cargar el dashboard.');
@@ -391,9 +360,28 @@ export default function DashboardPage() {
 
     useEffect(() => { fetchCentroMando(); }, [fetchCentroMando]);
 
+    const fetchSaludRepro = useCallback(async () => {
+        if (!selectedId) return;
+        setLoadingSalud(true);
+        setErrorSalud(null);
+        try {
+            setSaludRepro(await getSaludReproduccion(selectedId, periodoDias,
+                loteFilter === 'todos' ? undefined : loteFilter));
+        } catch (e) {
+            const err = e as { response?: { data?: string | { message?: string } } };
+            const data = err.response?.data;
+            setErrorSalud((typeof data === 'string' ? data : data?.message) || 'Error al cargar salud y reproducción.');
+        } finally {
+            setLoadingSalud(false);
+        }
+    }, [selectedId, loteFilter, periodoDias]);
+
+    useEffect(() => { fetchSaludRepro(); }, [fetchSaludRepro]);
+
     const refrescar = () => {
         fetchDashboard();
         fetchCentroMando();
+        fetchSaludRepro();
     };
 
     // ── Mapa animal
@@ -403,96 +391,6 @@ export default function DashboardPage() {
     const animalesFiltrados = useMemo(() =>
         loteFilter === 'todos' ? animales : animales.filter(a => a.rodeoLoteId === loteFilter),
         [animales, loteFilter]);
-
-    const alertasFiltradas = useMemo(() =>
-        loteFilter === 'todos'
-            ? alertasPendientes
-            : alertasPendientes.filter(a => {
-                const animal = animalMap.get(a.animalId);
-                return animal?.rodeoLoteId === loteFilter;
-            }),
-        [alertasPendientes, animalMap, loteFilter]);
-
-    // Alertas recientes (cualquier estado) del lote seleccionado
-    const alertasRecientesLote = useMemo(() =>
-        loteFilter === 'todos'
-            ? alertasRecientes
-            : alertasRecientes.filter(a => animalMap.get(a.animalId)?.rodeoLoteId === loteFilter),
-        [alertasRecientes, animalMap, loteFilter]);
-
-    // Última intervención registrada por animal
-    const ultimaIntervPorAnimal = useMemo(() => {
-        const m = new Map<number, IntervencionResponse>();
-        (intervenciones ?? []).forEach(i => {
-            const prev = m.get(i.animalId);
-            if (!prev || new Date(i.fechaHora) > new Date(prev.fechaHora)) m.set(i.animalId, i);
-        });
-        return m;
-    }, [intervenciones]);
-
-    // ── Idea 2: Ventanas de inseminación ─────────────────────────────────────
-    const ventanaItems: VentanaItem[] = useMemo(() => {
-        return alertasFiltradas
-            .filter(a => a.tipo === 'CELO' && ventanas.has(a.id) && (ventanas.get(a.id)!.estado === 'ACTIVA' || ventanas.get(a.id)!.estado === 'FUTURA'))
-            .map(a => ({
-                alerta: a,
-                animal: animalMap.get(a.animalId),
-                ventana: ventanas.get(a.id)!,
-            }))
-            .sort((a, b) => {
-                const aFutura = a.ventana.estado === 'FUTURA';
-                const bFutura = b.ventana.estado === 'FUTURA';
-                if (!aFutura && bFutura) return -1;
-                if (aFutura && !bFutura) return 1;
-                return a.ventana.tiempoRestanteSegundos - b.ventana.tiempoRestanteSegundos;
-            });
-    }, [alertasFiltradas, animalMap, ventanas]);
-
-    // ── Idea 3: Animales a revisar ────────────────────────────────────────────
-    const animalesARevisar = useMemo(() => {
-        return animalesFiltrados
-            .filter(a => a.estadoActual !== 'INACTIVO' && (
-                a.estadoSalud === 'ENFERMO' || a.estadoSalud === 'EN_OBSERVACION'
-            ))
-            .sort((a, b) => {
-                if (a.estadoSalud === 'ENFERMO' && b.estadoSalud !== 'ENFERMO') return -1;
-                if (b.estadoSalud === 'ENFERMO' && a.estadoSalud !== 'ENFERMO') return 1;
-                return 0;
-            });
-    }, [animalesFiltrados]);
-
-    // ── Idea 6: Embudo reproductivo ───────────────────────────────────────────
-    const embudo = useMemo(() => {
-        const reproductivos = animalesFiltrados.filter(
-            a => a.estadoActual !== 'INACTIVO' && esReproductiva(a)
-        );
-        const dist: Record<string, number> = {
-            VACIA: 0, CELO: 0, POSIBLE_CELO: 0, INSEMINADA: 0,
-            GESTANTE: 0, PARIDA: 0, ANESTRO: 0, SIN_ESTADO: 0,
-        };
-        let diasAbiertosSuma = 0;
-        let nAbiertas = 0;
-        let inseminadasPendienteDiag = 0;
-
-        reproductivos.forEach(a => {
-            const estado = a.estadoReproductivo ?? 'SIN_ESTADO';
-            dist[estado] = (dist[estado] ?? 0) + 1;
-
-            // Días abiertos: desde el último parto, sólo en vacas que todavía no quedaron preñadas
-            if (ESTADOS_ABIERTOS.has(estado) && a.fechaUltimoParto) {
-                diasAbiertosSuma += diffDias(a.fechaUltimoParto);
-                nAbiertas++;
-            }
-            // Inseminadas sin diagnóstico
-            if (estado === 'INSEMINADA' && a.fechaUltimaInseminacion) {
-                if (diffDias(a.fechaUltimaInseminacion) > INSEMINADA_DIAS_DIAG) inseminadasPendienteDiag++;
-            }
-        });
-
-        const totalRepro = reproductivos.length;
-        const diasAbiertosProm = nAbiertas > 0 ? Math.round(diasAbiertosSuma / nAbiertas) : 0;
-        return { dist, totalRepro, diasAbiertosProm, nAbiertas, inseminadasPendienteDiag };
-    }, [animalesFiltrados]);
 
     // ── Idea 10: Tabla por rodeo (ejecutivo) ──────────────────────────────
     const tablaRodeos = useMemo(() => {
@@ -595,105 +493,11 @@ export default function DashboardPage() {
         return { enCola: alertasPendientes.length, pctAtendidas, pctDescartadas, hist, totalAtendidas: tiempos.length };
     }, [alertasRecientes, alertasPendientes, periodoDias]);
 
-    // ── Salud tab: KPIs ──────────────────────────────────────────────────────
-    const kpiSaludSinAtender = useMemo(() =>
-        alertasFiltradas.filter(a => a.tipo === 'SALUD' && horasTranscurridas(a.tsGeneracion) > 24).length,
-        [alertasFiltradas]);
-
-    // ── Salud tab: Alertas de salud sin atender (todas las pendientes, la más vieja primero) ──
-    const alertasSaludSinAtender = useMemo(() =>
-        alertasFiltradas
-            .filter(a => a.tipo === 'SALUD')
-            .sort((a, b) => horasTranscurridas(b.tsGeneracion) - horasTranscurridas(a.tsGeneracion)),
-        [alertasFiltradas]);
-
-    // ── Salud tab: Excepciones del embudo ────────────────────────────────────
-    const embudoExcepciones = useMemo(() => {
-        const hace90d = 90 * 24 * 60 * 60 * 1000;
-        const reproductivos = animalesFiltrados.filter(
-            a => a.estadoActual !== 'INACTIVO' && esReproductiva(a)
-        );
-
-        const vaciasLargo = reproductivos.filter(a =>
-            a.estadoReproductivo === 'VACIA' &&
-            a.fechaUltimoParto &&
-            Date.now() - new Date(a.fechaUltimoParto).getTime() > hace90d
-        );
-
-        const inseminadasSinDiag = reproductivos.filter(a =>
-            a.estadoReproductivo === 'INSEMINADA' &&
-            a.fechaUltimaInseminacion &&
-            diffDias(a.fechaUltimaInseminacion) > INSEMINADA_DIAS_DIAG
-        );
-
-        // Anestro sin intervención: la alerta de anestro sigue pendiente (intervenir la cierra).
-        const conAnestroPendiente = new Set(alertasPendientes.filter(esAnestro).map(a => a.animalId));
-        const anestroSinInterv = reproductivos.filter(a => conAnestroPendiente.has(a.id));
-
-        const totalConEstado = reproductivos.filter(
-            a => a.estadoReproductivo && a.estadoReproductivo !== 'SIN_ESTADO'
-        ).length;
-        const completitudPct = reproductivos.length > 0
-            ? Math.round((totalConEstado / reproductivos.length) * 100)
-            : 0;
-
-        return { vaciasLargo, inseminadasSinDiag, anestroSinInterv, completitudPct, totalRepro: reproductivos.length };
-    }, [animalesFiltrados, alertasPendientes]);
-
-    // ── Salud tab: Partos esperados ──────────────────────────────────────────
-    const partosEsperados = useMemo(() => {
-        const hoy = new Date();
-
-        const gestantesConFecha = animalesFiltrados.filter(a =>
-            a.estadoActual !== 'INACTIVO' &&
-            a.estadoReproductivo === 'GESTANTE' &&
-            a.fechaUltimaInseminacion
-        );
-
-        const sinFecha = animalesFiltrados.filter(a =>
-            a.estadoActual !== 'INACTIVO' &&
-            a.estadoReproductivo === 'GESTANTE' &&
-            !a.fechaUltimaInseminacion
-        ).length;
-
-        // Agrupar por semana — próximas 12 semanas
-        const semanas = Array.from({ length: 12 }, (_, w) => {
-            const desde = new Date(hoy);
-            desde.setDate(desde.getDate() + w * 7);
-            const hasta = new Date(desde);
-            hasta.setDate(hasta.getDate() + 7);
-
-            // Label: "Sem 1", "Sem 2", etc., con fecha de inicio
-            const dd = String(desde.getDate()).padStart(2, '0');
-            const mm = String(desde.getMonth() + 1).padStart(2, '0');
-            const label = `${dd}/${mm}`;
-
-            const animalesSemana = gestantesConFecha.filter(a => {
-                const ins = new Date(a.fechaUltimaInseminacion!);
-                const parto = new Date(ins.getTime() + DIAS_GESTACION * 24 * 60 * 60 * 1000);
-                return parto >= desde && parto < hasta;
-            });
-
-            return { label, count: animalesSemana.length, desde, hasta, animales: animalesSemana };
-        });
-
-        // Gestantes cuya fecha esperada ya pasó (posible parto sin registrar)
-        const vencidos = gestantesConFecha.filter(a =>
-            new Date(a.fechaUltimaInseminacion!).getTime() + DIAS_GESTACION * DIA_MS < hoy.getTime()
-        ).length;
-
-        return { semanas, sinFecha, vencidos, total: gestantesConFecha.length + sinFecha };
-    }, [animalesFiltrados]);
-
     // ── Salud tab: Partos esperados — vista anual (estilo GitHub) ────────────
     const partosAnio = useMemo(() => {
-        const porDia = new Map<string, AnimalResponse[]>();
-        animalesFiltrados
-            .filter(a => a.estadoActual !== 'INACTIVO' && a.estadoReproductivo === 'GESTANTE' && a.fechaUltimaInseminacion)
-            .forEach(a => {
-                const key = fechaPartoEsperada(a.fechaUltimaInseminacion!).toDateString();
-                porDia.set(key, [...(porDia.get(key) ?? []), a]);
-            });
+        const porDia = new Map((saludRepro?.partos.porDia ?? []).map(d => [d.fecha, d.animales]));
+        const clave = (f: Date) =>
+            `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
 
         // 53 columnas (semanas) × 7 filas (lun..dom), arrancando el lunes de esta semana
         const hoy = new Date();
@@ -701,98 +505,12 @@ export default function DashboardPage() {
         const lunes = hoy.getDate() - ((hoy.getDay() + 6) % 7);
         const dias = Array.from({ length: 53 * 7 }, (_, i) => {
             const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), lunes + i);
-            return { fecha, animales: porDia.get(fecha.toDateString()) ?? [], pasado: fecha < hoy };
+            return { fecha, animales: porDia.get(clave(fecha)) ?? [], pasado: fecha < hoy };
         });
         const maxDia = Math.max(...dias.map(d => d.animales.length), 1);
 
         return { dias, maxDia };
-    }, [animalesFiltrados]);
-
-
-    // ── Salud tab: Desempeño reproductivo ────────────────────────────────────
-    const desempenyo = useMemo(() => {
-        const periodoMs = periodoDias * DIA_MS;
-        const enPeriodo = (ts: string) => Date.now() - new Date(ts).getTime() <= periodoMs;
-        const reproductivos = animalesFiltrados.filter(a => a.estadoActual !== 'INACTIVO' && esReproductiva(a));
-        const celosPeriodo = alertasRecientesLote.filter(a => esCeloConVentana(a) && enPeriodo(a.tsGeneracion));
-
-        // Celo detectado / atendido: alertas de celo generadas en el período
-        const celoDetectado = celosPeriodo.length;
-        const celoAtendido = celosPeriodo.filter(a => a.estado === 'CONFIRMADA').length;
-
-        // Ventanas perdidas: de esos celos, cuántos se archivaron sin atender
-        const ventanasPerdidas = celosPeriodo.filter(a => a.estado === 'ARCHIVADA').length;
-
-        // Inseminadas en el período, y de ellas las que hoy están gestantes
-        const inseminadasPeriodo = reproductivos.filter(a =>
-            a.fechaUltimaInseminacion && enPeriodo(a.fechaUltimaInseminacion)
-        );
-        const inseminadas = inseminadasPeriodo.length;
-        const gestantes = inseminadasPeriodo.filter(a => a.estadoReproductivo === 'GESTANTE').length;
-
-        return { celoDetectado, celoAtendido, ventanasPerdidas, inseminadas, gestantes, n: reproductivos.length };
-    }, [animalesFiltrados, alertasRecientesLote, periodoDias]);
-
-    // ── Salud tab: Reincidencia (Idea 13) ────────────────────────────────────
-    const reincidencia = useMemo(() => {
-        const periodoMs = periodoDias * DIA_MS;
-        const now = Date.now();
-        const alertasPeriodo = alertasRecientesLote.filter(a =>
-            now - new Date(a.tsGeneracion).getTime() <= periodoMs
-        );
-
-        // Por animal: cantidad de alertas en el período
-        const porAnimal = new Map<number, number>();
-        alertasPeriodo.forEach(a => {
-            porAnimal.set(a.animalId, (porAnimal.get(a.animalId) ?? 0) + 1);
-        });
-
-        const rankingAnimales = Array.from(porAnimal.entries())
-            .filter(([, count]) => count >= 2)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([animalId, count]) => ({ animal: animalMap.get(animalId), count }));
-
-        // Por lote: salidas de perímetro repetidas
-        const porLote = new Map<string, number>();
-        alertasPeriodo.filter(a => a.tipo === 'FUERA_DE_PERIMETRO').forEach(a => {
-            const anim = animalMap.get(a.animalId);
-            const lote = anim?.rodeoLoteNombre ?? 'Sin lote';
-            porLote.set(lote, (porLote.get(lote) ?? 0) + 1);
-        });
-        const rankingLotes = Array.from(porLote.entries())
-            .filter(([, count]) => count >= 2)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([nombre, count]) => ({ nombre, count }));
-
-        return { rankingAnimales, rankingLotes };
-    }, [alertasRecientesLote, animalMap, periodoDias]);
-
-    // ── Salud tab: Última intervención ───────────────────────────────────────
-    const ultimaIntervencion = useMemo(() => {
-        const activos = animalesFiltrados.filter(a => a.estadoActual !== 'INACTIVO');
-        const idsActivos = new Set(activos.map(a => a.id));
-
-        // La intervención más reciente del lote seleccionado
-        const masReciente = (intervenciones ?? []).find(i => idsActivos.has(i.animalId)) ?? null;
-
-        // Animales que llevan más tiempo sin intervenciones (nunca primero)
-        const ranking = activos
-            .map(a => {
-                const ult = ultimaIntervPorAnimal.get(a.id);
-                return { animal: a, dias: ult ? Math.floor(diffDias(ult.fechaHora)) : null };
-            })
-            .sort((a, b) => {
-                if (a.dias === null && b.dias === null) return 0;
-                if (a.dias === null) return -1;
-                if (b.dias === null) return 1;
-                return b.dias - a.dias;
-            })
-            .slice(0, 5);
-
-        return { masReciente, ranking };
-    }, [animalesFiltrados, intervenciones, ultimaIntervPorAnimal]);
+    }, [saludRepro]);
 
     // ── Salud tab: Ganancia de peso (null si no se pudieron cargar las pesadas) ──
     const gananciaPeso = useMemo(() =>
@@ -800,16 +518,8 @@ export default function DashboardPage() {
         [animalesFiltrados, pesos]);
 
     // Abre el listado de animales filtrado por estos ids; `motivo` se muestra en el chip del filtro
-    const verListaAnimales = (lista: AnimalResponse[], motivo: string) =>
+    const verListaAnimales = (lista: { id: number }[], motivo: string) =>
         navigate(`/animales?${new URLSearchParams({ ids: lista.map(a => a.id).join(','), motivo })}`);
-
-    // ── KPIs de header ────────────────────────────────────────────────────────
-    // Solo ventanas ya abiertas: en las FUTURAS el tiempo restante es hasta que abren, no hasta que vencen
-    const ventanasUrgentes = ventanaItems.filter(
-        v => v.ventana.estado === 'ACTIVA' && v.ventana.tiempoRestanteSegundos / 3600 <= 3
-    ).length;
-    const kpiVentanasSubtexto = ventanasUrgentes > 0 ? `${ventanasUrgentes} por vencer en < 3h` : 'sin urgencia inmediata';
-
 
     // ── Render ────────────────────────────────────────────────────────────────
     const cm = centroMando;
@@ -1058,14 +768,24 @@ export default function DashboardPage() {
 
     // ── Salud y reproducción del rodeo view ──────────────────────────────
     function SaludReproduccionView() {
-        if (loading) {
-            return <div className="dash-loading-center" style={{ padding: 60 }}><Spinner animation="border" /></div>;
+        const sr = saludRepro;
+        if (!sr) {
+            return errorSalud
+                ? <Alert variant="danger" style={{ borderRadius: 10, maxWidth: 1280, margin: '0 auto 16px' }}>
+                    <i className="bi bi-exclamation-triangle me-2" />{errorSalud}
+                </Alert>
+                : <div className="dash-loading-center" style={{ padding: 60 }}><Spinner animation="border" /></div>;
         }
 
-        const maxParto = Math.max(...partosEsperados.semanas.map(s => s.count), 1);
-        const maxDesempenyo = Math.max(
-            desempenyo.celoDetectado, desempenyo.celoAtendido, desempenyo.inseminadas, desempenyo.gestantes, 1
-        );
+        const d = sr.desempenyo;
+        // Semana "dd/mm" desde su primer día ('YYYY-MM-DD')
+        const semanasPartos = sr.partos.semanas.map(s => ({
+            label: `${s.desde.slice(8, 10)}/${s.desde.slice(5, 7)}`,
+            count: s.animales.length,
+            animales: s.animales,
+        }));
+        const maxParto = Math.max(...semanasPartos.map(s => s.count), 1);
+        const maxDesempenyo = Math.max(d.celosDetectados, d.celosAtendidos, d.inseminadas, d.gestantes, 1);
 
         return (
             <>
@@ -1073,34 +793,38 @@ export default function DashboardPage() {
                 <div className="dash-salud-kpi-row">
                     <div className="dash-salud-kpi">
                         <span className="dash-salud-kpi-label">Días abiertos (promedio)</span>
-                        <span className="dash-salud-kpi-val">{embudo.diasAbiertosProm}</span>
+                        <span className="dash-salud-kpi-val">{sr.indicadores.diasAbiertosPromedio}</span>
                         <span className="dash-salud-kpi-sub">
-                            {embudo.nAbiertas > 0 ? `${embudo.nAbiertas} vacas abiertas con parto registrado` : 'sin vacas abiertas con parto registrado'}
+                            {sr.indicadores.vacasAbiertas > 0 ? `${sr.indicadores.vacasAbiertas} vacas abiertas con parto registrado` : 'sin vacas abiertas con parto registrado'}
                         </span>
                     </div>
                     <div className="dash-salud-kpi">
                         <span className="dash-salud-kpi-label">Ventanas perdidas ({periodoDias} d)</span>
                         <span className="dash-salud-kpi-val dash-salud-kpi-warn">
-                            {desempenyo.celoDetectado > 0
-                                ? `${Math.round((desempenyo.ventanasPerdidas / desempenyo.celoDetectado) * 100)}%`
+                            {d.celosDetectados > 0
+                                ? `${Math.round((d.ventanasPerdidas / d.celosDetectados) * 100)}%`
                                 : '0%'
                             }
                         </span>
-                        <span className="dash-salud-kpi-sub">{desempenyo.ventanasPerdidas} de {desempenyo.celoDetectado} celos</span>
+                        <span className="dash-salud-kpi-sub">{d.ventanasPerdidas} de {d.celosDetectados} celos</span>
                     </div>
                     <div className="dash-salud-kpi">
                         <span className="dash-salud-kpi-label">Salud sin atender</span>
-                        <span className={`dash-salud-kpi-val ${kpiSaludSinAtender > 0 ? 'dash-salud-kpi-danger' : ''}`}>
-                            {kpiSaludSinAtender}
+                        <span className={`dash-salud-kpi-val ${sr.indicadores.saludSinAtender > 0 ? 'dash-salud-kpi-danger' : ''}`}>
+                            {sr.indicadores.saludSinAtender}
                         </span>
-                        <span className="dash-salud-kpi-sub">&gt; 24 h desde la alerta</span>
+                        <span className="dash-salud-kpi-sub">&gt; {sr.umbrales.horasSaludSinAtender} h desde la alerta</span>
                     </div>
                     <div className="dash-salud-kpi">
                         <span className="dash-salud-kpi-label">Celos sin atender</span>
-                        <span className={`dash-salud-kpi-val ${ventanasUrgentes > 0 ? 'dash-salud-kpi-danger' : ''}`}>
-                            {ventanaItems.length}
+                        <span className={`dash-salud-kpi-val ${sr.indicadores.celosPorVencer > 0 ? 'dash-salud-kpi-danger' : ''}`}>
+                            {sr.indicadores.celosSinAtender}
                         </span>
-                        <span className="dash-salud-kpi-sub">{kpiVentanasSubtexto}</span>
+                        <span className="dash-salud-kpi-sub">
+                            {sr.indicadores.celosPorVencer > 0
+                                ? `${sr.indicadores.celosPorVencer} por vencer en < ${sr.umbrales.horasVentanaPorVencer}h`
+                                : 'sin urgencia inmediata'}
+                        </span>
                     </div>
                 </div>
 
@@ -1120,13 +844,13 @@ export default function DashboardPage() {
                         {/* Celos con ventana abierta: lo más urgente del rodeo reproductivo, primero */}
                         <div className="dash-salud-revisar-section">
                             <span className="dash-salud-revisar-seclabel">Celos con ventana abierta</span>
-                            {ventanaItems.length === 0 ? (
+                            {sr.ventanas.length === 0 ? (
                                 <p className="dash-no-items" style={{ margin: '6px 0' }}>
                                     <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
                                     {' '}Sin celos con ventana abierta
                                 </p>
                             ) : (
-                                ventanaItems.slice(0, CELOS_MAX).map(({ alerta, animal, ventana }) => {
+                                sr.ventanas.slice(0, CELOS_MAX).map(({ alerta, animal, ventana }) => {
                                     const isFutura = ventana.estado === 'FUTURA';
                                     const vc = isFutura ? 'futura' : ventanaClass(ventana.tiempoRestanteSegundos);
                                     const restante = formatHorasRestantes(ventana.tiempoRestanteSegundos).replace(' restantes', '');
@@ -1145,21 +869,21 @@ export default function DashboardPage() {
                                     );
                                 })
                             )}
-                            {ventanaItems.length > CELOS_MAX && (
+                            {sr.ventanas.length > CELOS_MAX && (
                                 <button className="dash-ver-todas-btn" onClick={() => setActiveTab('mando')}>
-                                    +{ventanaItems.length - CELOS_MAX} más — ver en Centro de mando
+                                    +{sr.ventanas.length - CELOS_MAX} más — ver en Centro de mando
                                 </button>
                             )}
                         </div>
                         <div className="dash-salud-revisar-divider" />
 
-                        {embudoExcepciones.totalRepro === 0 ? (
+                        {sr.embudo.totalReproductivos === 0 ? (
                             <p className="dash-no-items">Sin animales reproductivos registrados</p>
                         ) : (
                             <>
                                 {/* Barra horizontal */}
                                 <div className="dash-embudo-bar-wrap">
-                                    {Object.entries(embudo.dist)
+                                    {Object.entries(sr.embudo.distribucion)
                                         .filter(([, v]) => v > 0)
                                         .map(([estado, count]) => (
                                             <div
@@ -1171,7 +895,7 @@ export default function DashboardPage() {
                                         ))}
                                 </div>
                                 <div className="dash-embudo-legend">
-                                    {Object.entries(embudo.dist).filter(([, v]) => v > 0).map(([estado, count]) => (
+                                    {Object.entries(sr.embudo.distribucion).filter(([, v]) => v > 0).map(([estado, count]) => (
                                         <span key={estado} className="dash-embudo-leg-item">
                                             <span
                                                 className={`dash-dot dash-embudo-${estado.toLowerCase()}`}
@@ -1190,14 +914,14 @@ export default function DashboardPage() {
                                     <div className="dash-salud-exc-row">
                                         <div className="dash-salud-exc-desc">
                                             <span className="dash-salud-exc-state vacia">VACÍA</span>
-                                            {' '}con &gt; {DIAS_ABIERTOS_URGENTE} días abiertos
+                                            {' '}con &gt; {sr.umbrales.diasVaciaLarga} días abiertos
                                         </div>
                                         <div className="dash-salud-exc-action">
-                                            <strong>{embudoExcepciones.vaciasLargo.length}</strong>
-                                            {embudoExcepciones.vaciasLargo.length > 0 && (
+                                            <strong>{sr.embudo.vaciasLargas.length}</strong>
+                                            {sr.embudo.vaciasLargas.length > 0 && (
                                                 <button
                                                     className="dash-ver-todas-btn"
-                                                    onClick={() => verListaAnimales(embudoExcepciones.vaciasLargo, `Vacías con > ${DIAS_ABIERTOS_URGENTE} días abiertos`)}
+                                                    onClick={() => verListaAnimales(sr.embudo.vaciasLargas, `Vacías con > ${sr.umbrales.diasVaciaLarga} días abiertos`)}
                                                 >
                                                     — ver lista
                                                 </button>
@@ -1208,14 +932,14 @@ export default function DashboardPage() {
                                     <div className="dash-salud-exc-row">
                                         <div className="dash-salud-exc-desc">
                                             <span className="dash-salud-exc-state inseminada">INSEMINADA</span>
-                                            {' '}sin diagnóstico &gt; {INSEMINADA_DIAS_DIAG} d
+                                            {' '}sin diagnóstico &gt; {sr.umbrales.diasDiagnosticoInseminada} d
                                         </div>
                                         <div className="dash-salud-exc-action">
-                                            <strong>{embudoExcepciones.inseminadasSinDiag.length}</strong>
-                                            {embudoExcepciones.inseminadasSinDiag.length > 0 && (
+                                            <strong>{sr.embudo.inseminadasSinDiagnostico.length}</strong>
+                                            {sr.embudo.inseminadasSinDiagnostico.length > 0 && (
                                                 <button
                                                     className="dash-ver-todas-btn"
-                                                    onClick={() => verListaAnimales(embudoExcepciones.inseminadasSinDiag, `Inseminadas sin diagnóstico > ${INSEMINADA_DIAS_DIAG} d`)}
+                                                    onClick={() => verListaAnimales(sr.embudo.inseminadasSinDiagnostico, `Inseminadas sin diagnóstico > ${sr.umbrales.diasDiagnosticoInseminada} d`)}
                                                 >
                                                     — ver lista
                                                 </button>
@@ -1229,11 +953,11 @@ export default function DashboardPage() {
                                             {' '}con alerta sin intervención
                                         </div>
                                         <div className="dash-salud-exc-action">
-                                            <strong>{embudoExcepciones.anestroSinInterv.length}</strong>
-                                            {embudoExcepciones.anestroSinInterv.length > 0 && (
+                                            <strong>{sr.embudo.anestroSinIntervencion.length}</strong>
+                                            {sr.embudo.anestroSinIntervencion.length > 0 && (
                                                 <button
                                                     className="dash-ver-todas-btn"
-                                                    onClick={() => verListaAnimales(embudoExcepciones.anestroSinInterv, 'Anestro con alerta sin intervención')}
+                                                    onClick={() => verListaAnimales(sr.embudo.anestroSinIntervencion, 'Anestro con alerta sin intervención')}
                                                 >
                                                     — ver lista
                                                 </button>
@@ -1243,7 +967,7 @@ export default function DashboardPage() {
                                 </div>
 
                                 <div className="dash-salud-completitud">
-                                    Completitud del dato: {embudoExcepciones.completitudPct}% de los animales con estado registrado
+                                    Completitud del dato: {sr.embudo.completitudPorcentaje}% de los animales con estado registrado
                                 </div>
                             </>
                         )}
@@ -1262,14 +986,13 @@ export default function DashboardPage() {
                         {/* Sub-sección: Alertas sin atender */}
                         <div className="dash-salud-revisar-section">
                             <span className="dash-salud-revisar-seclabel">Alertas sin atender</span>
-                            {alertasSaludSinAtender.length === 0 ? (
+                            {sr.alertasSaludSinAtender.length === 0 ? (
                                 <p className="dash-no-items" style={{ margin: '6px 0' }}>
                                     <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
                                     {' '}Sin alertas de salud pendientes
                                 </p>
                             ) : (
-                                alertasSaludSinAtender.slice(0, REVISAR_MAX).map(alerta => {
-                                    const animal = animalMap.get(alerta.animalId);
+                                sr.alertasSaludSinAtender.slice(0, REVISAR_MAX).map(({ alerta, animal }) => {
                                     const h = horasTranscurridas(alerta.tsGeneracion);
                                     const dias = Math.floor(h / 24);
                                     const sevDot = alerta.severidad === 'ALTA' ? 'dash-sev-dot-alta'
@@ -1283,16 +1006,16 @@ export default function DashboardPage() {
                                         >
                                             <span className={`dash-sev-dot ${sevDot}`} />
                                             <span className="dash-salud-revisar-nombre">{nombreAnimal(animal)}</span>
-                                            <span className={`dash-salud-revisar-tiempo ${h > 24 ? 'dash-salud-revisar-dias-urgente' : ''}`}>
+                                            <span className={`dash-salud-revisar-tiempo ${h > sr.umbrales.horasSaludSinAtender ? 'dash-salud-revisar-dias-urgente' : ''}`}>
                                                 {dias > 0 ? `${dias} d` : `${Math.floor(h)}h`}
                                             </span>
                                         </div>
                                     );
                                 })
                             )}
-                            {alertasSaludSinAtender.length > REVISAR_MAX && (
+                            {sr.alertasSaludSinAtender.length > REVISAR_MAX && (
                                 <button className="dash-ver-todas-btn" onClick={() => navigate('/alertas')}>
-                                    +{alertasSaludSinAtender.length - REVISAR_MAX} más — ver alertas
+                                    +{sr.alertasSaludSinAtender.length - REVISAR_MAX} más — ver alertas
                                 </button>
                             )}
                         </div>
@@ -1302,16 +1025,14 @@ export default function DashboardPage() {
                         {/* Sub-sección: En observación / enfermos */}
                         <div className="dash-salud-revisar-section">
                             <span className="dash-salud-revisar-seclabel">En observación / enfermos</span>
-                            {animalesARevisar.length === 0 ? (
+                            {sr.enObservacion.length === 0 ? (
                                 <p className="dash-no-items" style={{ margin: '6px 0' }}>
                                     <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
                                     {' '}Todos los animales sanos
                                 </p>
                             ) : (
-                                animalesARevisar.slice(0, REVISAR_MAX).map(a => {
-                                    const ultimaInterv = ultimaIntervPorAnimal.get(a.id);
-                                    const diasSinRevision = ultimaInterv ? Math.floor(diffDias(ultimaInterv.fechaHora)) : null;
-                                    const esEnfermo = a.estadoSalud === 'ENFERMO';
+                                sr.enObservacion.slice(0, REVISAR_MAX).map(({ animal: a, estadoSalud, ultimaIntervencionTipo, diasSinIntervencion: diasSinRevision }) => {
+                                    const esEnfermo = estadoSalud === 'ENFERMO';
                                     const sinRevisionLargo = diasSinRevision === null || diasSinRevision > 14;
                                     return (
                                         <div
@@ -1326,20 +1047,18 @@ export default function DashboardPage() {
                                             <span className="dash-salud-revisar-nombre">{nombreAnimal(a)}</span>
                                             <span className="dash-salud-revisar-lote">{a.rodeoLoteNombre ?? ''}</span>
                                             <span
-                                                className={`dash-salud-revisar-dias ${intervenciones && sinRevisionLargo ? 'dash-salud-revisar-dias-urgente' : ''}`}
-                                                title={ultimaInterv ? `Última intervención: ${TIPO_INTERVENCION_LABEL[ultimaInterv.tipo]}` : undefined}
+                                                className={`dash-salud-revisar-dias ${sinRevisionLargo ? 'dash-salud-revisar-dias-urgente' : ''}`}
+                                                title={ultimaIntervencionTipo ? `Última intervención: ${TIPO_INTERVENCION_LABEL[ultimaIntervencionTipo]}` : undefined}
                                             >
-                                                {!intervenciones ? '—'
-                                                    : diasSinRevision !== null ? `${diasSinRevision} d sin revisión`
-                                                        : 'sin intervenciones'}
+                                                {diasSinRevision !== null ? `${diasSinRevision} d sin revisión` : 'sin intervenciones'}
                                             </span>
                                         </div>
                                     );
                                 })
                             )}
-                            {animalesARevisar.length > REVISAR_MAX && (
+                            {sr.enObservacion.length > REVISAR_MAX && (
                                 <button className="dash-ver-todas-btn" onClick={() => navigate('/animales?tab=salud')}>
-                                    +{animalesARevisar.length - REVISAR_MAX} más — ver animales
+                                    +{sr.enObservacion.length - REVISAR_MAX} más — ver animales
                                 </button>
                             )}
                         </div>
@@ -1370,7 +1089,7 @@ export default function DashboardPage() {
                             </div>
                         </div>
 
-                        {partosEsperados.total === 0 ? (
+                        {sr.partos.totalGestantes === 0 ? (
                             <p className="dash-no-items">Sin animales gestantes registrados</p>
                         ) : (
                             <>
@@ -1413,7 +1132,7 @@ export default function DashboardPage() {
                                     </div>
                                 ) : (
                                     <div className="dash-partos-chart">
-                                        {partosEsperados.semanas.map((sem, i) => (
+                                        {semanasPartos.map((sem, i) => (
                                             <div key={i} className={`dash-partos-bar-col ${sem.count > 0 ? 'dash-partos-bar-col-active' : ''}`}
                                                 title={sem.count === 0 ? '' : tooltipPartos(
                                                     `📅 Semana ${sem.label} — ${sem.count} parto${sem.count > 1 ? 's' : ''} esperado${sem.count > 1 ? 's' : ''}`,
@@ -1439,14 +1158,14 @@ export default function DashboardPage() {
                                 )}
                                 <div className="dash-partos-sub">
                                     {partosVista === 'anio' ? 'Por día, próximos 12 meses · tocá un día para ver las vacas' : 'Por semana, próximas 12 semanas'}
-                                    {partosEsperados.sinFecha > 0 && (
+                                    {sr.partos.gestantesSinFecha > 0 && (
                                         <span className="dash-partos-subfecha">
-                                            {' '}· {partosEsperados.sinFecha} sin fecha de inseminación
+                                            {' '}· {sr.partos.gestantesSinFecha} sin fecha de inseminación
                                         </span>
                                     )}
-                                    {partosEsperados.vencidos > 0 && (
+                                    {sr.partos.vencidos > 0 && (
                                         <span className="dash-partos-subfecha">
-                                            {' '}· {partosEsperados.vencidos} con fecha de parto vencida
+                                            {' '}· {sr.partos.vencidos} con fecha de parto vencida
                                         </span>
                                     )}
                                 </div>
@@ -1464,16 +1183,16 @@ export default function DashboardPage() {
 
                         </div>
 
-                        {desempenyo.n === 0 ? (
+                        {d.reproductivos === 0 ? (
                             <p className="dash-no-items">Sin animales reproductivos registrados</p>
                         ) : (
                             <>
                                 <div className="dash-desempenyo-funnel">
                                     {[
-                                        { label: 'Celo detectado', val: desempenyo.celoDetectado, cls: 'dash-desempenyo-bar-celo' },
-                                        { label: 'Atendido', val: desempenyo.celoAtendido, cls: 'dash-desempenyo-bar-atend' },
-                                        { label: 'Inseminado', val: desempenyo.inseminadas, cls: 'dash-desempenyo-bar-ins' },
-                                        { label: 'Gestante', val: desempenyo.gestantes, cls: 'dash-desempenyo-bar-gest' },
+                                        { label: 'Celo detectado', val: d.celosDetectados, cls: 'dash-desempenyo-bar-celo' },
+                                        { label: 'Atendido', val: d.celosAtendidos, cls: 'dash-desempenyo-bar-atend' },
+                                        { label: 'Inseminado', val: d.inseminadas, cls: 'dash-desempenyo-bar-ins' },
+                                        { label: 'Gestante', val: d.gestantes, cls: 'dash-desempenyo-bar-gest' },
                                     ].map(row => (
                                         <div key={row.label} className="dash-desempenyo-row">
                                             <span className="dash-desempenyo-label">{row.label}</span>
@@ -1507,30 +1226,30 @@ export default function DashboardPage() {
 
                         </div>
 
-                        {reincidencia.rankingAnimales.length === 0 && reincidencia.rankingLotes.length === 0 ? (
+                        {sr.reincidencia.animales.length === 0 && sr.reincidencia.lotes.length === 0 ? (
                             <p className="dash-no-items">
                                 <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
                                 {' '}Sin reincidentes en {periodoDias} d
                             </p>
                         ) : (
                             <>
-                                {reincidencia.rankingAnimales.map((item, i) => (
+                                {sr.reincidencia.animales.map((item, i) => (
                                     <div
                                         key={i}
                                         className="dash-salud-reincidencia-row"
                                         onClick={() => item.animal && navigate(`/animales/${item.animal.id}`)}
                                     >
                                         <span className="dash-salud-reincidencia-nombre">{nombreAnimal(item.animal)}</span>
-                                        <span className="dash-salud-reincidencia-count">{item.count} alertas / {periodoDias} d</span>
+                                        <span className="dash-salud-reincidencia-count">{item.alertas} alertas / {periodoDias} d</span>
                                     </div>
                                 ))}
-                                {reincidencia.rankingLotes.length > 0 && (
+                                {sr.reincidencia.lotes.length > 0 && (
                                     <>
                                         <div className="dash-salud-revisar-divider" />
-                                        {reincidencia.rankingLotes.map((item, i) => (
+                                        {sr.reincidencia.lotes.map((item, i) => (
                                             <div key={i} className="dash-salud-reincidencia-row">
                                                 <span className="dash-salud-reincidencia-nombre">{item.nombre}</span>
-                                                <span className="dash-salud-reincidencia-count">{item.count} salidas de perímetro</span>
+                                                <span className="dash-salud-reincidencia-count">{item.salidas} salidas de perímetro</span>
                                             </div>
                                         ))}
                                     </>
@@ -1549,28 +1268,25 @@ export default function DashboardPage() {
 
                         </div>
 
-                        {intervenciones === null ? (
-                            <p className="dash-no-items">No se pudieron cargar las intervenciones</p>
-                        ) : (
-                            <>
-                                {ultimaIntervencion.masReciente ? (
+                        <>
+                                {sr.ultimaIntervencion.masReciente ? (
                                     <div
                                         className="dash-salud-interv-ultima"
-                                        onClick={() => navigate(`/animales/${ultimaIntervencion.masReciente!.animalId}`)}
+                                        onClick={() => sr.ultimaIntervencion.masReciente?.animal && navigate(`/animales/${sr.ultimaIntervencion.masReciente.animal.id}`)}
                                     >
                                         <span className="dash-salud-interv-ultima-tipo">
-                                            {TIPO_INTERVENCION_LABEL[ultimaIntervencion.masReciente.tipo]}
+                                            {TIPO_INTERVENCION_LABEL[sr.ultimaIntervencion.masReciente.tipo]}
                                         </span>
-                                        {' · '}{nombreAnimal(animalMap.get(ultimaIntervencion.masReciente.animalId))}
-                                        {' · '}{ultimaIntervencion.masReciente.interventor}
-                                        {' · '}hace {formatHoras(horasTranscurridas(ultimaIntervencion.masReciente.fechaHora))}
+                                        {' · '}{nombreAnimal(sr.ultimaIntervencion.masReciente.animal)}
+                                        {' · '}{sr.ultimaIntervencion.masReciente.interventor ?? '—'}
+                                        {' · '}hace {formatHoras(horasTranscurridas(sr.ultimaIntervencion.masReciente.fechaHora))}
                                     </div>
                                 ) : (
                                     <p className="dash-no-items">Sin intervenciones registradas</p>
                                 )}
 
                                 <div className="dash-salud-interv-note">Más tiempo sin intervenciones</div>
-                                {ultimaIntervencion.ranking.map(item => (
+                                {sr.ultimaIntervencion.sinIntervencionHaceMas.map(item => (
                                     <div
                                         key={item.animal.id}
                                         className="dash-salud-interv-row"
@@ -1593,8 +1309,7 @@ export default function DashboardPage() {
                                         </span>
                                     </div>
                                 ))}
-                            </>
-                        )}
+                        </>
                     </div>
 
                     {/* ── Ganancia de peso (Idea 17) ────────────────────────── */}
@@ -1739,9 +1454,9 @@ export default function DashboardPage() {
                         className="dash-atender-btn"
                         style={{ fontSize: '0.82rem', padding: '8px 16px' }}
                         onClick={refrescar}
-                        disabled={loading || loadingMando}
+                        disabled={loading || loadingMando || loadingSalud}
                     >
-                        {loading || loadingMando
+                        {loading || loadingMando || loadingSalud
                             ? <Spinner animation="border" size="sm" />
                             : <><i className="bi bi-arrow-clockwise me-1" />Refrescar</>
                         }

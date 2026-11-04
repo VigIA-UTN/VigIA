@@ -24,10 +24,10 @@ public class CentroMandoResponse {
     /** Hasta {@code umbrales.colaMax} ítems, del más urgente al menos urgente. */
     private List<ItemCola> cola;
     /** Ventanas abiertas o por abrir: primero las abiertas, cada grupo por tiempo restante. */
-    private List<ItemVentana> ventanas;
+    private List<VentanaAlertaResponse> ventanas;
     private Embudo embudo;
     private Tendencia tendencia;
-    private Umbrales umbrales;
+    private UmbralesDashboardResponse umbrales;
 
     @Data
     @Builder
@@ -78,16 +78,6 @@ public class CentroMandoResponse {
         private int porcentaje;
     }
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AnimalResumen {
-        private Long id;
-        private String idCaravanaOficial;
-        private String alias;
-    }
-
     /**
      * Una alerta pendiente, o una caravana que no transmite (tipo {@code CARAVANA}, con id negativo) para un animal
      * que no tiene otra alerta.
@@ -98,18 +88,8 @@ public class CentroMandoResponse {
     @AllArgsConstructor
     public static class ItemCola {
         private AlertaResponse alerta;
-        private AnimalResumen animal;
+        private AnimalResumenResponse animal;
         /** Solo en los celos con ventana de inseminación. */
-        private VentanaInseminacionResponse ventana;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ItemVentana {
-        private AlertaResponse alerta;
-        private AnimalResumen animal;
         private VentanaInseminacionResponse ventana;
     }
 
@@ -138,18 +118,5 @@ public class CentroMandoResponse {
         private List<String> semanas;
         private List<String> tipos;
         private Map<String, List<Long>> datos;
-    }
-
-    /** Los umbrales con los que se calculó, para que el frontend los muestre sin repetirlos. */
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Umbrales {
-        private int horasSinSenial;
-        private int bateriaBajaPorcentaje;
-        private int horasVentanaPorVencer;
-        private int diasDiagnosticoInseminada;
-        private int colaMax;
     }
 }

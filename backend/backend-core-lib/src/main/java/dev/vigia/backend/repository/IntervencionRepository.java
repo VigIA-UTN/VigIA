@@ -1,6 +1,7 @@
 package dev.vigia.backend.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,4 +34,9 @@ public interface IntervencionRepository extends JpaRepository<Intervencion, Long
                      "ORDER BY i.fechaHora DESC")
        List<Intervencion> findByEstablecimientoId(
                      @Param("establecimientoId") Long establecimientoId);
+
+       /** Dashboard: la última intervención de cada animal, en una sola consulta. */
+       @Query(value = "SELECT DISTINCT ON (animal_id) * FROM intervenciones WHERE animal_id IN (:animalIds) "
+                     + "ORDER BY animal_id, fecha_hora DESC, id DESC", nativeQuery = true)
+       List<Intervencion> findUltimaPorAnimal(@Param("animalIds") Collection<Long> animalIds);
 }

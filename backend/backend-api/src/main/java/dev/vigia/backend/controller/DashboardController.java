@@ -42,4 +42,29 @@ public class DashboardController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    /**
+     * GET /api/v1/establecimientos/{id}/dashboard/salud-reproduccion?rodeoId={rodeoId}&periodoDias={dias}
+     * <p>
+     * Pestaña "Salud y reproducción" (H0044): indicadores, embudo con sus excepciones, animales a revisar, partos
+     * esperados, desempeño reproductivo, reincidencia y última intervención.
+     *
+     * @return 200 con las métricas, 400 si el rodeo no existe o el período no es válido, 403 si el usuario no
+     *         pertenece al establecimiento o el rodeo es de otro
+     */
+    @GetMapping("/salud-reproduccion")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> saludReproduccion(@PathVariable Long id,
+            @RequestParam(name = "rodeoId", required = false) Long rodeoId,
+            @RequestParam(name = "periodoDias", defaultValue = "30") int periodoDias,
+            Authentication authentication) {
+        try {
+            return ResponseEntity.ok(
+                    dashboardService.saludReproduccion(authentication.getName(), id, rodeoId, periodoDias));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

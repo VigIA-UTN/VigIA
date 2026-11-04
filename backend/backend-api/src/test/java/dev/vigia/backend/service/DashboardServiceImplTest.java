@@ -2,6 +2,7 @@ package dev.vigia.backend.service;
 
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.CentroMandoResponse;
+import dev.vigia.backend.dto.SaludReproduccionResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.Caravana;
@@ -9,15 +10,18 @@ import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.EstadoAlerta;
 import dev.vigia.backend.model.EstadoAnimal;
 import dev.vigia.backend.model.EstadoReproductivo;
+import dev.vigia.backend.model.Intervencion;
 import dev.vigia.backend.model.Establecimiento;
 import dev.vigia.backend.model.PerfilReferencia;
 import dev.vigia.backend.model.RodeoLote;
+import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.repository.AlertaRepository;
 import dev.vigia.backend.repository.AnimalRepository;
 import dev.vigia.backend.repository.EstablecimientoRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository;
 import dev.vigia.backend.repository.EstadoSaludRepository.UltimoEstadoSalud;
+import dev.vigia.backend.repository.IntervencionRepository;
 import dev.vigia.backend.repository.RodeoLoteRepository;
 import dev.vigia.backend.service.impl.DashboardServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +37,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,6 +63,8 @@ class DashboardServiceImplTest {
     @Mock
     private AlertaRepository alertaRepository;
     @Mock
+    private IntervencionRepository intervencionRepository;
+    @Mock
     private EstablecimientoRepository establecimientoRepository;
     @Mock
     private RodeoLoteRepository rodeoLoteRepository;
@@ -72,7 +79,8 @@ class DashboardServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new DashboardServiceImpl(animalRepository, estadoSaludRepository, alertaRepository,
-                establecimientoRepository, rodeoLoteRepository, alertaService, 6, 20, 3, 35, 8);
+                intervencionRepository, establecimientoRepository, rodeoLoteRepository, alertaService,
+                6, 20, 3, 35, 8, 24, 90, 283);
         establecimiento = establecimiento(EST);
         rodeo1 = rodeo(10L, establecimiento);
         rodeo2 = rodeo(20L, establecimiento);
@@ -213,6 +221,51 @@ class DashboardServiceImplTest {
         List<Long> salud = r.getTendencia().getDatos().get("SALUD");
         assertThat(salud.get(salud.size() - 1)).isEqualTo(1L);
         verify(alertaRepository, never()).findAllById(any());
+    }
+
+    @Test
+    @DisplayName("Salud: 400 con un período inválido, antes de consultar nada")
+    void saludPeriodoInvalido() {
+        assertThatThrownBy(() -> service.saludReproduccion(EMAIL, EST, null, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.saludReproduccion(EMAIL, EST, null, 366))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(establecimientoRepository, never()).findActiveEstablecimientoByUsuarioEmail(any());
+    }
+
+    @Test
+    @DisplayName("Salud: con rodeo, el anestro pendiente se busca en todo el establecimiento y las intervenciones "
+            + "solo de sus animales")
+    void saludConRodeo() {
+        miembro();
+        when(rodeoLoteRepository.findById(10L)).thenReturn(Optional.of(rodeo1));
+        Animal enRodeo = animal(1L, rodeo1, true, true);
+        enRodeo.setEstadosReproductivos(new ArrayList<>(List.of(estado(TipoReproductivo.ANESTRO))));
+        when(animalRepository.findParaDashboardByEstablecimientoIdAndEstadoActualNot(EST, EstadoAnimal.INACTIVO))
+                .thenReturn(List.of(enRodeo, animal(2L, rodeo2, true, true)));
+        when(estadoSaludRepository.findUltimoPorAnimal(List.of(1L))).thenReturn(List.of());
+        when(alertaService.listarAlertas(EMAIL, EST, null, null, EstadoAlerta.PENDIENTE)).thenReturn(List.of(
+                pendiente(50L, 1L, DisparadorAlerta.CELO, "Anestro Detectado"),
+                pendiente(51L, 2L, DisparadorAlerta.SALUD, "SALUD")));
+        when(alertaRepository.findGeneradasDesde(eq(EST), any(), any())).thenReturn(List.of());
+        Intervencion intervencion = new Intervencion();
+        intervencion.setAnimal(enRodeo);
+        intervencion.setTipo(TipoIntervencion.TRATAMIENTO);
+        intervencion.setFechaHora(LocalDateTime.now().minusDays(2));
+        when(intervencionRepository.findUltimaPorAnimal(Set.of(1L))).thenReturn(List.of(intervencion));
+
+        SaludReproduccionResponse r = service.saludReproduccion(EMAIL, EST, 10L, 30);
+
+        assertThat(r.getEmbudo().getAnestroSinIntervencion()).extracting(a -> a.getId()).containsExactly(1L);
+        assertThat(r.getAlertasSaludSinAtender()).isEmpty();
+        assertThat(r.getUltimaIntervencion().getMasReciente().getTipo()).isEqualTo(TipoIntervencion.TRATAMIENTO);
+        assertThat(r.getUmbrales().getDiasGestacion()).isEqualTo(283);
+    }
+
+    private static EstadoReproductivo estado(TipoReproductivo tipo) {
+        EstadoReproductivo e = new EstadoReproductivo();
+        e.setEstado(tipo);
+        return e;
     }
 
     private static UltimoEstadoSalud salud(Long animalId, String estado) {
