@@ -13,6 +13,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -131,6 +133,53 @@ class InvitacionServiceTest {
                                 eq(request.getEmail()),
                                 eq(captured.getToken()),
                                 eq(establecimiento.getNombre()));
+        }
+
+        @ParameterizedTest(name = "Rol {0}")
+        @EnumSource(value = Rol.class, names = { "ADMINISTRADOR", "VETERINARIO", "CAMPERO" })
+        @DisplayName("Debe rechazar invitar como productor a un usuario con otro rol, sin vincularlo")
+        @SuppressWarnings("null")
+        void generarInvitacionProductor_UsuarioConOtroRol_ThrowsException(Rol rol) {
+                Usuario existente = new Usuario();
+                existente.setEmail(request.getEmail());
+                existente.setRol(rol);
+                when(usuarioRepository.findByEmail(adminEmail)).thenReturn(Optional.of(adminUser));
+                when(establecimientoRepository.findById(request.getEstablecimientoId()))
+                                .thenReturn(Optional.of(establecimiento));
+                when(usuarioRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(existente));
+                int vinculos = establecimiento.getEmpleados().size();
+
+                assertThatThrownBy(() -> invitacionService.generarInvitacionProductor(request, adminEmail))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("otro rol");
+
+                assertThat(establecimiento.getEmpleados()).hasSize(vinculos);
+                verify(invitacionRepository, never()).save(any(Invitacion.class));
+                verifyNoInteractions(emailService);
+        }
+
+        @Test
+        @DisplayName("Debe invitar a un usuario con rol pendiente en lugar de vincularlo directo")
+        @SuppressWarnings("null")
+        void generarInvitacionProductor_UsuarioPendiente_GeneraInvitacion() {
+                Usuario pendiente = new Usuario();
+                pendiente.setEmail(request.getEmail());
+                pendiente.setRol(Rol.PENDIENTE);
+                when(usuarioRepository.findByEmail(adminEmail)).thenReturn(Optional.of(adminUser));
+                when(establecimientoRepository.findById(request.getEstablecimientoId()))
+                                .thenReturn(Optional.of(establecimiento));
+                when(usuarioRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(pendiente));
+                when(invitacionRepository.save(any(Invitacion.class))).thenAnswer(inv -> inv.getArgument(0));
+                int vinculos = establecimiento.getEmpleados().size();
+
+                InvitacionResponse response = invitacionService.generarInvitacionProductor(request, adminEmail);
+
+                assertThat(response.getEstado()).isEqualTo(EstadoInvitacion.PENDIENTE.name());
+                assertThat(response.getRol()).isEqualTo(Rol.PRODUCTOR.name());
+                assertThat(establecimiento.getEmpleados()).hasSize(vinculos);
+                verify(emailService).enviarInvitacionPendienteUsuarioExistente(
+                                request.getEmail(), establecimiento.getNombre(), Rol.PRODUCTOR.name());
+                verify(emailService, never()).enviarInvitacionProductor(anyString(), anyString(), anyString());
         }
 
         @Test

@@ -23,8 +23,8 @@ test.describe('H0014 - Callback OAuth2 (UI)', () => {
 
     await page.goto(`/oauth2/callback?token=${token}&email=${encodeURIComponent(usuario.email)}&rol=ADMINISTRADOR`);
 
-    await expect(page).toHaveURL(/\/usuarios/, { timeout: 15000 });
-    await expect(page.getByRole('heading', { name: 'Usuarios' })).toBeVisible();
+    await expect(page).toHaveURL(/\/establecimientos$/, { timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Establecimientos', exact: true })).toBeVisible();
   });
 
   test('H0014-03 - Callback con error del backend (usuario sin invitación)', async ({ page }) => {

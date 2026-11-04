@@ -106,6 +106,41 @@ class InvitacionProductorIT extends SeguridadItBase {
                 Integer.class, token)).isZero();
     }
 
+    @ParameterizedTest(name = "H0032-07 - Invitar productor - Usuario {0} con otro rol")
+    @ValueSource(strings = { "admin", "veterinarioA", "camperoA" })
+    @DisplayName("H0032-07 - Invitar productor - Email de un usuario con otro rol")
+    void H0032_07_usuarioConOtroRol(String clave) throws Exception {
+        MvcResult resultado = invitar("admin", email(clave), idEstablecimiento(EST_B));
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(400);
+        assertThat(resultado.getResponse().getContentAsString()).contains("otro rol");
+        assertThat(esEmpleadoActivo(email(clave), EST_B)).isFalse();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM invitaciones WHERE email_destino = ?",
+                Integer.class, email(clave))).isZero();
+    }
+
+    @Test
+    @DisplayName("H0032-08 - Invitar productor - Usuario con rol pendiente acepta la invitación")
+    void H0032_08_usuarioPendienteAceptaInvitacion() throws Exception {
+        String email = emailUnico();
+        crearUsuario(email, "PENDIENTE", null);
+
+        MvcResult creada = invitar("admin", email, idEstablecimiento(EST_B));
+
+        assertThat(creada.getResponse().getStatus()).isEqualTo(201);
+        assertThat(leer(creada).get("estado").asText()).isEqualTo("PENDIENTE");
+        assertThat(esEmpleadoActivo(email, EST_B)).isFalse();
+
+        MvcResult aceptada = mockMvc.perform(post("/api/v1/invitaciones/" + leer(creada).get("id").asLong() + "/aceptar")
+                        .header("Authorization", "Bearer " + tokenDe(email, credenciales.password())))
+                .andReturn();
+
+        assertThat(aceptada.getResponse().getStatus()).isEqualTo(200);
+        assertThat(esEmpleadoActivo(email, EST_B)).isTrue();
+        assertThat(jdbcTemplate.queryForObject("SELECT rol FROM usuarios WHERE email = ?", String.class, email))
+                .isEqualTo("PRODUCTOR");
+    }
+
     private MvcResult invitar(String clave, String email, Long establecimientoId) throws Exception {
         return mockMvc.perform(post("/api/v1/invitaciones/productor")
                         .header("Authorization", bearer(clave))
