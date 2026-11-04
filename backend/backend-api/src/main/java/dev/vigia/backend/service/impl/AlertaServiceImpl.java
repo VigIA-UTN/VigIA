@@ -1,7 +1,6 @@
 package dev.vigia.backend.service.impl;
 
 import java.util.Comparator;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -60,6 +59,7 @@ import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.TipoReproductivo;
 import dev.vigia.backend.service.AlertaService;
 import dev.vigia.backend.service.CeloDatoDesactualizadoEvaluator;
+import dev.vigia.backend.service.VentanaInseminacionCalculadora;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
@@ -698,55 +698,7 @@ public class AlertaServiceImpl implements AlertaService {
                         throw new IllegalArgumentException("Las alertas de anestro no tienen ventana de inseminación.");
                 }
 
-                LocalDateTime now = LocalDateTime.now();
-                LocalDateTime inicio = alerta.getVentanaInicioIns();
-                LocalDateTime fin = alerta.getVentanaFinIns();
-
-                if (inicio == null || fin == null) {
-                        inicio = alerta.getTsGeneracion().plusHours(6);
-                        fin = alerta.getTsGeneracion().plusHours(24);
-                }
-
-                long tiempoRestanteSegundos = 0;
-                double porcentajeTranscurrido = 0.0;
-                boolean proximaAVencer = false;
-                String estado;
-
-                if (now.isAfter(fin) || now.isEqual(fin)) {
-                        estado = "VENCIDA";
-                        tiempoRestanteSegundos = 0;
-                        porcentajeTranscurrido = 100.0;
-                        proximaAVencer = false;
-                } else if (now.isBefore(inicio)) {
-                        estado = "FUTURA";
-                        tiempoRestanteSegundos = Duration.between(now, fin).getSeconds();
-                        porcentajeTranscurrido = 0.0;
-                        proximaAVencer = false;
-                } else {
-                        estado = "ACTIVA";
-                        tiempoRestanteSegundos = Duration.between(now, fin).getSeconds();
-
-                        long duracionTotal = Duration.between(inicio, fin).getSeconds();
-                        long duracionTranscurrida = Duration.between(inicio, now).getSeconds();
-
-                        porcentajeTranscurrido = ((double) duracionTranscurrida / duracionTotal) * 100.0;
-
-                        if (porcentajeTranscurrido > 100.0)
-                                porcentajeTranscurrido = 100.0;
-                        if (porcentajeTranscurrido < 0.0)
-                                porcentajeTranscurrido = 0.0;
-
-                        if (tiempoRestanteSegundos <= 7200) {
-                                proximaAVencer = true;
-                        }
-                }
-
-                return VentanaInseminacionResponse.builder()
-                                .tiempoRestanteSegundos(tiempoRestanteSegundos)
-                                .porcentajeTranscurrido(porcentajeTranscurrido)
-                                .proximaAVencer(proximaAVencer)
-                                .estado(estado)
-                                .build();
+                return VentanaInseminacionCalculadora.calcular(alerta, LocalDateTime.now());
         }
 
         @Override
