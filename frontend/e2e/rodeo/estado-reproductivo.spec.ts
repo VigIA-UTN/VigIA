@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { abrirDetalleAnimal, contextoRodeo, crearAnimal, pestanaAnimal } from '../helpers';
 
 /**
- * H0013 - Registro de estado reproductivo desde la pestaña Reproducción del detalle del animal.
+ * H0007 - Registro de estado reproductivo desde la pestaña Reproducción del detalle del animal.
  *
  * Precondiciones:
  *   - Usuario PRODUCTOR con "Fixture A".
@@ -30,8 +30,8 @@ function filaVigente(page: Page) {
   return page.locator('.vigia-table tbody tr').first();
 }
 
-test.describe('H0013 - Estado reproductivo desde pestaña Reproducción (UI)', () => {
-  test('H0013-01 - Registrar estado reproductivo "Gestante" con fechas', async ({ page, request }) => {
+test.describe('H0007 - Estado reproductivo desde pestaña Reproducción (UI)', () => {
+  test('H0007-07 - Registrar estado reproductivo "Gestante" con fechas', async ({ page, request }) => {
     await irAReproduccion(page, request);
     await abrirModalRegistro(page);
 
@@ -58,7 +58,7 @@ test.describe('H0013 - Estado reproductivo desde pestaña Reproducción (UI)', (
     await expect(fila).toContainText(ddmmaaaa(insem));
   });
 
-  test('H0013-02 - Registrar estado "Vacía"', async ({ page, request }) => {
+  test('H0007-08 - Registrar estado "Vacía"', async ({ page, request }) => {
     await irAReproduccion(page, request);
     await abrirModalRegistro(page);
 
@@ -72,7 +72,7 @@ test.describe('H0013 - Estado reproductivo desde pestaña Reproducción (UI)', (
     await expect(filaVigente(page)).toContainText('Vacía');
   });
 
-  test('H0013-03 - Editar el estado reproductivo más reciente', async ({ page, request }) => {
+  test('H0007-09 - Editar el estado reproductivo más reciente', async ({ page, request }) => {
     await irAReproduccion(page, request);
 
     // Un estado para editar

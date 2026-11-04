@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { loginPorRol, contextoRodeo, crearCaravana, ESTABLECIMIENTO_E2 } from '../helpers';
 
 /**
- * H0010 - Alta manual de animal (incluido el campo sensor) y error por identificador repetido.
+ * H0004 - Alta manual de animal (incluido el campo sensor) y error por identificador repetido.
  *
  * Precondiciones:
  *   - Usuario PRODUCTOR con "Fixture A" (productorA).
@@ -40,8 +40,8 @@ async function elegirPrimerLote(page: Page) {
   await loteSelect.selectOption(primerLote!);
 }
 
-test.describe('H0010 - Alta manual de animal (UI)', () => {
-  test('H0010-01 - Alta de animal con todos los campos, incluyendo sensor', async ({ page, request }) => {
+test.describe('H0004 - Alta manual de animal (UI)', () => {
+  test('H0004-06 - Alta de animal con todos los campos, incluyendo sensor', async ({ page, request }) => {
     const caravana = await crearCaravana(request, await contextoRodeo(request));
     const idAnimal = `E2E-${Date.now()}`;
     const alias = `Vaquillona ${Date.now()}`;
@@ -74,7 +74,7 @@ test.describe('H0010 - Alta manual de animal (UI)', () => {
     await expect(fila.getByText('Sin vincular')).toHaveCount(0);
   });
 
-  test('H0010-02 - Alta de animal con identificador ya existente muestra error', async ({ page }) => {
+  test('H0004-07 - Alta de animal con identificador ya existente muestra error', async ({ page }) => {
     const idAnimal = `E2E-DUP-${Date.now()}`;
 
     await irAAnimales(page);
@@ -102,7 +102,7 @@ test.describe('H0010 - Alta manual de animal (UI)', () => {
     });
   });
 
-  test('H0010-03 - Alta de animal sin identificador muestra error de validación', async ({ page }) => {
+  test('H0004-08 - Alta de animal sin identificador muestra error de validación', async ({ page }) => {
     await irAAnimales(page);
     await abrirModalNuevoAnimal(page);
 

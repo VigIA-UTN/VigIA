@@ -54,7 +54,7 @@ class ActividadRecienteIT extends GestionRodeoItBase {
     }
 
     @Test
-    @DisplayName("H0015-03 - Actividad 7 días - Animal sin caravana y acceso")
+    @DisplayName("H0015-03 - Actividad 7 días - Acceso, cambio de caravana y animal sin caravana")
     void H0015_03_sinCaravanaYAcceso() throws Exception {
         Long animal = idAnimal(EST_A, "A-101");
 

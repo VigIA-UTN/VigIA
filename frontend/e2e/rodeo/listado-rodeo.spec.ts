@@ -9,7 +9,7 @@ import {
 } from '../helpers';
 
 /**
- * H0012 - Listado del rodeo: filtros, orden y navegación al detalle del animal.
+ * H0006 - Listado del rodeo: filtros, orden y navegación al detalle del animal.
  *
  * Precondiciones:
  *   - Usuario PRODUCTOR con "Fixture A", que tiene los 6 animales del escenario (A-101 a A-106).
@@ -29,8 +29,8 @@ async function irAAnimales(page: Page) {
 const filas = (page: Page) => page.locator('.vigia-table tbody tr.animal-row');
 const buscador = (page: Page) => page.getByPlaceholder(/Buscar por identificador/i);
 
-test.describe('H0012 - Listado del rodeo: filtros, orden y navegación (UI)', () => {
-  test('H0012-01 - Buscador filtra animales por identificador', async ({ page, request }) => {
+test.describe('H0006 - Listado del rodeo: filtros, orden y navegación (UI)', () => {
+  test('H0006-04 - Buscador filtra animales por identificador', async ({ page, request }) => {
     const ctx = await contextoRodeo(request);
     const buscado = await crearAnimal(request, ctx);
     await crearAnimal(request, ctx);
@@ -44,7 +44,7 @@ test.describe('H0012 - Listado del rodeo: filtros, orden y navegación (UI)', ()
     await expect(filas(page).first().locator('td').first()).toHaveText(buscado.idCaravanaOficial);
   });
 
-  test('H0012-02 - Buscador filtra animales por nombre', async ({ page, request }) => {
+  test('H0006-05 - Buscador filtra animales por nombre', async ({ page, request }) => {
     const ctx = await contextoRodeo(request);
     const alias = `Nombre-${sufijoUnico()}`;
     const buscado = await crearAnimal(request, ctx, { alias });
@@ -58,7 +58,7 @@ test.describe('H0012 - Listado del rodeo: filtros, orden y navegación (UI)', ()
     await expect(filas(page).first().locator('td').first()).toHaveText(buscado.idCaravanaOficial);
   });
 
-  test('H0012-03 - Buscador con texto inexistente muestra "No se encontraron animales"', async ({ page }) => {
+  test('H0006-06 - Buscador con texto inexistente muestra "No se encontraron animales"', async ({ page }) => {
     await irAAnimales(page);
 
     await buscador(page).fill('XXXXXXXX_INEXISTENTE_99999');
@@ -67,7 +67,7 @@ test.describe('H0012 - Listado del rodeo: filtros, orden y navegación (UI)', ()
     await expect(filas(page)).toHaveCount(0);
   });
 
-  test('H0012-04 - Ordenar por columna ID cambia el orden de la lista', async ({ page }) => {
+  test('H0006-07 - Ordenar por columna ID cambia el orden de la lista', async ({ page }) => {
     await irAAnimales(page);
     const encabezadoId = page.getByRole('columnheader', { name: /^ID/ });
     const ids = () => filas(page).locator('td:first-child').allTextContents();
@@ -86,7 +86,7 @@ test.describe('H0012 - Listado del rodeo: filtros, orden y navegación (UI)', ()
     expect(descendente).not.toEqual(ascendente);
   });
 
-  test('H0012-05 - Clic en "Ver" navega al detalle del animal', async ({ page, request }) => {
+  test('H0006-08 - Clic en "Ver" navega al detalle del animal', async ({ page, request }) => {
     const alias = `Detalle-${sufijoUnico()}`;
     const animal = await crearAnimal(request, await contextoRodeo(request), { alias });
     await irAAnimales(page);
@@ -99,7 +99,7 @@ test.describe('H0012 - Listado del rodeo: filtros, orden y navegación (UI)', ()
     await expect(page.getByRole('heading', { name: alias })).toBeVisible({ timeout: 10000 });
   });
 
-  test('H0012-06 - Pestaña "Celo" filtra animales por estado reproductivo', async ({ page }) => {
+  test('H0006-09 - Pestaña "Celo" filtra animales por estado reproductivo', async ({ page }) => {
     await irAAnimales(page);
     await expect(page.getByRole('columnheader', { name: /Rodeo/ })).toBeVisible();
 
@@ -113,7 +113,7 @@ test.describe('H0012 - Listado del rodeo: filtros, orden y navegación (UI)', ()
     await expect(filas(page).first()).toBeVisible();
   });
 
-  test('H0012-07 - Pestaña "Salud" filtra animales con problemas de salud', async ({ page, request }) => {
+  test('H0006-10 - Pestaña "Salud" filtra animales con problemas de salud', async ({ page, request }) => {
     const ctx = await contextoRodeo(request);
     const marca = `Salud-${sufijoUnico()}`;
     const sano = await crearAnimal(request, ctx, { alias: `${marca}-sano` });

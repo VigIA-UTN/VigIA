@@ -9,7 +9,7 @@ import {
 } from '../helpers';
 
 /**
- * H0015 - Gestión de caravanas: baja, reactivación, vinculación y desvinculación.
+ * H0040 y H0041 - Gestión de caravanas: baja, reactivación, vinculación y desvinculación.
  *
  * Precondiciones:
  *   - Usuario PRODUCTOR con "Fixture A" y usuario ADMINISTRADOR (único que da de baja y reactiva caravanas).
@@ -45,8 +45,8 @@ async function irACaravanasYBuscar(page: Page, codigo: string) {
   return fila;
 }
 
-test.describe('H0015 - Gestión de caravanas (UI)', () => {
-  test('H0015-01 - Vincular caravana disponible a un animal sin caravana', async ({ page, request }) => {
+test.describe('H0040 y H0041 - Gestión de caravanas (UI)', () => {
+  test('H0041-05 - Vincular caravana disponible a un animal sin caravana', async ({ page, request }) => {
     const ctx = await contextoRodeo(request);
     const caravana = await crearCaravana(request, ctx);
     const animal = await crearAnimal(request, ctx);
@@ -69,7 +69,7 @@ test.describe('H0015 - Gestión de caravanas (UI)', () => {
     await expect(fila.getByText(caravana.codigo)).toBeVisible();
   });
 
-  test('H0015-02 - Desvincular caravana de un animal y deshacer con "Deshacer"', async ({ page, request }) => {
+  test('H0041-06 - Desvincular caravana de un animal y deshacer con "Deshacer"', async ({ page, request }) => {
     const ctx = await contextoRodeo(request);
     const caravana = await crearCaravana(request, ctx);
     const animal = await crearAnimal(request, ctx, { caravanaId: caravana.id });
@@ -92,7 +92,7 @@ test.describe('H0015 - Gestión de caravanas (UI)', () => {
     await expect(fila.getByText('Sin vincular')).toHaveCount(0);
   });
 
-  test('H0015-03 - Dar de baja una caravana desde la sección Caravanas (administrador)', async ({ page, request }) => {
+  test('H0040-06 - Dar de baja una caravana desde la sección Caravanas (administrador)', async ({ page, request }) => {
     const ctx = await contextoRodeo(request);
     const caravana = await crearCaravana(request, ctx);
 
@@ -109,7 +109,7 @@ test.describe('H0015 - Gestión de caravanas (UI)', () => {
     await expect(fila.getByRole('button', { name: 'Reactivar' })).toBeVisible();
   });
 
-  test('H0015-04 - Reactivar una caravana dada de baja (administrador)', async ({ page, request }) => {
+  test('H0040-07 - Reactivar una caravana dada de baja (administrador)', async ({ page, request }) => {
     const ctx = await contextoRodeo(request);
     const caravana = await crearCaravana(request, ctx);
     await darDeBajaCaravanaApi(request, ctx, caravana.id);

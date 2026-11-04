@@ -14,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 /**
- * H0006-04 (filtros, orden y paginación) no tiene test acá: GET /animales no los recibe, se resuelven en el frontend
- * y se cubren en la regresión E2E.
+ * H0006-04 a H0006-10 (búsqueda, orden y vistas) no tienen test acá: GET /animales no los recibe, se resuelven en el
+ * frontend y se cubren en la regresión E2E (e2e/rodeo/listado-rodeo.spec.ts).
  */
 @DisplayName("H0006 - Listado del rodeo (filtros, orden) — IT")
 class ListadoRodeoIT extends GestionRodeoItBase {

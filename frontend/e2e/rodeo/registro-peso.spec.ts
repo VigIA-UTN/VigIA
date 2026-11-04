@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { abrirDetalleAnimal, contextoRodeo, crearAnimal, registrarPesoApi } from '../helpers';
 
 /**
- * H0016 - Registro de peso y gráfico de evolución.
+ * H0042 - Registro de peso y gráfico de evolución.
  *
  * Precondiciones:
  *   - Usuario PRODUCTOR con "Fixture A".
@@ -27,8 +27,8 @@ async function abrirModalPeso(page: Page) {
   await expect(page.locator('.modal.show').getByText('Registrar Peso')).toBeVisible();
 }
 
-test.describe('H0016 - Registro de peso y gráfico de evolución (UI)', () => {
-  test('H0016-01 - Registrar un nuevo peso y que aparezca en el historial', async ({ page, request }) => {
+test.describe('H0042 - Registro de peso y gráfico de evolución (UI)', () => {
+  test('H0042-04 - Registrar un nuevo peso y que aparezca en el historial', async ({ page, request }) => {
     await abrirDetalleAnimal(page, await crearAnimal(request, await contextoRodeo(request)));
     await expect(page.getByText('Sin registros de peso aún.')).toBeVisible({ timeout: 15000 });
     await abrirModalPeso(page);
@@ -46,7 +46,7 @@ test.describe('H0016 - Registro de peso y gráfico de evolución (UI)', () => {
     await expect(page.locator('.recharts-line-dots circle')).toHaveCount(1);
   });
 
-  test('H0016-02 - El gráfico de evolución de peso es visible', async ({ page, request }) => {
+  test('H0042-05 - El gráfico de evolución de peso es visible', async ({ page, request }) => {
     const ctx = await contextoRodeo(request);
     const animal = await crearAnimal(request, ctx);
     await registrarPesoApi(request, ctx, animal.id, 300, isoHace(10));
@@ -64,7 +64,7 @@ test.describe('H0016 - Registro de peso y gráfico de evolución (UI)', () => {
     await expect(page.getByText('320 kg')).toBeVisible();
   });
 
-  test('H0016-03 - Registrar peso con valor inválido muestra error', async ({ page, request }) => {
+  test('H0042-06 - Registrar peso con valor inválido muestra error', async ({ page, request }) => {
     await abrirDetalleAnimal(page, await crearAnimal(request, await contextoRodeo(request)));
     await abrirModalPeso(page);
 
@@ -78,7 +78,7 @@ test.describe('H0016 - Registro de peso y gráfico de evolución (UI)', () => {
     await expect(page.getByText('¡Peso registrado correctamente!')).toHaveCount(0);
   });
 
-  test('H0016-04 - Registrar peso sin fecha muestra error de validación', async ({ page, request }) => {
+  test('H0042-07 - Registrar peso sin fecha muestra error de validación', async ({ page, request }) => {
     await abrirDetalleAnimal(page, await crearAnimal(request, await contextoRodeo(request)));
     await abrirModalPeso(page);
 
