@@ -22,7 +22,7 @@ export default function OAuth2CallbackPage() {
       login(token, email, rol || 'PENDIENTE');
 
       if (rol === 'ADMINISTRADOR') {
-        navigate('/usuarios', { replace: true });
+        navigate('/establecimientos', { replace: true });
       } else if (rol === 'PENDIENTE' || !rol) {
         navigate('/invitaciones', { replace: true });
       } else {
