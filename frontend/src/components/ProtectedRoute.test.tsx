@@ -69,18 +69,18 @@ describe('ProtectedRoute', () => {
     });
   });
 
-  it('redirige a /login cuando no hay sesión activa', () => {
+  it('H0002-07 - Ruta protegida - Redirige a /login cuando no hay sesión activa', () => {
     renderProtectedRoute();
     expect(screen.getByTestId('login-page')).toBeInTheDocument();
     expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
   });
 
-  it('muestra el contenido protegido cuando el usuario está autenticado', () => {
+  it('H0002-08 - Ruta protegida - Muestra el contenido protegido cuando el usuario está autenticado', () => {
     useAuthStore.setState({
       isAuthenticated: true,
       token: 'fake-token',
       email: 'usuario@test.com',
-      rol: 'ADMIN',
+      rol: 'ADMINISTRADOR',
       lastActivity: Date.now(),
     });
 
@@ -89,7 +89,7 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
   });
 
-  it('muestra el navbar cuando el usuario está autenticado', () => {
+  it('H0002-08 - Ruta protegida - Muestra el navbar cuando el usuario está autenticado', () => {
     useAuthStore.setState({
       isAuthenticated: true,
       token: 'fake-token',
@@ -102,22 +102,22 @@ describe('ProtectedRoute', () => {
     expect(screen.getByTestId('navbar')).toBeInTheDocument();
   });
 
-  it('redirige a / cuando el rol del usuario no está en la lista permitida', () => {
+  it('H0002-09 - Ruta protegida - Redirige a / cuando el rol del usuario no está en la lista permitida', () => {
     useAuthStore.setState({
       isAuthenticated: true,
       token: 'fake-token',
-      email: 'empleado@test.com',
-      rol: 'EMPLEADO',
+      email: 'campero@test.com',
+      rol: 'CAMPERO',
       lastActivity: Date.now(),
     });
 
     // Solo admins pueden entrar
-    renderProtectedRoute({ roles: ['ADMIN'] });
+    renderProtectedRoute({ roles: ['ADMINISTRADOR'] });
     expect(screen.getByTestId('home-page')).toBeInTheDocument();
     expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
   });
 
-  it('permite el acceso cuando el rol del usuario está en la lista permitida', () => {
+  it('H0002-09 - Ruta protegida - Permite el acceso cuando el rol del usuario está en la lista permitida', () => {
     useAuthStore.setState({
       isAuthenticated: true,
       token: 'fake-token',
@@ -126,16 +126,16 @@ describe('ProtectedRoute', () => {
       lastActivity: Date.now(),
     });
 
-    renderProtectedRoute({ roles: ['ADMIN', 'VETERINARIO'] });
+    renderProtectedRoute({ roles: ['ADMINISTRADOR', 'VETERINARIO'] });
     expect(screen.getByTestId('protected-content')).toBeInTheDocument();
   });
 
-  it('permite el acceso cuando no se especifican roles (ruta abierta a cualquier autenticado)', () => {
+  it('H0002-08 - Ruta protegida - Permite el acceso cuando no se especifican roles (ruta abierta a cualquier autenticado)', () => {
     useAuthStore.setState({
       isAuthenticated: true,
       token: 'fake-token',
       email: 'user@test.com',
-      rol: 'EMPLEADO',
+      rol: 'CAMPERO',
       lastActivity: Date.now(),
     });
 
