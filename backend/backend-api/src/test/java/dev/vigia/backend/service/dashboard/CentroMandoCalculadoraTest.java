@@ -44,34 +44,34 @@ class CentroMandoCalculadoraTest {
 
     /** Vaca adulta monitoreada: caravana con señal hace 10 min, batería 80 %, sin estados. */
     static AnimalDashboard vaca(long id) {
-        return new AnimalDashboard(id, "A-" + id, "Vaca " + id, 1L, "Rodeo 1", HOY.minusYears(3), HOY.minusYears(1), true,
-                false, AHORA.minusMinutes(10), 80.0, null, null, null, null);
+        return new AnimalDashboard(id, "A-" + id, "Vaca " + id, 1L, "Rodeo 1", HOY.minusYears(3), HOY.minusYears(1),
+                true, false, AHORA.minusMinutes(10), 80.0, null, null, null, null);
     }
 
     static AnimalDashboard conCaravana(AnimalDashboard a, boolean tiene, boolean calibrando,
             LocalDateTime ultimaSenial, Double bateria) {
-        return new AnimalDashboard(a.id(), a.idCaravanaOficial(), a.alias(), a.rodeoId(), a.rodeoNombre(), a.fechaNacimiento(),
-                a.fechaAlta(), tiene, calibrando, ultimaSenial, bateria, a.estadoReproductivo(), a.fechaUltimoParto(),
-                a.fechaUltimaInseminacion(), a.estadoSalud());
+        return new AnimalDashboard(a.id(), a.idCaravanaOficial(), a.alias(), a.rodeoId(), a.rodeoNombre(),
+                a.fechaNacimiento(), a.fechaAlta(), tiene, calibrando, ultimaSenial, bateria,
+                a.estadoReproductivo(), a.fechaUltimoParto(), a.fechaUltimaInseminacion(), a.estadoSalud());
     }
 
     static AnimalDashboard conReproductivo(AnimalDashboard a, TipoReproductivo estado, LocalDate parto,
             LocalDate inseminacion) {
-        return new AnimalDashboard(a.id(), a.idCaravanaOficial(), a.alias(), a.rodeoId(), a.rodeoNombre(), a.fechaNacimiento(),
-                a.fechaAlta(), a.tieneCaravana(), a.enCalibracion(), a.ultimaSenial(), a.bateria(), estado, parto,
-                inseminacion, a.estadoSalud());
+        return new AnimalDashboard(a.id(), a.idCaravanaOficial(), a.alias(), a.rodeoId(), a.rodeoNombre(),
+                a.fechaNacimiento(), a.fechaAlta(), a.tieneCaravana(), a.enCalibracion(), a.ultimaSenial(),
+                a.bateria(), estado, parto, inseminacion, a.estadoSalud());
     }
 
     static AnimalDashboard conSalud(AnimalDashboard a, TipoEstadoSalud salud) {
-        return new AnimalDashboard(a.id(), a.idCaravanaOficial(), a.alias(), a.rodeoId(), a.rodeoNombre(), a.fechaNacimiento(),
-                a.fechaAlta(), a.tieneCaravana(), a.enCalibracion(), a.ultimaSenial(), a.bateria(),
-                a.estadoReproductivo(), a.fechaUltimoParto(), a.fechaUltimaInseminacion(), salud);
+        return new AnimalDashboard(a.id(), a.idCaravanaOficial(), a.alias(), a.rodeoId(), a.rodeoNombre(),
+                a.fechaNacimiento(), a.fechaAlta(), a.tieneCaravana(), a.enCalibracion(), a.ultimaSenial(),
+                a.bateria(), a.estadoReproductivo(), a.fechaUltimoParto(), a.fechaUltimaInseminacion(), salud);
     }
 
     static AnimalDashboard nacida(AnimalDashboard a, LocalDate nacimiento) {
-        return new AnimalDashboard(a.id(), a.idCaravanaOficial(), a.alias(), a.rodeoId(), a.rodeoNombre(), nacimiento, a.fechaAlta(),
-                a.tieneCaravana(), a.enCalibracion(), a.ultimaSenial(), a.bateria(), a.estadoReproductivo(),
-                a.fechaUltimoParto(), a.fechaUltimaInseminacion(), a.estadoSalud());
+        return new AnimalDashboard(a.id(), a.idCaravanaOficial(), a.alias(), a.rodeoId(), a.rodeoNombre(),
+                nacimiento, a.fechaAlta(), a.tieneCaravana(), a.enCalibracion(), a.ultimaSenial(), a.bateria(),
+                a.estadoReproductivo(), a.fechaUltimoParto(), a.fechaUltimaInseminacion(), a.estadoSalud());
     }
 
     static AlertaResponse alerta(long id, long animalId, DisparadorAlerta tipo, String severidad,
@@ -313,17 +313,17 @@ class CentroMandoCalculadoraTest {
     void tendencia() {
         EstadoAlerta p = EstadoAlerta.PENDIENTE;
         List<AlertaGenerada> generadas = List.of(
-                new AlertaGenerada(1L, DisparadorAlerta.CELO, "Celo Detectado", AHORA.minusHours(1), p),
+                new AlertaGenerada(1L, DisparadorAlerta.CELO, "Celo Detectado", AHORA.minusHours(1), p, null),
                 new AlertaGenerada(1L, DisparadorAlerta.CELO, "Celo Detectado", LocalDateTime.of(2026, 11, 2, 0, 0),
-                        EstadoAlerta.ARCHIVADA),
-                new AlertaGenerada(1L, DisparadorAlerta.CELO, "Anestro Detectado", AHORA.minusHours(2), p),
+                        EstadoAlerta.ARCHIVADA, null),
+                new AlertaGenerada(1L, DisparadorAlerta.CELO, "Anestro Detectado", AHORA.minusHours(2), p, null),
                 // Domingo: semana anterior.
-                new AlertaGenerada(2L, DisparadorAlerta.SALUD, "SALUD", LocalDateTime.of(2026, 11, 1, 23, 59), p),
+                new AlertaGenerada(2L, DisparadorAlerta.SALUD, "SALUD", LocalDateTime.of(2026, 11, 1, 23, 59), p, null),
                 new AlertaGenerada(3L, DisparadorAlerta.FUERA_DE_PERIMETRO, "Fuera de Perímetro",
-                        LocalDateTime.of(2026, 9, 14, 8, 0), p),
+                        LocalDateTime.of(2026, 9, 14, 8, 0), p, null),
                 // Antes de la primera semana: no entra.
                 new AlertaGenerada(3L, DisparadorAlerta.FUERA_DE_PERIMETRO, "Fuera de Perímetro",
-                        LocalDateTime.of(2026, 9, 13, 23, 0), p));
+                        LocalDateTime.of(2026, 9, 13, 23, 0), p, null));
 
         CentroMandoResponse.Tendencia t = calcular(List.of(), List.of(), Map.of(), generadas).getTendencia();
 
@@ -341,18 +341,18 @@ class CentroMandoCalculadoraTest {
     void ventanasPerdidas() {
         List<AlertaGenerada> generadas = List.of(
                 new AlertaGenerada(1L, DisparadorAlerta.CELO, "Celo Detectado", AHORA.minusDays(29),
-                        EstadoAlerta.ARCHIVADA),
+                        EstadoAlerta.ARCHIVADA, null),
                 new AlertaGenerada(2L, DisparadorAlerta.CELO, "Celo Detectado", AHORA.minusDays(1),
-                        EstadoAlerta.ARCHIVADA),
+                        EstadoAlerta.ARCHIVADA, null),
                 // Fuera del período, atendido o anestro: no cuentan.
                 new AlertaGenerada(3L, DisparadorAlerta.CELO, "Celo Detectado", AHORA.minusDays(31),
-                        EstadoAlerta.ARCHIVADA),
+                        EstadoAlerta.ARCHIVADA, null),
                 new AlertaGenerada(4L, DisparadorAlerta.CELO, "Celo Detectado", AHORA.minusDays(2),
-                        EstadoAlerta.CONFIRMADA),
+                        EstadoAlerta.CONFIRMADA, null),
                 new AlertaGenerada(6L, DisparadorAlerta.CELO, "Celo Detectado", AHORA.minusDays(3),
-                        EstadoAlerta.VENCIDA),
+                        EstadoAlerta.VENCIDA, null),
                 new AlertaGenerada(5L, DisparadorAlerta.CELO, "Anestro Detectado", AHORA.minusDays(2),
-                        EstadoAlerta.ARCHIVADA));
+                        EstadoAlerta.ARCHIVADA, null));
 
         assertThat(calcular(List.of(), List.of(), Map.of(), generadas).getVentanasAbiertas()
                 .getPerdidasUltimos30Dias()).isEqualTo(3);

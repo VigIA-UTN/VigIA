@@ -2,6 +2,7 @@ package dev.vigia.backend.service.impl;
 
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.CentroMandoResponse;
+import dev.vigia.backend.dto.ResumenEjecutivoResponse;
 import dev.vigia.backend.dto.SaludReproduccionResponse;
 import dev.vigia.backend.dto.UmbralesDashboardResponse;
 import dev.vigia.backend.dto.VentanaInseminacionResponse;
@@ -27,6 +28,8 @@ import dev.vigia.backend.service.dashboard.DashboardDatos;
 import dev.vigia.backend.service.dashboard.DashboardDatos.AlertaGenerada;
 import dev.vigia.backend.service.dashboard.DashboardDatos.AnimalDashboard;
 import dev.vigia.backend.service.dashboard.DashboardDatos.IntervencionDashboard;
+import dev.vigia.backend.service.dashboard.ResumenEjecutivoCalculadora;
+import dev.vigia.backend.service.dashboard.ResumenEjecutivoCalculadora.RodeoDashboard;
 import dev.vigia.backend.service.dashboard.SaludReproduccionCalculadora;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
@@ -35,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -112,9 +116,7 @@ public class DashboardServiceImpl implements DashboardService {
     @Transactional(readOnly = true)
     public SaludReproduccionResponse saludReproduccion(String emailUsuario, Long establecimientoId, Long rodeoId,
             int periodoDias) {
-        if (periodoDias < 1 || periodoDias > PERIODO_MAX_DIAS) {
-            throw new IllegalArgumentException("El período debe ser de 1 a " + PERIODO_MAX_DIAS + " días.");
-        }
+        validarPeriodo(periodoDias);
         verificarAcceso(emailUsuario, establecimientoId, rodeoId);
         LocalDateTime ahora = LocalDateTime.now();
 
@@ -136,7 +138,38 @@ public class DashboardServiceImpl implements DashboardService {
                 generadas, ultimasIntervenciones(ids), periodoDias, umbrales, ahora);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ResumenEjecutivoResponse resumenEjecutivo(String emailUsuario, Long establecimientoId, int periodoDias) {
+        validarPeriodo(periodoDias);
+        verificarAcceso(emailUsuario, establecimientoId, null);
+        LocalDateTime ahora = LocalDateTime.now();
+
+        List<AnimalDashboard> animales = animales(establecimientoId, null);
+        List<RodeoDashboard> rodeos = rodeoLoteRepository.findByEstablecimientoId(establecimientoId).stream()
+                .filter(RodeoLote::isActivo)
+                .sorted(Comparator.comparing(RodeoLote::getId))
+                .map(r -> new RodeoDashboard(r.getId(), r.getNombre()))
+                .toList();
+        List<AlertaResponse> pendientes = pendientes(emailUsuario, establecimientoId, null, ids(animales));
+        // Lo que cubra más: el período o las 8 semanas de la tendencia.
+        LocalDateTime inicioPeriodo = ahora.minusDays(periodoDias);
+        LocalDateTime inicioTendencia = CentroMandoCalculadora.inicioTendencia(ahora);
+        List<AlertaGenerada> generadas = generadas(establecimientoId,
+                inicioPeriodo.isBefore(inicioTendencia) ? inicioPeriodo : inicioTendencia,
+                EnumSet.allOf(DisparadorAlerta.class), null, Set.of());
+
+        return ResumenEjecutivoCalculadora.calcular(animales, rodeos, pendientes, generadas, periodoDias, umbrales,
+                ahora);
+    }
+
     // ── Acceso ───────────────────────────────────────────────────────────────
+
+    private static void validarPeriodo(int periodoDias) {
+        if (periodoDias < 1 || periodoDias > PERIODO_MAX_DIAS) {
+            throw new IllegalArgumentException("El período debe ser de 1 a " + PERIODO_MAX_DIAS + " días.");
+        }
+    }
 
     private void verificarAcceso(String emailUsuario, Long establecimientoId, Long rodeoId) {
         boolean pertenece = establecimientoRepository.findActiveEstablecimientoByUsuarioEmail(emailUsuario).stream()
@@ -205,7 +238,7 @@ public class DashboardServiceImpl implements DashboardService {
             Collection<DisparadorAlerta> disparadores, Long rodeoId, Set<Long> idsAnimales) {
         return alertaRepository.findGeneradasDesde(establecimientoId, desde, disparadores).stream()
                 .map(fila -> new AlertaGenerada((Long) fila[0], (DisparadorAlerta) fila[1], (String) fila[2],
-                        (LocalDateTime) fila[3], (EstadoAlerta) fila[4]))
+                        (LocalDateTime) fila[3], (EstadoAlerta) fila[4], (LocalDateTime) fila[5]))
                 .filter(g -> rodeoId == null || idsAnimales.contains(g.animalId()))
                 .toList();
     }

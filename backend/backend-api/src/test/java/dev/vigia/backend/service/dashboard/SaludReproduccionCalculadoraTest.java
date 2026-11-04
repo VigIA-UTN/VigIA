@@ -52,7 +52,7 @@ class SaludReproduccionCalculadoraTest {
 
     private static AlertaGenerada generada(long animalId, DisparadorAlerta disparador, String tipo, int diasAtras,
             EstadoAlerta estado) {
-        return new AlertaGenerada(animalId, disparador, tipo, AHORA.minusDays(diasAtras), estado);
+        return new AlertaGenerada(animalId, disparador, tipo, AHORA.minusDays(diasAtras), estado, null);
     }
 
     private static List<Long> ids(List<AnimalResumenResponse> animales) {

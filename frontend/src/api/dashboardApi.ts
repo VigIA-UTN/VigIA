@@ -151,3 +151,46 @@ export async function getSaludReproduccion(
   );
   return response.data;
 }
+
+/** Pestaña "Resumen ejecutivo" (H0045), de todo el establecimiento, calculada en el backend. */
+export interface ResumenEjecutivoResponse {
+  periodoDias: number;
+  /** Una fila por rodeo activo. */
+  rodeos: {
+    id: number;
+    nombre: string;
+    animales: number;
+    coberturaPorcentaje: number;
+    alertasPendientes: number;
+    alertasCada100: number;
+    ventanasPerdidas: number;
+    vaciasLargasPorcentaje: number;
+  }[];
+  /** Promedio de los rodeos con animales, para destacar los que se apartan. */
+  promedio: {
+    coberturaPorcentaje: number;
+    alertasCada100: number;
+    ventanasPerdidas: number;
+    vaciasLargasPorcentaje: number;
+  };
+  tendencia: TendenciaResponse;
+  equipo: {
+    enCola: number;
+    porcentajeAtendidas: number;
+    porcentajeDescartadas: number;
+    totalAtendidas: number;
+    tiempoAtencion: { rango: string; alertas: number }[];
+  };
+  umbrales: UmbralesDashboard;
+}
+
+export async function getResumenEjecutivo(
+  establecimientoId: number,
+  periodoDias: number,
+): Promise<ResumenEjecutivoResponse> {
+  const response = await axiosClient.get<ResumenEjecutivoResponse>(
+    `/establecimientos/${establecimientoId}/dashboard/resumen-ejecutivo`,
+    { params: { periodoDias } },
+  );
+  return response.data;
+}

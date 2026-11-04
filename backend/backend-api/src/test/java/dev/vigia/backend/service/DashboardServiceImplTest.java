@@ -2,6 +2,7 @@ package dev.vigia.backend.service;
 
 import dev.vigia.backend.dto.AlertaResponse;
 import dev.vigia.backend.dto.CentroMandoResponse;
+import dev.vigia.backend.dto.ResumenEjecutivoResponse;
 import dev.vigia.backend.dto.SaludReproduccionResponse;
 import dev.vigia.backend.model.Alerta;
 import dev.vigia.backend.model.Animal;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
@@ -210,8 +212,8 @@ class DashboardServiceImplTest {
                 pendiente(51L, 2L, DisparadorAlerta.SALUD, "SALUD")));
         LocalDateTime hace1h = LocalDateTime.now().minusHours(1);
         when(alertaRepository.findGeneradasDesde(eq(EST), any(), any())).thenReturn(List.of(
-                new Object[] { 1L, DisparadorAlerta.SALUD, "SALUD", hace1h, EstadoAlerta.PENDIENTE },
-                new Object[] { 2L, DisparadorAlerta.SALUD, "SALUD", hace1h, EstadoAlerta.PENDIENTE }));
+                new Object[] { 1L, DisparadorAlerta.SALUD, "SALUD", hace1h, EstadoAlerta.PENDIENTE, null },
+                new Object[] { 2L, DisparadorAlerta.SALUD, "SALUD", hace1h, EstadoAlerta.PENDIENTE, null }));
 
         CentroMandoResponse r = service.centroMando(EMAIL, EST, 10L);
 
@@ -260,6 +262,30 @@ class DashboardServiceImplTest {
         assertThat(r.getAlertasSaludSinAtender()).isEmpty();
         assertThat(r.getUltimaIntervencion().getMasReciente().getTipo()).isEqualTo(TipoIntervencion.TRATAMIENTO);
         assertThat(r.getUmbrales().getDiasGestacion()).isEqualTo(283);
+    }
+
+    @Test
+    @DisplayName("Resumen: una fila por rodeo activo, en orden, y las alertas desde lo que cubra más entre el "
+            + "período y la tendencia")
+    void resumenEjecutivo() {
+        miembro();
+        RodeoLote inactivo = rodeo(5L, establecimiento);
+        inactivo.setActivo(false);
+        when(rodeoLoteRepository.findByEstablecimientoId(EST)).thenReturn(List.of(rodeo2, inactivo, rodeo1));
+        when(animalRepository.findParaDashboardByEstablecimientoIdAndEstadoActualNot(EST, EstadoAnimal.INACTIVO))
+                .thenReturn(List.of(animal(1L, rodeo1, true, true)));
+        when(estadoSaludRepository.findUltimoPorAnimal(anyCollection())).thenReturn(List.of());
+        when(alertaService.listarAlertas(EMAIL, EST, null, null, EstadoAlerta.PENDIENTE)).thenReturn(List.of());
+        when(alertaRepository.findGeneradasDesde(eq(EST), any(), any())).thenReturn(List.of());
+
+        ResumenEjecutivoResponse r = service.resumenEjecutivo(EMAIL, EST, 90);
+
+        assertThat(r.getRodeos()).extracting(ResumenEjecutivoResponse.FilaRodeo::getId).containsExactly(10L, 20L);
+        assertThat(r.getRodeos().get(0).getAnimales()).isEqualTo(1);
+        ArgumentCaptor<LocalDateTime> desde = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(alertaRepository).findGeneradasDesde(eq(EST), desde.capture(), any());
+        // 90 días es más que las 8 semanas de la tendencia.
+        assertThat(desde.getValue()).isBefore(LocalDateTime.now().minusDays(89));
     }
 
     private static EstadoReproductivo estado(TipoReproductivo tipo) {

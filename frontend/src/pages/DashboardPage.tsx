@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/purity, react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Spinner, Alert, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -11,13 +11,15 @@ import type { AnimalResponse, IntervencionResponse, RegistroPesoResponse } from 
 import {
     calcularGananciaPeso, ADPV_PIERDE, COBERTURA_BAJA_PCT, DIAS_COBERTURA, DIAS_COMPARACION, DIAS_PESADA_VIGENTE,
 } from '../utils/gananciaPeso';
-import { getAlertas, esAnestro, tieneDatoDesactualizado, textoAccionRecomendada } from '../api/alertaApi';
+import { esAnestro, tieneDatoDesactualizado, textoAccionRecomendada } from '../api/alertaApi';
 import type { AlertaResponse } from '../api/alertaApi';
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { getAnimalesMapa } from '../api/animalesApi';
-import { getCentroMando, getSaludReproduccion } from '../api/dashboardApi';
-import type { AnimalResumen, CentroMandoResponse, SaludReproduccionResponse } from '../api/dashboardApi';
+import { getCentroMando, getResumenEjecutivo, getSaludReproduccion } from '../api/dashboardApi';
+import type {
+    AnimalResumen, CentroMandoResponse, ResumenEjecutivoResponse, SaludReproduccionResponse,
+} from '../api/dashboardApi';
 import type { AnimalMapa } from '../api/animalesApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { determinarIcono } from '../utils/animalPins';
@@ -27,11 +29,8 @@ import './DashboardPage.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const SILENCIO_THRESHOLD_H = 6;     // caravana sin señal > 6h = silenciosa
-const BATERIA_BAJA_PCT = 20;        // batería ≤ 20% = crítica
 const PERIODOS_DIAS = [7, 30, 90];  // opciones del selector de período (Salud y Resumen ejecutivo)
 const PERIODO_DEFAULT_DIAS = 30;
-const DIA_MS = 24 * 60 * 60 * 1000;
 
 // Card "Ganancia de peso"
 const ADPV_AYUDA = 'ADPV: aumento diario de peso vivo, en kg por animal por día.';
@@ -53,14 +52,6 @@ const TIPO_INTERVENCION_LABEL: Record<IntervencionResponse['tipo'], string> = {
 
 function horasTranscurridas(ts: string): number {
     return (Date.now() - new Date(ts).getTime()) / (1000 * 60 * 60);
-}
-
-function diffDias(ts: string): number {
-    return (Date.now() - new Date(ts).getTime()) / (1000 * 60 * 60 * 24);
-}
-
-function esReproductiva(a: AnimalResponse): boolean {
-    return diffDias(a.fechaNacimiento) / 365.25 >= 1;
 }
 
 function nombreAnimal(a: { id: number; alias?: string | null; idCaravanaOficial?: string | null } | null | undefined): string {
@@ -88,9 +79,6 @@ function formatHorasRestantes(seg: number): string {
     if (h > 0) return `${h}h ${m}min restantes`;
     return `${m}min restantes`;
 }
-
-// Celo con ventana de inseminación: el anestro llega con tipo CELO pero no la tiene.
-const esCeloConVentana = (a: AlertaResponse) => a.tipo === 'CELO' && !esAnestro(a);
 
 // ── Colores ventana ───────────────────────────────────────────────────────────
 function ventanaClass(seg: number): 'critica' | 'venciendo' | 'optima' {
@@ -122,50 +110,6 @@ const TREND_COLORS = {
     SALUD: '#3B8D99',
     FUERA_DE_PERIMETRO: '#13D4FB',
 } as const;
-
-// ── Helpers del resumen ejecutivo ─────────────────────────────────────────
-// Semana ISO 8601 (lunes a domingo; la semana 1 es la que contiene el primer jueves del año).
-function getWeekKey(ts: string): string {
-    const d = new Date(ts);
-    const jueves = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    jueves.setDate(jueves.getDate() - ((jueves.getDay() + 6) % 7) + 3);
-    const anioIso = jueves.getFullYear();
-    const primerJueves = new Date(anioIso, 0, 4);
-    primerJueves.setDate(primerJueves.getDate() - ((primerJueves.getDay() + 6) % 7) + 3);
-    // Math.round absorbe la hora de diferencia de los cambios de horario.
-    const week = 1 + Math.round((jueves.getTime() - primerJueves.getTime()) / (7 * 86400000));
-    return `${anioIso}-W${String(week).padStart(2, '0')}`;
-}
-
-function last8WeekKeys(): string[] {
-    const keys: string[] = [];
-    for (let i = 7; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i * 7);
-        keys.push(getWeekKey(d.toISOString()));
-    }
-    return keys;
-}
-
-type TipoTendencia = 'CELO' | 'SALUD' | 'FUERA_DE_PERIMETRO';
-
-// Alertas generadas por semana y por tipo en las últimas 8 semanas (los anestros no cuentan como celo).
-function calcularTendencia8Semanas(alertas: AlertaResponse[]) {
-    const semanas = last8WeekKeys();
-    const tipos: TipoTendencia[] = ['CELO', 'SALUD', 'FUERA_DE_PERIMETRO'];
-    const datos: Record<TipoTendencia, number[]> = { CELO: [], SALUD: [], FUERA_DE_PERIMETRO: [] };
-
-    semanas.forEach(sem => {
-        tipos.forEach(tipo => {
-            const count = alertas.filter(a =>
-                a.tipo === tipo && !esAnestro(a) && getWeekKey(a.tsGeneracion) === sem
-            ).length;
-            datos[tipo].push(count);
-        });
-    });
-
-    return { semanas, datos, tipos };
-}
 
 // ── SVG line chart helper ─────────────────────────────────────────────
 function TrendChart({ datos, semanas, tipos }: {
@@ -280,13 +224,8 @@ export default function DashboardPage() {
 
     // Raw data
     const [animales, setAnimales] = useState<AnimalResponse[]>([]);
-    const [alertasPendientes, setAlertasPendientes] = useState<AlertaResponse[]>([]);
-    const [alertasArchivadasCelo, setAlertasArchivadasCelo] = useState<AlertaResponse[]>([]);
     const [rodeos, setRodeos] = useState<RodeoLoteResponse[]>([]);
     const [animalesMapa, setAnimalesMapa] = useState<AnimalMapa[]>([]);
-
-    // Alertas generadas dentro del período más largo del selector (cubre también la tendencia de 8 semanas)
-    const [alertasRecientes, setAlertasRecientes] = useState<AlertaResponse[]>([]);
 
     // Pesadas del establecimiento (null si no se pudieron cargar)
     const [pesos, setPesos] = useState<RegistroPesoResponse[] | null>([]);
@@ -305,34 +244,27 @@ export default function DashboardPage() {
     const [loadingSalud, setLoadingSalud] = useState(true);
     const [errorSalud, setErrorSalud] = useState<string | null>(null);
 
+    // Resumen ejecutivo, calculado en el backend
+    const [resumen, setResumen] = useState<ResumenEjecutivoResponse | null>(null);
+    const [loadingResumen, setLoadingResumen] = useState(true);
+    const [errorResumen, setErrorResumen] = useState<string | null>(null);
+
     const fetchDashboard = useCallback(async () => {
         if (!selectedId) return;
         setLoading(true);
         setError(null);
         try {
-            const [anim, pendientes, celoArchivadas, rodeosData, mapaData, confirmadas, descartadas, pesosData] = await Promise.all([
+            const [anim, rodeosData, mapaData, pesosData] = await Promise.all([
                 getAnimales(selectedId),
-                getAlertas(selectedId, undefined, undefined, 'PENDIENTE'),
-                getAlertas(selectedId, 'CELO', undefined, 'ARCHIVADA'),
                 getRodeoLotes(selectedId),
                 getAnimalesMapa(selectedId),
-                getAlertas(selectedId, undefined, undefined, 'CONFIRMADA'),
-                getAlertas(selectedId, undefined, undefined, 'DESCARTADA'),
                 // Si falla, el resto del dashboard sigue funcionando.
                 getPesosEstablecimiento(selectedId).catch(() => null),
             ]);
             setAnimales(anim);
             setPesos(pesosData);
-            setAlertasPendientes(pendientes);
-            setAlertasArchivadasCelo(celoArchivadas);
             setRodeos(rodeosData.filter(r => r.activo));
             setAnimalesMapa(mapaData);
-            // Para tendencias y métricas por período
-            const ventanaMs = Math.max(...PERIODOS_DIAS) * DIA_MS;
-            const todas = [...pendientes, ...celoArchivadas, ...confirmadas, ...descartadas].filter(
-                a => Date.now() - new Date(a.tsGeneracion).getTime() <= ventanaMs
-            );
-            setAlertasRecientes(todas);
         } catch (e) {
             const err = e as { response?: { data?: { message?: string } } };
             setError(err.response?.data?.message || 'Error al cargar el dashboard.');
@@ -378,120 +310,34 @@ export default function DashboardPage() {
 
     useEffect(() => { fetchSaludRepro(); }, [fetchSaludRepro]);
 
+    const fetchResumen = useCallback(async () => {
+        if (!selectedId) return;
+        setLoadingResumen(true);
+        setErrorResumen(null);
+        try {
+            setResumen(await getResumenEjecutivo(selectedId, periodoDias));
+        } catch (e) {
+            const err = e as { response?: { data?: string | { message?: string } } };
+            const data = err.response?.data;
+            setErrorResumen((typeof data === 'string' ? data : data?.message) || 'Error al cargar el resumen ejecutivo.');
+        } finally {
+            setLoadingResumen(false);
+        }
+    }, [selectedId, periodoDias]);
+
+    useEffect(() => { fetchResumen(); }, [fetchResumen]);
+
     const refrescar = () => {
         fetchDashboard();
         fetchCentroMando();
         fetchSaludRepro();
+        fetchResumen();
     };
-
-    // ── Mapa animal
-    const animalMap = useMemo(() => new Map(animales.map(a => [a.id, a])), [animales]);
 
     // ── Filtrado por lote ────────────────────────────────────────────────────
     const animalesFiltrados = useMemo(() =>
         loteFilter === 'todos' ? animales : animales.filter(a => a.rodeoLoteId === loteFilter),
         [animales, loteFilter]);
-
-    // ── Idea 10: Tabla por rodeo (ejecutivo) ──────────────────────────────
-    const tablaRodeos = useMemo(() => {
-        const periodoMs = periodoDias * DIA_MS;
-        const hace90d = 90 * 24 * 60 * 60 * 1000;
-
-        return rodeos.map(rodeo => {
-            const animalesRodeo = animales.filter(
-                a => a.rodeoLoteId === rodeo.id && a.estadoActual !== 'INACTIVO'
-            );
-            const totalAnim = animalesRodeo.length;
-            if (totalAnim === 0) return { rodeo, totalAnim, cobPct: 0, alertasPend: 0, alertas100: 0, ventPerdidas: 0, pctVacias90: 0 };
-
-            // Cobertura
-            let okCount = 0;
-            animalesRodeo.forEach(a => {
-                if (!a.caravanaId || a.enCalibracion) return;
-                const hs = a.caravanaUltimaSenial ? horasTranscurridas(a.caravanaUltimaSenial) : Infinity;
-                if (hs <= SILENCIO_THRESHOLD_H && (a.caravanaBateria === null || a.caravanaBateria > BATERIA_BAJA_PCT)) okCount++;
-            });
-            const cobPct = Math.round((okCount / totalAnim) * 100);
-
-            // Alertas pendientes del rodeo
-            const alertasRodeo = alertasPendientes.filter(al => {
-                const anim = animalMap.get(al.animalId);
-                return anim?.rodeoLoteId === rodeo.id;
-            });
-            const alertasPend = alertasRodeo.length;
-            const alertas100 = totalAnim > 0 ? Math.round((alertasPend / totalAnim) * 100) : 0;
-
-            // Ventanas perdidas: celos archivados sin atender en el período. Los anestros también
-            // llegan archivados (al registrarse un ciclo), pero no tienen ventana que perder.
-            const ventPerdidas = alertasArchivadasCelo.filter(al => {
-                const anim = animalMap.get(al.animalId);
-                return esCeloConVentana(al) && anim?.rodeoLoteId === rodeo.id &&
-                    Date.now() - new Date(al.tsGeneracion).getTime() <= periodoMs;
-            }).length;
-
-            // % vacías > 90d
-            const reproductivas = animalesRodeo.filter(a => esReproductiva(a));
-            const vacias90 = reproductivas.filter(a =>
-                a.estadoReproductivo === 'VACIA' &&
-                a.fechaUltimoParto &&
-                Date.now() - new Date(a.fechaUltimoParto).getTime() > hace90d
-            ).length;
-            const pctVacias90 = reproductivas.length > 0
-                ? Math.round((vacias90 / reproductivas.length) * 100)
-                : 0;
-
-            return { rodeo, totalAnim, cobPct, alertasPend, alertas100, ventPerdidas, pctVacias90 };
-        });
-    }, [rodeos, animales, alertasPendientes, alertasArchivadasCelo, animalMap, periodoDias]);
-
-    // Promedio del establecimiento para comparar colores
-    const mediaEstab = useMemo(() => {
-        const rows = tablaRodeos.filter(r => r.totalAnim > 0);
-        if (rows.length === 0) return { cobPct: 80, alertas100: 10, ventPerdidas: 2, pctVacias90: 15 };
-        return {
-            cobPct: Math.round(rows.reduce((s, r) => s + r.cobPct, 0) / rows.length),
-            alertas100: Math.round(rows.reduce((s, r) => s + r.alertas100, 0) / rows.length),
-            ventPerdidas: Math.round(rows.reduce((s, r) => s + r.ventPerdidas, 0) / rows.length),
-            pctVacias90: Math.round(rows.reduce((s, r) => s + r.pctVacias90, 0) / rows.length),
-        };
-    }, [tablaRodeos]);
-
-    // ── Idea 8: Tendencia 8 semanas ───────────────────────────────────────
-    // Resumen ejecutivo: todo el establecimiento.
-    const tendencia8Semanas = useMemo(() => calcularTendencia8Semanas(alertasRecientes), [alertasRecientes]);
-
-    // ── Idea 9: ¿Está actuando el equipo? ────────────────────────────────
-    const equipoMetrics = useMemo(() => {
-        const desde = Date.now() - periodoDias * DIA_MS;
-        // Alertas generadas en el período. Los celos archivados cuentan como no atendidos; los
-        // anestros archivados se cerraron solos al registrarse un ciclo, así que no son trabajo del equipo.
-        const delPeriodo = alertasRecientes.filter(a =>
-            new Date(a.tsGeneracion).getTime() >= desde &&
-            !(a.estado === 'ARCHIVADA' && esAnestro(a))
-        );
-        const resueltas = delPeriodo.filter(a => a.estado === 'CONFIRMADA' || a.estado === 'DESCARTADA');
-        const descartadas = resueltas.filter(a => a.estado === 'DESCARTADA').length;
-
-        const pctAtendidas = delPeriodo.length > 0 ? Math.round((resueltas.length / delPeriodo.length) * 100) : 0;
-        const pctDescartadas = resueltas.length > 0 ? Math.round((descartadas / resueltas.length) * 100) : 0;
-
-        // Tiempo de atención: desde que se generó la alerta hasta que se confirmó o descartó.
-        const tiempos = resueltas
-            .filter(a => a.tsConfirmacion)
-            .map(a => (new Date(a.tsConfirmacion!).getTime() - new Date(a.tsGeneracion).getTime()) / (1000 * 60 * 60));
-        const buckets = [
-            { label: '<6h', max: 6 },
-            { label: '6-24h', max: 24 },
-            { label: '1-3d', max: 72 },
-            { label: '>3d', max: Infinity },
-        ];
-        const hist = buckets.map((b, i) => {
-            const min = i === 0 ? -Infinity : buckets[i - 1].max;
-            return { label: b.label, count: tiempos.filter(h => h >= min && h < b.max).length };
-        });
-
-        return { enCola: alertasPendientes.length, pctAtendidas, pctDescartadas, hist, totalAtendidas: tiempos.length };
-    }, [alertasRecientes, alertasPendientes, periodoDias]);
 
     // ── Salud tab: Partos esperados — vista anual (estilo GitHub) ────────────
     const partosAnio = useMemo(() => {
@@ -526,13 +372,18 @@ export default function DashboardPage() {
 
     // ── Resumen ejecutivo view ────────────────────────────────────────────
     function ResumenEjecutivoView() {
-        if (loading) {
-            return <div className="dash-loading-center" style={{ padding: 60 }}><Spinner animation="border" /></div>;
+        const re = resumen;
+        if (!re) {
+            return errorResumen
+                ? <Alert variant="danger" style={{ borderRadius: 10, maxWidth: 1280, margin: '0 auto 16px' }}>
+                    <i className="bi bi-exclamation-triangle me-2" />{errorResumen}
+                </Alert>
+                : <div className="dash-loading-center" style={{ padding: 60 }}><Spinner animation="border" /></div>;
         }
 
         // Umbrales para colorear celdas
         const COB_UMBRAL_BAJO = 80; // < 80% cobertura → rojo
-        const ALERTAS100_UMBRAL = mediaEstab.alertas100 * 1.4; // >40% sobre la media → rojo
+        const ALERTAS100_UMBRAL = re.promedio.alertasCada100 * 1.4; // >40% sobre la media → rojo
         const VACIAS90_UMBRAL = 15; // >15% vacías >90d → amarillo
 
         function cobCell(pct: number) {
@@ -557,7 +408,7 @@ export default function DashboardPage() {
             return <span className={`dash-exec-cell-badge ${cls}`}>{pct}%</span>;
         }
 
-        const maxHist = Math.max(...equipoMetrics.hist.map(b => b.count), 1);
+        const maxHist = Math.max(...re.equipo.tiempoAtencion.map(b => b.alertas), 1);
 
         return (
             <>
@@ -571,7 +422,7 @@ export default function DashboardPage() {
                             </p>
                         </div>
 
-                        {rodeos.length === 0 ? (
+                        {re.rodeos.length === 0 ? (
                             <p className="dash-no-items">
                                 <i className="bi bi-info-circle" style={{ color: '#94A3B8' }} />
                                 No hay rodeos activos registrados
@@ -587,26 +438,26 @@ export default function DashboardPage() {
                                             <th>Alertas pend.</th>
                                             <th>Alertas /100</th>
                                             <th>Vent. perdidas</th>
-                                            <th>% vacías &gt; 90 d</th>
+                                            <th>% vacías &gt; {re.umbrales.diasVaciaLarga} d</th>
                                             <th></th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {tablaRodeos.map(row => (
-                                            <tr key={row.rodeo.id}>
+                                        {re.rodeos.map(row => (
+                                            <tr key={row.id}>
                                                 <td>
-                                                    <span className="dash-exec-rodeo-name">{row.rodeo.nombre}</span>
+                                                    <span className="dash-exec-rodeo-name">{row.nombre}</span>
                                                 </td>
-                                                <td className="dash-exec-cell-normal">{row.totalAnim}</td>
-                                                <td>{cobCell(row.cobPct)}</td>
-                                                <td className="dash-exec-cell-normal">{row.alertasPend}</td>
-                                                <td>{alertas100Cell(row.alertas100, row.alertasPend)}</td>
-                                                <td className="dash-exec-cell-normal">{row.ventPerdidas}</td>
-                                                <td>{vacias90Cell(row.pctVacias90)}</td>
+                                                <td className="dash-exec-cell-normal">{row.animales}</td>
+                                                <td>{cobCell(row.coberturaPorcentaje)}</td>
+                                                <td className="dash-exec-cell-normal">{row.alertasPendientes}</td>
+                                                <td>{alertas100Cell(row.alertasCada100, row.alertasPendientes)}</td>
+                                                <td className="dash-exec-cell-normal">{row.ventanasPerdidas}</td>
+                                                <td>{vacias90Cell(row.vaciasLargasPorcentaje)}</td>
                                                 <td>
                                                     <button
                                                         className="dash-exec-ver-btn"
-                                                        onClick={() => navigate(`/animales?rodeo=${row.rodeo.id}`)}
+                                                        onClick={() => navigate(`/animales?rodeo=${row.id}`)}
                                                     >
                                                         Ver
                                                     </button>
@@ -632,16 +483,16 @@ export default function DashboardPage() {
                             </p>
                         </div>
 
-                        {tendencia8Semanas.tipos.every(t => tendencia8Semanas.datos[t].every(v => v === 0)) ? (
+                        {re.tendencia.tipos.every(t => re.tendencia.datos[t].every(v => v === 0)) ? (
                             <p className="dash-no-items">
                                 <i className="bi bi-bar-chart" style={{ color: '#94A3B8' }} />
                                 Sin datos de alertas en las últimas 8 semanas
                             </p>
                         ) : (
                             <TrendChart
-                                datos={tendencia8Semanas.datos}
-                                semanas={tendencia8Semanas.semanas}
-                                tipos={tendencia8Semanas.tipos}
+                                datos={re.tendencia.datos}
+                                semanas={re.tendencia.semanas}
+                                tipos={re.tendencia.tipos}
                             />
                         )}
                     </div>
@@ -658,17 +509,17 @@ export default function DashboardPage() {
                         <div className="dash-team-kpis">
                             <div className="dash-team-kpi">
                                 <span className="dash-team-kpi-label">En cola</span>
-                                <span className="dash-team-kpi-val">{equipoMetrics.enCola}</span>
+                                <span className="dash-team-kpi-val">{re.equipo.enCola}</span>
                                 <span className="dash-team-kpi-sub">pendientes ahora</span>
                             </div>
                             <div className="dash-team-kpi">
                                 <span className="dash-team-kpi-label">Atendidas</span>
-                                <span className="dash-team-kpi-val">{equipoMetrics.pctAtendidas}%</span>
+                                <span className="dash-team-kpi-val">{re.equipo.porcentajeAtendidas}%</span>
                                 <span className="dash-team-kpi-sub">de las generadas</span>
                             </div>
                             <div className="dash-team-kpi">
                                 <span className="dash-team-kpi-label">Descartadas</span>
-                                <span className="dash-team-kpi-val">{equipoMetrics.pctDescartadas}%</span>
+                                <span className="dash-team-kpi-val">{re.equipo.porcentajeDescartadas}%</span>
                                 <span className="dash-team-kpi-sub">de las atendidas</span>
                             </div>
                         </div>
@@ -676,22 +527,22 @@ export default function DashboardPage() {
                         <div className="dash-team-hist-label">
                             Tiempo de atención
                         </div>
-                        {equipoMetrics.totalAtendidas === 0 ? (
+                        {re.equipo.totalAtendidas === 0 ? (
                             <p className="dash-no-items">
                                 <i className="bi bi-hourglass" style={{ color: '#94A3B8' }} />
                                 Sin alertas atendidas en los últimos {periodoDias} días
                             </p>
                         ) : (
                             <div className="dash-team-hist">
-                                {equipoMetrics.hist.map(bucket => (
-                                    <div key={bucket.label} className="dash-team-hist-bar-wrap">
-                                        <span className="dash-team-hist-count">{bucket.count}</span>
+                                {re.equipo.tiempoAtencion.map(bucket => (
+                                    <div key={bucket.rango} className="dash-team-hist-bar-wrap">
+                                        <span className="dash-team-hist-count">{bucket.alertas}</span>
                                         <div
                                             className="dash-team-hist-bar"
-                                            style={{ height: `${Math.round((bucket.count / maxHist) * 52)}px` }}
-                                            title={`${bucket.count} alertas`}
+                                            style={{ height: `${Math.round((bucket.alertas / maxHist) * 52)}px` }}
+                                            title={`${bucket.alertas} alertas`}
                                         />
-                                        <span className="dash-team-hist-bar-label">{bucket.label}</span>
+                                        <span className="dash-team-hist-bar-label">{bucket.rango}</span>
                                     </div>
                                 ))}
                             </div>
@@ -1454,9 +1305,9 @@ export default function DashboardPage() {
                         className="dash-atender-btn"
                         style={{ fontSize: '0.82rem', padding: '8px 16px' }}
                         onClick={refrescar}
-                        disabled={loading || loadingMando || loadingSalud}
+                        disabled={loading || loadingMando || loadingSalud || loadingResumen}
                     >
-                        {loading || loadingMando || loadingSalud
+                        {loading || loadingMando || loadingSalud || loadingResumen
                             ? <Spinner animation="border" size="sm" />
                             : <><i className="bi bi-arrow-clockwise me-1" />Refrescar</>
                         }
@@ -1504,9 +1355,10 @@ export default function DashboardPage() {
                     alerta={alertaAbierta}
                     mode="fixed"
                     onClose={() => setAlertaAbierta(null)}
-                    onActionComplete={(alertaId, nuevoEstado) => {
-                        setAlertasPendientes(prev => prev.filter(a => a.id !== alertaId));
-                        setAlertasRecientes(prev => prev.map(a => (a.id === alertaId ? { ...a, estado: nuevoEstado } : a)));
+                    onActionComplete={() => {
+                        fetchCentroMando();
+                        fetchSaludRepro();
+                        fetchResumen();
                     }}
                     onOpenIntervencion={() => setIntervencionAlerta(alertaAbierta)}
                 />

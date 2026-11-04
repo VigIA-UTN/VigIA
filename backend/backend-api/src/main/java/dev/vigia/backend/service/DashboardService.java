@@ -1,6 +1,7 @@
 package dev.vigia.backend.service;
 
 import dev.vigia.backend.dto.CentroMandoResponse;
+import dev.vigia.backend.dto.ResumenEjecutivoResponse;
 import dev.vigia.backend.dto.SaludReproduccionResponse;
 
 /** Métricas del Dashboard, calculadas en el backend por pestaña. */
@@ -21,4 +22,11 @@ public interface DashboardService {
      */
     SaludReproduccionResponse saludReproduccion(String emailUsuario, Long establecimientoId, Long rodeoId,
             int periodoDias);
+
+    /**
+     * Pestaña "Resumen ejecutivo" (H0045), de todo el establecimiento.
+     *
+     * @param periodoDias días hacia atrás para las ventanas perdidas y la actuación del equipo
+     */
+    ResumenEjecutivoResponse resumenEjecutivo(String emailUsuario, Long establecimientoId, int periodoDias);
 }

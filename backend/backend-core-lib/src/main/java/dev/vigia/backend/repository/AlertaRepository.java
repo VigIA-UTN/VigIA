@@ -100,10 +100,10 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
        List<Object[]> countAlertasActivasPorDisparador(@Param("establecimientoId") Long establecimientoId);
 
        /**
-        * Tendencia del Dashboard: animal, disparador, tipo, momento y estado de cada alerta generada desde
+        * Dashboard: animal, disparador, tipo, momento, estado y resolución de cada alerta generada desde
         * {@code desde}, en cualquier estado.
         */
-       @Query("SELECT a.animal.id, a.disparador, a.tipo, a.tsGeneracion, a.estado FROM Alerta a " +
+       @Query("SELECT a.animal.id, a.disparador, a.tipo, a.tsGeneracion, a.estado, a.tsConfirmacion FROM Alerta a " +
                      "WHERE a.animal.establecimiento.id = :establecimientoId " +
                      "AND a.tsGeneracion >= :desde AND a.disparador IN :disparadores")
        List<Object[]> findGeneradasDesde(@Param("establecimientoId") Long establecimientoId,

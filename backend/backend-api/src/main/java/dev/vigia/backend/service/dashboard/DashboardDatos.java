@@ -49,9 +49,9 @@ public final class DashboardDatos {
             LocalDate fechaUltimoParto, LocalDate fechaUltimaInseminacion, TipoEstadoSalud estadoSalud) {
     }
 
-    /** Una alerta generada en el período que se analiza, en cualquier estado. */
+    /** Una alerta generada en el período que se analiza, en cualquier estado; tsConfirmacion si se resolvió. */
     public record AlertaGenerada(Long animalId, DisparadorAlerta disparador, String tipo, LocalDateTime tsGeneracion,
-            EstadoAlerta estado) {
+            EstadoAlerta estado, LocalDateTime tsConfirmacion) {
     }
 
     /** La última intervención registrada sobre un animal. */

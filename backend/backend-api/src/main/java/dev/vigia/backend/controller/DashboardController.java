@@ -67,4 +67,25 @@ public class DashboardController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    /**
+     * GET /api/v1/establecimientos/{id}/dashboard/resumen-ejecutivo?periodoDias={dias}
+     * <p>
+     * Pestaña "Resumen ejecutivo" (H0045): tabla por rodeo, tendencia de 8 semanas y actuación del equipo.
+     *
+     * @return 200 con las métricas, 400 si el período no es válido, 403 si el usuario no pertenece al establecimiento
+     */
+    @GetMapping("/resumen-ejecutivo")
+    @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
+    public ResponseEntity<?> resumenEjecutivo(@PathVariable Long id,
+            @RequestParam(name = "periodoDias", defaultValue = "30") int periodoDias,
+            Authentication authentication) {
+        try {
+            return ResponseEntity.ok(dashboardService.resumenEjecutivo(authentication.getName(), id, periodoDias));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }
