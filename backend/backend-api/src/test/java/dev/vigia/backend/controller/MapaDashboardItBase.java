@@ -78,6 +78,32 @@ abstract class MapaDashboardItBase extends GestionRodeoItBase {
     protected record UltimoDato(LocalDateTime fechaHora, double latitud, double longitud) {
     }
 
+    // ── Alertas ──────────────────────────────────────────────────────────────
+
+    /**
+     * Inserta una alerta sobre un animal del escenario, con los campos obligatorios y los que usan el mapa y el
+     * Dashboard. Devuelve el id.
+     */
+    protected Long insertarAlerta(String establecimiento, String identificador, String tipo, String disparador,
+            String severidad, String estado, LocalDateTime tsGeneracion) {
+        return jdbcTemplate.queryForObject("INSERT INTO alertas (animal_id, tipo, severidad, ts_generacion, disparador, "
+                        + "valor_umbral, valor_detectado, estado) VALUES (?, ?, ?, ?, ?, 1.0, 1.0, ?) RETURNING id",
+                Long.class, idAnimal(establecimiento, identificador), tipo, severidad,
+                Timestamp.valueOf(tsGeneracion), disparador, estado);
+    }
+
+    /** Cambia el estado de las alertas del animal con ese disparador (las del escenario están en PENDIENTE). */
+    protected void cambiarEstadoAlertas(String establecimiento, String identificador, String disparador,
+            String estado) {
+        jdbcTemplate.update("UPDATE alertas SET estado = ? WHERE animal_id = ? AND disparador = ?", estado,
+                idAnimal(establecimiento, identificador), disparador);
+    }
+
+    protected Long idAlerta(String establecimiento, String identificador, String disparador) {
+        return jdbcTemplate.queryForObject("SELECT id FROM alertas WHERE animal_id = ? AND disparador = ?",
+                Long.class, idAnimal(establecimiento, identificador), disparador);
+    }
+
     /** Fecha y hora de la respuesta ({@code LocalDateTime} serializado por Jackson). */
     protected static LocalDateTime fecha(JsonNode valor) {
         return LocalDateTime.parse(valor.asText());
