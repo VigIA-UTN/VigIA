@@ -287,7 +287,7 @@ export default function EstablecimientosPage() {
         </Modal.Header>
         <Form onSubmit={handleSubmit(onSubmit)}>
           <Modal.Body>
-            <Form.Group className="mb-3">
+            <Form.Group controlId="establecimiento-nombre" className="mb-3">
               <Form.Label>Nombre</Form.Label>
               <Form.Control
                 type="text"
@@ -300,7 +300,7 @@ export default function EstablecimientosPage() {
               </Form.Control.Feedback>
             </Form.Group>
 
-            <Form.Group className="mb-3">
+            <Form.Group controlId="establecimiento-latitud" className="mb-3">
               <Form.Label>Latitud</Form.Label>
               <Form.Control
                 type="number"
@@ -314,7 +314,7 @@ export default function EstablecimientosPage() {
               </Form.Control.Feedback>
             </Form.Group>
 
-            <Form.Group className="mb-3">
+            <Form.Group controlId="establecimiento-longitud" className="mb-3">
               <Form.Label>Longitud</Form.Label>
               <Form.Control
                 type="number"

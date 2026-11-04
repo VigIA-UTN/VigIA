@@ -292,7 +292,7 @@ class InvitacionServiceTest {
                                 .thenReturn(Optional.of(otroEstablecimiento));
 
                 assertThatThrownBy(() -> invitacionService.generarInvitacionEmpleado(empleadoRequest, productorEmail))
-                                .isInstanceOf(IllegalArgumentException.class)
+                                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                                 .hasMessageContaining("El productor no pertenece a este establecimiento");
         }
 

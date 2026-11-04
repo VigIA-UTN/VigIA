@@ -95,10 +95,12 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .orElseThrow(() -> new IllegalArgumentException("Productor no encontrado"));
 
         Establecimiento establecimiento = establecimientoRepository.findById(establecimientoId)
-                .filter(e -> e.isActivo()
-                        && e.getEmpleados().stream().anyMatch(v -> v.getUsuario().equals(productor) && v.isActivo()))
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Establecimiento no encontrado o el productor no pertenece al mismo"));
+                .orElseThrow(() -> new IllegalArgumentException("Establecimiento no encontrado"));
+        // Operar sobre un establecimiento ajeno es un acceso denegado (403), no un dato inválido.
+        if (!establecimiento.isActivo()
+                || establecimiento.getEmpleados().stream().noneMatch(v -> v.getUsuario().equals(productor) && v.isActivo())) {
+            throw new AccessDeniedException("El productor no pertenece al establecimiento o no está activo");
+        }
 
         Usuario empleado = usuarioRepository.findById(empleadoId)
                 .orElseThrow(() -> new IllegalArgumentException("Empleado no encontrado"));
@@ -108,8 +110,13 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .findFirst();
 
         if (vinculoOpt.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "El empleado no pertenece al establecimiento del productor o ya está desvinculado");
+            // Sin ningún vínculo con este establecimiento es un usuario ajeno (403); con un vínculo inactivo, ya
+            // estaba desvinculado (400).
+            boolean tuvoVinculo = establecimiento.getEmpleados().stream().anyMatch(v -> v.getUsuario().equals(empleado));
+            if (!tuvoVinculo) {
+                throw new AccessDeniedException("El empleado no pertenece al establecimiento del productor");
+            }
+            throw new IllegalArgumentException("El empleado ya está desvinculado del establecimiento");
         }
 
         if (empleado.getRol() == Rol.PRODUCTOR) {

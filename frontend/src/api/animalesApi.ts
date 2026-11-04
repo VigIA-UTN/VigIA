@@ -145,6 +145,10 @@ export async function descargarAsignacionesCaravanasExcel(establecimientoId: num
   return response.data;
 }
 
+// Con filas inválidas las cargas masivas responden 422 con el mismo reporte (errores por fila): no es una falla
+// del pedido, es el resultado que muestra el modal.
+const aceptaReporteConErrores = (status: number) => (status >= 200 && status < 300) || status === 422;
+
 export async function cargarAnimalesExcel(file: File, establecimientoId: number): Promise<CargaMasivaResponse> {
   const formData = new FormData();
   formData.append('file', file);
@@ -153,6 +157,7 @@ export async function cargarAnimalesExcel(file: File, establecimientoId: number)
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    validateStatus: aceptaReporteConErrores,
   });
   return response.data;
 }
@@ -165,6 +170,7 @@ export async function cargarEstadosExcel(file: File, establecimientoId: number):
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    validateStatus: aceptaReporteConErrores,
   });
   return response.data;
 }

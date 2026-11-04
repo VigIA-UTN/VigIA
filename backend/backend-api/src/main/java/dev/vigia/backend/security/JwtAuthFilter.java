@@ -32,6 +32,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
+        // La API se autentica solo con el JWT. SecurityContextHolderFilter ya cargó la autenticación que hubiera en la
+        // sesión HTTP (JSESSIONID): si se la deja, una cookie de sesión alcanza para operar con un JWT vencido,
+        // inválido o ausente, y cerrar sesión o desactivar al usuario no corta el acceso. Se descarta y solo la vuelve
+        // a crear un JWT válido. El login con Google (/oauth2/**) sí usa la sesión y no pasa por acá.
+        if (request.getRequestURI().startsWith("/api/")) {
+            SecurityContextHolder.clearContext();
+        }
+
         String authHeader = request.getHeader("Authorization");
         String jwt = null;
         final String userEmail;
@@ -50,7 +58,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             userEmail = jwtUtil.extractUsername(jwt);
             if (userEmail != null) {
                 UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(userEmail);
-                if (jwtUtil.validateToken(jwt, userDetails)) {
+                // isEnabled() refleja usuarios.activo: un usuario desactivado pierde el acceso en el momento, no
+                // cuando vence su JWT (hasta 24 h después).
+                if (jwtUtil.validateToken(jwt, userDetails) && userDetails.isEnabled()) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,

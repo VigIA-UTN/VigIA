@@ -146,7 +146,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -166,7 +166,8 @@ public class AnimalServiceImpl implements AnimalService {
                 RodeoLote lote = rodeoLoteRepository.findById(request.getRodeoLoteId())
                                 .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
                 if (!lote.getEstablecimiento().getId().equals(establecimiento.getId())) {
-                        throw new IllegalArgumentException("El rodeo no pertenece al establecimiento.");
+                        // Un rodeo de otro establecimiento es un recurso ajeno: 403, como el resto de los accesos cruzados.
+                        throw new AccessDeniedException("El rodeo no pertenece al establecimiento.");
                 }
                 if (!lote.isActivo()) {
                         throw new IllegalArgumentException("El rodeo/lote no está activo.");
@@ -178,7 +179,9 @@ public class AnimalServiceImpl implements AnimalService {
                 animal.setAlias(request.getAlias());
                 animal.setFechaNacimiento(request.getFechaNacimiento());
                 animal.setRaza(request.getRaza());
-                animal.setEstadoActual(request.getEstadoActual());
+                // Sin estado, el alta es un animal activo: un estado null lo dejaría fuera del listado.
+                animal.setEstadoActual(request.getEstadoActual() != null ? request.getEstadoActual()
+                                : EstadoAnimal.ACTIVO);
 
                 Animal savedAnimal = animalRepository.save(animal);
 
@@ -215,7 +218,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!esProductorOEmpleadoDelEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -233,7 +236,7 @@ public class AnimalServiceImpl implements AnimalService {
                                         .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                         if (!activoEnNuevoEstablecimiento) {
-                                throw new IllegalArgumentException(
+                                throw new AccessDeniedException(
                                                 "El productor no pertenece al nuevo establecimiento destino o no está activo.");
                         }
                 }
@@ -304,7 +307,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!esProductorOEmpleadoDelEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -339,7 +342,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!esProductorOEmpleadoDelEstablecimiento && !productorUser.getRol().equals(Rol.ADMINISTRADOR)) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -576,7 +579,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -655,7 +658,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece a este establecimiento o no está activo.");
                 }
 
@@ -667,6 +670,11 @@ public class AnimalServiceImpl implements AnimalService {
                                 .orElseThrow(() -> new IllegalArgumentException("Estado reproductivo no encontrado."));
 
                 if (!estado.getAnimal().getId().equals(animalId)) {
+                        // Si el estado es de un animal de otro establecimiento es un acceso cruzado (403); si es de
+                        // otro animal del mismo, un dato mal armado (400).
+                        if (!estado.getAnimal().getEstablecimiento().getId().equals(animal.getEstablecimiento().getId())) {
+                                throw new AccessDeniedException("El estado reproductivo no pertenece a este establecimiento.");
+                        }
                         throw new IllegalArgumentException("El estado reproductivo no pertenece a este animal.");
                 }
 
@@ -746,7 +754,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .anyMatch(v -> v.getUsuario().equals(productorUser) && v.isActivo());
 
                 if (!productorActivoEnEstablecimiento) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "El productor no pertenece al establecimiento seleccionado.");
                 }
 
@@ -891,7 +899,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 || usuario.getRol().equals(Rol.ADMINISTRADOR);
 
                 if (!tieneAcceso) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "No tiene acceso a los datos de este animal.");
                 }
 
@@ -1560,7 +1568,7 @@ public class AnimalServiceImpl implements AnimalService {
                         RodeoLote lote = rodeoLoteRepository.findById(rodeoLoteId)
                                         .orElseThrow(() -> new IllegalArgumentException("Rodeo lote no encontrado."));
                         if (!lote.getEstablecimiento().getId().equals(establecimiento.getId())) {
-                                throw new IllegalArgumentException("El rodeo no pertenece al establecimiento.");
+                                throw new AccessDeniedException("El rodeo no pertenece al establecimiento.");
                         }
                 }
 
@@ -1603,7 +1611,13 @@ public class AnimalServiceImpl implements AnimalService {
                 validarPermisoGestionCaravana(usuario, establecimiento);
 
                 Set<Long> filtro = animalIds == null ? Set.of() : new HashSet<>(animalIds);
-                List<Animal> conCaravana = animalRepository.findByEstablecimientoId(establecimientoId).stream()
+                List<Animal> delEstablecimiento = animalRepository.findByEstablecimientoId(establecimientoId);
+                // Pedir animales de otro establecimiento no se ignora en silencio: es un acceso cruzado.
+                Set<Long> propios = delEstablecimiento.stream().map(Animal::getId).collect(Collectors.toSet());
+                if (!propios.containsAll(filtro)) {
+                        throw new AccessDeniedException("Hay animales que no pertenecen a este establecimiento.");
+                }
+                List<Animal> conCaravana = delEstablecimiento.stream()
                                 .filter(a -> a.getCaravana() != null)
                                 .filter(a -> filtro.isEmpty() || filtro.contains(a.getId()))
                                 .toList();
@@ -1618,7 +1632,7 @@ public class AnimalServiceImpl implements AnimalService {
                 if (nuevaCaravana.getEstablecimiento() == null ||
                                 !nuevaCaravana.getEstablecimiento().getId()
                                                 .equals(animal.getEstablecimiento().getId())) {
-                        throw new IllegalArgumentException(
+                        throw new AccessDeniedException(
                                         "La caravana no pertenece al mismo establecimiento que el animal.");
                 }
 

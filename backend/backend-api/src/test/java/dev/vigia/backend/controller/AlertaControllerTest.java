@@ -1089,7 +1089,7 @@ class AlertaControllerTest {
     }
 
     @Test
-    @DisplayName("Listar diagnósticos de otro establecimiento → no se ven (animal ajeno vacío, sin filtros no aparecen)")
+    @DisplayName("Listar diagnósticos de otro establecimiento → no se ven (animal ajeno 403, sin filtros no aparecen)")
     @SuppressWarnings("null")
     void listarDiagnosticos_deOtroEstablecimiento_noSeVen() throws Exception {
         Alerta alertaAjena = alertaRepository.findById(alertaOtroEstId).orElseThrow();
@@ -1103,8 +1103,7 @@ class AlertaControllerTest {
         diagnosticoRepository.save(ajeno);
 
         getDiagnosticos(veterinarioToken, "animalId", alertaAjena.getAnimal().getId().toString())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(status().isForbidden());
         getDiagnosticos(veterinarioToken)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
