@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -18,11 +19,17 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret:defaultSecretKeyForVigiaApplicationWhichNeedsToBeAtLeast256BitsLong123}")
+    @Value("${jwt.secret}")
     private String secret;
 
     @Value("${jwt.expiration:86400000}")
     private Long jwtExpirationInMs;
+
+    // Sin esto, un secreto vacío o corto recién fallaría en el primer login.
+    @PostConstruct
+    void validarSecreto() {
+        getSigningKey();
+    }
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());

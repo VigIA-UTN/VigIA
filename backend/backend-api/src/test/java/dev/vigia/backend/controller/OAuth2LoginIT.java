@@ -80,14 +80,37 @@ class OAuth2LoginIT extends SeguridadItBase {
         String email = emailUnico();
         crearInvitacion("EMPLEADO", "CAMPERO", email, EST_A, "PENDIENTE", LocalDateTime.now().minusDays(1));
 
-        MvcResult resultado = mockMvc.perform(post("/api/v1/auth/oauth2/google")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("email", email, "nombre", "Nuevo", "apellido", "SSO"))))
-                .andReturn();
+        UriComponents redirect = loginConProveedor(email);
 
-        assertThat(resultado.getResponse().getStatus()).isEqualTo(400);
+        assertThat(redirect.getQueryParams().getFirst("token")).isNull();
+        assertThat(redirect.getQueryParams().getFirst("error")).isNotBlank();
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM usuarios WHERE email = ?", Integer.class,
                 email)).isZero();
+    }
+
+    @Test
+    @DisplayName("H0014-05 - SSO - Usuario desactivado")
+    void H0014_05_usuarioDesactivado() throws Exception {
+        jdbcTemplate.update("UPDATE usuarios SET activo = 0 WHERE email = ?", email("camperoA"));
+
+        UriComponents redirect = loginConProveedor(email("camperoA"));
+
+        assertThat(redirect.getQueryParams().getFirst("token")).isNull();
+        assertThat(redirect.getQueryParams().getFirst("error")).contains("no está activa");
+    }
+
+    @Test
+    @DisplayName("H0014-06 - SSO - Sin pasar por el proveedor no se obtiene token")
+    void H0014_06_sinProveedorNoHayToken() throws Exception {
+        for (String ruta : List.of("/api/v1/auth/oauth2", "/api/v1/auth/oauth2/google")) {
+            MvcResult resultado = mockMvc.perform(post(ruta)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of("email", email("admin"), "provider", "GOOGLE"))))
+                    .andReturn();
+
+            assertThat(resultado.getResponse().getStatus()).as(ruta).isEqualTo(404);
+            assertThat(resultado.getResponse().getContentAsString()).as(ruta).doesNotContain("token");
+        }
     }
 
     private UriComponents loginConProveedor(String email) throws Exception {
