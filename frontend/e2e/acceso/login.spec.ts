@@ -121,7 +121,7 @@ const MENU_POR_ROL: [RolUsuario, string[], string][] = [
 
 test.describe('H0002 - Opciones de menú por rol (UI)', () => {
   for (const [rol, visibles, rutaAjena] of MENU_POR_ROL) {
-    test(`H0002-07 - Menú por rol - ${rol} ve solo sus opciones`, async ({ page }) => {
+    test(`H0002-10 - Menú por rol - ${rol} ve solo sus opciones`, async ({ page }) => {
       await loginPorRol(page, rol, rol === 'ADMINISTRADOR' ? undefined : { establecimiento: 'Fixture A' });
       const navbar = page.locator('nav.navbar');
 
