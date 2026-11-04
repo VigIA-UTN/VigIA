@@ -38,11 +38,11 @@ class VentanaInseminacionIT extends DeteccionItBase {
     @Test
     @DisplayName("H0016-02 - Ventana de inseminación - Antes de abrir y a menos de 2 h de vencer")
     void H0016_02_futuraYProximaAVencer() throws Exception {
-        // Detectado hace 1 h: la ventana todavía no abrió (faltan 5 h) y el countdown cuenta hasta el cierre.
+        // Detectado hace 1 h: la ventana todavía no abrió y el countdown cuenta hasta que abre (faltan 5 h).
         Long futura = crearAlertaCelo(idAnimal(EST_A, "A-101"), LocalDateTime.now().minusHours(1));
         JsonNode antes = ventana("veterinarioA", futura);
         assertThat(antes.get("estado").asText()).isEqualTo("FUTURA");
-        assertThat(antes.get("tiempoRestanteSegundos").asLong()).isCloseTo(23 * 3600, within(60L));
+        assertThat(antes.get("tiempoRestanteSegundos").asLong()).isCloseTo(5 * 3600, within(60L));
         assertThat(antes.get("porcentajeTranscurrido").asDouble()).isZero();
         assertThat(antes.get("proximaAVencer").asBoolean()).isFalse();
 
