@@ -31,6 +31,14 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
     @EntityGraph(attributePaths = { "estadosReproductivos", "perfilReferencia" })
     List<Animal> findConEstadosByEstablecimientoIdAndEstadoActualNot(Long establecimientoId, EstadoAnimal estadoActual);
 
+    /**
+     * Dashboard: los animales activos del establecimiento con todo lo que leen sus cálculos en una sola consulta.
+     * perfilReferencia va en el join por lo mismo que en el detector de anestro.
+     */
+    @EntityGraph(attributePaths = { "rodeoLote", "caravana", "perfilReferencia", "estadosReproductivos" })
+    List<Animal> findParaDashboardByEstablecimientoIdAndEstadoActualNot(Long establecimientoId,
+            EstadoAnimal estadoActual);
+
     Optional<Animal> findByIdCaravanaOficial(String idCaravanaOficial);
 
     Optional<Animal> findByIdCaravanaOficialAndEstablecimientoId(String idCaravanaOficial, Long establecimientoId);

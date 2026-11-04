@@ -16,6 +16,8 @@ import type { AlertaResponse, VentanaInseminacionResponse } from '../api/alertaA
 import { getRodeoLotes } from '../api/rodeoLotesApi';
 import type { RodeoLoteResponse } from '../api/rodeoLotesApi';
 import { getAnimalesMapa } from '../api/animalesApi';
+import { getCentroMando } from '../api/dashboardApi';
+import type { CentroMandoResponse } from '../api/dashboardApi';
 import type { AnimalMapa } from '../api/animalesApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { determinarIcono } from '../utils/animalPins';
@@ -66,7 +68,7 @@ function esReproductiva(a: AnimalResponse): boolean {
     return diffDias(a.fechaNacimiento) / 365.25 >= 1;
 }
 
-function nombreAnimal(a: AnimalResponse | null | undefined): string {
+function nombreAnimal(a: { id: number; alias?: string | null; idCaravanaOficial?: string | null } | null | undefined): string {
     if (!a) return '—';
     return a.alias || a.idCaravanaOficial || `#${a.id}`;
 }
@@ -101,16 +103,6 @@ function formatHorasRestantes(seg: number): string {
 // Celo con ventana de inseminación: el anestro llega con tipo CELO pero no la tiene.
 const esCeloConVentana = (a: AlertaResponse) => a.tipo === 'CELO' && !esAnestro(a);
 
-// ── Urgencia para ranking (menor = más urgente) ───────────────────────────────
-function urgencia(a: AlertaResponse, ventana?: VentanaInseminacionResponse): number {
-    if (a.tipo === 'CELO' && ventana?.estado === 'ACTIVA') {
-        return ventana.tiempoRestanteSegundos / 3600; // horas restantes
-    }
-    if (a.tipo === 'FUERA_DE_PERIMETRO') return 24 + horasTranscurridas(a.tsGeneracion);
-    const sevVal = a.severidad === 'ALTA' ? 0 : a.severidad === 'MEDIA' ? 1 : 2;
-    return 100 + sevVal * 10 + horasTranscurridas(a.tsGeneracion);
-}
-
 // ── Colores ventana ───────────────────────────────────────────────────────────
 function ventanaClass(seg: number): 'critica' | 'venciendo' | 'optima' {
     const h = seg / 3600;
@@ -132,12 +124,6 @@ function MapFitter({ animales }: { animales: AnimalMapa[] }) {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface ColaItem {
-    alerta: AlertaResponse;
-    animal: AnimalResponse | undefined;
-    ventana?: VentanaInseminacionResponse;
-}
 
 interface VentanaItem {
     alerta: AlertaResponse;
@@ -332,6 +318,11 @@ export default function DashboardPage() {
     const [alertaAbierta, setAlertaAbierta] = useState<AlertaResponse | null>(null);
     const [intervencionAlerta, setIntervencionAlerta] = useState<AlertaResponse | null>(null);
 
+    // Centro de mando, calculado en el backend
+    const [centroMando, setCentroMando] = useState<CentroMandoResponse | null>(null);
+    const [loadingMando, setLoadingMando] = useState(true);
+    const [errorMando, setErrorMando] = useState<string | null>(null);
+
     const fetchDashboard = useCallback(async () => {
         if (!selectedId) return;
         setLoading(true);
@@ -383,6 +374,28 @@ export default function DashboardPage() {
 
     useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
+    const fetchCentroMando = useCallback(async () => {
+        if (!selectedId) return;
+        setLoadingMando(true);
+        setErrorMando(null);
+        try {
+            setCentroMando(await getCentroMando(selectedId, loteFilter === 'todos' ? undefined : loteFilter));
+        } catch (e) {
+            const err = e as { response?: { data?: string | { message?: string } } };
+            const data = err.response?.data;
+            setErrorMando((typeof data === 'string' ? data : data?.message) || 'Error al cargar el centro de mando.');
+        } finally {
+            setLoadingMando(false);
+        }
+    }, [selectedId, loteFilter]);
+
+    useEffect(() => { fetchCentroMando(); }, [fetchCentroMando]);
+
+    const refrescar = () => {
+        fetchDashboard();
+        fetchCentroMando();
+    };
+
     // ── Mapa animal
     const animalMap = useMemo(() => new Map(animales.map(a => [a.id, a])), [animales]);
 
@@ -417,39 +430,6 @@ export default function DashboardPage() {
         return m;
     }, [intervenciones]);
 
-    // ── Idea 1: Cola de atención ─────────────────────────────────────────────
-    const colaItems: ColaItem[] = useMemo(() => {
-        const items: ColaItem[] = alertasFiltradas.map(a => ({
-            alerta: a,
-            animal: animalMap.get(a.animalId),
-            ventana: ventanas.get(a.id),
-        }));
-
-        // Detectar caravanas silenciosas (sin caravana o sin señal > 6h)
-        const activosSinCaravana = animalesFiltrados.filter(
-            a => a.estadoActual !== 'INACTIVO' && (
-                !a.caravanaId ||
-                (a.caravanaUltimaSenial && horasTranscurridas(a.caravanaUltimaSenial) > SILENCIO_THRESHOLD_H)
-            )
-        );
-        // Las caravanas silenciosas como "alertas sintéticas" — sólo si no tienen ya una alerta
-        const alertaIds = new Set(alertasFiltradas.map(a => a.animalId));
-        activosSinCaravana.filter(a => !alertaIds.has(a.id)).forEach(a => {
-            items.push({
-                alerta: {
-                    id: -a.id, // ID sintético negativo
-                    animalId: a.id,
-                    tipo: 'CARAVANA',
-                    estado: 'PENDIENTE',
-                    tsGeneracion: a.caravanaUltimaSenial ?? a.fechaAlta,
-                } as AlertaResponse,
-                animal: a,
-            });
-        });
-
-        return items.sort((a, b) => urgencia(a.alerta, a.ventana) - urgencia(b.alerta, b.ventana));
-    }, [alertasFiltradas, animalesFiltrados, animalMap, ventanas]);
-
     // ── Idea 2: Ventanas de inseminación ─────────────────────────────────────
     const ventanaItems: VentanaItem[] = useMemo(() => {
         return alertasFiltradas
@@ -468,13 +448,6 @@ export default function DashboardPage() {
             });
     }, [alertasFiltradas, animalMap, ventanas]);
 
-    const celoArchivadasRecientes = useMemo(() => {
-        const hace30d = 30 * 24 * 60 * 60 * 1000;
-        return alertasArchivadasCelo.filter(
-            a => esCeloConVentana(a) && Date.now() - new Date(a.tsGeneracion).getTime() <= hace30d
-        ).length;
-    }, [alertasArchivadasCelo]);
-
     // ── Idea 3: Animales a revisar ────────────────────────────────────────────
     const animalesARevisar = useMemo(() => {
         return animalesFiltrados
@@ -486,24 +459,6 @@ export default function DashboardPage() {
                 if (b.estadoSalud === 'ENFERMO' && a.estadoSalud !== 'ENFERMO') return 1;
                 return 0;
             });
-    }, [animalesFiltrados]);
-
-    // ── Idea 4: Cobertura de caravanas ─────────────────────────────────────────
-    const cobertura = useMemo(() => {
-        const elegibles = animalesFiltrados.filter(a => a.estadoActual !== 'INACTIVO');
-        const total = elegibles.length;
-        if (total === 0) return { pct: 0, ok: 0, calibrando: 0, silencio: 0, bateriaBaja: 0, sinCaravana: 0, total: 0 };
-
-        let ok = 0, calibrando = 0, silencio = 0, bateriaBaja = 0, sinCaravana = 0;
-        elegibles.forEach(a => {
-            if (!a.caravanaId) { sinCaravana++; return; }
-            if (a.enCalibracion) { calibrando++; return; }
-            const hs = a.caravanaUltimaSenial ? horasTranscurridas(a.caravanaUltimaSenial) : Infinity;
-            if (hs > SILENCIO_THRESHOLD_H) { silencio++; return; }
-            if (a.caravanaBateria !== null && a.caravanaBateria <= BATERIA_BAJA_PCT) { bateriaBaja++; return; }
-            ok++;
-        });
-        return { pct: Math.round((ok / total) * 100), ok, calibrando, silencio, bateriaBaja, sinCaravana, total };
     }, [animalesFiltrados]);
 
     // ── Idea 6: Embudo reproductivo ───────────────────────────────────────────
@@ -606,14 +561,6 @@ export default function DashboardPage() {
     // ── Idea 8: Tendencia 8 semanas ───────────────────────────────────────
     // Resumen ejecutivo: todo el establecimiento.
     const tendencia8Semanas = useMemo(() => calcularTendencia8Semanas(alertasRecientes), [alertasRecientes]);
-
-    // Centro de mando: respeta el filtro de lote.
-    const tendencia8SemanasLote = useMemo(() => {
-        if (loteFilter === 'todos') return tendencia8Semanas;
-        return calcularTendencia8Semanas(
-            alertasRecientes.filter(a => animalMap.get(a.animalId)?.rodeoLoteId === loteFilter)
-        );
-    }, [alertasRecientes, animalMap, loteFilter, tendencia8Semanas]);
 
     // ── Idea 9: ¿Está actuando el equipo? ────────────────────────────────
     const equipoMetrics = useMemo(() => {
@@ -857,22 +804,15 @@ export default function DashboardPage() {
         navigate(`/animales?${new URLSearchParams({ ids: lista.map(a => a.id).join(','), motivo })}`);
 
     // ── KPIs de header ────────────────────────────────────────────────────────
-    const kpiAlertasPendientes = alertasFiltradas.length;
-    const kpiVentanasAbiertas = ventanaItems.length;
-    const kpiBajoObservacion = animalesARevisar.length;
-    const kpiCobertura = cobertura.pct;
     // Solo ventanas ya abiertas: en las FUTURAS el tiempo restante es hasta que abren, no hasta que vencen
     const ventanasUrgentes = ventanaItems.filter(
         v => v.ventana.estado === 'ACTIVA' && v.ventana.tiempoRestanteSegundos / 3600 <= 3
     ).length;
     const kpiVentanasSubtexto = ventanasUrgentes > 0 ? `${ventanasUrgentes} por vencer en < 3h` : 'sin urgencia inmediata';
-    const kpiObsSubtexto = (() => {
-        const sinRevision = animalesARevisar.filter(a => !a.estadoSalud || a.estadoSalud === 'ENFERMO').length;
-        return sinRevision > 0 ? `${sinRevision} enfermos` : 'en observación';
-    })();
 
 
     // ── Render ────────────────────────────────────────────────────────────────
+    const cm = centroMando;
 
     // ── Resumen ejecutivo view ────────────────────────────────────────────
     function ResumenEjecutivoView() {
@@ -1798,10 +1738,10 @@ export default function DashboardPage() {
                     <button
                         className="dash-atender-btn"
                         style={{ fontSize: '0.82rem', padding: '8px 16px' }}
-                        onClick={fetchDashboard}
-                        disabled={loading}
+                        onClick={refrescar}
+                        disabled={loading || loadingMando}
                     >
-                        {loading
+                        {loading || loadingMando
                             ? <Spinner animation="border" size="sm" />
                             : <><i className="bi bi-arrow-clockwise me-1" />Refrescar</>
                         }
@@ -1863,7 +1803,7 @@ export default function DashboardPage() {
                     onClose={() => setIntervencionAlerta(null)}
                     onSuccess={() => {
                         setIntervencionAlerta(null);
-                        fetchDashboard();
+                        refrescar();
                     }}
                 />
             )}
@@ -1875,7 +1815,14 @@ export default function DashboardPage() {
             {activeTab === 'salud' && SaludReproduccionView()}
 
             {/* ── TAB: Centro de mando ──────────────────────────────────────── */}
-            {activeTab === 'mando' && (
+            {activeTab === 'mando' && !cm && (
+                errorMando
+                    ? <Alert variant="danger" style={{ borderRadius: 10, maxWidth: 1280, margin: '0 auto 16px' }}>
+                        <i className="bi bi-exclamation-triangle me-2" />{errorMando}
+                    </Alert>
+                    : <div className="dash-loading-center" style={{ padding: 60 }}><Spinner animation="border" /></div>
+            )}
+            {activeTab === 'mando' && cm && (
 
                 <>
                     {/* ── KPI Chips ──────────────────────────────────────────────── */}
@@ -1886,13 +1833,13 @@ export default function DashboardPage() {
                             <div className="dash-kpi-chip-label">
                                 Alertas pendientes
                             </div>
-                            {loading ? <Spinner animation="border" size="sm" /> : (
-                                <div className="dash-kpi-chip-val">{kpiAlertasPendientes}</div>
+                            {loadingMando ? <Spinner animation="border" size="sm" /> : (
+                                <div className="dash-kpi-chip-val">{cm.alertasPendientes.total}</div>
                             )}
                             <div className="dash-kpi-chip-sub">
-                                {alertasFiltradas.filter(a => a.tipo === 'CELO').length} celo
-                                · {alertasFiltradas.filter(a => a.tipo === 'SALUD').length} salud
-                                · {alertasFiltradas.filter(a => a.tipo === 'FUERA_DE_PERIMETRO').length} perímetro
+                                {cm.alertasPendientes.celo} celo
+                                · {cm.alertasPendientes.salud} salud
+                                · {cm.alertasPendientes.perimetro} perímetro
                             </div>
                         </div>
 
@@ -1901,10 +1848,12 @@ export default function DashboardPage() {
                             <div className="dash-kpi-chip-label">
                                 Ventanas abiertas
                             </div>
-                            {loading ? <Spinner animation="border" size="sm" /> : (
-                                <div className="dash-kpi-chip-val">{kpiVentanasAbiertas}</div>
+                            {loadingMando ? <Spinner animation="border" size="sm" /> : (
+                                <div className="dash-kpi-chip-val">{cm.ventanasAbiertas.total}</div>
                             )}
-                            <div className="dash-kpi-chip-sub">{kpiVentanasSubtexto}</div>
+                            <div className="dash-kpi-chip-sub">{cm.ventanasAbiertas.porVencer > 0
+                                ? `${cm.ventanasAbiertas.porVencer} por vencer en < ${cm.umbrales.horasVentanaPorVencer}h`
+                                : 'sin urgencia inmediata'}</div>
                         </div>
 
                         {/* Bajo observación */}
@@ -1912,10 +1861,10 @@ export default function DashboardPage() {
                             <div className="dash-kpi-chip-label">
                                 Bajo observación
                             </div>
-                            {loading ? <Spinner animation="border" size="sm" /> : (
-                                <div className="dash-kpi-chip-val">{kpiBajoObservacion}</div>
+                            {loadingMando ? <Spinner animation="border" size="sm" /> : (
+                                <div className="dash-kpi-chip-val">{cm.bajoObservacion.total}</div>
                             )}
-                            <div className="dash-kpi-chip-sub">{kpiObsSubtexto}</div>
+                            <div className="dash-kpi-chip-sub">{cm.bajoObservacion.enfermos > 0 ? `${cm.bajoObservacion.enfermos} enfermos` : 'en observación'}</div>
                         </div>
 
                         {/* Cobertura */}
@@ -1923,12 +1872,12 @@ export default function DashboardPage() {
                             <div className="dash-kpi-chip-label">
                                 Cobertura de caravanas
                             </div>
-                            {loading ? <Spinner animation="border" size="sm" /> : (
-                                <div className="dash-kpi-chip-val">{kpiCobertura}%</div>
+                            {loadingMando ? <Spinner animation="border" size="sm" /> : (
+                                <div className="dash-kpi-chip-val">{cm.cobertura.porcentaje}%</div>
                             )}
                             <div className="dash-kpi-chip-sub">
-                                {cobertura.silencio > 0 ? `${cobertura.silencio} sin señal · ` : ''}
-                                {cobertura.bateriaBaja > 0 ? `${cobertura.bateriaBaja} batería baja` : 'caravanas ok'}
+                                {cm.cobertura.sinSenial > 0 ? `${cm.cobertura.sinSenial} sin señal · ` : ''}
+                                {cm.cobertura.bateriaBaja > 0 ? `${cm.cobertura.bateriaBaja} batería baja` : 'caravanas ok'}
                             </div>
                         </div>
                     </div>
@@ -1947,13 +1896,13 @@ export default function DashboardPage() {
                                         Cola de atención
                                     </p>
                                     <button className="dash-ver-todas-btn" onClick={() => navigate('/alertas')}>
-                                        Ver todas ({kpiAlertasPendientes}) <i className="bi bi-arrow-right" />
+                                        Ver todas ({cm.alertasPendientes.total}) <i className="bi bi-arrow-right" />
                                     </button>
                                 </div>
 
-                                {loading ? (
+                                {loadingMando ? (
                                     <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                                ) : colaItems.length === 0 ? (
+                                ) : cm.cola.length === 0 ? (
                                     <p className="dash-no-items">
                                         <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
                                         Sin alertas pendientes — todo en orden
@@ -1968,7 +1917,7 @@ export default function DashboardPage() {
                                             <span className='d-none d-md-block' style={{ textAlign: 'center' }}>Antigüedad</span>
                                             <span /> {/* Spacer para boton */}
                                         </div>
-                                        {colaItems.slice(0, 8).map((item, i) => {
+                                        {cm.cola.map((item, i) => {
                                             const { alerta, animal, ventana } = item;
                                             const horas = horasTranscurridas(alerta.tsGeneracion);
                                             const isCelo = alerta.tipo === 'CELO';
@@ -2052,25 +2001,25 @@ export default function DashboardPage() {
                                         <i className="bi bi-clock-history" />
                                         Ventanas de inseminación abiertas
                                     </p>
-                                    {!loading && (
+                                    {!loadingMando && (
                                         <span className="dash-card-tag">
-                                            Oportunidades perdidas (30d): {celoArchivadasRecientes}
+                                            Oportunidades perdidas (30d): {cm.ventanasAbiertas.perdidasUltimos30Dias}
                                         </span>
                                     )}
                                 </div>
 
-                                {loading ? (
+                                {loadingMando ? (
                                     <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                                ) : ventanaItems.length === 0 ? (
+                                ) : cm.ventanas.length === 0 ? (
                                     <p className="dash-no-items">
                                         <i className="bi bi-check-circle-fill" style={{ color: '#38A169' }} />
                                         Sin ventanas activas
                                     </p>
                                 ) : (
-                                    ventanaItems.map(({ alerta, animal, ventana }) => {
+                                    cm.ventanas.map(({ alerta, animal, ventana }) => {
                                         const isFutura = ventana.estado === 'FUTURA';
                                         const vc = isFutura ? 'futura' : ventanaClass(ventana.tiempoRestanteSegundos);
-                                        const pct = isFutura ? 0 : Math.min(100, Math.max(0, ventana.porcentajeTranscurrido * 100));
+                                        const pct = isFutura ? 0 : Math.min(100, Math.max(0, ventana.porcentajeTranscurrido));
                                         const restanteClass = isFutura
                                             ? 'dash-ventana-restante-futura'
                                             : vc === 'critica'
@@ -2119,45 +2068,45 @@ export default function DashboardPage() {
                                     </p>
                                 </div>
 
-                                {loading ? (
+                                {loadingMando ? (
                                     <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
                                 ) : (
                                     <>
                                         <div className="dash-coverage-pct">
-                                            {cobertura.pct}%
+                                            {cm.cobertura.porcentaje}%
                                         </div>
                                         <div className="dash-coverage-sub">del rodeo vigilado</div>
 
                                         <div className="dash-coverage-bar-wrap">
-                                            {cobertura.ok > 0 && (
+                                            {cm.cobertura.ok > 0 && (
                                                 <div className="dash-coverage-seg dash-coverage-ok"
-                                                    style={{ flex: cobertura.ok }} title={`Monitoreados: ${cobertura.ok}`} />
+                                                    style={{ flex: cm.cobertura.ok }} title={`Monitoreados: ${cm.cobertura.ok}`} />
                                             )}
-                                            {cobertura.calibrando > 0 && (
+                                            {cm.cobertura.calibrando > 0 && (
                                                 <div className="dash-coverage-seg dash-coverage-calibrando"
-                                                    style={{ flex: cobertura.calibrando }} title={`Calibrando: ${cobertura.calibrando}`} />
+                                                    style={{ flex: cm.cobertura.calibrando }} title={`Calibrando: ${cm.cobertura.calibrando}`} />
                                             )}
-                                            {cobertura.bateriaBaja > 0 && (
+                                            {cm.cobertura.bateriaBaja > 0 && (
                                                 <div className="dash-coverage-seg dash-coverage-bateria"
-                                                    style={{ flex: cobertura.bateriaBaja }} title={`Batería baja: ${cobertura.bateriaBaja}`} />
+                                                    style={{ flex: cm.cobertura.bateriaBaja }} title={`Batería baja: ${cm.cobertura.bateriaBaja}`} />
                                             )}
-                                            {cobertura.silencio > 0 && (
+                                            {cm.cobertura.sinSenial > 0 && (
                                                 <div className="dash-coverage-seg dash-coverage-silencio"
-                                                    style={{ flex: cobertura.silencio }} title={`Sin señal: ${cobertura.silencio}`} />
+                                                    style={{ flex: cm.cobertura.sinSenial }} title={`Sin señal: ${cm.cobertura.sinSenial}`} />
                                             )}
-                                            {cobertura.sinCaravana > 0 && (
+                                            {cm.cobertura.sinCaravana > 0 && (
                                                 <div className="dash-coverage-seg dash-coverage-sincaravana"
-                                                    style={{ flex: cobertura.sinCaravana }} title={`Sin caravana: ${cobertura.sinCaravana}`} />
+                                                    style={{ flex: cm.cobertura.sinCaravana }} title={`Sin caravana: ${cm.cobertura.sinCaravana}`} />
                                             )}
                                         </div>
 
                                         <div className="dash-coverage-legend">
                                             {[
-                                                { label: 'Monitoreados', count: cobertura.ok, cls: 'dash-coverage-ok' },
-                                                { label: 'En calibración', count: cobertura.calibrando, cls: 'dash-coverage-calibrando' },
-                                                { label: 'Sin señal > 6h', count: cobertura.silencio, cls: 'dash-coverage-silencio' },
-                                                { label: `Batería ≤ ${BATERIA_BAJA_PCT}%`, count: cobertura.bateriaBaja, cls: 'dash-coverage-bateria' },
-                                                { label: 'Sin caravana', count: cobertura.sinCaravana, cls: 'dash-coverage-sincaravana' },
+                                                { label: 'Monitoreados', count: cm.cobertura.ok, cls: 'dash-coverage-ok' },
+                                                { label: 'En calibración', count: cm.cobertura.calibrando, cls: 'dash-coverage-calibrando' },
+                                                { label: `Sin señal > ${cm.umbrales.horasSinSenial}h`, count: cm.cobertura.sinSenial, cls: 'dash-coverage-silencio' },
+                                                { label: `Batería ≤ ${cm.umbrales.bateriaBajaPorcentaje}%`, count: cm.cobertura.bateriaBaja, cls: 'dash-coverage-bateria' },
+                                                { label: 'Sin caravana', count: cm.cobertura.sinCaravana, cls: 'dash-coverage-sincaravana' },
                                             ].filter(r => r.count > 0).map(row => (
                                                 <div key={row.label} className="dash-coverage-leg-row">
                                                     <div className="dash-coverage-leg-left">
@@ -2233,21 +2182,21 @@ export default function DashboardPage() {
                                     <i className="bi bi-diagram-3-fill" />
                                     Embudo reproductivo
                                 </p>
-                                {!loading && embudo.inseminadasPendienteDiag > 0 && (
+                                {!loadingMando && cm.embudo.inseminadasSinDiagnostico > 0 && (
                                     <span style={{ fontSize: '0.75rem', color: '#ECC94B' }}>
-                                        {embudo.inseminadasPendienteDiag} esperan diagnóstico
+                                        {cm.embudo.inseminadasSinDiagnostico} esperan diagnóstico
                                     </span>
                                 )}
                             </div>
 
-                            {loading ? (
+                            {loadingMando ? (
                                 <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                            ) : embudo.totalRepro === 0 ? (
+                            ) : cm.embudo.totalReproductivos === 0 ? (
                                 <p className="dash-no-items">Sin animales reproductivos registrados</p>
                             ) : (
                                 <>
                                     <div className="dash-embudo-bar-wrap">
-                                        {Object.entries(embudo.dist)
+                                        {Object.entries(cm.embudo.distribucion)
                                             .filter(([, v]) => v > 0)
                                             .map(([estado, count]) => (
                                                 <div
@@ -2259,7 +2208,7 @@ export default function DashboardPage() {
                                             ))}
                                     </div>
                                     <div className="dash-embudo-legend">
-                                        {Object.entries(embudo.dist).filter(([, v]) => v > 0).map(([estado, count]) => (
+                                        {Object.entries(cm.embudo.distribucion).filter(([, v]) => v > 0).map(([estado, count]) => (
                                             <span key={estado} className="dash-embudo-leg-item">
                                                 <span className={`dash-dot dash-embudo-${estado.toLowerCase()}`}
                                                     style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%' }}
@@ -2281,18 +2230,18 @@ export default function DashboardPage() {
                                     Tendencia de alertas · 8 semanas
                                 </p>
                             </div>
-                            {loading ? (
+                            {loadingMando ? (
                                 <div className="dash-loading-center"><Spinner animation="border" size="sm" /></div>
-                            ) : tendencia8SemanasLote.tipos.every(t => tendencia8SemanasLote.datos[t].every(v => v === 0)) ? (
+                            ) : cm.tendencia.tipos.every(t => cm.tendencia.datos[t].every(v => v === 0)) ? (
                                 <p className="dash-no-items">
                                     <i className="bi bi-bar-chart" style={{ color: '#94A3B8' }} />
                                     Sin alertas en las últimas 8 semanas
                                 </p>
                             ) : (
                                 <TrendChart
-                                    datos={tendencia8SemanasLote.datos}
-                                    semanas={tendencia8SemanasLote.semanas}
-                                    tipos={tendencia8SemanasLote.tipos}
+                                    datos={cm.tendencia.datos}
+                                    semanas={cm.tendencia.semanas}
+                                    tipos={cm.tendencia.tipos}
                                 />
                             )}
                         </div>
