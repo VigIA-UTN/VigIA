@@ -8,7 +8,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Comparator;
 import java.util.List;
 import java.util.HashMap;
@@ -55,6 +57,7 @@ import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.dto.RegistroPesoRequest;
 import dev.vigia.backend.dto.RegistroPesoResponse;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.AlertaAnimalAislado;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
@@ -66,6 +69,7 @@ import dev.vigia.backend.model.PerfilReferencia;
 import dev.vigia.backend.model.RegistroCohesion;
 import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.TipoEstadoSalud;
 import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.RegistroPeso;
 import dev.vigia.backend.model.RodeoLote;
@@ -374,23 +378,82 @@ public class AnimalServiceImpl implements AnimalService {
                 LocalDateTime desdeAsignacion = caravana.getFechaAsignacion() != null
                                 ? caravana.getFechaAsignacion().atStartOfDay()
                                 : LocalDate.EPOCH.atStartOfDay();
-                return telemetriaRepository
+                return calibracionEnCurso(telemetriaRepository
                                 .findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(caravana, desdeAsignacion)
-                                .map(primerDato -> {
-                                        LocalDate fin = primerDato.getFechaHora().plusDays(calibracionDias).toLocalDate();
-                                        // 0 también si ya pasó y el worker todavía no armó el perfil: "finaliza hoy"
-                                        return new Calibracion(true,
-                                                        (int) Math.max(0, ChronoUnit.DAYS.between(LocalDate.now(), fin)));
-                                })
-                                .orElse(new Calibracion(true, calibracionDias));
+                                .map(Telemetria::getFechaHora)
+                                .orElse(null));
+        }
+
+        /** Calibración en curso a partir del primer dato desde la asignación (null: la caravana todavía no transmitió). */
+        private Calibracion calibracionEnCurso(LocalDateTime primerDato) {
+                if (primerDato == null) {
+                        return new Calibracion(true, calibracionDias);
+                }
+                LocalDate fin = primerDato.plusDays(calibracionDias).toLocalDate();
+                // 0 también si ya pasó y el worker todavía no armó el perfil: "finaliza hoy"
+                return new Calibracion(true, (int) Math.max(0, ChronoUnit.DAYS.between(LocalDate.now(), fin)));
+        }
+
+        /**
+         * Listado y mapa: la calibración de cada animal, con la misma regla que {@link #calibracion(Animal)} pero
+         * en dos consultas. Los animales sin perfil ni caravana no quedan en el Map.
+         */
+        private Map<Long, Calibracion> calibracionPorAnimal(List<Animal> animales) {
+                if (animales.isEmpty()) {
+                        return Map.of();
+                }
+                Set<Long> conPerfil = perfilReferenciaRepository.findAnimalIdsConPerfil(
+                                animales.stream().map(Animal::getId).collect(Collectors.toList()));
+                List<Long> caravanasCalibrando = animales.stream()
+                                .filter(a -> !conPerfil.contains(a.getId()) && a.getCaravana() != null)
+                                .map(a -> a.getCaravana().getId())
+                                .collect(Collectors.toList());
+                Map<Long, LocalDateTime> primerDatoPorCaravana = caravanasCalibrando.isEmpty() ? Map.of()
+                                : telemetriaRepository.findPrimerDatoDesdeAsignacion(caravanasCalibrando).stream()
+                                                .collect(Collectors.toMap(TelemetriaRepository.PrimerDato::getCaravanaId,
+                                                                TelemetriaRepository.PrimerDato::getFechaHora));
+
+                Map<Long, Calibracion> resultado = new HashMap<>();
+                for (Animal animal : animales) {
+                        if (conPerfil.contains(animal.getId())) {
+                                resultado.put(animal.getId(), new Calibracion(false, 0));
+                        } else if (animal.getCaravana() != null) {
+                                resultado.put(animal.getId(), calibracionEnCurso(
+                                                primerDatoPorCaravana.get(animal.getCaravana().getId())));
+                        }
+                }
+                return resultado;
         }
 
         private AnimalResponse mapToResponse(Animal animal) {
-                EstadoReproductivo ultimoEstado = animal.getEstadosReproductivos().stream()
+                EstadoSalud ultimoEstadoSalud = animal.getEstadosSalud().stream()
                                 .findFirst()
                                 .orElse(null);
+                return mapToResponse(animal, ultimoEstadoSalud != null ? ultimoEstadoSalud.getEstado() : null,
+                                calibracion(animal));
+        }
 
-                EstadoSalud ultimoEstadoSalud = animal.getEstadosSalud().stream()
+        /**
+         * Listado: arma todos los animales con dos consultas más (estado de salud actual y primer dato de las
+         * caravanas que calibran). Espera los animales como los trae el listado, con lote, caravana, perfil y estados
+         * reproductivos cargados.
+         */
+        private List<AnimalResponse> mapToResponses(List<Animal> animales) {
+                Map<Long, TipoEstadoSalud> saludPorAnimal = new HashMap<>();
+                if (!animales.isEmpty()) {
+                        estadoSaludRepository.findUltimoPorAnimal(animales.stream().map(Animal::getId).toList())
+                                        .forEach(e -> saludPorAnimal.put(e.getAnimalId(),
+                                                        TipoEstadoSalud.valueOf(e.getEstado())));
+                }
+                Map<Long, Calibracion> calibracionPorAnimal = calibracionPorAnimal(animales);
+                return animales.stream()
+                                .map(a -> mapToResponse(a, saludPorAnimal.get(a.getId()),
+                                                calibracionPorAnimal.get(a.getId())))
+                                .collect(Collectors.toList());
+        }
+
+        private AnimalResponse mapToResponse(Animal animal, TipoEstadoSalud estadoSalud, Calibracion calibracion) {
+                EstadoReproductivo ultimoEstado = animal.getEstadosReproductivos().stream()
                                 .findFirst()
                                 .orElse(null);
 
@@ -413,7 +476,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .fechaUltimoParto(ultimoEstado != null ? ultimoEstado.getFechaUltParto() : null)
                                 .fechaUltimaInseminacion(
                                                 ultimoEstado != null ? ultimoEstado.getFechaUltInseminacion() : null)
-                                .estadoSalud(ultimoEstadoSalud != null ? ultimoEstadoSalud.getEstado() : null);
+                                .estadoSalud(estadoSalud);
 
                 if (animal.getCaravana() != null) {
                         Caravana c = animal.getCaravana();
@@ -426,7 +489,6 @@ public class AnimalServiceImpl implements AnimalService {
                                         .caravanaBateria(c.getBateria());
                 }
 
-                Calibracion calibracion = calibracion(animal);
                 if (calibracion != null) {
                         builder.enCalibracion(calibracion.enCurso())
                                         .diasRestantesCalibracion(calibracion.diasRestantes());
@@ -443,10 +505,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
                 if (usuario.getRol().equals(Rol.ADMINISTRADOR)) {
-                        return animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO)
-                                        .stream()
-                                        .map(this::mapToResponse)
-                                        .collect(Collectors.toList());
+                        return mapToResponses(animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO));
                 }
 
                 List<Establecimiento> establecimientos = establecimientoRepository
@@ -464,23 +523,17 @@ public class AnimalServiceImpl implements AnimalService {
                                 throw new org.springframework.security.access.AccessDeniedException(
                                                 "No tiene acceso a este establecimiento");
                         }
-                        return animalRepository
+                        return mapToResponses(animalRepository
                                         .findByEstablecimientoIdInAndEstadoActualNot(List.of(establecimientoId),
-                                                        EstadoAnimal.INACTIVO)
-                                        .stream()
-                                        .map(this::mapToResponse)
-                                        .collect(Collectors.toList());
+                                                        EstadoAnimal.INACTIVO));
                 }
 
                 List<Long> establecimientoIds = establecimientos.stream()
                                 .map(Establecimiento::getId)
                                 .collect(Collectors.toList());
 
-                return animalRepository
-                                .findByEstablecimientoIdInAndEstadoActualNot(establecimientoIds, EstadoAnimal.INACTIVO)
-                                .stream()
-                                .map(this::mapToResponse)
-                                .collect(Collectors.toList());
+                return mapToResponses(animalRepository
+                                .findByEstablecimientoIdInAndEstadoActualNot(establecimientoIds, EstadoAnimal.INACTIVO));
         }
 
         @Override
@@ -492,12 +545,10 @@ public class AnimalServiceImpl implements AnimalService {
 
                 List<Animal> animales;
                 if (usuario.getRol().equals(Rol.ADMINISTRADOR)) {
-                        animales = animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO);
-                        if (establecimientoId != null) {
-                                animales = animales.stream()
-                                                .filter(a -> a.getEstablecimiento().getId().equals(establecimientoId))
-                                                .collect(Collectors.toList());
-                        }
+                        animales = establecimientoId != null
+                                        ? animalRepository.findByEstablecimientoIdInAndEstadoActualNot(
+                                                        List.of(establecimientoId), EstadoAnimal.INACTIVO)
+                                        : animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO);
                 } else {
                         List<Establecimiento> establecimientos = establecimientoRepository
                                         .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
@@ -526,37 +577,43 @@ public class AnimalServiceImpl implements AnimalService {
 
                 LocalDateTime hace15Minutos = LocalDateTime.now().minusMinutes(15);
 
+                List<Long> caravanaIds = animales.stream()
+                                .filter(a -> a.getCaravana() != null)
+                                .map(a -> a.getCaravana().getId())
+                                .collect(Collectors.toList());
+                Map<Long, Telemetria> ultimaPorCaravana = caravanaIds.isEmpty() ? Map.of()
+                                : telemetriaRepository.findUltimaPorCaravana(caravanaIds).stream()
+                                                .collect(Collectors.toMap(t -> t.getCaravana().getId(), t -> t));
+                Map<Long, Calibracion> calibracionPorAnimal = calibracionPorAnimal(animales);
+                Map<Long, List<Alerta>> alertasPorAnimal = alertasPendientesPorAnimal(
+                                animales.stream().map(Animal::getId).collect(Collectors.toList()));
+                Map<Long, List<AnimalAisladoResponse>> aisladosPorAlerta = animalesAisladosPorAlerta(alertasPorAnimal);
+
                 return animales.stream().map(animal -> {
                         AnimalMapaResponse.AnimalMapaResponseBuilder builder = AnimalMapaResponse.builder()
                                         .id(animal.getId())
                                         .identificador(animal.getIdCaravanaOficial());
-                        Calibracion calibracion = calibracion(animal);
+                        Calibracion calibracion = calibracionPorAnimal.get(animal.getId());
                         if (calibracion != null) {
                                 builder.enCalibracion(calibracion.enCurso())
                                                 .diasRestantesCalibracion(calibracion.diasRestantes());
                         }
 
-                        if (animal.getCaravana() != null) {
-                                Optional<Telemetria> ultimaPos = telemetriaRepository
-                                                .findFirstByCaravanaOrderByFechaHoraDesc(animal.getCaravana());
-                                if (ultimaPos.isPresent()) {
-                                        Telemetria t = ultimaPos.get();
-                                        builder.latitud(t.getLatitud());
-                                        builder.longitud(t.getLongitud());
-                                        builder.tsUltimaPosicion(t.getFechaHora());
-                                        builder.sinDatosRecientes(t.getFechaHora().isBefore(hace15Minutos));
-                                } else {
-                                        builder.sinDatosRecientes(true);
-                                }
+                        Telemetria t = animal.getCaravana() != null
+                                        ? ultimaPorCaravana.get(animal.getCaravana().getId())
+                                        : null;
+                        if (t != null) {
+                                builder.latitud(t.getLatitud());
+                                builder.longitud(t.getLongitud());
+                                builder.tsUltimaPosicion(t.getFechaHora());
+                                builder.sinDatosRecientes(t.getFechaHora().isBefore(hace15Minutos));
                         } else {
                                 builder.sinDatosRecientes(true);
                         }
 
-                        List<Alerta> alertasAnimal = alertaRepository.alertasAnimalActivas(animal.getId());
-                        List<AlertaResponse> alertasAnimalResponse = alertasAnimal.stream()
-                                        .map(this::alertaToAlertaResponse)
-                                        .collect(Collectors.toList());
-                        builder.alertasAnimal(alertasAnimalResponse);
+                        builder.alertasAnimal(alertasPorAnimal.getOrDefault(animal.getId(), List.of()).stream()
+                                        .map(alerta -> alertaToAlertaResponse(alerta, aisladosPorAlerta))
+                                        .collect(Collectors.toList()));
 
                         return builder.build();
                 }).collect(Collectors.toList());
@@ -983,7 +1040,8 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
-        private AlertaResponse alertaToAlertaResponse(Alerta alerta) {
+        private AlertaResponse alertaToAlertaResponse(Alerta alerta,
+                        Map<Long, List<AnimalAisladoResponse>> aisladosPorAlerta) {
                 boolean aplicaAviso = datoDesactualizadoEvaluator.aplica(alerta.getDisparador(), alerta.getTipo(),
                                 alerta.getEstado());
                 LocalDateTime ultimaSenial = aplicaAviso && alerta.getAnimal() != null
@@ -1006,17 +1064,55 @@ public class AnimalServiceImpl implements AnimalService {
                                                 ultimaSenial))
                                 .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
                                 .animalesAislados(alerta.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL
-                                                ? animalesAislados(alerta)
+                                                ? aisladosPorAlerta.getOrDefault(alerta.getId(), List.of())
                                                 : null)
                                 .build();
         }
 
-        // ponytail: una consulta por alerta de aislamiento y por animal del mapa;
-        // cargarlas en lote si el mapa crece.
-        private List<AnimalAisladoResponse> animalesAislados(Alerta alerta) {
-                return alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId()).stream()
-                                .map(episodio -> AnimalAisladoResponse.from(episodio, alerta.getValorUmbral()))
-                                .toList();
+        /**
+         * Alertas pendientes de cada animal del mapa: las propias y las de aislamiento que lo listan (aunque ya haya
+         * vuelto), ALTA primero. Dos consultas para todo el listado.
+         */
+        private Map<Long, List<Alerta>> alertasPendientesPorAnimal(Collection<Long> animalIds) {
+                if (animalIds.isEmpty()) {
+                        return Map.of();
+                }
+                Map<Long, Map<Long, Alerta>> porAnimal = new HashMap<>();
+                for (Alerta alerta : alertaRepository.findPendientesDeAnimales(animalIds)) {
+                        porAnimal.computeIfAbsent(alerta.getAnimal().getId(), id -> new LinkedHashMap<>())
+                                        .put(alerta.getId(), alerta);
+                }
+                for (AlertaAnimalAislado listado : alertaAnimalAisladoRepository
+                                .findListadosEnAlertasPendientes(animalIds)) {
+                        porAnimal.computeIfAbsent(listado.getAnimal().getId(), id -> new LinkedHashMap<>())
+                                        .putIfAbsent(listado.getAlerta().getId(), listado.getAlerta());
+                }
+                Comparator<Alerta> porSeveridad = Comparator.comparingInt(a -> a.getSeveridad() == SeveridadAlerta.ALTA
+                                ? 1
+                                : a.getSeveridad() == SeveridadAlerta.MEDIA ? 2 : 3);
+                Map<Long, List<Alerta>> resultado = new HashMap<>();
+                porAnimal.forEach((animalId, alertas) -> resultado.put(animalId,
+                                alertas.values().stream().sorted(porSeveridad).toList()));
+                return resultado;
+        }
+
+        /** Animales aislados de cada alerta de aislamiento del mapa, en una sola consulta. */
+        private Map<Long, List<AnimalAisladoResponse>> animalesAisladosPorAlerta(
+                        Map<Long, List<Alerta>> alertasPorAnimal) {
+                Map<Long, Alerta> aislamientos = new HashMap<>();
+                alertasPorAnimal.values().forEach(alertas -> alertas.stream()
+                                .filter(a -> a.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL)
+                                .forEach(a -> aislamientos.putIfAbsent(a.getId(), a)));
+                if (aislamientos.isEmpty()) {
+                        return Map.of();
+                }
+                return alertaAnimalAisladoRepository.findByAlerta_IdInOrderBySegundosFueraDesc(aislamientos.keySet())
+                                .stream()
+                                .collect(Collectors.groupingBy(episodio -> episodio.getAlerta().getId(),
+                                                Collectors.mapping(episodio -> AnimalAisladoResponse.from(episodio,
+                                                                aislamientos.get(episodio.getAlerta().getId())
+                                                                                .getValorUmbral()),
+                                                                Collectors.toList())));
         }
 
         @Override

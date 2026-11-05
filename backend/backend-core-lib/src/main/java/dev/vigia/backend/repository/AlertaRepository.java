@@ -110,11 +110,14 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("desde") LocalDateTime desde,
                      @Param("disparadores") Collection<DisparadorAlerta> disparadores);
 
-       /** Alertas pendientes del animal: las propias y las de aislamiento que lo listan (aunque ya haya vuelto). */
-       @Query("SELECT a FROM Alerta a WHERE (a.animal.id = :animalId "
-                     + "OR EXISTS (SELECT r.id FROM AlertaAnimalAislado r WHERE r.alerta = a AND r.animal.id = :animalId)) "
-                     + "AND a.estado = 'PENDIENTE' ORDER BY CASE WHEN a.severidad = 'ALTA' THEN 1 WHEN a.severidad = 'MEDIA' THEN 2 ELSE 3 END ASC")
-       List<Alerta> alertasAnimalActivas(@Param("animalId") Long animalId);
+       /**
+        * Mapa: alertas pendientes propias de los animales, en una consulta. Trae el animal y su caravana para la
+        * última señal del aviso de dato desactualizado. Las de aislamiento que listan al animal las trae
+        * {@link AlertaAnimalAisladoRepository#findListadosEnAlertasPendientes}.
+        */
+       @Query("SELECT a FROM Alerta a JOIN FETCH a.animal an LEFT JOIN FETCH an.caravana "
+                     + "WHERE an.id IN :animalIds AND a.estado = 'PENDIENTE'")
+       List<Alerta> findPendientesDeAnimales(@Param("animalIds") Collection<Long> animalIds);
 
        /** Detector de anestro: las alertas de un tipo de todo el establecimiento en una consulta, la más nueva primero. */
        List<Alerta> findByAnimal_Establecimiento_IdAndTipoOrderByTsGeneracionDesc(Long establecimientoId, String tipo);
