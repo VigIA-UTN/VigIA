@@ -36,6 +36,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Comparator;
@@ -43,6 +44,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -204,8 +206,14 @@ public class DashboardServiceImpl implements DashboardService {
 
         return animales.stream().map(a -> {
             // Mismo criterio que la ficha del animal: el último estado registrado, y calibrando mientras no tenga
-            // perfil de salud.
-            EstadoReproductivo reproductivo = a.getEstadosReproductivos().stream().findFirst().orElse(null);
+            // perfil de salud. Las fechas de parto e inseminación salen del último registro que las tiene: el
+            // POSIBLE_CELO automático o una GESTANTE cargada después de la INSEMINADA no las repiten.
+            List<EstadoReproductivo> historial = a.getEstadosReproductivos();
+            EstadoReproductivo reproductivo = historial.stream().findFirst().orElse(null);
+            LocalDate ultimoParto = historial.stream().map(EstadoReproductivo::getFechaUltParto)
+                    .filter(Objects::nonNull).findFirst().orElse(null);
+            LocalDate ultimaInseminacion = historial.stream().map(EstadoReproductivo::getFechaUltInseminacion)
+                    .filter(Objects::nonNull).findFirst().orElse(null);
             boolean tieneCaravana = a.getCaravana() != null;
             RodeoLote rodeo = a.getRodeoLote();
             return new AnimalDashboard(a.getId(), a.getIdCaravanaOficial(), a.getAlias(),
@@ -215,8 +223,8 @@ public class DashboardServiceImpl implements DashboardService {
                     tieneCaravana ? a.getCaravana().getUltimaSenial() : null,
                     tieneCaravana ? a.getCaravana().getBateria() : null,
                     reproductivo != null ? reproductivo.getEstado() : null,
-                    reproductivo != null ? reproductivo.getFechaUltParto() : null,
-                    reproductivo != null ? reproductivo.getFechaUltInseminacion() : null,
+                    ultimoParto,
+                    ultimaInseminacion,
                     salud.get(a.getId()));
         }).toList();
     }

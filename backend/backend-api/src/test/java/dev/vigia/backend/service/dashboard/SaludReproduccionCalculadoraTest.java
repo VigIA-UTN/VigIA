@@ -27,6 +27,7 @@ import static dev.vigia.backend.service.dashboard.CentroMandoCalculadoraTest.AHO
 import static dev.vigia.backend.service.dashboard.CentroMandoCalculadoraTest.HOY;
 import static dev.vigia.backend.service.dashboard.CentroMandoCalculadoraTest.UMBRALES;
 import static dev.vigia.backend.service.dashboard.CentroMandoCalculadoraTest.alerta;
+import static dev.vigia.backend.service.dashboard.CentroMandoCalculadoraTest.conCaravana;
 import static dev.vigia.backend.service.dashboard.CentroMandoCalculadoraTest.conReproductivo;
 import static dev.vigia.backend.service.dashboard.CentroMandoCalculadoraTest.conSalud;
 import static dev.vigia.backend.service.dashboard.CentroMandoCalculadoraTest.nacida;
@@ -89,7 +90,11 @@ class SaludReproduccionCalculadoraTest {
         List<AnimalDashboard> animales = List.of(
                 conReproductivo(vaca(1), TipoReproductivo.VACIA, HOY.minusDays(100), null),
                 conReproductivo(vaca(2), TipoReproductivo.PARIDA, HOY.minusDays(50), null),
-                vaca(3));
+                vaca(3),
+                // Sin perfil de salud todavía; la sin caravana no calibra.
+                conCaravana(vaca(4), true, true, AHORA.minusMinutes(10), 80.0),
+                conCaravana(vaca(5), true, true, AHORA.minusMinutes(10), 80.0),
+                nacida(conCaravana(vaca(6), false, false, null, null), HOY.minusMonths(6)));
         List<AlertaResponse> pendientes = List.of(
                 alerta(10, 3, DisparadorAlerta.SALUD, "MEDIA", AHORA.minusHours(2)),
                 alerta(11, 3, DisparadorAlerta.SALUD, "ALTA", AHORA.minusHours(30)),
@@ -101,6 +106,7 @@ class SaludReproduccionCalculadoraTest {
         assertThat(r.getIndicadores().getVacasAbiertas()).isEqualTo(2);
         assertThat(r.getIndicadores().getSaludSinAtender()).isEqualTo(1);
         assertThat(r.getIndicadores().getCelosSinAtender()).isZero();
+        assertThat(r.getIndicadores().getAnimalesEnCalibracion()).isEqualTo(2);
         // Todas las sanitarias pendientes, de la más vieja a la más nueva.
         assertThat(r.getAlertasSaludSinAtender()).extracting(a -> a.getAlerta().getId()).containsExactly(11L, 10L);
         assertThat(r.getAlertasSaludSinAtender().get(0).getAnimal().getId()).isEqualTo(3L);
