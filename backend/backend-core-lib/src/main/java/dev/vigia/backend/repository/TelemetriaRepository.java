@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,6 +34,14 @@ public interface TelemetriaRepository extends JpaRepository<Telemetria, Long> {
         List<Telemetria> findByCaravanaAndFechaHoraAfterOrderByFechaHoraAsc(Caravana caravana, LocalDateTime fechaHora);
 
         Optional<Telemetria> findFirstByCaravanaOrderByFechaHoraDesc(Caravana caravana);
+
+        /**
+         * Último dato de cada caravana, en una sola consulta (mapa de posiciones). En TimescaleDB el DISTINCT ON
+         * se resuelve con SkipScan sobre idx_telemetria_caravana_fecha: no lee toda la serie de cada caravana.
+         */
+        @Query(value = "SELECT DISTINCT ON (caravana_id) * FROM telemetria WHERE caravana_id IN (:caravanaIds) "
+                        + "ORDER BY caravana_id, fecha_hora DESC", nativeQuery = true)
+        List<Telemetria> findUltimaPorCaravana(@Param("caravanaIds") Collection<Long> caravanaIds);
 
         /** Primer dato de la caravana desde {@code desde}: donde empieza la primera calibración de salud. */
         Optional<Telemetria> findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(

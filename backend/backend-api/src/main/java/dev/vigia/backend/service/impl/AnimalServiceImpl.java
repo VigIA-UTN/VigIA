@@ -526,6 +526,14 @@ public class AnimalServiceImpl implements AnimalService {
 
                 LocalDateTime hace15Minutos = LocalDateTime.now().minusMinutes(15);
 
+                List<Long> caravanaIds = animales.stream()
+                                .filter(a -> a.getCaravana() != null)
+                                .map(a -> a.getCaravana().getId())
+                                .collect(Collectors.toList());
+                Map<Long, Telemetria> ultimaPorCaravana = caravanaIds.isEmpty() ? Map.of()
+                                : telemetriaRepository.findUltimaPorCaravana(caravanaIds).stream()
+                                                .collect(Collectors.toMap(t -> t.getCaravana().getId(), t -> t));
+
                 return animales.stream().map(animal -> {
                         AnimalMapaResponse.AnimalMapaResponseBuilder builder = AnimalMapaResponse.builder()
                                         .id(animal.getId())
@@ -536,18 +544,14 @@ public class AnimalServiceImpl implements AnimalService {
                                                 .diasRestantesCalibracion(calibracion.diasRestantes());
                         }
 
-                        if (animal.getCaravana() != null) {
-                                Optional<Telemetria> ultimaPos = telemetriaRepository
-                                                .findFirstByCaravanaOrderByFechaHoraDesc(animal.getCaravana());
-                                if (ultimaPos.isPresent()) {
-                                        Telemetria t = ultimaPos.get();
-                                        builder.latitud(t.getLatitud());
-                                        builder.longitud(t.getLongitud());
-                                        builder.tsUltimaPosicion(t.getFechaHora());
-                                        builder.sinDatosRecientes(t.getFechaHora().isBefore(hace15Minutos));
-                                } else {
-                                        builder.sinDatosRecientes(true);
-                                }
+                        Telemetria t = animal.getCaravana() != null
+                                        ? ultimaPorCaravana.get(animal.getCaravana().getId())
+                                        : null;
+                        if (t != null) {
+                                builder.latitud(t.getLatitud());
+                                builder.longitud(t.getLongitud());
+                                builder.tsUltimaPosicion(t.getFechaHora());
+                                builder.sinDatosRecientes(t.getFechaHora().isBefore(hace15Minutos));
                         } else {
                                 builder.sinDatosRecientes(true);
                         }
