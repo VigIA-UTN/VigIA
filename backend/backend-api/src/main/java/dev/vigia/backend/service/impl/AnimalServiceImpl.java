@@ -8,7 +8,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Comparator;
 import java.util.List;
 import java.util.HashMap;
@@ -55,6 +57,7 @@ import dev.vigia.backend.dto.IntervencionResponse;
 import dev.vigia.backend.dto.RegistroPesoRequest;
 import dev.vigia.backend.dto.RegistroPesoResponse;
 import dev.vigia.backend.model.Alerta;
+import dev.vigia.backend.model.AlertaAnimalAislado;
 import dev.vigia.backend.model.Animal;
 import dev.vigia.backend.model.DisparadorAlerta;
 import dev.vigia.backend.model.Establecimiento;
@@ -533,6 +536,9 @@ public class AnimalServiceImpl implements AnimalService {
                 Map<Long, Telemetria> ultimaPorCaravana = caravanaIds.isEmpty() ? Map.of()
                                 : telemetriaRepository.findUltimaPorCaravana(caravanaIds).stream()
                                                 .collect(Collectors.toMap(t -> t.getCaravana().getId(), t -> t));
+                Map<Long, List<Alerta>> alertasPorAnimal = alertasPendientesPorAnimal(
+                                animales.stream().map(Animal::getId).collect(Collectors.toList()));
+                Map<Long, List<AnimalAisladoResponse>> aisladosPorAlerta = animalesAisladosPorAlerta(alertasPorAnimal);
 
                 return animales.stream().map(animal -> {
                         AnimalMapaResponse.AnimalMapaResponseBuilder builder = AnimalMapaResponse.builder()
@@ -556,11 +562,9 @@ public class AnimalServiceImpl implements AnimalService {
                                 builder.sinDatosRecientes(true);
                         }
 
-                        List<Alerta> alertasAnimal = alertaRepository.alertasAnimalActivas(animal.getId());
-                        List<AlertaResponse> alertasAnimalResponse = alertasAnimal.stream()
-                                        .map(this::alertaToAlertaResponse)
-                                        .collect(Collectors.toList());
-                        builder.alertasAnimal(alertasAnimalResponse);
+                        builder.alertasAnimal(alertasPorAnimal.getOrDefault(animal.getId(), List.of()).stream()
+                                        .map(alerta -> alertaToAlertaResponse(alerta, aisladosPorAlerta))
+                                        .collect(Collectors.toList()));
 
                         return builder.build();
                 }).collect(Collectors.toList());
@@ -987,7 +991,8 @@ public class AnimalServiceImpl implements AnimalService {
                                 .build();
         }
 
-        private AlertaResponse alertaToAlertaResponse(Alerta alerta) {
+        private AlertaResponse alertaToAlertaResponse(Alerta alerta,
+                        Map<Long, List<AnimalAisladoResponse>> aisladosPorAlerta) {
                 boolean aplicaAviso = datoDesactualizadoEvaluator.aplica(alerta.getDisparador(), alerta.getTipo(),
                                 alerta.getEstado());
                 LocalDateTime ultimaSenial = aplicaAviso && alerta.getAnimal() != null
@@ -1010,17 +1015,55 @@ public class AnimalServiceImpl implements AnimalService {
                                                 ultimaSenial))
                                 .horasUmbralDatoDesactualizado(datoDesactualizadoEvaluator.getHorasUmbral())
                                 .animalesAislados(alerta.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL
-                                                ? animalesAislados(alerta)
+                                                ? aisladosPorAlerta.getOrDefault(alerta.getId(), List.of())
                                                 : null)
                                 .build();
         }
 
-        // ponytail: una consulta por alerta de aislamiento y por animal del mapa;
-        // cargarlas en lote si el mapa crece.
-        private List<AnimalAisladoResponse> animalesAislados(Alerta alerta) {
-                return alertaAnimalAisladoRepository.findByAlerta_IdOrderBySegundosFueraDesc(alerta.getId()).stream()
-                                .map(episodio -> AnimalAisladoResponse.from(episodio, alerta.getValorUmbral()))
-                                .toList();
+        /**
+         * Alertas pendientes de cada animal del mapa: las propias y las de aislamiento que lo listan (aunque ya haya
+         * vuelto), ALTA primero. Dos consultas para todo el listado.
+         */
+        private Map<Long, List<Alerta>> alertasPendientesPorAnimal(Collection<Long> animalIds) {
+                if (animalIds.isEmpty()) {
+                        return Map.of();
+                }
+                Map<Long, Map<Long, Alerta>> porAnimal = new HashMap<>();
+                for (Alerta alerta : alertaRepository.findPendientesDeAnimales(animalIds)) {
+                        porAnimal.computeIfAbsent(alerta.getAnimal().getId(), id -> new LinkedHashMap<>())
+                                        .put(alerta.getId(), alerta);
+                }
+                for (AlertaAnimalAislado listado : alertaAnimalAisladoRepository
+                                .findListadosEnAlertasPendientes(animalIds)) {
+                        porAnimal.computeIfAbsent(listado.getAnimal().getId(), id -> new LinkedHashMap<>())
+                                        .putIfAbsent(listado.getAlerta().getId(), listado.getAlerta());
+                }
+                Comparator<Alerta> porSeveridad = Comparator.comparingInt(a -> a.getSeveridad() == SeveridadAlerta.ALTA
+                                ? 1
+                                : a.getSeveridad() == SeveridadAlerta.MEDIA ? 2 : 3);
+                Map<Long, List<Alerta>> resultado = new HashMap<>();
+                porAnimal.forEach((animalId, alertas) -> resultado.put(animalId,
+                                alertas.values().stream().sorted(porSeveridad).toList()));
+                return resultado;
+        }
+
+        /** Animales aislados de cada alerta de aislamiento del mapa, en una sola consulta. */
+        private Map<Long, List<AnimalAisladoResponse>> animalesAisladosPorAlerta(
+                        Map<Long, List<Alerta>> alertasPorAnimal) {
+                Map<Long, Alerta> aislamientos = new HashMap<>();
+                alertasPorAnimal.values().forEach(alertas -> alertas.stream()
+                                .filter(a -> a.getDisparador() == DisparadorAlerta.AISLAMIENTO_SOCIAL)
+                                .forEach(a -> aislamientos.putIfAbsent(a.getId(), a)));
+                if (aislamientos.isEmpty()) {
+                        return Map.of();
+                }
+                return alertaAnimalAisladoRepository.findByAlerta_IdInOrderBySegundosFueraDesc(aislamientos.keySet())
+                                .stream()
+                                .collect(Collectors.groupingBy(episodio -> episodio.getAlerta().getId(),
+                                                Collectors.mapping(episodio -> AnimalAisladoResponse.from(episodio,
+                                                                aislamientos.get(episodio.getAlerta().getId())
+                                                                                .getValorUmbral()),
+                                                                Collectors.toList())));
         }
 
         @Override
