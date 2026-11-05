@@ -17,7 +17,7 @@ test.describe('H0014 - Callback OAuth2 (UI)', () => {
     await expect.poll(() => obtenerEstablecimientoSeleccionado(page)).toBe('Fixture A');
   });
 
-  test('H0014-02 - Callback con token del administrador', async ({ page, request }) => {
+  test('H0014-07 - Callback con token del administrador', async ({ page, request }) => {
     const usuario = obtenerUsuarioPorClave('admin');
     const token = await tokenPorClave(request, 'admin');
 
@@ -36,7 +36,7 @@ test.describe('H0014 - Callback OAuth2 (UI)', () => {
     await expect(page.getByRole('alert')).toContainText(error);
   });
 
-  test('H0014-04 - Callback sin token', async ({ page }) => {
+  test('H0014-08 - Callback sin token', async ({ page }) => {
     await page.goto('/oauth2/callback');
 
     await expect(page).toHaveURL(/\/login/);

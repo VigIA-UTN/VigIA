@@ -65,7 +65,7 @@ test.describe('H0002 - Login y sesión (UI)', () => {
     await expect(page.getByRole('alert')).toContainText(/bloqueada por múltiples intentos fallidos/i);
   });
 
-  test('H0002-04 - Cierre de sesión', async ({ page }) => {
+  test('H0002-11 - Cierre de sesión', async ({ page }) => {
     await loginPorRol(page, 'PRODUCTOR', { establecimiento: 'Fixture A' });
     await expect(page).toHaveURL(/\/dashboard/);
 
@@ -97,13 +97,15 @@ test.describe('H0002 - Login y sesión (UI)', () => {
     await expect(page.locator('#email')).toBeVisible();
   });
 
-  test('H0002-06 - Sesión cerrada por 60 minutos de inactividad', async ({ page }) => {
+  test('H0002-12 - Sesión cerrada por 60 minutos de inactividad', async ({ page }) => {
     await page.clock.install();
     await loginPorRol(page, 'CAMPERO', { establecimiento: 'Fixture A' });
     await expect(page).toHaveURL(/\/dashboard/);
 
-    // Con el dashboard ya montado, el timer de inactividad está corriendo.
-    await expect(page.locator('.dashboard-page')).toBeVisible();
+    // El timer se arma en un useEffect, que React corre después de pintar: ver .dashboard-page no alcanza, y si el reloj
+    // salta antes, el timer se arma después del salto y no vence. Los KPI dependen de datos que la app pide después de
+    // montar la ruta privada, así que cuando se ven el timer ya está corriendo.
+    await expect(page.getByText('Alertas pendientes')).toBeVisible();
     await page.clock.fastForward('01:01:00');
 
     await expect(page).toHaveURL(/\/login/, { timeout: 15000 });

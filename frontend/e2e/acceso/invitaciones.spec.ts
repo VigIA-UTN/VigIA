@@ -69,7 +69,7 @@ test.describe('H0034 - Invitaciones pendientes (UI)', () => {
     expect(await obtenerEstablecimientosDisponibles(page)).not.toContain('Fixture B');
   });
 
-  test('H0034-03 - Sin sesión - Aceptar desde el link del mail', async ({ page, request }) => {
+  test('H0034-05 - Sin sesión - Aceptar desde el link del mail', async ({ page, request }) => {
     const { usuario, invitacion } = await veterinarioInvitadoAB(request);
 
     await abrirLinkDelMailSinSesion(page, usuario);
@@ -79,7 +79,7 @@ test.describe('H0034 - Invitaciones pendientes (UI)', () => {
     await expect.poll(() => obtenerEstablecimientosDisponibles(page)).toContain('Fixture B');
   });
 
-  test('H0034-04 - Sin sesión - Rechazar desde el link del mail', async ({ page, request }) => {
+  test('H0034-06 - Sin sesión - Rechazar desde el link del mail', async ({ page, request }) => {
     const { usuario, invitacion } = await veterinarioInvitadoAB(request);
 
     await abrirLinkDelMailSinSesion(page, usuario);
