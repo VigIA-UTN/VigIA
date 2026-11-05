@@ -34,6 +34,8 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
+    /* El backend manda las fechas sin zona, en hora argentina: un navegador en UTC (el runner) las leería 3 h corridas. */
+    timezoneId: 'America/Argentina/Buenos_Aires',
     /* Recolecta trace en fallos para inspección posterior */
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
