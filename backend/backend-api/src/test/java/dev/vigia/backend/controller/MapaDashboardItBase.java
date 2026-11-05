@@ -122,6 +122,19 @@ abstract class MapaDashboardItBase extends GestionRodeoItBase {
                 Timestamp.valueOf(tsGeneracion.plusHours(6)), Timestamp.valueOf(tsGeneracion.plusHours(24)));
     }
 
+    /**
+     * Una alerta ya resuelta (CONFIRMADA o DESCARTADA) en {@code tsConfirmacion}. Se inserta resuelta porque una vez
+     * resuelta la base no deja cambiarle la resolución.
+     */
+    protected Long insertarAlertaResuelta(String establecimiento, String identificador, String tipo,
+            String disparador, String estado, LocalDateTime tsGeneracion, LocalDateTime tsConfirmacion) {
+        return jdbcTemplate.queryForObject("INSERT INTO alertas (animal_id, tipo, severidad, ts_generacion, disparador, "
+                        + "valor_umbral, valor_detectado, estado, ts_confirmacion) "
+                        + "VALUES (?, ?, 'MEDIA', ?, ?, 1.0, 1.0, ?, ?) RETURNING id",
+                Long.class, idAnimal(establecimiento, identificador), tipo, Timestamp.valueOf(tsGeneracion),
+                disparador, estado, Timestamp.valueOf(tsConfirmacion));
+    }
+
     /** Una alerta de anestro como la arma AnestroDetectorService: disparador CELO, sin ventana de inseminación. */
     protected Long insertarAnestro(String establecimiento, String identificador, String estado,
             LocalDateTime tsGeneracion) {
@@ -175,6 +188,14 @@ abstract class MapaDashboardItBase extends GestionRodeoItBase {
                         + "VALUES (?, ?, 'Intervención de prueba', ?, ?)",
                 idAnimal(establecimiento, identificador), idUsuario(email(claveInterventor)),
                 Timestamp.valueOf(fechaHora), tipo);
+    }
+
+    /** Rodeo nuevo del establecimiento, sin animales. */
+    protected Long crearRodeo(String establecimiento, String nombre, boolean activo) {
+        return jdbcTemplate.queryForObject("INSERT INTO rodeo_lote (establecimiento_id, nombre, activo, fecha_alta) "
+                        + "VALUES (?, ?, ?, ?) RETURNING id",
+                Long.class, idEstablecimiento(establecimiento), nombre, activo ? 1 : 0,
+                Timestamp.valueOf(ahora()));
     }
 
     /** Animal sin caravana en el Rodeo 1 del establecimiento, nacido en {@code nacimiento}. */
