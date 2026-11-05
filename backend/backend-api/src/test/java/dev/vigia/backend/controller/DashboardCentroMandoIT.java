@@ -119,7 +119,7 @@ class DashboardCentroMandoIT extends MapaDashboardItBase {
         insertarCelo(EST_A, "A-104", "Celo Detectado", "ARCHIVADA", ahora.minusDays(10));
         insertarCelo(EST_A, "A-105", "Celo Detectado", "VENCIDA", ahora.minusDays(20));
         insertarCelo(EST_A, "A-101", "Celo Detectado", "ARCHIVADA", ahora.minusDays(40));
-        insertarCelo(EST_A, "A-104", "Anestro", "ARCHIVADA", ahora.minusDays(5));
+        insertarAnestro(EST_A, "A-104", "ARCHIVADA", ahora.minusDays(5));
         insertarCelo(EST_A, "A-105", "Celo Detectado", "CONFIRMADA", ahora.minusDays(5));
 
         JsonNode cm = centroMando(Map.of());
@@ -175,11 +175,7 @@ class DashboardCentroMandoIT extends MapaDashboardItBase {
     @Test
     @DisplayName("H0043-06 - Centro de mando - Embudo reproductivo")
     void H0043_06_embudoReproductivo() throws Exception {
-        jdbcTemplate.update("INSERT INTO animales (establecimiento_id, rodeo_lote_id, id_caravana_oficial, alias, "
-                        + "fecha_nacimiento, raza, estado_actual, fecha_alta) "
-                        + "VALUES (?, ?, 'A-190', 'Vaquillona A', ?, 'Holando', 'ACTIVO', ?)",
-                idEstablecimiento(EST_A), idRodeo(EST_A, "Rodeo A1"),
-                java.sql.Date.valueOf(LocalDate.now().minusMonths(6)), java.sql.Date.valueOf(LocalDate.now()));
+        altaAnimalSinCaravana(EST_A, "A-190", LocalDate.now().minusMonths(6));
 
         JsonNode embudo = centroMando(Map.of()).get("embudo");
 

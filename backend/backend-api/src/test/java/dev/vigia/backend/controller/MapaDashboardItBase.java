@@ -1,10 +1,13 @@
 package dev.vigia.backend.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import dev.vigia.backend.model.Alerta;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
@@ -108,7 +111,7 @@ abstract class MapaDashboardItBase extends GestionRodeoItBase {
 
     /**
      * Una alerta de celo generada en {@code tsGeneracion}, con su ventana de inseminación de 6 a 24 h, como la arma
-     * CeloDetector. Con {@code tipo} "Anestro" es una alerta de anestro (mismo disparador, sin ventana que cuente).
+     * CeloDetector.
      */
     protected Long insertarCelo(String establecimiento, String identificador, String tipo, String estado,
             LocalDateTime tsGeneracion) {
@@ -117,6 +120,16 @@ abstract class MapaDashboardItBase extends GestionRodeoItBase {
                         + "VALUES (?, ?, 'ALTA', ?, 'CELO', 0.947, 0.95, ?, ?, ?, 0.95) RETURNING id",
                 Long.class, idAnimal(establecimiento, identificador), tipo, Timestamp.valueOf(tsGeneracion), estado,
                 Timestamp.valueOf(tsGeneracion.plusHours(6)), Timestamp.valueOf(tsGeneracion.plusHours(24)));
+    }
+
+    /** Una alerta de anestro como la arma AnestroDetectorService: disparador CELO, sin ventana de inseminación. */
+    protected Long insertarAnestro(String establecimiento, String identificador, String estado,
+            LocalDateTime tsGeneracion) {
+        return jdbcTemplate.queryForObject("INSERT INTO alertas (animal_id, tipo, severidad, ts_generacion, disparador, "
+                        + "valor_umbral, valor_detectado, estado) VALUES (?, ?, 'MEDIA', ?, 'CELO', 120.0, 150.0, ?) "
+                        + "RETURNING id",
+                Long.class, idAnimal(establecimiento, identificador), Alerta.TIPO_ANESTRO,
+                Timestamp.valueOf(tsGeneracion), estado);
     }
 
     // ── Estado del animal ────────────────────────────────────────────────────
@@ -134,6 +147,44 @@ abstract class MapaDashboardItBase extends GestionRodeoItBase {
     protected void ultimaSenial(String codigoCaravana, LocalDateTime ultima) {
         jdbcTemplate.update("UPDATE caravanas SET ultima_senial = ? WHERE codigo = ?", Timestamp.valueOf(ultima),
                 codigoCaravana);
+    }
+
+    /** Estado reproductivo cargado a mano, registrado en {@code registro}; las fechas pueden ser null. */
+    protected void estadoReproductivo(String establecimiento, String identificador, String estado, LocalDate parto,
+            LocalDate inseminacion, LocalDateTime registro) {
+        jdbcTemplate.update("INSERT INTO estados_reproductivos (animal_id, usuario_registro_id, estado, "
+                        + "fecha_ultimo_parto, fecha_ultima_inseminacion, origen, fecha_registro) "
+                        + "VALUES (?, ?, ?, ?, ?, 'MANUAL', ?)",
+                idAnimal(establecimiento, identificador), idUsuario(email("veterinarioA")), estado,
+                parto == null ? null : Date.valueOf(parto), inseminacion == null ? null : Date.valueOf(inseminacion),
+                Timestamp.valueOf(registro));
+    }
+
+    /** Estado de salud registrado por el veterinario en {@code registro}. */
+    protected void estadoSalud(String establecimiento, String identificador, String estado, LocalDateTime registro) {
+        jdbcTemplate.update("INSERT INTO estados_salud (animal_id, usuario_veterinario_id, fecha_revision, estado, "
+                        + "origen, fecha_registro) VALUES (?, ?, ?, ?, 'MANUAL', ?)",
+                idAnimal(establecimiento, identificador), idUsuario(email("veterinarioA")),
+                Date.valueOf(registro.toLocalDate()), estado, Timestamp.valueOf(registro));
+    }
+
+    /** Intervención sobre el animal (sin alerta), registrada por el usuario de esa clave en {@code fechaHora}. */
+    protected void intervencion(String establecimiento, String identificador, String tipo, String claveInterventor,
+            LocalDateTime fechaHora) {
+        jdbcTemplate.update("INSERT INTO intervenciones (animal_id, interventor_id, descripcion, fecha_hora, tipo) "
+                        + "VALUES (?, ?, 'Intervención de prueba', ?, ?)",
+                idAnimal(establecimiento, identificador), idUsuario(email(claveInterventor)),
+                Timestamp.valueOf(fechaHora), tipo);
+    }
+
+    /** Animal sin caravana en el Rodeo 1 del establecimiento, nacido en {@code nacimiento}. */
+    protected void altaAnimalSinCaravana(String establecimiento, String identificador, LocalDate nacimiento) {
+        String letra = establecimiento.substring(establecimiento.length() - 1);
+        jdbcTemplate.update("INSERT INTO animales (establecimiento_id, rodeo_lote_id, id_caravana_oficial, alias, "
+                        + "fecha_nacimiento, raza, estado_actual, fecha_alta) "
+                        + "VALUES (?, ?, ?, ?, ?, 'Holando', 'ACTIVO', ?)",
+                idEstablecimiento(establecimiento), idRodeo(establecimiento, "Rodeo " + letra + "1"), identificador,
+                "Animal " + identificador, Date.valueOf(nacimiento), Date.valueOf(LocalDate.now()));
     }
 
     /** Le saca la caravana al animal, sin tocar la caravana. */
