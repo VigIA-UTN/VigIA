@@ -2,10 +2,12 @@ package dev.vigia.backend.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,6 +104,55 @@ abstract class MapaDashboardItBase extends GestionRodeoItBase {
     protected Long idAlerta(String establecimiento, String identificador, String disparador) {
         return jdbcTemplate.queryForObject("SELECT id FROM alertas WHERE animal_id = ? AND disparador = ?",
                 Long.class, idAnimal(establecimiento, identificador), disparador);
+    }
+
+    /**
+     * Una alerta de celo generada en {@code tsGeneracion}, con su ventana de inseminación de 6 a 24 h, como la arma
+     * CeloDetector. Con {@code tipo} "Anestro" es una alerta de anestro (mismo disparador, sin ventana que cuente).
+     */
+    protected Long insertarCelo(String establecimiento, String identificador, String tipo, String estado,
+            LocalDateTime tsGeneracion) {
+        return jdbcTemplate.queryForObject("INSERT INTO alertas (animal_id, tipo, severidad, ts_generacion, disparador, "
+                        + "valor_umbral, valor_detectado, estado, ventana_inicio_ins, ventana_fin_ins, confianza_modelo) "
+                        + "VALUES (?, ?, 'ALTA', ?, 'CELO', 0.947, 0.95, ?, ?, ?, 0.95) RETURNING id",
+                Long.class, idAnimal(establecimiento, identificador), tipo, Timestamp.valueOf(tsGeneracion), estado,
+                Timestamp.valueOf(tsGeneracion.plusHours(6)), Timestamp.valueOf(tsGeneracion.plusHours(24)));
+    }
+
+    // ── Estado del animal ────────────────────────────────────────────────────
+
+    /** Perfil de salud calculado: el animal sale de calibración. */
+    protected void perfilSalud(String establecimiento, String identificador) {
+        jdbcTemplate.update("INSERT INTO perfiles_referencia (animal_id, perfil_json, fecha_calculo) VALUES (?, '{}', ?)",
+                idAnimal(establecimiento, identificador), Timestamp.valueOf(ahora().minusDays(1)));
+    }
+
+    protected void bateria(String codigoCaravana, double porcentaje) {
+        jdbcTemplate.update("UPDATE caravanas SET bateria = ? WHERE codigo = ?", porcentaje, codigoCaravana);
+    }
+
+    protected void ultimaSenial(String codigoCaravana, LocalDateTime ultima) {
+        jdbcTemplate.update("UPDATE caravanas SET ultima_senial = ? WHERE codigo = ?", Timestamp.valueOf(ultima),
+                codigoCaravana);
+    }
+
+    /** Le saca la caravana al animal, sin tocar la caravana. */
+    protected void sinCaravana(String establecimiento, String identificador) {
+        jdbcTemplate.update("UPDATE animales SET caravana_id = NULL WHERE id = ?",
+                idAnimal(establecimiento, identificador));
+    }
+
+    // ── Dashboard ────────────────────────────────────────────────────────────
+
+    /** GET de una pestaña del Dashboard ({@code centro-mando}, ...) con sus parámetros, verificando el 200. */
+    protected JsonNode dashboardOk(String clave, String establecimiento, String pestania, Map<String, Object> params)
+            throws Exception {
+        MockHttpServletRequestBuilder pedido = get("/api/v1/establecimientos/{id}/dashboard/" + pestania,
+                idEstablecimiento(establecimiento)).header("Authorization", bearer(clave));
+        params.forEach((nombre, valor) -> pedido.param(nombre, valor.toString()));
+        MvcResult resultado = mockMvc.perform(pedido).andReturn();
+        assertThat(resultado.getResponse().getStatus()).as(texto(resultado)).isEqualTo(200);
+        return leer(resultado);
     }
 
     /** Fecha y hora de la respuesta ({@code LocalDateTime} serializado por Jackson). */
