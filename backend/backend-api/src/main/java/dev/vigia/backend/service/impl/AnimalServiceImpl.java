@@ -377,15 +377,51 @@ public class AnimalServiceImpl implements AnimalService {
                 LocalDateTime desdeAsignacion = caravana.getFechaAsignacion() != null
                                 ? caravana.getFechaAsignacion().atStartOfDay()
                                 : LocalDate.EPOCH.atStartOfDay();
-                return telemetriaRepository
+                return calibracionEnCurso(telemetriaRepository
                                 .findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(caravana, desdeAsignacion)
-                                .map(primerDato -> {
-                                        LocalDate fin = primerDato.getFechaHora().plusDays(calibracionDias).toLocalDate();
-                                        // 0 también si ya pasó y el worker todavía no armó el perfil: "finaliza hoy"
-                                        return new Calibracion(true,
-                                                        (int) Math.max(0, ChronoUnit.DAYS.between(LocalDate.now(), fin)));
-                                })
-                                .orElse(new Calibracion(true, calibracionDias));
+                                .map(Telemetria::getFechaHora)
+                                .orElse(null));
+        }
+
+        /** Calibración en curso a partir del primer dato desde la asignación (null: la caravana todavía no transmitió). */
+        private Calibracion calibracionEnCurso(LocalDateTime primerDato) {
+                if (primerDato == null) {
+                        return new Calibracion(true, calibracionDias);
+                }
+                LocalDate fin = primerDato.plusDays(calibracionDias).toLocalDate();
+                // 0 también si ya pasó y el worker todavía no armó el perfil: "finaliza hoy"
+                return new Calibracion(true, (int) Math.max(0, ChronoUnit.DAYS.between(LocalDate.now(), fin)));
+        }
+
+        /**
+         * Mapa: la calibración de cada animal del listado, con la misma regla que {@link #calibracion(Animal)} pero
+         * en dos consultas. Los animales sin perfil ni caravana no quedan en el Map.
+         */
+        private Map<Long, Calibracion> calibracionPorAnimal(List<Animal> animales) {
+                if (animales.isEmpty()) {
+                        return Map.of();
+                }
+                Set<Long> conPerfil = perfilReferenciaRepository.findAnimalIdsConPerfil(
+                                animales.stream().map(Animal::getId).collect(Collectors.toList()));
+                List<Long> caravanasCalibrando = animales.stream()
+                                .filter(a -> !conPerfil.contains(a.getId()) && a.getCaravana() != null)
+                                .map(a -> a.getCaravana().getId())
+                                .collect(Collectors.toList());
+                Map<Long, LocalDateTime> primerDatoPorCaravana = caravanasCalibrando.isEmpty() ? Map.of()
+                                : telemetriaRepository.findPrimerDatoDesdeAsignacion(caravanasCalibrando).stream()
+                                                .collect(Collectors.toMap(TelemetriaRepository.PrimerDato::getCaravanaId,
+                                                                TelemetriaRepository.PrimerDato::getFechaHora));
+
+                Map<Long, Calibracion> resultado = new HashMap<>();
+                for (Animal animal : animales) {
+                        if (conPerfil.contains(animal.getId())) {
+                                resultado.put(animal.getId(), new Calibracion(false, 0));
+                        } else if (animal.getCaravana() != null) {
+                                resultado.put(animal.getId(), calibracionEnCurso(
+                                                primerDatoPorCaravana.get(animal.getCaravana().getId())));
+                        }
+                }
+                return resultado;
         }
 
         private AnimalResponse mapToResponse(Animal animal) {
@@ -536,6 +572,7 @@ public class AnimalServiceImpl implements AnimalService {
                 Map<Long, Telemetria> ultimaPorCaravana = caravanaIds.isEmpty() ? Map.of()
                                 : telemetriaRepository.findUltimaPorCaravana(caravanaIds).stream()
                                                 .collect(Collectors.toMap(t -> t.getCaravana().getId(), t -> t));
+                Map<Long, Calibracion> calibracionPorAnimal = calibracionPorAnimal(animales);
                 Map<Long, List<Alerta>> alertasPorAnimal = alertasPendientesPorAnimal(
                                 animales.stream().map(Animal::getId).collect(Collectors.toList()));
                 Map<Long, List<AnimalAisladoResponse>> aisladosPorAlerta = animalesAisladosPorAlerta(alertasPorAnimal);
@@ -544,7 +581,7 @@ public class AnimalServiceImpl implements AnimalService {
                         AnimalMapaResponse.AnimalMapaResponseBuilder builder = AnimalMapaResponse.builder()
                                         .id(animal.getId())
                                         .identificador(animal.getIdCaravanaOficial());
-                        Calibracion calibracion = calibracion(animal);
+                        Calibracion calibracion = calibracionPorAnimal.get(animal.getId());
                         if (calibracion != null) {
                                 builder.enCalibracion(calibracion.enCurso())
                                                 .diasRestantesCalibracion(calibracion.diasRestantes());

@@ -47,6 +47,23 @@ public interface TelemetriaRepository extends JpaRepository<Telemetria, Long> {
         Optional<Telemetria> findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc(
                         Caravana caravana, LocalDateTime desde);
 
+        /**
+         * Mapa: primer dato de cada caravana desde el día en que se asignó (donde empieza la calibración de salud),
+         * en una consulta. Misma regla que {@link #findFirstByCaravanaAndFechaHoraGreaterThanEqualOrderByFechaHoraAsc}.
+         */
+        @Query(value = "SELECT DISTINCT ON (t.caravana_id) t.caravana_id AS caravanaId, t.fecha_hora AS fechaHora "
+                        + "FROM telemetria t JOIN caravanas c ON c.id = t.caravana_id "
+                        + "WHERE t.caravana_id IN (:caravanaIds) "
+                        + "AND t.fecha_hora >= COALESCE(CAST(c.fecha_asignacion AS TIMESTAMP), TIMESTAMP '1970-01-01 00:00:00') "
+                        + "ORDER BY t.caravana_id, t.fecha_hora ASC", nativeQuery = true)
+        List<PrimerDato> findPrimerDatoDesdeAsignacion(@Param("caravanaIds") Collection<Long> caravanaIds);
+
+        interface PrimerDato {
+                Long getCaravanaId();
+
+                LocalDateTime getFechaHora();
+        }
+
         List<Telemetria> findByCaravanaAndFechaHoraBetweenOrderByFechaHoraAsc(
                         Caravana caravana, LocalDateTime desde, LocalDateTime hasta);
 
