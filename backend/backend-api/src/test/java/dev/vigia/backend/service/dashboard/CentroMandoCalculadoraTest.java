@@ -125,7 +125,8 @@ class CentroMandoCalculadoraTest {
         assertThat(r.getAlertasPendientes().getCelo()).isEqualTo(2);
         assertThat(r.getAlertasPendientes().getSalud()).isEqualTo(1);
         assertThat(r.getAlertasPendientes().getPerimetro()).isEqualTo(1);
-        assertThat(r.getVentanasAbiertas().getTotal()).isEqualTo(2);
+        // La FUTURA de la alerta 11 todavía no abrió: no cuenta como abierta.
+        assertThat(r.getVentanasAbiertas().getTotal()).isEqualTo(1);
         assertThat(r.getVentanasAbiertas().getPorVencer()).isEqualTo(1);
         assertThat(r.getBajoObservacion().getTotal()).isEqualTo(2);
         assertThat(r.getBajoObservacion().getEnfermos()).isEqualTo(1);
@@ -139,17 +140,20 @@ class CentroMandoCalculadoraTest {
     class Cola {
 
         @Test
-        @DisplayName("Celos por tiempo restante de su ventana, después perímetro, después el resto por severidad")
+        @DisplayName("Celos por tiempo restante de su ventana, después perímetro, después el resto por severidad; "
+                + "en cada grupo, la más antigua primero")
         void ordenPorUrgencia() {
-            List<AnimalDashboard> animales = List.of(vaca(1), vaca(2), vaca(3), vaca(4), vaca(5), vaca(6));
+            List<AnimalDashboard> animales = List.of(vaca(1), vaca(2), vaca(3), vaca(4), vaca(5), vaca(6), vaca(7));
             List<AlertaResponse> pendientes = List.of(
                     alerta(10, 1, DisparadorAlerta.SALUD, "BAJA", AHORA.minusHours(30)),
                     alerta(11, 2, DisparadorAlerta.SALUD, "ALTA", AHORA.minusHours(3)),
                     alerta(12, 3, DisparadorAlerta.FUERA_DE_PERIMETRO, "ALTA", AHORA.minusHours(2)),
                     alerta(13, 4, DisparadorAlerta.CELO, "ALTA", AHORA.minusHours(12)),
                     alerta(14, 5, DisparadorAlerta.CELO, "ALTA", AHORA.minusHours(20)),
-                    // Celo con la ventana por abrir: va con el resto, por severidad.
-                    alerta(15, 6, DisparadorAlerta.CELO, "ALTA", AHORA.minusHours(1)));
+                    // Celo con la ventana por abrir: va con el resto, por severidad y antigüedad.
+                    alerta(15, 6, DisparadorAlerta.CELO, "ALTA", AHORA.minusHours(1)),
+                    // En perímetro no pesa la severidad: la que está afuera hace más tiempo va antes.
+                    alerta(16, 7, DisparadorAlerta.FUERA_DE_PERIMETRO, "MEDIA", AHORA.minusHours(5)));
             Map<Long, VentanaInseminacionResponse> ventanas = Map.of(
                     13L, ventana("ACTIVA", 12 * 3600),
                     14L, ventana("ACTIVA", 4 * 3600),
@@ -157,7 +161,8 @@ class CentroMandoCalculadoraTest {
 
             List<ItemCola> cola = calcular(animales, pendientes, ventanas, List.of()).getCola();
 
-            assertThat(cola).extracting(i -> i.getAlerta().getId()).containsExactly(14L, 13L, 12L, 15L, 11L, 10L);
+            assertThat(cola).extracting(i -> i.getAlerta().getId())
+                    .containsExactly(14L, 13L, 16L, 12L, 11L, 15L, 10L);
             assertThat(cola.get(0).getVentana().getTiempoRestanteSegundos()).isEqualTo(4 * 3600);
             assertThat(cola.get(0).getAnimal().getIdCaravanaOficial()).isEqualTo("A-5");
             assertThat(cola.get(2).getVentana()).isNull();
@@ -197,8 +202,9 @@ class CentroMandoCalculadoraTest {
 
             List<ItemCola> cola = calcular(List.of(), pendientes, Map.of(), List.of()).getCola();
 
-            assertThat(cola).hasSize(8);
-            assertThat(cola.get(0).getAlerta().getId()).isEqualTo(1L);
+            // Quedan las 8 más antiguas: afuera las de hace 1 y 2 h.
+            assertThat(cola).extracting(i -> i.getAlerta().getId())
+                    .containsExactly(10L, 9L, 8L, 7L, 6L, 5L, 4L, 3L);
             assertThat(cola.get(0).getAnimal()).isNull();
         }
     }
@@ -223,7 +229,8 @@ class CentroMandoCalculadoraTest {
         CentroMandoResponse r = calcular(animales, pendientes, ventanas, List.of());
 
         assertThat(r.getVentanas()).extracting(v -> v.getAlerta().getId()).containsExactly(12L, 11L, 10L);
-        assertThat(r.getVentanasAbiertas().getTotal()).isEqualTo(3);
+        // La lista incluye la por abrir; el indicador cuenta solo las dos abiertas.
+        assertThat(r.getVentanasAbiertas().getTotal()).isEqualTo(2);
     }
 
     @Test
