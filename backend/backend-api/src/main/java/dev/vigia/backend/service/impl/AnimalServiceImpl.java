@@ -69,6 +69,7 @@ import dev.vigia.backend.model.PerfilReferencia;
 import dev.vigia.backend.model.RegistroCohesion;
 import dev.vigia.backend.model.EstadoSalud;
 import dev.vigia.backend.model.Intervencion;
+import dev.vigia.backend.model.TipoEstadoSalud;
 import dev.vigia.backend.model.TipoIntervencion;
 import dev.vigia.backend.model.RegistroPeso;
 import dev.vigia.backend.model.RodeoLote;
@@ -394,7 +395,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         /**
-         * Mapa: la calibración de cada animal del listado, con la misma regla que {@link #calibracion(Animal)} pero
+         * Listado y mapa: la calibración de cada animal, con la misma regla que {@link #calibracion(Animal)} pero
          * en dos consultas. Los animales sin perfil ni caravana no quedan en el Map.
          */
         private Map<Long, Calibracion> calibracionPorAnimal(List<Animal> animales) {
@@ -425,11 +426,34 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         private AnimalResponse mapToResponse(Animal animal) {
-                EstadoReproductivo ultimoEstado = animal.getEstadosReproductivos().stream()
+                EstadoSalud ultimoEstadoSalud = animal.getEstadosSalud().stream()
                                 .findFirst()
                                 .orElse(null);
+                return mapToResponse(animal, ultimoEstadoSalud != null ? ultimoEstadoSalud.getEstado() : null,
+                                calibracion(animal));
+        }
 
-                EstadoSalud ultimoEstadoSalud = animal.getEstadosSalud().stream()
+        /**
+         * Listado: arma todos los animales con dos consultas más (estado de salud actual y primer dato de las
+         * caravanas que calibran). Espera los animales como los trae el listado, con lote, caravana, perfil y estados
+         * reproductivos cargados.
+         */
+        private List<AnimalResponse> mapToResponses(List<Animal> animales) {
+                Map<Long, TipoEstadoSalud> saludPorAnimal = new HashMap<>();
+                if (!animales.isEmpty()) {
+                        estadoSaludRepository.findUltimoPorAnimal(animales.stream().map(Animal::getId).toList())
+                                        .forEach(e -> saludPorAnimal.put(e.getAnimalId(),
+                                                        TipoEstadoSalud.valueOf(e.getEstado())));
+                }
+                Map<Long, Calibracion> calibracionPorAnimal = calibracionPorAnimal(animales);
+                return animales.stream()
+                                .map(a -> mapToResponse(a, saludPorAnimal.get(a.getId()),
+                                                calibracionPorAnimal.get(a.getId())))
+                                .collect(Collectors.toList());
+        }
+
+        private AnimalResponse mapToResponse(Animal animal, TipoEstadoSalud estadoSalud, Calibracion calibracion) {
+                EstadoReproductivo ultimoEstado = animal.getEstadosReproductivos().stream()
                                 .findFirst()
                                 .orElse(null);
 
@@ -452,7 +476,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .fechaUltimoParto(ultimoEstado != null ? ultimoEstado.getFechaUltParto() : null)
                                 .fechaUltimaInseminacion(
                                                 ultimoEstado != null ? ultimoEstado.getFechaUltInseminacion() : null)
-                                .estadoSalud(ultimoEstadoSalud != null ? ultimoEstadoSalud.getEstado() : null);
+                                .estadoSalud(estadoSalud);
 
                 if (animal.getCaravana() != null) {
                         Caravana c = animal.getCaravana();
@@ -465,7 +489,6 @@ public class AnimalServiceImpl implements AnimalService {
                                         .caravanaBateria(c.getBateria());
                 }
 
-                Calibracion calibracion = calibracion(animal);
                 if (calibracion != null) {
                         builder.enCalibracion(calibracion.enCurso())
                                         .diasRestantesCalibracion(calibracion.diasRestantes());
@@ -482,10 +505,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
                 if (usuario.getRol().equals(Rol.ADMINISTRADOR)) {
-                        return animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO)
-                                        .stream()
-                                        .map(this::mapToResponse)
-                                        .collect(Collectors.toList());
+                        return mapToResponses(animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO));
                 }
 
                 List<Establecimiento> establecimientos = establecimientoRepository
@@ -503,23 +523,17 @@ public class AnimalServiceImpl implements AnimalService {
                                 throw new org.springframework.security.access.AccessDeniedException(
                                                 "No tiene acceso a este establecimiento");
                         }
-                        return animalRepository
+                        return mapToResponses(animalRepository
                                         .findByEstablecimientoIdInAndEstadoActualNot(List.of(establecimientoId),
-                                                        EstadoAnimal.INACTIVO)
-                                        .stream()
-                                        .map(this::mapToResponse)
-                                        .collect(Collectors.toList());
+                                                        EstadoAnimal.INACTIVO));
                 }
 
                 List<Long> establecimientoIds = establecimientos.stream()
                                 .map(Establecimiento::getId)
                                 .collect(Collectors.toList());
 
-                return animalRepository
-                                .findByEstablecimientoIdInAndEstadoActualNot(establecimientoIds, EstadoAnimal.INACTIVO)
-                                .stream()
-                                .map(this::mapToResponse)
-                                .collect(Collectors.toList());
+                return mapToResponses(animalRepository
+                                .findByEstablecimientoIdInAndEstadoActualNot(establecimientoIds, EstadoAnimal.INACTIVO));
         }
 
         @Override

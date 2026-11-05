@@ -17,11 +17,16 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
 
     List<Animal> findByRodeoLoteId(Long rodeoLoteId);
 
-    @EntityGraph(attributePaths = { "rodeoLote", "estadosReproductivos", "caravana" })
+    /**
+     * Listado y mapa. perfilReferencia va en el join porque, del lado mappedBy del OneToOne, Hibernate lo carga
+     * igual con una consulta por animal.
+     */
+    @EntityGraph(attributePaths = { "rodeoLote", "estadosReproductivos", "caravana", "perfilReferencia" })
     List<Animal> findByEstablecimientoIdInAndEstadoActualNot(
             List<Long> establecimientoIds, EstadoAnimal estadoActual);
 
-    @EntityGraph(attributePaths = { "rodeoLote", "estadosReproductivos", "caravana" })
+    /** Listado y mapa del administrador: mismo grafo que {@link #findByEstablecimientoIdInAndEstadoActualNot}. */
+    @EntityGraph(attributePaths = { "rodeoLote", "estadosReproductivos", "caravana", "perfilReferencia" })
     List<Animal> findByEstadoActualNot(EstadoAnimal estadoActual);
 
     /**
