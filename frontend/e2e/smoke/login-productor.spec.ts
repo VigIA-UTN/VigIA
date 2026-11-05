@@ -7,7 +7,7 @@ import {
 } from '../helpers';
 
 test.describe('Humo - Autenticación y navegación básica', () => {
-  test('login de Productor y llegada al Dashboard', async ({ page }) => {
+  test('H0002-01 - Humo - Login de Productor y llegada al Dashboard', async ({ page }) => {
     // 1. Iniciar sesión como Productor usando credenciales del escenario
     const usuario = await loginPorRol(page, 'PRODUCTOR');
     expect(usuario.rol).toBe('PRODUCTOR');
@@ -24,7 +24,7 @@ test.describe('Humo - Autenticación y navegación básica', () => {
     expect(usuario.establecimientos).toContain(establecimientoActual);
   });
 
-  test('productor con múltiples campos puede alternar de establecimiento', async ({ page }) => {
+  test('H0035-01 - Humo - Productor con múltiples campos puede alternar de establecimiento', async ({ page }) => {
     // ProductorAmbos tiene asignados "Fixture A" y "Fixture B"
     const usuario = await loginPorClave(page, 'productorAmbos');
     expect(usuario.establecimientos).toContain('Fixture A');

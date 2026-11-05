@@ -114,7 +114,7 @@ test.describe('H0032 - Alta de productor (UI)', () => {
     await expect(page.getByRole('link', { name: email })).toBeVisible();
   });
 
-  test('H0032-02 - Invitar a un productor que ya pertenece al establecimiento', async ({ page }) => {
+  test('H0032-03 - Invitar a un productor que ya pertenece al establecimiento', async ({ page }) => {
     await loginPorRol(page, 'ADMINISTRADOR');
     await page.goto('/invitaciones');
 
@@ -128,7 +128,7 @@ test.describe('H0032 - Alta de productor (UI)', () => {
 });
 
 test.describe('H0036 - Activación y desactivación de usuarios (UI)', () => {
-  test('H0036-01 - El administrador desactiva y reactiva un usuario', async ({ page, request }) => {
+  test('H0036-02 - El administrador desactiva y reactiva un usuario', async ({ page, request }) => {
     // Flujo largo (tres inicios de sesión): más tiempo que el default de 30 s.
     test.setTimeout(90_000);
     const usuario = await crearEmpleado(request, 'productorA', 'Fixture A', 'CAMPERO');

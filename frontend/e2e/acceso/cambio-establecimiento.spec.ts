@@ -19,7 +19,7 @@ test.describe('H0035 - Cambio de establecimiento activo (UI)', () => {
     await expect(page.getByText('A-101', { exact: true })).toHaveCount(0);
   });
 
-  test('H0035-02 - El establecimiento elegido se mantiene al recargar y al navegar', async ({ page }) => {
+  test('H0035-06 - El establecimiento elegido se mantiene al recargar y al navegar', async ({ page }) => {
     await loginPorClave(page, 'productorAmbos');
     await seleccionarEstablecimiento(page, 'Fixture B');
 

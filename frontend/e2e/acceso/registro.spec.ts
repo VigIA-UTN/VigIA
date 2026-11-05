@@ -45,7 +45,7 @@ test.describe('H0001 - Registro por invitación (UI)', () => {
     await expect(page).toHaveURL(/\/dashboard/);
   });
 
-  test('H0001-03 - Link de invitación ya usado o inexistente', async ({ page, request }) => {
+  test('H0001-04 - Link de invitación ya usado o inexistente', async ({ page, request }) => {
     const invitacion = await invitarEmpleado(request, 'productorA', 'Fixture A', 'VETERINARIO');
     const registro = await request.post('/api/v1/auth/register', {
       data: { nombre: 'Ya', apellido: 'Usado', password: PASSWORD_E2E, token: invitacion.token },
@@ -62,7 +62,7 @@ test.describe('H0001 - Registro por invitación (UI)', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('H0001-04 - Contraseña que no cumple las reglas', async ({ page, request }) => {
+  test('H0001-06 - Contraseña que no cumple las reglas', async ({ page, request }) => {
     const invitacion = await invitarEmpleado(request, 'productorA', 'Fixture A', 'CAMPERO');
 
     await page.goto(`/aceptar-invitacion?token=${invitacion.token}`);
