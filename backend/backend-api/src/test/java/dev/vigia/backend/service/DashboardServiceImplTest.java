@@ -156,6 +156,41 @@ class DashboardServiceImplTest {
     }
 
     @Test
+    @DisplayName("Parto e inseminación salen del último registro que los tiene, aunque el estado actual no los traiga")
+    void fechasDelHistorial() {
+        miembro();
+        LocalDate hoy = LocalDate.now();
+        // Parida hace 60 días y después un POSIBLE_CELO automático, sin fechas.
+        Animal parida = animal(1L, rodeo1, true, true);
+        EstadoReproductivo posibleCelo = estado(TipoReproductivo.POSIBLE_CELO);
+        EstadoReproductivo parto = estado(TipoReproductivo.PARIDA);
+        parto.setFechaUltParto(hoy.minusDays(60));
+        parida.setEstadosReproductivos(new ArrayList<>(List.of(posibleCelo, parto)));
+        // Inseminada hace 263 días y después registrada como gestante sin repetir la fecha.
+        Animal gestante = animal(2L, rodeo1, true, true);
+        EstadoReproductivo diagnostico = estado(TipoReproductivo.GESTANTE);
+        EstadoReproductivo inseminacion = estado(TipoReproductivo.INSEMINADA);
+        inseminacion.setFechaUltInseminacion(hoy.minusDays(263));
+        EstadoReproductivo anterior = estado(TipoReproductivo.INSEMINADA);
+        anterior.setFechaUltInseminacion(hoy.minusDays(400));
+        gestante.setEstadosReproductivos(new ArrayList<>(List.of(diagnostico, inseminacion, anterior)));
+        when(animalRepository.findParaDashboardByEstablecimientoIdAndEstadoActualNot(EST, EstadoAnimal.INACTIVO))
+                .thenReturn(List.of(parida, gestante));
+        when(estadoSaludRepository.findUltimoPorAnimal(anyCollection())).thenReturn(List.of());
+        when(alertaService.listarAlertas(EMAIL, EST, null, null, EstadoAlerta.PENDIENTE)).thenReturn(List.of());
+        when(alertaRepository.findGeneradasDesde(eq(EST), any(), any())).thenReturn(List.of());
+
+        SaludReproduccionResponse r = service.saludReproduccion(EMAIL, EST, null, 30);
+
+        assertThat(r.getIndicadores().getVacasAbiertas()).isEqualTo(1);
+        assertThat(r.getIndicadores().getDiasAbiertosPromedio()).isBetween(60L, 61L);
+        assertThat(r.getEmbudo().getDistribucion().get("POSIBLE_CELO")).isEqualTo(1L);
+        // Parto a 283 días de la inseminación más reciente: en 20 días, la tercera semana.
+        assertThat(r.getPartos().getGestantesSinFecha()).isZero();
+        assertThat(r.getPartos().getSemanas().get(2).getAnimales()).extracting(a -> a.getId()).containsExactly(2L);
+    }
+
+    @Test
     @DisplayName("Arma cada animal con su estado actual y calcula las ventanas solo de los celos que la tienen")
     void armaAnimalesYVentanas() {
         miembro();

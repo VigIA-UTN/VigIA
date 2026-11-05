@@ -1148,10 +1148,10 @@
     display: block;
 }
 
-/* ── Strip de 4 KPIs ───────────────────────────────────────────── */
+/* ── Strip de 5 KPIs ───────────────────────────────────────────── */
 .dash-salud-kpi-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 14px;
     max-width: 1280px;
     margin: 0 auto 18px;
