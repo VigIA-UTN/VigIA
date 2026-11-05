@@ -89,6 +89,7 @@ public final class SaludReproduccionCalculadora {
                                 .count())
                         .celosSinAtender(ventanas.size())
                         .celosPorVencer(DashboardDatos.porVencer(ventanas, umbrales))
+                        .animalesEnCalibracion(animales.stream().filter(AnimalDashboard::enCalibracion).count())
                         .build())
                 .ventanas(ventanas)
                 .embudo(embudo(animales, embudo, anestros, umbrales, ahora))

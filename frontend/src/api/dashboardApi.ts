@@ -86,6 +86,7 @@ export interface SaludReproduccionResponse {
     saludSinAtender: number;
     celosSinAtender: number;
     celosPorVencer: number;
+    animalesEnCalibracion: number;
   };
   /** Abiertas primero, cada grupo por tiempo restante. */
   ventanas: VentanaAlerta[];

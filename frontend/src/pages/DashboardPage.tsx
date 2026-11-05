@@ -640,7 +640,7 @@ export default function DashboardPage() {
 
         return (
             <>
-                {/* ── STRIP DE 4 KPIs ────────────────────────────────────── */}
+                {/* ── STRIP DE 5 KPIs ────────────────────────────────────── */}
                 <div className="dash-salud-kpi-row">
                     <div className="dash-salud-kpi">
                         <span className="dash-salud-kpi-label">Días abiertos (promedio)</span>
@@ -676,6 +676,13 @@ export default function DashboardPage() {
                                 ? `${sr.indicadores.celosPorVencer} por vencer en < ${sr.umbrales.horasVentanaPorVencer}h`
                                 : 'sin urgencia inmediata'}
                         </span>
+                    </div>
+                    <div className="dash-salud-kpi">
+                        <span className="dash-salud-kpi-label">En calibración</span>
+                        <span className={`dash-salud-kpi-val ${sr.indicadores.animalesEnCalibracion === 0 ? 'dash-salud-kpi-muted' : ''}`}>
+                            {sr.indicadores.animalesEnCalibracion}
+                        </span>
+                        <span className="dash-salud-kpi-sub">sin perfil de salud: sus alertas sanitarias todavía no son confiables</span>
                     </div>
                 </div>
 

@@ -46,6 +46,13 @@ public final class CentroMandoCalculadora {
 
     static final String TIPO_CARAVANA = "CARAVANA";
 
+    private static final String ACTIVA = "ACTIVA";
+
+    // Grupos de la cola de atención, del más urgente al menos.
+    private static final int GRUPO_CELO_ABIERTO = 0;
+    private static final int GRUPO_PERIMETRO = 1;
+    private static final int GRUPO_RESTO = 2;
+
     private CentroMandoCalculadora() {
     }
 
@@ -68,8 +75,9 @@ public final class CentroMandoCalculadora {
                         .salud(contarTipo(pendientes, DisparadorAlerta.SALUD))
                         .perimetro(contarTipo(pendientes, DisparadorAlerta.FUERA_DE_PERIMETRO))
                         .build())
+                // La lista trae también las que están por abrir; el indicador cuenta solo las abiertas.
                 .ventanasAbiertas(VentanasAbiertas.builder()
-                        .total(ventanas.size())
+                        .total(ventanas.stream().filter(v -> ACTIVA.equals(v.getVentana().getEstado())).count())
                         .porVencer(DashboardDatos.porVencer(ventanas, umbrales))
                         .perdidasUltimos30Dias(ventanasPerdidas(generadas, ahora))
                         .build())
@@ -123,32 +131,37 @@ public final class CentroMandoCalculadora {
             }
         }
 
-        // Estable: a igual urgencia queda el orden de llegada (las pendientes, por severidad y antigüedad).
         return items.stream()
-                .sorted(Comparator.comparingDouble(item -> urgencia(item, ahora)))
+                .sorted(POR_URGENCIA)
                 .limit(umbrales.getColaMax())
                 .toList();
     }
 
     /**
-     * Menor es más urgente: primero los celos con la ventana abierta, por horas restantes; después las salidas de
-     * perímetro, por antigüedad; después el resto, por severidad y antigüedad.
+     * De la más urgente a la menos: primero los celos con la ventana abierta, por tiempo restante; después las salidas
+     * de perímetro; después el resto, por severidad. Dentro de cada grupo, la que espera hace más tiempo va antes (un
+     * celo con la ventana todavía cerrada no se puede atender: va con el resto).
      */
-    static double urgencia(ItemCola item, LocalDateTime ahora) {
-        AlertaResponse alerta = item.getAlerta();
+    static final Comparator<ItemCola> POR_URGENCIA = Comparator
+            .comparingInt(CentroMandoCalculadora::grupo)
+            .thenComparingLong(item -> grupo(item) == GRUPO_CELO_ABIERTO
+                    ? item.getVentana().getTiempoRestanteSegundos() : 0)
+            .thenComparingInt(item -> grupo(item) == GRUPO_RESTO ? severidad(item.getAlerta()) : 0)
+            .thenComparing(item -> item.getAlerta().getTsGeneracion(),
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+
+    private static int grupo(ItemCola item) {
+        String tipo = item.getAlerta().getTipo();
         VentanaInseminacionResponse ventana = item.getVentana();
-        if (DisparadorAlerta.CELO.name().equals(alerta.getTipo()) && ventana != null
-                && "ACTIVA".equals(ventana.getEstado())) {
-            return ventana.getTiempoRestanteSegundos() / 3600.0;
+        if (DisparadorAlerta.CELO.name().equals(tipo) && ventana != null && ACTIVA.equals(ventana.getEstado())) {
+            return GRUPO_CELO_ABIERTO;
         }
-        double antiguedad = alerta.getTsGeneracion() != null
-                ? DashboardDatos.horasDesde(alerta.getTsGeneracion(), ahora)
-                : 0;
-        if (DisparadorAlerta.FUERA_DE_PERIMETRO.name().equals(alerta.getTipo())) {
-            return 24 + antiguedad;
-        }
-        int severidad = "ALTA".equals(alerta.getSeveridad()) ? 0 : "MEDIA".equals(alerta.getSeveridad()) ? 1 : 2;
-        return 100 + severidad * 10 + antiguedad;
+        return DisparadorAlerta.FUERA_DE_PERIMETRO.name().equals(tipo) ? GRUPO_PERIMETRO : GRUPO_RESTO;
+    }
+
+    /** ALTA primero; sin severidad (la caravana que no transmite) cuenta como BAJA. */
+    private static int severidad(AlertaResponse alerta) {
+        return "ALTA".equals(alerta.getSeveridad()) ? 0 : "MEDIA".equals(alerta.getSeveridad()) ? 1 : 2;
     }
 
     /** Celos de los últimos 30 días cuya ventana se perdió (los anestros también se archivan, pero sin ventana). */
