@@ -119,6 +119,14 @@ class MatrizPermisosIT extends SeguridadItBase {
         m.add(ep("PUT", "/api/v1/establecimientos/{id}/aislamiento", "/api/v1/establecimientos/{estA}/aislamiento",
                 Set.of(P, V)));
 
+        // DashboardController: las tres pestañas, para los roles que ven el Dashboard.
+        m.add(ep("GET", "/api/v1/establecimientos/{id}/dashboard/centro-mando",
+                "/api/v1/establecimientos/{estA}/dashboard/centro-mando", Set.of(P, V, C)));
+        m.add(ep("GET", "/api/v1/establecimientos/{id}/dashboard/salud-reproduccion",
+                "/api/v1/establecimientos/{estA}/dashboard/salud-reproduccion", Set.of(P, V, C)));
+        m.add(ep("GET", "/api/v1/establecimientos/{id}/dashboard/resumen-ejecutivo",
+                "/api/v1/establecimientos/{estA}/dashboard/resumen-ejecutivo", Set.of(P, V, C)));
+
         // InvitacionController
         m.add(ep("POST", "/api/v1/invitaciones/productor", "/api/v1/invitaciones/productor", Set.of(A),
                 "{\"email\":\"" + emailUnico() + "\",\"establecimientoId\":{estA}}"));
