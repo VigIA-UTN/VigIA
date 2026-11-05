@@ -438,13 +438,13 @@ class AlertaControllerTest {
     }
 
     @Test
-    @DisplayName("Alerta inexistente → 400")
+    @DisplayName("Alerta inexistente → 404")
     @SuppressWarnings("null")
-    void actualizarAlerta_idInexistente_returns400() throws Exception {
+    void actualizarAlerta_idInexistente_returns404() throws Exception {
         mockMvc.perform(put("/api/v1/alertas/estado/{id}", 999999L)
                 .header("Authorization", "Bearer " + productorToken)
                 .param("estado", "CONFIRMADA"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound());
     }
 
     @Test

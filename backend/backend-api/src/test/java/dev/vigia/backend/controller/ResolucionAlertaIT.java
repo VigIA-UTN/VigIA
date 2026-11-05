@@ -200,8 +200,7 @@ class ResolucionAlertaIT extends CicloAlertasItBase {
         assertThat(estado(resolver("admin", celo, "CONFIRMADA", null))).isEqualTo(403);
         assertThat(estado(resolver("productorB", celo, "CONFIRMADA", null))).isEqualTo(403);
         assertThat(estado(resolver("veterinarioB", salud, "DESCARTADA", null))).isEqualTo(403);
-        // Una alerta que no existe es un error de la solicitud.
-        assertThat(estado(resolver("productorA", inexistente, "CONFIRMADA", null))).isEqualTo(400);
+        assertThat(estado(resolver("productorA", inexistente, "CONFIRMADA", null))).isEqualTo(404);
 
         // Ninguno de los rechazos tocó las alertas.
         assertThat(estadoEnBase(celo)).isEqualTo("PENDIENTE");

@@ -259,6 +259,9 @@ public class AlertaController {
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());
         } catch (IllegalArgumentException e) {
+            if ("Alerta no encontrada.".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
@@ -274,7 +277,8 @@ public class AlertaController {
      * @param notas          (opcional) notas asociadas al cambio de estado
      * @param authentication contexto de seguridad inyectado por Spring Security
      * @return 200 con la alerta actualizada, 400 si hay error, 403 si acceso
-     *         denegado, 409 si otro usuario ya la procesó
+     *         denegado, 404 si la alerta no existe, 409 si otro usuario ya la
+     *         procesó
      */
     @PutMapping("/estado/{id}")
     @PreAuthorize("hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
@@ -292,6 +296,9 @@ public class AlertaController {
         } catch (AlertaYaProcesadaException e) {
             return ResponseEntity.status(409).body(e.getMessage());
         } catch (IllegalArgumentException e) {
+            if ("Alerta no encontrada.".equals(e.getMessage())) {
+                return ResponseEntity.status(404).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

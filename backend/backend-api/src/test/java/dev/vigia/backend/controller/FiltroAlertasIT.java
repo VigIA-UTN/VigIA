@@ -138,7 +138,7 @@ class FiltroAlertasIT extends CicloAlertasItBase {
     }
 
     @Test
-    @DisplayName("H0011-05 - Filtros inválidos - Tipo o estado desconocidos y falta del establecimiento")
+    @DisplayName("H0011-05 - Filtros inválidos - Tipo, severidad o estado desconocidos y falta del establecimiento")
     void H0011_05_filtrosInvalidos() throws Exception {
         armarConjunto();
 
@@ -147,6 +147,10 @@ class FiltroAlertasIT extends CicloAlertasItBase {
         assertThat(estado(tipo)).as(texto(tipo)).isEqualTo(400);
         assertThat(texto(tipo)).contains("Tipo de alerta desconocido: inexistente");
         assertThat(estado(listar("productorA", EST_A, null, null, "RESUELTA"))).isEqualTo(400);
+        // Una severidad desconocida tampoco se ignora: devolvería todas las alertas sin avisar.
+        MvcResult severidad = listar("productorA", EST_A, null, "URGENTE", null);
+        assertThat(estado(severidad)).as(texto(severidad)).isEqualTo(400);
+        assertThat(texto(severidad)).contains("Severidad de alerta desconocida: URGENTE");
         // El establecimiento es obligatorio.
         assertThat(estado(mockMvc.perform(get("/api/v1/alertas").header("Authorization", bearer("productorA")))
                 .andReturn())).isEqualTo(400);
