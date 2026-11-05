@@ -531,12 +531,10 @@ public class AnimalServiceImpl implements AnimalService {
 
                 List<Animal> animales;
                 if (usuario.getRol().equals(Rol.ADMINISTRADOR)) {
-                        animales = animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO);
-                        if (establecimientoId != null) {
-                                animales = animales.stream()
-                                                .filter(a -> a.getEstablecimiento().getId().equals(establecimientoId))
-                                                .collect(Collectors.toList());
-                        }
+                        animales = establecimientoId != null
+                                        ? animalRepository.findByEstablecimientoIdInAndEstadoActualNot(
+                                                        List.of(establecimientoId), EstadoAnimal.INACTIVO)
+                                        : animalRepository.findByEstadoActualNot(EstadoAnimal.INACTIVO);
                 } else {
                         List<Establecimiento> establecimientos = establecimientoRepository
                                         .findActiveEstablecimientoByUsuarioEmail(emailUsuario);
