@@ -16,8 +16,12 @@ public interface EstadoSaludRepository extends JpaRepository<EstadoSalud, Long> 
 
     List<EstadoSalud> findByAnimalIdOrderByFechaRegistroDesc(Long animalId);
 
-    /** Estado de salud actual (el último registrado) de cada animal, en una sola consulta. */
-    @Query(value = "SELECT DISTINCT ON (animal_id) animal_id AS animalId, estado AS estado FROM estados_salud "
+    /**
+     * Estado de salud actual (el último registrado) de cada animal, en una sola consulta. fecha_registro y
+     * estado_salud_id van en el SELECT porque H2 (tests) exige las columnas del ORDER BY en un DISTINCT ON.
+     */
+    @Query(value = "SELECT DISTINCT ON (animal_id) animal_id AS animalId, estado AS estado, fecha_registro, "
+            + "estado_salud_id FROM estados_salud "
             + "WHERE animal_id IN (:animalIds) ORDER BY animal_id, fecha_registro DESC, estado_salud_id DESC",
             nativeQuery = true)
     List<UltimoEstadoSalud> findUltimoPorAnimal(@Param("animalIds") Collection<Long> animalIds);

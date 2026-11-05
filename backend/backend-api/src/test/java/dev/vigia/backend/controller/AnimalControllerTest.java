@@ -1577,6 +1577,40 @@ class AnimalControllerTest {
         }
 
         @Test
+        @DisplayName("GET /api/v1/animales/mapa - El administrador ve solo el establecimiento pedido, o todos sin filtro")
+        @SuppressWarnings("null")
+        void getPosicionesMapa_administrador_filtraPorEstablecimiento() throws Exception {
+                Long animalEst1Id = crearAnimal("Vaca Est 1", establecimientoId, rodeoLoteId);
+
+                Establecimiento est2 = new Establecimiento();
+                est2.setNombre("Estancia Admin");
+                est2.setActivo(true);
+                est2.setFechaAlta(LocalDate.now());
+                est2.setEmpleados(new ArrayList<>());
+                est2 = establecimientoRepository.save(est2);
+                RodeoLote rodeo2 = new RodeoLote(est2);
+                rodeo2.setNombre("Rodeo Admin");
+                rodeo2 = rodeoLoteRepository.save(rodeo2);
+                Animal animalEst2 = new Animal(est2, rodeo2);
+                animalEst2.setAlias("Vaca Est 2");
+                animalEst2.setEstadoActual(EstadoAnimal.ACTIVO);
+                animalRepository.save(animalEst2);
+
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .param("establecimientoId", est2.getId().toString())
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(1))
+                                .andExpect(jsonPath("$[0].id").value(animalEst2.getId()));
+
+                mockMvc.perform(get("/api/v1/animales/mapa")
+                                .header("Authorization", "Bearer " + adminToken))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[?(@.id == " + animalEst1Id + ")]").isNotEmpty())
+                                .andExpect(jsonPath("$[?(@.id == " + animalEst2.getId() + ")]").isNotEmpty());
+        }
+
+        @Test
         @DisplayName("GET /api/v1/animales/mapa - Animales con y sin alertas, orden por severidad")
         @SuppressWarnings("null")
         void getPosicionesMapa_conAlertas() throws Exception {
