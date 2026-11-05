@@ -106,6 +106,18 @@ class AccesoCruzadoIT extends SeguridadItBase {
         t.add(a("PUT", "/api/v1/establecimientos/{id}/aislamiento", "/api/v1/establecimientos/{estB}/aislamiento",
                 "{\"umbralAislamientoM\":150}"));
 
+        // Dashboard: el establecimiento de B, y un rodeo de B pedido dentro del establecimiento propio.
+        t.add(a("GET", "/api/v1/establecimientos/{id}/dashboard/centro-mando",
+                "/api/v1/establecimientos/{estB}/dashboard/centro-mando"));
+        t.add(a("GET", "/api/v1/establecimientos/{id}/dashboard/centro-mando",
+                "/api/v1/establecimientos/{estA}/dashboard/centro-mando?rodeoId={rodeoB}"));
+        t.add(a("GET", "/api/v1/establecimientos/{id}/dashboard/salud-reproduccion",
+                "/api/v1/establecimientos/{estB}/dashboard/salud-reproduccion"));
+        t.add(a("GET", "/api/v1/establecimientos/{id}/dashboard/salud-reproduccion",
+                "/api/v1/establecimientos/{estA}/dashboard/salud-reproduccion?rodeoId={rodeoB}"));
+        t.add(a("GET", "/api/v1/establecimientos/{id}/dashboard/resumen-ejecutivo",
+                "/api/v1/establecimientos/{estB}/dashboard/resumen-ejecutivo"));
+
         // Invitaciones
         t.add(a("POST", "/api/v1/invitaciones/empleado", "/api/v1/invitaciones/empleado",
                 "{\"email\":\"" + emailUnico() + "\",\"establecimientoId\":{estB},\"rol\":\"CAMPERO\"}"));
