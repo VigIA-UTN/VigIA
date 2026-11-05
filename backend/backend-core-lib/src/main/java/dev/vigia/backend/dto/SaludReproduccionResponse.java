@@ -50,6 +50,8 @@ public class SaludReproduccionResponse {
         /** Celos con ventana abierta o por abrir. */
         private long celosSinAtender;
         private long celosPorVencer;
+        /** Con caravana y todavía sin perfil de salud: sus alertas sanitarias no son confiables aún. */
+        private long animalesEnCalibracion;
     }
 
     @Data
