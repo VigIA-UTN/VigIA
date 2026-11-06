@@ -195,6 +195,9 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend
+        env:
+          # frontend/.env no está en git. Sin esta variable, los streams SSE piden /undefined/... y dan 404.
+          VITE_API_URL: http://localhost:8080/api/v1
         run: npm run test:e2e -- --project=${{ matrix.project }}
 
       - name: Dump Docker logs on failure
