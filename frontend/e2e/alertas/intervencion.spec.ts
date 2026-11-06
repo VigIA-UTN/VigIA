@@ -16,6 +16,10 @@ import {
  * celo e inseminación": la intervención es opcional, pero con tipo y descripción obligatorios si se registra.
  */
 test.describe('H0021 - Registrar intervención asociada a alerta (UI)', () => {
+  // El histórico y el panel cargan todas las alertas pendientes del establecimiento: con la base cargada de otros specs
+  // superan los 30 s por defecto.
+  test.describe.configure({ timeout: 60_000 });
+
   test('H0021-05 - Confirmar el celo y registrar la inseminación desde el panel del mapa', async ({ page, request }) => {
     const animal = await animalJoven(request);
     const alertaId = crearAlerta(animal.id, 'CELO');

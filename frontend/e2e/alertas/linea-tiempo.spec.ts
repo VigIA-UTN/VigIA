@@ -44,6 +44,10 @@ function nodos(page: Page) {
 }
 
 test.describe('H0024 - Línea de tiempo de alertas por animal (UI)', () => {
+  // El histórico y el panel cargan todas las alertas pendientes del establecimiento: con la base cargada de otros specs
+  // superan los 30 s por defecto.
+  test.describe.configure({ timeout: 60_000 });
+
   test('H0024-05 - Alertas, inseminaciones y estados del animal en orden cronológico', async ({ page, request }) => {
     const h = await armarHistorial(request);
     await loginPorClave(page, 'productorA');
