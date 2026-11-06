@@ -13,9 +13,9 @@ import { contextoRodeo, crearAnimal, type AnimalE2 } from './rodeo.helper';
  */
 
 /** Los timestamps de la base son hora local de Buenos Aires, como LocalDateTime.now() en la API y el worker. */
-const AHORA = "(now() AT TIME ZONE 'America/Argentina/Buenos_Aires')";
+export const AHORA = "(now() AT TIME ZONE 'America/Argentina/Buenos_Aires')";
 
-function sql(consulta: string): string {
+export function sql(consulta: string): string {
   const resultado = spawnSync(
     'docker',
     ['exec', '-i', 'vigia-db', 'psql', '-U', 'vigia_user', '-d', 'vigia', '-q', '-At', '-v', 'ON_ERROR_STOP=1'],

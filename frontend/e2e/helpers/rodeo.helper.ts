@@ -81,11 +81,11 @@ export async function darDeBajaCaravanaApi(request: APIRequestContext, ctx: Cont
   expect(respuesta.status(), await respuesta.text()).toBe(200);
 }
 
-/** Animal nuevo en el primer rodeo activo del establecimiento, con o sin caravana. */
+/** Animal nuevo, por defecto en el primer rodeo activo del establecimiento, con o sin caravana. */
 export async function crearAnimal(
   request: APIRequestContext,
   ctx: ContextoRodeo,
-  opciones: { caravanaId?: number; alias?: string } = {}
+  opciones: { caravanaId?: number; alias?: string; rodeoLoteId?: number; fechaNacimiento?: string } = {}
 ): Promise<AnimalE2> {
   const lotes = await request.get(`/api/v1/rodeo-lotes?establecimientoId=${ctx.establecimientoId}`, {
     headers: auth(ctx.tokenProductor),
@@ -100,9 +100,9 @@ export async function crearAnimal(
     data: {
       idCaravanaOficial,
       alias: opciones.alias ?? idCaravanaOficial,
-      fechaNacimiento: '2024-05-01',
+      fechaNacimiento: opciones.fechaNacimiento ?? '2024-05-01',
       raza: 'Holando',
-      rodeoLoteId: lote.id,
+      rodeoLoteId: opciones.rodeoLoteId ?? lote.id,
       estadoActual: 'ACTIVO',
       establecimientoId: ctx.establecimientoId,
       caravanaId: opciones.caravanaId,
