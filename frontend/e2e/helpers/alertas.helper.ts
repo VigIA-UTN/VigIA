@@ -129,3 +129,43 @@ export async function resolverPorApi(
   });
   expect(respuesta.status(), await respuesta.text()).toBe(200);
 }
+
+export interface IntervencionEnBase {
+  tipo: string;
+  descripcion: string;
+  /** Email de quien la registró. */
+  interventor: string;
+  /** Cuántas intervenciones tiene la alerta (la API admite una sola). */
+  cantidad: number;
+}
+
+/** La intervención registrada sobre la alerta; con ninguna, tipo, descripción e interventor vacíos y cantidad 0. */
+export function intervencionEnBase(alertaId: number): IntervencionEnBase {
+  const [tipo = '', descripcion = '', interventor = '', cantidad = '0'] = sql(
+    `SELECT coalesce(max(i.tipo), ''), coalesce(max(i.descripcion), ''), coalesce(max(u.email), ''), count(*)
+     FROM intervenciones i JOIN usuarios u ON u.id = i.interventor_id WHERE i.alerta_id = ${alertaId};`
+  ).split('|');
+  return { tipo, descripcion, interventor, cantidad: Number(cantidad) };
+}
+
+/** Registra una intervención sobre una alerta ya confirmada, por API. `fechaHora` en hora local ISO (sin zona). */
+export async function intervenirPorApi(
+  request: APIRequestContext,
+  alertaId: number,
+  datos: { tipo: string; descripcion: string; fechaHora?: string },
+  clave = 'veterinarioA'
+): Promise<void> {
+  const token = await tokenPorClave(request, clave);
+  const respuesta = await request.post(`/api/v1/alertas/intervenir/${alertaId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: datos,
+  });
+  expect(respuesta.status(), await respuesta.text()).toBe(200);
+}
+
+/** Fecha y hora local ISO (sin zona) de hace `horas`, como las manda y espera el backend. */
+export function haceHoras(horas: number): string {
+  const d = new Date(Date.now() - horas * 3600_000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
