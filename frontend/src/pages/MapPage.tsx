@@ -106,6 +106,7 @@ export default function MapPage() {
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [selectedAlertaMap, setSelectedAlertaMap] = useState<AlertaResponse | null>(null);
   const [animales, setAnimales] = useState<AnimalMapa[]>([]);
+  const [errorAnimales, setErrorAnimales] = useState(false);
   const [resumenAlertas, setResumenAlertas] = useState<AlertaResumenResponse | null>(null);
   const [selectedAnimalMap, setSelectedAnimalMap] = useState<AnimalMapa | null>(null);
   const [flyToTrigger, setFlyToTrigger] = useState<{ lat: number, lng: number, t: number } | null>(null);
@@ -185,23 +186,33 @@ export default function MapPage() {
   }, [selectedId]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchDatos = async () => {
       try {
-        if (selectedId) {
-          const animalesData = await getAnimalesMapa(selectedId);
-          setAnimales(animalesData);
-          const resumenData = await getResumenAlertas(selectedId);
-          setResumenAlertas(resumenData);
-        } else {
-          const animalesData = await getAnimalesMapa();
-          setAnimales(animalesData);
-          setResumenAlertas(null);
-        }
+        const animalesData = await getAnimalesMapa(selectedId ?? undefined);
+        if (!isMounted) return;
+        setAnimales(animalesData);
+        setErrorAnimales(false);
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching animales del mapa', err);
+        if (!isMounted) return;
+        // Sin esto quedarían a la vista los pines del establecimiento anterior
+        setAnimales([]);
+        setErrorAnimales(true);
+      }
+
+      try {
+        const resumenData = selectedId ? await getResumenAlertas(selectedId) : null;
+        if (isMounted) setResumenAlertas(resumenData);
+      } catch (err) {
+        console.error('Error fetching resumen de alertas', err);
+        if (isMounted) setResumenAlertas(null);
       }
     };
     fetchDatos();
+    return () => {
+      isMounted = false;
+    };
   }, [selectedId]);
 
   useEffect(() => {
@@ -739,6 +750,15 @@ export default function MapPage() {
               <h4 className="card-text mb-0 fw-bold" style={{ color: '#dc3545' }}>{resumenAlertas.geoespacial}</h4>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Sin este aviso, un error se ve igual que un establecimiento sin animales */}
+      {errorAnimales && (
+        <div className="mapa-error-animales">
+          <Alert variant="danger" className="mb-0">
+            No se pudieron cargar los animales del mapa. Recargá la página para reintentar.
+          </Alert>
         </div>
       )}
 
