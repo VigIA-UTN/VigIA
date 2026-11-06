@@ -99,6 +99,7 @@ test.describe('H0012 - Mapa de posiciones del rodeo (UI)', () => {
     await loginPorClave(page, 'productorB');
     await page.goto('/mapa');
 
+    await expect(page.getByText('No se pudieron cargar los animales del mapa. Recargá la página para reintentar.')).toBeVisible();
     await expect(page.locator('.leaflet-container')).toBeVisible();
     await expect(pines(page)).toHaveCount(0);
     await page.getByRole('button', { name: 'Alertas', exact: true }).click();
@@ -106,10 +107,6 @@ test.describe('H0012 - Mapa de posiciones del rodeo (UI)', () => {
   });
 
   test('H0012-12 - Con varios establecimientos solo se ven los animales del seleccionado', async ({ page, request }) => {
-    // Defecto abierto: la consulta sin filtro, si responde última, pisa a la del establecimiento seleccionado. Cuando
-    // esté corregido, este test empieza a pasar y test.fail() lo marca como error: hay que quitar esta línea.
-    test.fail();
-
     await loginPorClave(page, 'productorAmbos');
     // Sin selección guardada, como en el primer ingreso: el mapa arranca sin establecimiento y pide todos los animales.
     // Se borra antes de que cargue la app: en el Dashboard ya abierto, el store la volvería a guardar.
