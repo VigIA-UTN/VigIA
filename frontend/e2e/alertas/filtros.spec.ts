@@ -63,6 +63,10 @@ async function filasVisibles(page: Page, visibles: number[], ocultas: number[]) 
 }
 
 test.describe('H0011 - Filtrar alertas por tipo y severidad (UI)', () => {
+  // El histórico y el panel cargan todas las alertas pendientes del establecimiento: con la base cargada de otros specs
+  // superan los 30 s por defecto.
+  test.describe.configure({ timeout: 60_000 });
+
   test('H0011-07 - Histórico: filtro por tipo', async ({ page, request }) => {
     const c = await armarConjunto(request);
     await loginPorClave(page, 'productorA');

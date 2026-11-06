@@ -16,6 +16,10 @@ import {
  * origen") y la acción recomendada, y lo conserva cuando la alerta ya se resolvió.
  */
 test.describe('H0022 - Ver dato que disparó la alerta (UI)', () => {
+  // El histórico y el panel cargan todas las alertas pendientes del establecimiento: con la base cargada de otros specs
+  // superan los 30 s por defecto.
+  test.describe.configure({ timeout: 60_000 });
+
   test('H0022-04 - Celo: la confianza de la detección, la hora y la acción recomendada', async ({ page, request }) => {
     const animal = await animalJoven(request);
     crearAlerta(animal.id, 'CELO', {

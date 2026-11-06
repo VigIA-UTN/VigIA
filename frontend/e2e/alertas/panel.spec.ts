@@ -34,6 +34,10 @@ function posiciones(lista: number[], ...animales: number[]): number[] {
 }
 
 test.describe('H0028 - Panel de alertas ordenado por severidad (UI)', () => {
+  // El histórico y el panel cargan todas las alertas pendientes del establecimiento: con la base cargada de otros specs
+  // superan los 30 s por defecto.
+  test.describe.configure({ timeout: 60_000 });
+
   test('H0028-05 - Histórico: de la severidad más alta a la más baja y, a igual severidad, la más reciente', async ({
     page,
     request,
