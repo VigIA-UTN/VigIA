@@ -1,5 +1,6 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import { obtenerUsuarioPorClave } from '../fixtures/credenciales';
+import { tokenPorClave } from './api.helper';
 import { AHORA, sql } from './salud.helper';
 
 /**
@@ -89,4 +90,42 @@ export function tarjetaPanel(page: Page, animalId: number) {
 export async function abrirDetalleDesdePanel(page: Page, animalId: number): Promise<void> {
   await abrirPanelAlertas(page);
   await tarjetaPanel(page, animalId).click();
+}
+
+/**
+ * Alerta de aislamiento pendiente que lista a todos estos animales (el primero es el principal), como la deja el
+ * detector de cohesión: una sola alerta para el grupo, con un episodio abierto por animal.
+ */
+export function crearAlertaAislamiento(animalIds: number[], minutosAtras = 5): number {
+  const alertaId = Number(
+    sql(`INSERT INTO alertas (animal_id, tipo, severidad, ts_generacion, disparador, valor_umbral, valor_detectado,
+           estado, accion_recomendada)
+         VALUES (${animalIds[0]}, 'AISLAMIENTO_SOCIAL', 'ALTA', ${AHORA} - make_interval(mins => ${minutosAtras}),
+           'AISLAMIENTO_SOCIAL', 100, 280, 'PENDIENTE',
+           'Recorrer la zona y verificar el estado de los animales alejados del rodeo.')
+         RETURNING id;`)
+  );
+  const episodios = animalIds
+    .map(
+      (id, i) =>
+        `(${alertaId}, ${id}, ${3600 + i * 600}, ${280 + i * 10}, ${AHORA} - make_interval(mins => ${60 + i * 10}))`
+    )
+    .join(', ');
+  sql(`INSERT INTO alerta_animales_aislados (alerta_id, animal_id, segundos_fuera, distancia_grupo_m, ts_inicio)
+       VALUES ${episodios};`);
+  return alertaId;
+}
+
+/** Confirma o descarta la alerta por API con la sesión de un usuario del escenario (por defecto, el veterinario). */
+export async function resolverPorApi(
+  request: APIRequestContext,
+  alertaId: number,
+  estado: 'CONFIRMADA' | 'DESCARTADA',
+  clave = 'veterinarioA'
+): Promise<void> {
+  const token = await tokenPorClave(request, clave);
+  const respuesta = await request.put(`/api/v1/alertas/estado/${alertaId}?estado=${estado}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(respuesta.status(), await respuesta.text()).toBe(200);
 }
