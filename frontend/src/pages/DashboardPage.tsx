@@ -23,6 +23,7 @@ import type {
 import type { AnimalMapa } from '../api/animalesApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { determinarIcono } from '../utils/animalPins';
+import { valoresGrillaY } from '../utils/graficoTendencia';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
 import IntervencionFormPanel from '../components/IntervencionFormPanel';
 import './DashboardPage.css';
@@ -140,7 +141,7 @@ function TrendChart({ datos, semanas, tipos }: {
     };
 
     // Y grid
-    const gridVals = [0, Math.round(maxVal / 2), maxVal];
+    const gridVals = valoresGrillaY(maxVal);
 
     return (
         <>

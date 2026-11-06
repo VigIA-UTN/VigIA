@@ -88,6 +88,18 @@
   gap: 10px
 }
 
+/* Abajo al centro para no pisar los controles; deja pasar los clicks al mapa */
+.mapa-error-animales {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: max-content;
+  max-width: calc(100% - 120px);
+  pointer-events: none;
+}
+
 @media (max-width: 600px) {
   .resumen-alertas {
     flex-direction: column;
