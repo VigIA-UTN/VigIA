@@ -22,8 +22,9 @@ public class MlGeoClient {
     private final RestClient restClient;
 
     @Autowired
-    public MlGeoClient(@Value("${vigia.ml.geo-url}") String geoUrl, RestClient.Builder restClientBuilder) {
-        this(MlClientes.construir(restClientBuilder, geoUrl));
+    public MlGeoClient(@Value("${vigia.ml.geo-url}") String geoUrl,
+            @Value("${vigia.ml.geo-timeout-ms}") long timeoutMs, RestClient.Builder restClientBuilder) {
+        this(MlClientes.construir(restClientBuilder, geoUrl, timeoutMs));
     }
 
     /** Para tests: recibe un RestClient ya configurado (p. ej. atado a MockRestServiceServer). */

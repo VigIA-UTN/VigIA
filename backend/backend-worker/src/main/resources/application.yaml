@@ -43,6 +43,11 @@ vigia:
     celo-url: ${ML_CELO_URL}
     salud-url: ${ML_SALUD_URL}
     geo-url: ${ML_GEO_URL}
+    # Timeout de lectura de cada llamada. Medido con la CPU limitada a 0,5 vCPU, el p95 fue de ~800 ms en celo y de
+    # ~200 ms en salud. Geo recibe las posiciones de todo el rodeo y su tiempo crece con el tamaño del establecimiento.
+    celo-timeout-ms: ${VIGIA_ML_CELO_TIMEOUT_MS:2000}
+    salud-timeout-ms: ${VIGIA_ML_SALUD_TIMEOUT_MS:4000}
+    geo-timeout-ms: ${VIGIA_ML_GEO_TIMEOUT_MS:10000}
   batch:
     celo-rate: ${VIGIA_BATCH_CELO_RATE:60000}
     salud-rate: ${VIGIA_BATCH_SALUD_RATE:60000}

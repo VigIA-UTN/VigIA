@@ -11,20 +11,22 @@ import java.time.Duration;
 final class MlClientes {
 
     private static final Duration TIMEOUT_CONEXION = Duration.ofSeconds(2);
-    private static final Duration TIMEOUT_LECTURA = Duration.ofSeconds(10);
 
     private MlClientes() {
     }
 
-    /** RestClient con timeouts explícitos: sin ellos un microservicio colgado bloquea el scheduler. */
+    /**
+     * RestClient con timeouts explícitos: sin ellos un microservicio colgado bloquea el scheduler. El de lectura
+     * es propio de cada microservicio (vigia.ml.*-timeout-ms).
+     */
     @SuppressWarnings("null")
-    static RestClient construir(RestClient.Builder builder, String baseUrl) {
+    static RestClient construir(RestClient.Builder builder, String baseUrl, long timeoutLecturaMs) {
         return builder
                 .baseUrl(baseUrl)
                 .requestFactory(ClientHttpRequestFactories.get(
                         ClientHttpRequestFactorySettings.DEFAULTS
                                 .withConnectTimeout(TIMEOUT_CONEXION)
-                                .withReadTimeout(TIMEOUT_LECTURA)))
+                                .withReadTimeout(Duration.ofMillis(timeoutLecturaMs))))
                 .build();
     }
 

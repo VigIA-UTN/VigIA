@@ -24,8 +24,9 @@ public class MlSaludClient {
     private final RestClient restClient;
 
     @Autowired
-    public MlSaludClient(@Value("${vigia.ml.salud-url}") String saludUrl, RestClient.Builder restClientBuilder) {
-        this(MlClientes.construir(restClientBuilder, saludUrl));
+    public MlSaludClient(@Value("${vigia.ml.salud-url}") String saludUrl,
+            @Value("${vigia.ml.salud-timeout-ms}") long timeoutMs, RestClient.Builder restClientBuilder) {
+        this(MlClientes.construir(restClientBuilder, saludUrl, timeoutMs));
     }
 
     /** Para tests: recibe un RestClient ya configurado (p. ej. atado a MockRestServiceServer). */

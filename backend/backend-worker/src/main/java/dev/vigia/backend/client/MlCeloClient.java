@@ -23,8 +23,9 @@ public class MlCeloClient {
     private final RestClient restClient;
 
     @Autowired
-    public MlCeloClient(@Value("${vigia.ml.celo-url}") String celoUrl, RestClient.Builder restClientBuilder) {
-        this(MlClientes.construir(restClientBuilder, celoUrl));
+    public MlCeloClient(@Value("${vigia.ml.celo-url}") String celoUrl,
+            @Value("${vigia.ml.celo-timeout-ms}") long timeoutMs, RestClient.Builder restClientBuilder) {
+        this(MlClientes.construir(restClientBuilder, celoUrl, timeoutMs));
     }
 
     /** Para tests: recibe un RestClient ya configurado (p. ej. atado a MockRestServiceServer). */
