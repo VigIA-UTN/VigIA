@@ -47,6 +47,12 @@ cd ml-training/salud && python evaluar_final.py
 Sin argumentos, cada script evalúa el run más reciente de su `models/`. Se
 puede fijar el run con `--run-dir models/<run>`.
 
+Ojo: por defecto escriben en esta carpeta (`resultados_finales/`), que está
+versionada. Si solo querés verificar un reentrenamiento sin cambiar los
+resultados del informe, usá `--out-dir <carpeta temporal>`. `celo/evaluar_final.py`
+además acepta `--umbral-servicio` (default 0.947): si cambiaste `CELO_THRESHOLD`,
+pasalo, o la línea del modelo desplegado se calcula con el umbral equivocado.
+
 Los modelos productivos sí están versionados, dentro de cada microservicio
 (`ml-celo/app/models/`, `ml-salud/app/models/`). Los runs de entrenamiento
 con las 5 semillas **no se versionan** (`models/` está en `.gitignore`; el de

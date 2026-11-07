@@ -21,3 +21,70 @@ Ambos comparten:
 
 Si en algún momento se cambia la cadencia real de heartbeat, ver
 [`RUNBOOK_CAMBIO_HEARTBEAT.md`](RUNBOOK_CAMBIO_HEARTBEAT.md).
+
+## Reentrenar y reemplazar un modelo (RNF05)
+
+Resumen para alguien que no trabajó en ML. El detalle de cada pipeline está
+en su README; acá van los puntos donde es fácil trabarse.
+
+**Requisitos.** Python 3.11 (TensorFlow no tiene instalador para 3.13 o
+posterior), Docker Desktop encendido y JDK 17. Los datasets ya están
+versionados: para reentrenar **no** hace falta regenerarlos.
+
+**Entorno (una vez).** Desde `ml-training`:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Si PowerShell dice que la ejecución de scripts está deshabilitada, correr
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` y reintentar
+(o usar `cmd` con `.venv\Scripts\activate.bat`). Con el venv activo el prompt
+muestra `(.venv)`.
+
+**Cada pipeline se corre desde su propia carpeta**, porque las rutas
+(`--dataset-dir dataset`) son relativas, y tienen scripts distintos:
+
+| Modelo | Carpeta | Script | Despliegue al microservicio |
+|---|---|---|---|
+| Celo (LSTM) | `ml-training/celo` | `train_multiseed.py` | **Manual**: copiar archivos y actualizar `CELO_THRESHOLD` ([celo/README.md](celo/README.md) §5) |
+| Salud (RandomForest) | `ml-training/salud` | `train_model.py` | **Automático** a `ml-salud/app/models/` ([salud/README.md](salud/README.md)) |
+
+El entrenamiento de celo tarda varios minutos (5 semillas, en CPU). Mientras
+corre se imprime un aviso de TensorFlow (`use_unbounded_threadpool`, línea
+`E0000`): es inofensivo, se puede ignorar. Termina cuando aparece el
+`RESUMEN 5 CORRIDAS` y vuelve el prompt.
+
+**Verificar.**
+
+1. `python evaluar_final.py` en la carpeta del pipeline. Por defecto
+   **sobrescribe** `resultados_finales/`, que está versionado. Para probar sin
+   pisarlo: `--out-dir "$env:TEMP\eval_celo"`. En celo, además,
+   `--umbral-servicio <valor>` con el `CELO_THRESHOLD` real (default 0.947);
+   la línea "con CELO_THRESHOLD=…" del final solo es válida con el umbral correcto.
+   Mientras el modelo del microservicio no sea uno de los entrenados, el script
+   termina con `FALLA ... no coincide`: es lo esperado antes de copiarlo.
+2. Tests del microservicio: `pip install -r requirements.txt` dentro de
+   `ml-celo` (o `ml-salud`) y `pytest tests -q`. El venv de `ml-training`
+   no trae esas dependencias.
+3. Servicio con el modelo nuevo: desde `infra`, `docker compose up -d --build
+   ml-celo ml-salud` y `GET http://localhost:8001/health` (celo) o `:8002/health`
+   (salud) deben dar `model_loaded: true`. Si el contenedor ya estaba corriendo,
+   reiniciarlo (`docker compose restart ml-celo`): el modelo se carga al arrancar.
+4. Pipeline del backend: desde `backend`, `.\mvnw.cmd -B verify -pl backend-worker -am`
+   (no hace falta instalar Maven; requiere Docker). Ojo: estos `*IT` simulan los
+   ML (`MlSimulado`), así que pasan con cualquier modelo; para ver el modelo real
+   contra el worker hay que levantar el stack y usar `simulador/simulador_celo.py`
+   o `simulador_salud.py` (ver `docs/DESARROLLO.md`).
+
+**Comparar con los resultados publicados.** Los números publicados se generaron
+con scikit-learn 1.9.0 (ver `resultados_finales/README.md`). Con otras versiones
+(por ejemplo 1.9.1) el reentrenamiento da pesos y métricas distintos, aunque
+sigan cumpliendo el criterio de aceptación.
+
+**Antes de commitear**, `git status` no debe mostrar archivos de
+`ml-training/resultados_finales/` ni de `*/dataset/` (el reentrenamiento no
+los toca, salvo que se haya regenerado el dataset o corrido `evaluar_final.py`
+sin `--out-dir`), ni nada bajo `backend/`.

@@ -104,6 +104,8 @@ Para reproducir el entrenamiento, seguí estos pasos en tu terminal (estando den
    ```powershell
    ..\.venv\Scripts\Activate.ps1
    ```
+   Si el venv no existe todavía o PowerShell bloquea el script, ver
+   [`../README.md`](../README.md#reentrenar-y-reemplazar-un-modelo-rnf05).
 2. **Instalar dependencias (solo la primera vez):**
    ```powershell
    pip install -r ..\requirements.txt
