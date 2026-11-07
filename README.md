@@ -88,7 +88,7 @@ flowchart LR
 
 **Cada vaca se compara contra sí misma.** Una vaca naturalmente tranquila y una inquieta no pueden medirse con la misma vara. `ml-salud` construye un perfil de referencia por animal durante 7 días de calibración y evalúa cada día contra *ese* perfil, no contra el promedio del rodeo. El celo, en cambio, sí es un patrón poblacional, por eso usa otro modelo.
 
-**El sistema no se cae si el ML se cae.** Cada llamada a un microservicio pasa por **Resilience4j** (timeouts, reintentos, circuit breaker). Si `ml-celo` no responde, la telemetría queda marcada como `INFERENCIA_PENDIENTE` y se procesa en el próximo ciclo: no se pierde ningún dato.
+**El sistema no se cae si el ML se cae.** Cada llamada a un microservicio pasa por **Resilience4j** (timeouts, reintentos, circuit breaker). Si `ml-celo` no responde, la telemetría queda `PENDIENTE` y el próximo ciclo la vuelve a evaluar: no se pierde ningún dato.
 
 **Ingesta y consulta separadas.** El `backend-worker` recibe la telemetría y corre los jobs pesados; el `backend-api` atiende al usuario. Comparten entidades y lógica en `backend-core-lib`, pero escalan y se despliegan por separado.
 

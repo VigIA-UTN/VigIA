@@ -106,7 +106,8 @@ resilience4j:
           - org.springframework.web.client.HttpClientErrorException
   # Un solo reintento, y solo ante fallas pasajeras: 503, 504, timeout o servicio inalcanzable (ver FallaTransitoriaMl).
   # Un 500 o un 4xx darían lo mismo al repetirlos, y con el circuito abierto repetir solo suma la espera. Todo lo que
-  # no se reintenta va directo al fallback.
+  # no se reintenta va directo al fallback, y si el servicio está degradado la telemetría queda PENDIENTE para el
+  # próximo ciclo del batch.
   retry:
     instances:
       celoML:

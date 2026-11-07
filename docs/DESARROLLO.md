@@ -119,7 +119,7 @@ VigIA cuenta con un pipeline de CI en GitHub Actions (`.github/workflows/ci.yml`
 
 ### Resiliencia (Circuit Breaker)
 
-No es estrictamente obligatorio levantar los contenedores ML para correr el backend. Si el microservicio de Celo está apagado o tarda en responder, el patrón Circuit Breaker (Resilience4j) en el `backend-worker` capturará el error de forma segura, marcará la telemetría como `"INFERENCIA_PENDIENTE"` en base de datos, y permitirá que la aplicación siga funcionando sin perder datos.
+No es estrictamente obligatorio levantar los contenedores ML para correr el backend. Si el microservicio de Celo está apagado o tarda en responder, el patrón Circuit Breaker (Resilience4j) en el `backend-worker` capturará el error de forma segura, dejará la telemetría como `PENDIENTE` en base de datos para que el próximo ciclo la vuelva a evaluar, y permitirá que la aplicación siga funcionando sin perder datos.
 
 ---
 
