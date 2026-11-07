@@ -109,8 +109,11 @@ test.describe('H0012 - Mapa de posiciones del rodeo (UI)', () => {
   test('H0012-12 - Con varios establecimientos solo se ven los animales del seleccionado', async ({ page, request }) => {
     await loginPorClave(page, 'productorAmbos');
     // Sin selección guardada, como en el primer ingreso: el mapa arranca sin establecimiento y pide todos los animales.
-    // Se borra antes de que cargue la app: en el Dashboard ya abierto, el store la volvería a guardar.
-    await page.addInitScript(() => localStorage.removeItem('vigia-establecimiento'));
+    // El store de establecimientos se persiste en sessionStorage (no en localStorage), que sobrevive al goto. Si el
+    // Dashboard llegó a cargar los establecimientos antes de navegar, la selección quedaba guardada, el mapa pedía
+    // directo con filtro y la consulta sin filtro que espera el test no salía nunca. Se borra antes de que cargue la
+    // app: en el Dashboard ya abierto, el store la volvería a guardar.
+    await page.addInitScript(() => sessionStorage.removeItem('vigia-establecimiento'));
 
     // La consulta sin filtro se retiene hasta después de la filtrada, para que siempre responda última. La espera de
     // la filtrada se registra antes de navegar: si se registrara recién dentro del handler, la filtrada podía
