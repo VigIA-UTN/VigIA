@@ -43,6 +43,11 @@ vigia:
     celo-url: ${ML_CELO_URL}
     salud-url: ${ML_SALUD_URL}
     geo-url: ${ML_GEO_URL}
+    # Timeout de lectura de cada llamada. Medido con la CPU limitada a 0,5 vCPU, el p95 fue de ~800 ms en celo y de
+    # ~200 ms en salud. Geo recibe las posiciones de todo el rodeo y su tiempo crece con el tamaño del establecimiento.
+    celo-timeout-ms: ${VIGIA_ML_CELO_TIMEOUT_MS:2000}
+    salud-timeout-ms: ${VIGIA_ML_SALUD_TIMEOUT_MS:4000}
+    geo-timeout-ms: ${VIGIA_ML_GEO_TIMEOUT_MS:10000}
   batch:
     celo-rate: ${VIGIA_BATCH_CELO_RATE:60000}
     salud-rate: ${VIGIA_BATCH_SALUD_RATE:60000}
@@ -99,20 +104,21 @@ resilience4j:
         permittedNumberOfCallsInHalfOpenState: 3
         ignoreExceptions:
           - org.springframework.web.client.HttpClientErrorException
+  # Un solo reintento, y solo ante fallas pasajeras: 503, 504, timeout o servicio inalcanzable (ver FallaTransitoriaMl).
+  # Un 500 o un 4xx darían lo mismo al repetirlos, y con el circuito abierto repetir solo suma la espera. Todo lo que
+  # no se reintenta va directo al fallback, y si el servicio está degradado la telemetría queda PENDIENTE para el
+  # próximo ciclo del batch.
   retry:
     instances:
       celoML:
         maxAttempts: 2
         waitDuration: 500ms
-        ignoreExceptions:
-          - org.springframework.web.client.HttpClientErrorException
+        retryExceptionPredicate: dev.vigia.backend.client.FallaTransitoriaMl
       saludML:
         maxAttempts: 2
         waitDuration: 500ms
-        ignoreExceptions:
-          - org.springframework.web.client.HttpClientErrorException
+        retryExceptionPredicate: dev.vigia.backend.client.FallaTransitoriaMl
       geoML:
         maxAttempts: 2
         waitDuration: 500ms
-        ignoreExceptions:
-          - org.springframework.web.client.HttpClientErrorException
+        retryExceptionPredicate: dev.vigia.backend.client.FallaTransitoriaMl

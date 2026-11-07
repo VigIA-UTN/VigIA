@@ -2,6 +2,7 @@ package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.client.MlSaludClient;
+import dev.vigia.backend.client.MlServicioDegradadoException;
 import dev.vigia.backend.dto.SerieComparativaSnapshot;
 import dev.vigia.backend.dto.ml.PerfilCalibracionResponseDTO;
 import dev.vigia.backend.dto.ml.PuntoTelemetriaDTO;
@@ -119,16 +120,17 @@ class SaludDetectorStrategyImplTest {
 
     @SuppressWarnings("null")
     @Test
-    void testMarcarInferenciaPendiente() {
+    void testRegistrarFalla_degradado_quedaPendiente() {
         Telemetria t1 = new Telemetria();
         t1.setEstadoInferenciaSalud(EstadoInferencia.PENDIENTE);
 
         List<Telemetria> lista = List.of(t1);
 
-        saludDetectorStrategy.marcarInferenciaPendiente(lista, "12345", new RuntimeException("Timeout"));
+        saludDetectorStrategy.registrarFalla(lista, "12345",
+                new MlServicioDegradadoException("ml-salud degradado", new RuntimeException("Timeout")));
 
-        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferenciaSalud());
-        verify(telemetriaRepository).saveAll(anyList());
+        assertEquals(EstadoInferencia.PENDIENTE, t1.getEstadoInferenciaSalud());
+        verify(telemetriaRepository, never()).saveAll(anyList());
     }
 
     private Telemetria datoDel(LocalDateTime fechaHora) {
@@ -605,7 +607,7 @@ class SaludDetectorStrategyImplTest {
         saludDetectorStrategy.process(lista, "corr-caido");
 
         mockServer.verify();
-        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, lista.get(0).getEstadoInferenciaSalud());
+        assertEquals(EstadoInferencia.PENDIENTE, lista.get(0).getEstadoInferenciaSalud());
         verify(alertaRepository, never()).save(any());
     }
 

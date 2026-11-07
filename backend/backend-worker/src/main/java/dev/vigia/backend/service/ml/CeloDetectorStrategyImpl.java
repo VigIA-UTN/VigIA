@@ -2,6 +2,7 @@ package dev.vigia.backend.service.ml;
 
 import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.client.MlCeloClient;
+import dev.vigia.backend.client.MlServicioDegradadoException;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.PuntoTelemetriaDTO;
 import dev.vigia.backend.dto.ml.CeloPredictResponseDTO;
@@ -67,7 +68,7 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
                 try {
                         procesar(telemetriaList, correlationId);
                 } catch (RuntimeException e) {
-                        marcarInferenciaPendiente(telemetriaList, correlationId, e);
+                        registrarFalla(telemetriaList, correlationId, e);
                 }
         }
 
@@ -173,14 +174,24 @@ public class CeloDetectorStrategyImpl implements DetectorStrategy {
                 }
         }
 
-        /** ml-celo no respondió (o falló el procesamiento): se deja la telemetría para reintentar. */
-        void marcarInferenciaPendiente(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
-                log.error(
-                                "Fallo al comunicarse con el microservicio ML de celo (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
-                                correlationId, t.getMessage());
-                telemetriaList.forEach(telemetria -> telemetria
-                                .setEstadoInferenciaCelo(EstadoInferencia.INFERENCIA_PENDIENTE));
-                telemetriaRepository.saveAll(telemetriaList);
+        /**
+         * Con ml-celo degradado (timeout, 5xx, circuito abierto) no se toca nada: la telemetría sigue PENDIENTE y
+         * el próximo ciclo del batch la vuelve a evaluar. Cualquier otra falla (un 4xx, un error al procesar) daría
+         * lo mismo al repetirse, así que las lecturas pendientes pasan a ERROR.
+         */
+        void registrarFalla(List<Telemetria> telemetriaList, String correlationId, RuntimeException e) {
+                if (MlServicioDegradadoException.esDegradacion(e)) {
+                        log.warn("ml-celo degradado (Correlation-ID: {}): la telemetría queda pendiente para el próximo ciclo. Motivo: {}",
+                                        correlationId, e.getMessage());
+                        return;
+                }
+                log.error("No se pudo evaluar celo (Correlation-ID: {}): la telemetría pendiente pasa a ERROR. Motivo: {}",
+                                correlationId, e.getMessage(), e);
+                List<Telemetria> pendientes = telemetriaList.stream()
+                                .filter(t -> t.getEstadoInferenciaCelo() == EstadoInferencia.PENDIENTE)
+                                .collect(Collectors.toList());
+                pendientes.forEach(t -> t.setEstadoInferenciaCelo(EstadoInferencia.ERROR));
+                telemetriaRepository.saveAll(pendientes);
         }
 
         /** Solo las lecturas que estaban pendientes: las demás ya se evaluaron en otro ciclo. */

@@ -2,6 +2,7 @@ package dev.vigia.backend.service.ml;
 
 import dev.vigia.backend.mensajeria.PublicadorDeAlertas;
 import dev.vigia.backend.client.MlGeoClient;
+import dev.vigia.backend.client.MlServicioDegradadoException;
 import dev.vigia.backend.dto.AnimalAisladoResponse;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.geo.AlertaAnimalDTO;
@@ -20,8 +21,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -116,18 +119,21 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
                 .collect(Collectors.groupingBy(t -> Optional.ofNullable(rodeoIdDe(t.getCaravana().getAnimal())),
                         LinkedHashMap::new, Collectors.toList()));
 
+        // Las lecturas de los rodeos que quedan para el próximo ciclo: no se marcan como completadas al final.
+        Set<Telemetria> sinEvaluar = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Map.Entry<Optional<Long>, List<Telemetria>> grupo : porRodeo.entrySet()) {
-            // Una falla en un rodeo (ml-geo caído, respuesta inválida) no frena a los demás:
-            // su telemetría queda pendiente de inferencia y el resto se procesa igual.
+            // Una falla en un rodeo (ml-geo caído, respuesta inválida) no frena a los demás.
             try {
                 analizarRodeo(establecimiento, grupo.getKey().orElse(null), umbral, grupo.getValue(), abiertos,
                         correlationId);
             } catch (RuntimeException e) {
-                marcarInferenciaPendiente(grupo.getValue(), correlationId, e);
+                if (registrarFalla(grupo.getValue(), correlationId, e)) {
+                    sinEvaluar.addAll(grupo.getValue());
+                }
             }
         }
 
-        marcarCompletados(telemetriaList);
+        marcarCompletados(telemetriaList.stream().filter(t -> !sinEvaluar.contains(t)).collect(Collectors.toList()));
     }
 
     private void analizarRodeo(Establecimiento establecimiento, Long rodeoId, double umbral,
@@ -453,16 +459,29 @@ public class GeoDetectorStrategyImpl implements DetectorStrategy {
         }
     }
 
-    /** ml-geo no respondió (o falló el procesamiento): se deja la telemetría para reintentar. */
-    void marcarInferenciaPendiente(List<Telemetria> telemetriaList, String correlationId, Throwable t) {
-        log.error("Fallo en el análisis geoespacial (Correlation-ID: {}). Marcando como inferencia pendiente. Motivo: {}",
-                correlationId, t.getMessage());
+    /**
+     * Falla al analizar un rodeo. Con ml-geo degradado (timeout, 5xx, circuito abierto) no se toca nada: la
+     * telemetría sigue PENDIENTE, el próximo ciclo vuelve a analizar el establecimiento y devuelve true para que no
+     * se marque como completada. Cualquier otra falla (un 4xx, un error al procesar) daría lo mismo al repetirse,
+     * así que las lecturas pendientes pasan a ERROR.
+     *
+     * @return si la telemetría del rodeo queda pendiente para el próximo ciclo
+     */
+    boolean registrarFalla(List<Telemetria> telemetriaList, String correlationId, RuntimeException e) {
+        if (MlServicioDegradadoException.esDegradacion(e)) {
+            log.warn("ml-geo degradado (Correlation-ID: {}): la telemetría del rodeo queda pendiente para el próximo ciclo. Motivo: {}",
+                    correlationId, e.getMessage());
+            return true;
+        }
+        log.error("No se pudo analizar el rodeo (Correlation-ID: {}): su telemetría pendiente pasa a ERROR. Motivo: {}",
+                correlationId, e.getMessage(), e);
         List<Telemetria> pendientes = telemetriaList.stream()
-                .filter(t1 -> t1.getEstadoInferenciaGeo() == EstadoInferencia.PENDIENTE)
+                .filter(t -> t.getEstadoInferenciaGeo() == EstadoInferencia.PENDIENTE)
                 .collect(Collectors.toList());
         if (!pendientes.isEmpty()) {
-            pendientes.forEach(t1 -> t1.setEstadoInferenciaGeo(EstadoInferencia.INFERENCIA_PENDIENTE));
+            pendientes.forEach(t -> t.setEstadoInferenciaGeo(EstadoInferencia.ERROR));
             telemetriaRepository.saveAll(pendientes);
         }
+        return false;
     }
 }

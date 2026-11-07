@@ -165,7 +165,7 @@ class GeoDetectorStrategyImplTest {
 
         assertThatCode(() -> strategy.process(List.of(rodeoCaido, rodeoOk), "corr-caido")).doesNotThrowAnyException();
 
-        assertThat(rodeoCaido.getEstadoInferenciaGeo()).isEqualTo(EstadoInferencia.INFERENCIA_PENDIENTE);
+        assertThat(rodeoCaido.getEstadoInferenciaGeo()).isEqualTo(EstadoInferencia.PENDIENTE);
         assertThat(rodeoOk.getEstadoInferenciaGeo()).isEqualTo(EstadoInferencia.COMPLETADO);
         ArgumentCaptor<RegistroCohesion> captor = ArgumentCaptor.forClass(RegistroCohesion.class);
         verify(registroCohesionRepository).save(captor.capture());
