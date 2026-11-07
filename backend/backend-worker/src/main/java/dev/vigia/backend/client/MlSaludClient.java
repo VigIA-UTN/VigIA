@@ -34,7 +34,7 @@ public class MlSaludClient {
         this.restClient = restClient;
     }
 
-    @CircuitBreaker(name = "saludML", fallbackMethod = "fallbackPredict")
+    @CircuitBreaker(name = "saludML")
     @Retry(name = "saludML", fallbackMethod = "fallbackPredict")
     @SuppressWarnings("null")
     public SaludPredictResponseDTO predict(SaludPredictRequestDTO request, String correlationId) {
@@ -47,7 +47,7 @@ public class MlSaludClient {
                 .body(SaludPredictResponseDTO.class);
     }
 
-    @CircuitBreaker(name = "saludML", fallbackMethod = "fallbackPerfil")
+    @CircuitBreaker(name = "saludML")
     @Retry(name = "saludML", fallbackMethod = "fallbackPerfil")
     @SuppressWarnings("null")
     public PerfilCalibracionResponseDTO calcularPerfil(PerfilCalibracionRequestDTO request, String correlationId) {

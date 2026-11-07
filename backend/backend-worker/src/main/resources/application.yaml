@@ -104,20 +104,20 @@ resilience4j:
         permittedNumberOfCallsInHalfOpenState: 3
         ignoreExceptions:
           - org.springframework.web.client.HttpClientErrorException
+  # Un solo reintento, y solo ante fallas pasajeras: 503, 504, timeout o servicio inalcanzable (ver FallaTransitoriaMl).
+  # Un 500 o un 4xx darían lo mismo al repetirlos, y con el circuito abierto repetir solo suma la espera. Todo lo que
+  # no se reintenta va directo al fallback.
   retry:
     instances:
       celoML:
         maxAttempts: 2
         waitDuration: 500ms
-        ignoreExceptions:
-          - org.springframework.web.client.HttpClientErrorException
+        retryExceptionPredicate: dev.vigia.backend.client.FallaTransitoriaMl
       saludML:
         maxAttempts: 2
         waitDuration: 500ms
-        ignoreExceptions:
-          - org.springframework.web.client.HttpClientErrorException
+        retryExceptionPredicate: dev.vigia.backend.client.FallaTransitoriaMl
       geoML:
         maxAttempts: 2
         waitDuration: 500ms
-        ignoreExceptions:
-          - org.springframework.web.client.HttpClientErrorException
+        retryExceptionPredicate: dev.vigia.backend.client.FallaTransitoriaMl

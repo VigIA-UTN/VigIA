@@ -7,7 +7,15 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 
-/** Configuración HTTP común a los clientes de los microservicios de ML del worker. */
+/**
+ * Configuración HTTP común a los clientes de los microservicios de ML del worker.
+ * <p>
+ * En cada llamada, resilience4j aplica el reintento por fuera del circuit breaker: Retry(CircuitBreaker(llamada)).
+ * Por eso el fallback va solo en {@code @Retry}: si también estuviera en {@code @CircuitBreaker}, el Retry recibiría
+ * la excepción ya envuelta y no podría elegir qué reintentar. Se reintenta una vez ante 503, 504, timeout o
+ * servicio inalcanzable (ver {@link FallaTransitoriaMl}); un 500, un 4xx o el circuito abierto van directo al
+ * fallback.
+ */
 final class MlClientes {
 
     private static final Duration TIMEOUT_CONEXION = Duration.ofSeconds(2);

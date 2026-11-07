@@ -33,7 +33,7 @@ public class MlCeloClient {
         this.restClient = restClient;
     }
 
-    @CircuitBreaker(name = "celoML", fallbackMethod = "fallbackPredict")
+    @CircuitBreaker(name = "celoML")
     @Retry(name = "celoML", fallbackMethod = "fallbackPredict")
     @SuppressWarnings("null")
     public CeloPredictResponseDTO predict(List<PuntoTelemetriaDTO> serie, String correlationId) {

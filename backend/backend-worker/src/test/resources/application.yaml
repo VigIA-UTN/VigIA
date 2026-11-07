@@ -67,20 +67,18 @@ resilience4j:
         permittedNumberOfCallsInHalfOpenState: 3
         ignoreExceptions:
           - org.springframework.web.client.HttpClientErrorException
+  # Igual que en main: un reintento solo ante 503, 504, timeout o servicio inalcanzable.
   retry:
     instances:
       celoML:
         maxAttempts: 2
         waitDuration: 500ms
-        ignoreExceptions:
-          - org.springframework.web.client.HttpClientErrorException
+        retryExceptionPredicate: dev.vigia.backend.client.FallaTransitoriaMl
       saludML:
         maxAttempts: 2
         waitDuration: 500ms
-        ignoreExceptions:
-          - org.springframework.web.client.HttpClientErrorException
+        retryExceptionPredicate: dev.vigia.backend.client.FallaTransitoriaMl
       geoML:
         maxAttempts: 2
         waitDuration: 500ms
-        ignoreExceptions:
-          - org.springframework.web.client.HttpClientErrorException
+        retryExceptionPredicate: dev.vigia.backend.client.FallaTransitoriaMl

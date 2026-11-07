@@ -32,7 +32,7 @@ public class MlGeoClient {
         this.restClient = restClient;
     }
 
-    @CircuitBreaker(name = "geoML", fallbackMethod = "fallbackAnalyze")
+    @CircuitBreaker(name = "geoML")
     @Retry(name = "geoML", fallbackMethod = "fallbackAnalyze")
     @SuppressWarnings("null")
     public GeoAnalyzeResponseDTO analyze(GeoAnalyzeRequestDTO request, String correlationId) {
