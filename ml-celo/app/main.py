@@ -49,6 +49,19 @@ SAMPLES_PER_DAY = 288
 # configura nada; en producción se espera CELO_THRESHOLD seteado explícitamente.
 CELO_THRESHOLD = float(os.getenv("CELO_THRESHOLD", "0.5"))
 
+def calentar_modelo():
+    """
+    Hace una predicción descartable antes de aceptar requests. La primera llamada a
+    model.predict arma el grafo de TensorFlow: con 0,5 vCPU tardó ~1,4 s contra ~0,6 s
+    de las siguientes, y se la comía el primer request del backend, que corta a los 2 s.
+    """
+    try:
+        model.predict(np.zeros((1, SAMPLES_PER_DAY, 2)), verbose=0)
+        log.info("Modelo calentado: la primera predicción ya no paga el armado del grafo.")
+    except Exception as e:
+        # No impide arrancar: el primer request solo vuelve a pagar el armado del grafo.
+        log.warning("No se pudo calentar el modelo: %s", e)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global model, scaler
@@ -64,6 +77,7 @@ async def lifespan(app: FastAPI):
             scaler = joblib.load(scaler_path)
             log.info("Modelo y scaler de normalización cargados correctamente. "
                      "Umbral de decisión (CELO_THRESHOLD) = %s", CELO_THRESHOLD)
+            calentar_modelo()
         else:
             log.warning("No se encontró el modelo en %s. Ejecute el script de entrenamiento primero.", models_dir)
     yield
@@ -96,10 +110,14 @@ def health():
     return {"status": "ok", "service": "ml-celo", "model_loaded": True}
 
 @app.post("/api/internal/ml/celo/predict", response_model=PrediccionCeloResponse)
-async def predict(serie: List[PuntoTelemetria]):
+def predict(serie: List[PuntoTelemetria]):
     """
     Request: serie temporal de la telemetría del animal de las últimas 24 horas
     (SAMPLES_PER_DAY puntos, 1 cada 5 min).
+
+    Es def y no async def: model.predict bloquea, y en una corrutina frenaba el event
+    loop entero (también el /health) mientras predecía. FastAPI corre los def en su
+    pool de threads.
     """
     log.info("Request recibida para predicción de celo con %d puntos.", len(serie))
 

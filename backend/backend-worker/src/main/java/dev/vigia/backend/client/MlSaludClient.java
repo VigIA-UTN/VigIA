@@ -24,8 +24,9 @@ public class MlSaludClient {
     private final RestClient restClient;
 
     @Autowired
-    public MlSaludClient(@Value("${vigia.ml.salud-url}") String saludUrl, RestClient.Builder restClientBuilder) {
-        this(MlClientes.construir(restClientBuilder, saludUrl));
+    public MlSaludClient(@Value("${vigia.ml.salud-url}") String saludUrl,
+            @Value("${vigia.ml.salud-timeout-ms}") long timeoutMs, RestClient.Builder restClientBuilder) {
+        this(MlClientes.construir(restClientBuilder, saludUrl, timeoutMs));
     }
 
     /** Para tests: recibe un RestClient ya configurado (p. ej. atado a MockRestServiceServer). */
@@ -33,7 +34,7 @@ public class MlSaludClient {
         this.restClient = restClient;
     }
 
-    @CircuitBreaker(name = "saludML", fallbackMethod = "fallbackPredict")
+    @CircuitBreaker(name = "saludML")
     @Retry(name = "saludML", fallbackMethod = "fallbackPredict")
     @SuppressWarnings("null")
     public SaludPredictResponseDTO predict(SaludPredictRequestDTO request, String correlationId) {
@@ -46,7 +47,7 @@ public class MlSaludClient {
                 .body(SaludPredictResponseDTO.class);
     }
 
-    @CircuitBreaker(name = "saludML", fallbackMethod = "fallbackPerfil")
+    @CircuitBreaker(name = "saludML")
     @Retry(name = "saludML", fallbackMethod = "fallbackPerfil")
     @SuppressWarnings("null")
     public PerfilCalibracionResponseDTO calcularPerfil(PerfilCalibracionRequestDTO request, String correlationId) {

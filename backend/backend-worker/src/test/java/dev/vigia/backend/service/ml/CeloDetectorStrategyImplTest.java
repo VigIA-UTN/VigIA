@@ -2,6 +2,7 @@ package dev.vigia.backend.service.ml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.vigia.backend.client.MlCeloClient;
+import dev.vigia.backend.client.MlServicioDegradadoException;
 import dev.vigia.backend.dto.ml.AlertaEventDTO;
 import dev.vigia.backend.dto.ml.CeloPredictResponseDTO;
 import dev.vigia.backend.model.Alerta;
@@ -363,7 +364,7 @@ class CeloDetectorStrategyImplTest {
 
     @Test
     @SuppressWarnings("null")
-    void testProcess_mlCeloFalla_marcaInferenciaPendienteSinPropagar() {
+    void testProcess_mlCeloFalla_quedaPendienteSinPropagar() {
         Animal animal = new Animal();
         animal.setId(30L);
         List<Telemetria> lista = ventana24h(animal, 288);
@@ -379,7 +380,7 @@ class CeloDetectorStrategyImplTest {
         assertDoesNotThrow(() -> celoDetectorStrategy.process(lista, "corr-caido"));
 
         mockServer.verify();
-        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t.getEstadoInferenciaCelo());
+        assertEquals(EstadoInferencia.PENDIENTE, t.getEstadoInferenciaCelo());
         verify(alertaRepository, never()).save(any());
     }
 
@@ -461,16 +462,17 @@ class CeloDetectorStrategyImplTest {
 
     @Test
     @SuppressWarnings("null")
-    void testMarcarInferenciaPendiente() {
+    void testRegistrarFalla_degradado_quedaPendiente() {
         Telemetria t1 = new Telemetria();
         t1.setEstadoInferenciaCelo(EstadoInferencia.PENDIENTE);
 
         List<Telemetria> lista = List.of(t1);
 
-        celoDetectorStrategy.marcarInferenciaPendiente(lista, "12345", new RuntimeException("Timeout"));
+        celoDetectorStrategy.registrarFalla(lista, "12345",
+                new MlServicioDegradadoException("ml-celo degradado", new RuntimeException("Timeout")));
 
-        assertEquals(EstadoInferencia.INFERENCIA_PENDIENTE, t1.getEstadoInferenciaCelo());
-        verify(telemetriaRepository).saveAll(lista);
+        assertEquals(EstadoInferencia.PENDIENTE, t1.getEstadoInferenciaCelo());
+        verify(telemetriaRepository, never()).saveAll(anyList());
     }
 
     @Test
