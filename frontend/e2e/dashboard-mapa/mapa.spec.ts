@@ -112,17 +112,20 @@ test.describe('H0012 - Mapa de posiciones del rodeo (UI)', () => {
     // Se borra antes de que cargue la app: en el Dashboard ya abierto, el store la volvería a guardar.
     await page.addInitScript(() => localStorage.removeItem('vigia-establecimiento'));
 
-    // La consulta sin filtro se retiene hasta después de la filtrada, para que siempre responda última.
+    // La consulta sin filtro se retiene hasta después de la filtrada, para que siempre responda última. La espera de
+    // la filtrada se registra antes de navegar: si se registrara recién dentro del handler, la filtrada podía
+    // responder mientras Playwright entregaba la intercepción, y el handler esperaba algo que ya había pasado.
     const sinFiltro = /\/api\/v1\/animales\/mapa$/;
+    const respuestaFiltrada = page.waitForResponse(/\/api\/v1\/animales\/mapa\?establecimientoId=/);
     await page.route(sinFiltro, async (ruta) => {
-      await page.waitForResponse(/\/api\/v1\/animales\/mapa\?establecimientoId=/);
+      await respuestaFiltrada;
       await page.waitForTimeout(1500);
       await ruta.continue();
     });
     const respuestaSinFiltro = page.waitForResponse(sinFiltro);
 
     await page.goto('/mapa');
-    await respuestaSinFiltro;
+    await Promise.all([respuestaFiltrada, respuestaSinFiltro]);
     // Da tiempo a que el mapa dibuje esa respuesta: antes, la cantidad de pines todavía sería la correcta.
     await page.waitForTimeout(1000);
 
