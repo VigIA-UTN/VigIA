@@ -44,10 +44,11 @@ qué se usa un `RandomForestClassifier` en vez de una LSTM (reproducibilidad).
 
 > **Para reentrenar no hace falta regenerar el dataset.** `dataset/` ya está
 > versionado y el bloque de abajo, que empieza con `generate_dataset.py`, lo
-> **sobrescribe** (queda modificado en `git status`). Para solo reentrenar con
-> los hiperparámetros de los resultados finales, correr desde esta carpeta:
-> `python train_model.py --dataset-dir dataset --models-dir models --split-seed 42 --init-seeds 42 43 44 45 46 --n-estimators 600 --max-depth 0`
-> (el comando de abajo usa los defaults, que no son esos). Ver también
+> **sobrescribe** (queda modificado en `git status`). Para solo reentrenar,
+> correr desde esta carpeta únicamente la última línea:
+> `python train_model.py --dataset-dir dataset --models-dir models`. Sus
+> defaults son los hiperparámetros de los resultados finales (split-seed 42,
+> semillas 42 a 46, 600 árboles, sin límite de profundidad). Ver también
 > [`../README.md`](../README.md#reentrenar-y-reemplazar-un-modelo-rnf05).
 
 ```bash
