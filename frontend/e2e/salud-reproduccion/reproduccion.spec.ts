@@ -14,7 +14,7 @@ import {
  */
 
 test.describe('H0008 - Alerta de celo con dato desactualizado (UI)', () => {
-  test('H0008-01 - Badge de dato desactualizado en el listado', async ({ page, request }) => {
+  test('H0008-09 - Badge de dato desactualizado en el listado', async ({ page, request }) => {
     const [desactualizado, alDia] = [await idAnimalEscenario(request, 'A-106'), await idAnimalEscenario(request, 'A-102')];
     await loginPorClave(page, 'veterinarioA');
     await page.goto('/alertas');
@@ -24,7 +24,7 @@ test.describe('H0008 - Alerta de celo con dato desactualizado (UI)', () => {
     await expect(filaAlerta(page, alDia).getByText(/Sin señal/)).toHaveCount(0);
   });
 
-  test('H0008-02 - Aviso de dato desactualizado en el detalle', async ({ page, request }) => {
+  test('H0008-10 - Aviso de dato desactualizado en el detalle', async ({ page, request }) => {
     const [desactualizado, alDia] = [await idAnimalEscenario(request, 'A-106'), await idAnimalEscenario(request, 'A-102')];
     await loginPorClave(page, 'veterinarioA');
 
@@ -38,7 +38,7 @@ test.describe('H0008 - Alerta de celo con dato desactualizado (UI)', () => {
 });
 
 test.describe('H0009 - Detalle del evento de celo (UI)', () => {
-  test('H0009-01 - Detalle de la alerta', async ({ page, request }) => {
+  test('H0009-07 - Detalle de la alerta', async ({ page, request }) => {
     const id = await idAnimalEscenario(request, 'A-102');
     await loginPorClave(page, 'productorA');
     await abrirDetalleAlerta(page, id);
@@ -52,7 +52,7 @@ test.describe('H0009 - Detalle del evento de celo (UI)', () => {
 });
 
 test.describe('H0016 - Countdown de la ventana óptima (UI)', () => {
-  test('H0016-01 - Antes de la ventana', async ({ page, request }) => {
+  test('H0016-05 - Antes de la ventana', async ({ page, request }) => {
     const id = await idAnimalEscenario(request, 'A-102');
     await loginPorClave(page, 'productorA');
     await abrirDetalleAlerta(page, id);
@@ -64,7 +64,7 @@ test.describe('H0016 - Countdown de la ventana óptima (UI)', () => {
     await expect.poll(() => tarjeta.innerText(), { timeout: 5000 }).not.toBe(inicial);
   });
 
-  test('H0016-02 - Dentro de la ventana', async ({ page, request }) => {
+  test('H0016-06 - Dentro de la ventana', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     crearAlertaCelo(animal.id, 8);
     await loginPorClave(page, 'productorA');
@@ -75,7 +75,7 @@ test.describe('H0016 - Countdown de la ventana óptima (UI)', () => {
     await expect(page.getByText(/Menos de 2 horas/)).toHaveCount(0);
   });
 
-  test('H0016-03 - Últimas 2 horas', async ({ page, request }) => {
+  test('H0016-07 - Últimas 2 horas', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     crearAlertaCelo(animal.id, 23);
     await loginPorClave(page, 'productorA');
@@ -84,7 +84,7 @@ test.describe('H0016 - Countdown de la ventana óptima (UI)', () => {
     await expect(page.getByText(/Menos de 2 horas/)).toBeVisible();
   });
 
-  test('H0016-04 - Ventana vencida', async ({ page, request }) => {
+  test('H0016-08 - Ventana vencida', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     crearAlertaCelo(animal.id, 25);
     await loginPorClave(page, 'productorA');
@@ -95,7 +95,7 @@ test.describe('H0016 - Countdown de la ventana óptima (UI)', () => {
 });
 
 test.describe('H0023 - Historial reproductivo (UI)', () => {
-  test('H0023-01 - Historial en la pestaña Reproducción', async ({ page, request }) => {
+  test('H0023-04 - Historial en la pestaña Reproducción', async ({ page, request }) => {
     const id = await idAnimalEscenario(request, 'A-102');
     await loginPorClave(page, 'veterinarioA');
     await page.goto(`/animales/${id}?tab=reproduccion`);
@@ -107,7 +107,7 @@ test.describe('H0023 - Historial reproductivo (UI)', () => {
     await expect(page.locator('table tbody tr', { hasText: /Posible celo/i })).toContainText(/Autom/);
   });
 
-  test('H0023-02 - Registrar un estado', async ({ page, request }) => {
+  test('H0023-05 - Registrar un estado', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     await loginPorClave(page, 'veterinarioA');
     await page.goto(`/animales/${animal.id}?tab=reproduccion`);
@@ -122,7 +122,7 @@ test.describe('H0023 - Historial reproductivo (UI)', () => {
     await expect(fila).toContainText('Manual');
   });
 
-  test('H0023-03 - El campero solo consulta', async ({ page, request }) => {
+  test('H0023-06 - El campero solo consulta', async ({ page, request }) => {
     const id = await idAnimalEscenario(request, 'A-102');
     await loginPorClave(page, 'camperoA');
     await page.goto(`/animales/${id}?tab=reproduccion`);

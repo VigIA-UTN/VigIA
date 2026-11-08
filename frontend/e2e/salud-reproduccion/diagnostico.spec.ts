@@ -14,7 +14,7 @@ import {
  * diagnosticarla no se puede deshacer, y los specs corren en varios navegadores.
  */
 test.describe('H0031 - Diagnóstico veterinario (UI)', () => {
-  test('H0031-01 - Confirmar la alerta y registrar el diagnóstico', async ({ page, request }) => {
+  test('H0031-05 - Confirmar la alerta y registrar el diagnóstico', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     crearAlertaSalud(animal.id);
     await loginPorClave(page, 'veterinarioA');
@@ -34,7 +34,7 @@ test.describe('H0031 - Diagnóstico veterinario (UI)', () => {
     await expect(registrado).toContainText('Veterinario A');
   });
 
-  test('H0031-02 - El diagnóstico no se puede editar', async ({ page, request }) => {
+  test('H0031-06 - El diagnóstico no se puede editar', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     const alertaId = crearAlertaSalud(animal.id);
     await diagnosticarPorApi(request, alertaId, 'Neumonía', 'Reposo');
@@ -57,7 +57,7 @@ test.describe('H0031 - Diagnóstico veterinario (UI)', () => {
     await expect(fila).toContainText('Neumonía');
   });
 
-  test('H0031-03 - El historial clínico muestra el diagnóstico', async ({ page, request }) => {
+  test('H0031-07 - El historial clínico muestra el diagnóstico', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     const alertaId = crearAlertaSalud(animal.id);
     await diagnosticarPorApi(request, alertaId, 'Neumonía', 'Reposo');
@@ -71,7 +71,7 @@ test.describe('H0031 - Diagnóstico veterinario (UI)', () => {
     await expect(evento).toContainText('Reposo');
   });
 
-  test('H0031-04 - El campero no ve las acciones del veterinario', async ({ page, request }) => {
+  test('H0031-08 - El campero no ve las acciones del veterinario', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     const pendiente = await animalNuevo(request);
     const alertaId = crearAlertaSalud(animal.id);
