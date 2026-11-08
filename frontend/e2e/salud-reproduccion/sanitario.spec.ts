@@ -22,7 +22,7 @@ async function chipEstadoSalud(page: Page, animalId: number) {
 }
 
 test.describe('H0018 - Detalle de alerta sanitaria (UI)', () => {
-  test('H0018-01 - Severidad media y causa probable', async ({ page, request }) => {
+  test('H0018-06 - Severidad media y causa probable', async ({ page, request }) => {
     const id = await idAnimalEscenario(request, 'A-103');
     await loginPorClave(page, 'veterinarioA');
     await abrirDetalleAlerta(page, id);
@@ -33,7 +33,7 @@ test.describe('H0018 - Detalle de alerta sanitaria (UI)', () => {
     await expect(page.getByText('Caída de actividad respecto de su perfil').first()).toBeVisible();
   });
 
-  test('H0018-02 - Severidad alta', async ({ page, request }) => {
+  test('H0018-07 - Severidad alta', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     crearAlertaSalud(animal.id, 'ALTA');
     await loginPorClave(page, 'veterinarioA');
@@ -45,7 +45,7 @@ test.describe('H0018 - Detalle de alerta sanitaria (UI)', () => {
 });
 
 test.describe('H0019 - Registro manual del estado de salud (UI)', () => {
-  test('H0019-01 - Registro manual', async ({ page, request }) => {
+  test('H0019-05 - Registro manual', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     await loginPorClave(page, 'veterinarioA');
     await page.goto(`/animales/${animal.id}?tab=historial`);
@@ -62,7 +62,7 @@ test.describe('H0019 - Registro manual del estado de salud (UI)', () => {
     await expect(evento).toContainText('Decaimiento leve, se controla mañana');
   });
 
-  test('H0019-02 - Estado obligatorio', async ({ page, request }) => {
+  test('H0019-06 - Estado obligatorio', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     await loginPorClave(page, 'veterinarioA');
     await page.goto(`/animales/${animal.id}?tab=historial`);
@@ -75,9 +75,9 @@ test.describe('H0019 - Registro manual del estado de salud (UI)', () => {
 
 test.describe('H0020 - Indicadores de salud (UI)', () => {
   for (const [caso, nombre, estado, etiqueta] of [
-    ['H0020-01', 'Nivel normal', 'SANO', 'Normal'],
-    ['H0020-02', 'Nivel borde', 'EN_OBSERVACION', 'Atención'],
-    ['H0020-03', 'Nivel crítico', 'ENFERMO', 'Alerta'],
+    ['H0020-06', 'Nivel normal', 'SANO', 'Normal'],
+    ['H0020-07', 'Nivel borde', 'EN_OBSERVACION', 'Atención'],
+    ['H0020-08', 'Nivel crítico', 'ENFERMO', 'Alerta'],
   ] as const) {
     test(`${caso} - ${nombre}`, async ({ page, request }) => {
       const ctx = await contextoRodeo(request);
@@ -91,7 +91,7 @@ test.describe('H0020 - Indicadores de salud (UI)', () => {
     });
   }
 
-  test('H0020-04 - Sin datos', async ({ page, request }) => {
+  test('H0020-09 - Sin datos', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     await loginPorClave(page, 'veterinarioA');
 
@@ -102,7 +102,7 @@ test.describe('H0020 - Indicadores de salud (UI)', () => {
 });
 
 test.describe('H0026 - Índice de cohesión (UI)', () => {
-  test('H0026-01 - Animal alejado del rodeo', async ({ page, request }) => {
+  test('H0026-10 - Animal alejado del rodeo', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     registrarCohesion(animal.id, 0.25);
     await loginPorClave(page, 'veterinarioA');
@@ -114,7 +114,7 @@ test.describe('H0026 - Índice de cohesión (UI)', () => {
     await expect(page.getByText('Alejado', { exact: true })).toBeVisible();
   });
 
-  test('H0026-02 - Animal en calibración', async ({ page, request }) => {
+  test('H0026-11 - Animal en calibración', async ({ page, request }) => {
     const id = await idAnimalEscenario(request, 'A-102');
     await loginPorClave(page, 'veterinarioA');
     await page.goto(`/animales/${id}?tab=actividad`);
@@ -122,7 +122,7 @@ test.describe('H0026 - Índice de cohesión (UI)', () => {
     await expect(page.getByText('Disponible al finalizar la calibración.')).toBeVisible();
   });
 
-  test('H0026-03 - Vista del campero', async ({ page, request }) => {
+  test('H0026-12 - Vista del campero', async ({ page, request }) => {
     const animal = await animalNuevo(request);
     registrarCohesion(animal.id, 0.25);
     await loginPorClave(page, 'camperoA');
