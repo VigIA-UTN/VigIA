@@ -28,3 +28,6 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# Capturas de RNF06 (evidencia para el documento de Casos de Prueba)
+evidencia-rnf06/
