@@ -255,8 +255,10 @@ class DashboardServiceImplTest {
         assertThat(r.getCobertura().getTotal()).isEqualTo(1);
         assertThat(r.getAlertasPendientes().getTotal()).isEqualTo(1);
         assertThat(r.getCola()).extracting(i -> i.getAlerta().getId()).containsExactly(50L);
+        // Se suman las 8 semanas: en la primera hora del lunes, "hace 1 h" cae en la semana anterior. En qué semana
+        // va cada alerta lo prueba CentroMandoCalculadoraTest con una fecha fija.
         List<Long> salud = r.getTendencia().getDatos().get("SALUD");
-        assertThat(salud.get(salud.size() - 1)).isEqualTo(1L);
+        assertThat(salud.stream().mapToLong(Long::longValue).sum()).isEqualTo(1L);
         verify(alertaRepository, never()).findAllById(any());
     }
 
