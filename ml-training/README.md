@@ -88,3 +88,18 @@ sigan cumpliendo el criterio de aceptación.
 `ml-training/resultados_finales/` ni de `*/dataset/` (el reentrenamiento no
 los toca, salvo que se haya regenerado el dataset o corrido `evaluar_final.py`
 sin `--out-dir`), ni nada bajo `backend/`.
+
+**Si fue solo una prueba, volver al modelo publicado.** El modelo que queda en
+el microservicio tiene que ser el de `resultados_finales/`: si se commitea uno
+reentrenado, los números del informe dejan de corresponder al modelo
+desplegado. Para descartar el reemplazo, desde la raíz del repo:
+
+```powershell
+git restore ml-celo/app/models ml-salud/app/models ml-salud/app/features_salud.py
+```
+
+Si se cambió `CELO_THRESHOLD`, volverlo a 0.947 en `infra/.env` (y en
+`infra/.env.example` y `simulador/simulador_celo.py`, si se tocaron) y
+reiniciar el contenedor (`docker compose restart ml-celo`). Reemplazar el
+modelo de verdad es otra decisión: hay que volver a correr `evaluar_final.py`
+sin `--out-dir` y commitear también `resultados_finales/`.
