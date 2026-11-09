@@ -88,6 +88,24 @@ body {
   display: block;
 }
 
+/* Entre lg y xxl el navbar de escritorio no entra con el espaciado completo: el selector de establecimiento y el
+   engranaje (posicionados a la izquierda) tapaban los links del productor a 1280 px. Se compactan los links y se
+   limita el ancho del selector; desde 1400 px queda como antes. */
+@media (min-width: 992px) and (max-width: 1399.98px) {
+  #navbarScroll .nav-link {
+    font-size: 0.9rem;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+    margin-left: 0.2rem !important;
+    margin-right: 0.2rem !important;
+  }
+
+  #navbar-establecimiento-selector {
+    max-width: 150px !important;
+    text-overflow: ellipsis;
+  }
+}
+
 /* Tabla Estándar Global (VigIA Table) */
 .vigia-table-wrapper {
   background: white;
