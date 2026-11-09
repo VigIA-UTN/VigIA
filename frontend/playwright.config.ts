@@ -56,6 +56,8 @@ export default defineConfig({
     },
     {
       name: 'webkit',
+      /* RNF06 cubre Chrome, Firefox, Edge y móvil: Safari no está en el Plan. */
+      testIgnore: /rnf06[\\/]/,
       use: { ...devices['Desktop Safari'] },
     },
     {
@@ -64,6 +66,12 @@ export default defineConfig({
         ...devices['Desktop Edge'],
         ...(process.env.PLAYWRIGHT_CHANNEL_EDGE ? { channel: 'msedge' } : {}),
       },
+    },
+    {
+      /* RNF06: móvil de 390 px con red 4G (la red la simula el spec por CDP). Solo corre los flujos críticos. */
+      name: 'mobile-4g',
+      testMatch: /rnf06[\\/].*\.spec\.ts/,
+      use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
     },
   ],
 
