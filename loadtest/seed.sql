@@ -29,6 +29,21 @@
 \else
 \set sin_perfil 0
 \endif
+-- RNF01 (ver README, "Alertas"): animales de cada establecimiento con las últimas 24 h anómalas, ya procesadas. Los
+-- primeros :celo en celo, los :salud siguientes con desvío sanitario y, con :aislamiento=1, el último sensor con
+-- historial normal (k6 lo aleja del rodeo). carga.js, con las mismas variables, sigue cada patrón.
+\if :{?celo}
+\else
+\set celo 0
+\endif
+\if :{?salud}
+\else
+\set salud 0
+\endif
+\if :{?aislamiento}
+\else
+\set aislamiento 0
+\endif
 \set ON_ERROR_STOP on
 \timing on
 
@@ -79,13 +94,17 @@ FROM carga c
 CROSS JOIN generate_series(0, :sensores - 1) d
 CROSS JOIN LATERAL (SELECT format('LT-%s', lpad(((c.n - 1) * :sensores + d + 1)::text, 5, '0')) AS codigo) x;
 
--- d: índice del sensor en su establecimiento, el de trayectoria.sql.
+-- d: índice del sensor en su establecimiento, el de trayectoria.sql. tipo: normal, celo, salud o aislamiento.
 CREATE TEMP TABLE carga_sensor ON COMMIT DROP AS
-SELECT k.id AS caravana_id, k.codigo, (substr(k.codigo, 4)::int - 1) % :sensores AS d, r.id AS rodeo_id, c.*
-FROM caravanas k
-JOIN carga c ON c.establecimiento_id = k.establecimiento_id
-JOIN rodeo_lote r ON r.establecimiento_id = c.establecimiento_id
-WHERE k.codigo LIKE 'LT-%';
+SELECT s.*, CASE WHEN s.d < :celo THEN 'celo'
+                 WHEN s.d < :celo + :salud THEN 'salud'
+                 WHEN :aislamiento > 0 AND s.d = :sensores - 1 THEN 'aislamiento'
+                 ELSE 'normal' END AS tipo
+FROM (SELECT k.id AS caravana_id, k.codigo, (substr(k.codigo, 4)::int - 1) % :sensores AS d, r.id AS rodeo_id, c.*
+      FROM caravanas k
+      JOIN carga c ON c.establecimiento_id = k.establecimiento_id
+      JOIN rodeo_lote r ON r.establecimiento_id = c.establecimiento_id
+      WHERE k.codigo LIKE 'LT-%') s;
 
 INSERT INTO animales (establecimiento_id, rodeo_lote_id, id_caravana_oficial, alias, fecha_nacimiento,
                       estado_actual, fecha_alta, caravana_id)
@@ -106,18 +125,25 @@ FROM animales a JOIN carga_sensor s ON s.caravana_id = a.caravana_id
 WHERE random() >= :sin_perfil;
 
 -- :dias días (24 h por defecto) cada 5 minutos (ticks k) hasta ahora, sobre la misma trayectoria, menos la fracción
--- :perdida de las filas. Geo, que corre cada 15 min, ya procesó todo; celo y salud tienen pendientes las últimas
--- :pendientes_h horas (12 ticks por hora).
+-- :perdida de las filas. Geo ya procesó todo; celo y salud tienen pendientes las últimas :pendientes_h horas (12
+-- ticks por hora), salvo en los animales en celo o con desvío: si no, alertarían antes de que k6 mande nada.
+-- Celo: moveState 7-9 y un salto en los ticks impares (carga_salto); salud: moveState 1-3 y vueltas al 40 %
+-- (validado contra ml-celo y ml-salud: ver README).
 INSERT INTO telemetria (fecha_hora, caravana_id, latitud, longitud, move_state, bateria,
                         estado_inferencia_celo, estado_inferencia_salud, estado_inferencia_geo)
 SELECT to_timestamp(k * 300)::timestamp, s.caravana_id,
-       s.latitud + pg_temp.carga_dlat(s.d, k), s.longitud + pg_temp.carga_dlon(s.d, k),
-       pg_temp.carga_move_state(), 90, x.estado, x.estado, 'COMPLETADO'
+       s.latitud + pg_temp.carga_dlat(s.d, k, :sensores, x.amplitud) + x.salto[1],
+       s.longitud + pg_temp.carga_dlon(s.d, k, x.amplitud) + x.salto[2],
+       pg_temp.carga_move_state(s.tipo), 90, x.estado, x.estado, 'COMPLETADO'
 FROM carga_sensor s
 CROSS JOIN (SELECT floor(extract(epoch FROM now()) / 300)::int AS ahora) a
 CROSS JOIN generate_series(a.ahora - (:dias * 288 - 1), a.ahora) k
-CROSS JOIN LATERAL (SELECT CASE WHEN k > a.ahora - :pendientes_h * 12 THEN 'PENDIENTE' ELSE 'COMPLETADO' END
-                    AS estado) x
+CROSS JOIN LATERAL (SELECT CASE WHEN s.tipo IN ('normal', 'aislamiento') AND k > a.ahora - :pendientes_h * 12
+                                THEN 'PENDIENTE' ELSE 'COMPLETADO' END
+                           AS estado,
+                           CASE WHEN s.tipo = 'salud' THEN 0.4 ELSE 1 END AS amplitud,
+                           CASE WHEN s.tipo = 'celo' THEN pg_temp.carga_salto(k) ELSE ARRAY[0, 0]::float8[] END
+                           AS salto) x
 WHERE random() >= :perdida;
 
 COMMIT;
