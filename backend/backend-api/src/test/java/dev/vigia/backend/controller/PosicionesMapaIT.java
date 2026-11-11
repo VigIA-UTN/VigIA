@@ -65,7 +65,9 @@ class PosicionesMapaIT extends MapaDashboardItBase {
     @DisplayName("H0012-02 - Mapa de posiciones - Actualización ante nueva telemetría")
     void H0012_02_actualizacionAnteNuevaTelemetria() throws Exception {
         UltimoDato anterior = ultimoDato("FX-A-01");
-        LocalDateTime nueva = ahora();
+        // Un segundo después de ahora(): el último dato del escenario queda al minuto, así que si el test corre en el
+        // primer segundo del minuto ahora() empata con él y el DISTINCT ON del mapa puede devolver cualquiera de los dos.
+        LocalDateTime nueva = ahora().plusSeconds(1);
         insertarTelemetria("FX-A-01", nueva, anterior.latitud() + 0.001, anterior.longitud() + 0.001);
         // Un frame atrasado (más viejo que el último) no pisa la posición.
         insertarTelemetria("FX-A-01", nueva.minusHours(1), anterior.latitud() - 0.01, anterior.longitud() - 0.01);
