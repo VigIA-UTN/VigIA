@@ -59,13 +59,18 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 @SpringBootTest
@@ -103,7 +108,8 @@ class AnimalControllerTest {
         private IntervencionRepository intervencionRepository;
         @Autowired
         private CaravanaRepository caravanaRepository;
-        @Autowired
+        // Espía: H2 no tiene LATERAL, ver ultimaPosicionSinLateral().
+        @SpyBean
         private TelemetriaRepository telemetriaRepository;
         @Autowired
         private EntityManager entityManager;
@@ -125,6 +131,21 @@ class AnimalControllerTest {
         private String adminToken;
         private String veterinarioToken;
         private String camperoToken;
+
+        /**
+         * findUltimaPorCaravana usa CROSS JOIN LATERAL (una fila del índice por caravana, RNF02), que H2 no tiene. Acá se
+         * resuelve con la consulta derivada de una caravana; la consulta real se prueba contra TimescaleDB en
+         * TelemetriaPorCaravanaIT.
+         */
+        @BeforeEach
+        void ultimaPosicionSinLateral() {
+                doAnswer(inv -> {
+                        Collection<Long> ids = inv.getArgument(0);
+                        return ids.stream().map(caravanaRepository::getReferenceById)
+                                        .map(telemetriaRepository::findFirstByCaravanaOrderByFechaHoraDesc)
+                                        .flatMap(Optional::stream).toList();
+                }).when(telemetriaRepository).findUltimaPorCaravana(anyCollection());
+        }
 
         @BeforeEach
         @SuppressWarnings("null")

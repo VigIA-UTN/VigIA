@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Una corrida de volumen (RNF01 y RNF02, ver README, "Volumen"): un establecimiento con <sensores> animales, <n> en
 # celo, <n> con desvío sanitario y uno que se aísla. Desde la raíz del repo, con el stack en modo carga levantado:
-#   loadtest/volumen.sh <sensores> <n> [duración]        p. ej. loadtest/volumen.sh 200 10 70m
-# Deja todo en loadtest/resultados/vol-<sensores>/.
+#   loadtest/volumen.sh <sensores> <n> [duración] [corrida]   p. ej. loadtest/volumen.sh 200 10 70m
+# Deja todo en loadtest/resultados/<corrida>/ (por defecto vol-<sensores>), y borra lo que hubiera ahí.
 set -euo pipefail
 S=$1
 N=$2
 DURACION=${3:-70m}
-CORRIDA=vol-$S
+CORRIDA=${4:-vol-$S}
 DIR=loadtest/resultados/$CORRIDA
 DC="docker compose -f infra/docker-compose.yml -f infra/docker-compose.carga.yml"
 PSQL="docker exec -i vigia-db psql -U vigia_user -d vigia"
