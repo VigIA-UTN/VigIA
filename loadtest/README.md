@@ -159,7 +159,7 @@ Un establecimiento por corrida, con 24 h de historial y tráfico real encima. Mi
 loadtest/volumen.sh 200 10 70m    # sensores, animales con anomalía de cada tipo, duración
 ```
 
-En orden: `limpiar.sql`, la semilla, reinicio del worker (celo, salud y geo corren al arrancar y después cada 30 min), 2 min de calentamiento sin medir y la corrida con el observador. Deja en `resultados/vol-<sensores>/` lo de siempre más `semilla.txt` y `latencia.txt`.
+En orden: `limpiar.sql`, la semilla, reinicio del worker (celo, salud y geo corren al arrancar y después cada 30 min), 2 min de calentamiento sin medir y la corrida con el observador. Una corrida de menos de 30 min (`volumen.sh 200 10 20m`) reparte los turnos en su duración y, al terminar k6, espera la segunda pasada de los jobs para que `latencia.txt` mida RNF01. Deja en `resultados/vol-<sensores>/` lo de siempre más `semilla.txt` y `latencia.txt`.
 
 **Alertas.** Con `-v celo=N -v salud=N -v aislamiento=1` (semilla) y `CELO`, `SALUD`, `AISLAMIENTO` (k6), en cada establecimiento:
 

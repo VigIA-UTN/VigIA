@@ -39,11 +39,23 @@ MINUTOS=${DURACION%m}
 python loadtest/observar.py "$CORRIDA" --minutos "$((MINUTOS + 1))" > /dev/null &
 OBSERVADOR=$!
 set +e
-$DC run --rm k6 run -q $VARS -e ESCENARIOS=$ESCENARIOS -e DURACION="$DURACION" -e ESCALONAR=30m \
-  --out csv="resultados/$CORRIDA/k6.csv.gz" carga.js > "$DIR/k6-resumen.txt" 2>&1
+# Los turnos de las anomalías se reparten en 30 min, o en toda la corrida si es más corta.
+$DC run --rm k6 run -q $VARS -e ESCENARIOS=$ESCENARIOS -e DURACION="$DURACION" \
+  -e ESCALONAR="$((MINUTOS < 30 ? MINUTOS : 30))m" --out csv="resultados/$CORRIDA/k6.csv.gz" carga.js \
+  > "$DIR/k6-resumen.txt" 2>&1
 log "k6 terminó con código $?"
 set -e
 wait $OBSERVADOR || true
+
+# Una corrida de menos de 30 min termina antes de la segunda pasada de los jobs, que es la que alerta (RNF01).
+if [ "$MINUTOS" -lt 30 ]; then
+  until [ "$($PSQL -qtA -c "SELECT count(*) FROM (SELECT i.job_name FROM batch_job_execution e
+      JOIN batch_job_instance i USING (job_instance_id) WHERE e.start_time >= '$INICIO' AND e.status = 'COMPLETED'
+      AND i.job_name IN ('celoJob', 'saludJob', 'geoJob') GROUP BY i.job_name HAVING count(*) >= 2) x")" = 3 ]; do
+    sleep 30
+  done
+  log "segunda pasada de los jobs lista"
+fi
 
 for c in worker api; do log "$c reinicios=$(docker inspect -f '{{.RestartCount}}' vigia-backend-$c)"; done
 python loadtest/observar.py --resumen "$CORRIDA" > "$DIR/resumen.txt"
