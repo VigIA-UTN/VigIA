@@ -52,11 +52,11 @@ CELO_THRESHOLD = float(os.getenv("CELO_THRESHOLD", "0.5"))
 def calentar_modelo():
     """
     Hace una predicción descartable antes de aceptar requests. La primera llamada a
-    model.predict arma el grafo de TensorFlow: con 0,5 vCPU tardó ~1,4 s contra ~0,6 s
-    de las siguientes, y se la comía el primer request del backend, que corta a los 2 s.
+    model.predict_on_batch arma el grafo de TensorFlow (con predict() y 0,5 vCPU tardaba ~1,4 s contra ~0,6 s
+    de las siguientes), y se la comía el primer request del backend, que corta a los 2 s.
     """
     try:
-        model.predict(np.zeros((1, SAMPLES_PER_DAY, 2)), verbose=0)
+        model.predict_on_batch(np.zeros((1, SAMPLES_PER_DAY, 2)))
         log.info("Modelo calentado: la primera predicción ya no paga el armado del grafo.")
     except Exception as e:
         # No impide arrancar: el primer request solo vuelve a pagar el armado del grafo.
@@ -115,7 +115,7 @@ def predict(serie: List[PuntoTelemetria]):
     Request: serie temporal de la telemetría del animal de las últimas 24 horas
     (SAMPLES_PER_DAY puntos, 1 cada 5 min).
 
-    Es def y no async def: model.predict bloquea, y en una corrutina frenaba el event
+    Es def y no async def: model.predict_on_batch bloquea, y en una corrutina frenaba el event
     loop entero (también el /health) mientras predecía. FastAPI corre los def en su
     pool de threads.
     """
@@ -155,7 +155,9 @@ def predict(serie: List[PuntoTelemetria]):
                 X_input.reshape(-1, X_input.shape[-1])
             ).reshape(X_input.shape)
 
-        y_pred_prob = model.predict(X_input, verbose=0)
+        # predict_on_batch y no predict(): predict() arma un pipeline de datos en cada
+        # llamada, y con una sola ventana era casi todo el costo (~41 ms contra ~5).
+        y_pred_prob = model.predict_on_batch(X_input)
         prob = float(y_pred_prob[0][0])
         evento = prob > CELO_THRESHOLD
         ventana = 12 if evento else 0

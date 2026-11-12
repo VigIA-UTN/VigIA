@@ -57,7 +57,7 @@ def serie_24h(move_state=3, paso=0.0):
 def modelo(monkeypatch):
     """Modelo cargado que devuelve la probabilidad que fije cada test, sin TensorFlow."""
     mock = MagicMock()
-    mock.predict.return_value = np.array([[0.20]])
+    mock.predict_on_batch.return_value = np.array([[0.20]])
     monkeypatch.setattr(main_app, "model", mock)
     monkeypatch.setattr(main_app, "scaler", None)
     return mock
@@ -73,7 +73,7 @@ def sin_modelo(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_ML01_01_predict_celo_detectado_respeta_el_contrato(modelo):
-    modelo.predict.return_value = np.array([[0.85]])
+    modelo.predict_on_batch.return_value = np.array([[0.85]])
 
     response = client.post(ENDPOINT, json=serie_24h(9, paso=0.001))
 
@@ -86,7 +86,7 @@ def test_ML01_01_predict_celo_detectado_respeta_el_contrato(modelo):
 
 
 def test_ML01_02_predict_sin_celo_respeta_el_contrato(modelo):
-    modelo.predict.return_value = np.array([[0.20]])
+    modelo.predict_on_batch.return_value = np.array([[0.20]])
 
     response = client.post(ENDPOINT, json=serie_24h(1))
 
@@ -102,7 +102,7 @@ def test_ML01_02_predict_sin_celo_respeta_el_contrato(modelo):
 def test_ML01_03_predict_decide_con_el_umbral_configurado(modelo, monkeypatch, probabilidad, evento):
     """CELO_THRESHOLD (0.947 en infra) es estricto: P(celo) igual al umbral no es celo."""
     monkeypatch.setattr(main_app, "CELO_THRESHOLD", 0.947)
-    modelo.predict.return_value = np.array([[probabilidad]])
+    modelo.predict_on_batch.return_value = np.array([[probabilidad]])
 
     data = client.post(ENDPOINT, json=serie_24h()).json()
 
@@ -184,7 +184,7 @@ def test_ML01_12_serie_que_no_tiene_288_puntos_responde_422(modelo, puntos):
     assert data["error"] == "Payload Invalido"
     assert data["mensaje"] == (f"serie: debe tener exactamente 288 puntos (24 hs a 5 min); "
                                f"se recibieron {puntos}")
-    modelo.predict.assert_not_called()
+    modelo.predict_on_batch.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ def test_ML01_16_health_sin_modelo_responde_503_degraded(sin_modelo):
 
 
 def test_ML01_17_falla_del_servicio_responde_503_con_formato_comun(modelo):
-    modelo.predict.side_effect = RuntimeError("fallo de inferencia")
+    modelo.predict_on_batch.side_effect = RuntimeError("fallo de inferencia")
 
     response = client.post(ENDPOINT, json=serie_24h(), headers={"X-Correlation-ID": "ml01-17"})
 

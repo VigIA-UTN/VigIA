@@ -149,7 +149,7 @@ Escribe `loadtest/resultados/<corrida>/muestras.csv`:
 
 Celo, salud y geo corren de a uno (ver `BatchScheduler`), así que geo espera mientras dura el ciclo de celo y salud.
 
-`loadtest/estres.sh rafaga` y `loadtest/estres.sh estable [90m]` hacen todo esto (limpiar, semilla, reiniciar el worker, observador y k6) y guardan la corrida en `resultados/stress-<modo>/`. La estable agrega en cada establecimiento un animal en celo, uno con desvío y uno que se aísla, que arrancan a los 5 min, y mide su latencia con `latencia.sql` al terminar k6 (`latencia.txt`). A 25.000 caravanas una pasada de celo más una de salud dura más que la corrida, así que los que todavía no alertaron aparecen en "Problemas".
+`loadtest/estres.sh rafaga` y `loadtest/estres.sh estable [90m]` hacen todo esto (limpiar, semilla, reiniciar el worker, observador y k6) y guardan la corrida en `resultados/stress-<modo>/`, o en `resultados/<corrida>/` con un tercer argumento (`estres.sh estable 90m stress-estable-2`). La estable agrega en cada establecimiento un animal en celo, uno con desvío y uno que se aísla, que arrancan a los 5 min, y mide su latencia con `latencia.sql` al terminar k6 (`latencia.txt`). A 25.000 caravanas una pasada de celo más una de salud dura más que la corrida, así que los que todavía no alertaron aparecen en "Problemas".
 
 ## Volumen: 10, 50 y 200 animales (RNF01 y RNF02)
 

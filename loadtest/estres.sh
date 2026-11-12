@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Estrés de 25.000 caravanas (500 × 50) con el stack en modo carga (ver README, "Orden de una corrida"). Desde la raíz:
 #   loadtest/estres.sh rafaga                      ráfaga hasta que se corta; reinicia el worker al final
-#   loadtest/estres.sh estable [90m]               carga sostenida, con una anomalía de cada tipo por establecimiento
+#   loadtest/estres.sh estable [90m] [corrida]     carga sostenida, con una anomalía de cada tipo por establecimiento
 #                                                  (arrancan a los 5 min) y su latencia al terminar
-# Deja todo en loadtest/resultados/stress-<modo>/.
+# Deja todo en loadtest/resultados/<corrida>/ (por defecto stress-<modo>).
 set -euo pipefail
 MODO=$1
 DURACION=${2:-90m}
-CORRIDA=stress-$MODO
+CORRIDA=${3:-stress-$MODO}
 DIR=loadtest/resultados/$CORRIDA
 DC="docker compose -f infra/docker-compose.yml -f infra/docker-compose.carga.yml"
 PSQL="docker exec -i vigia-db psql -U vigia_user -d vigia"

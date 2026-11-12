@@ -47,7 +47,7 @@ def mock_dependencies():
                 # Baja actividad -> probabilidad de celo <= 0.5
                 return np.array([[0.20]])
 
-        mock_model.predict.side_effect = predict_mock
+        mock_model.predict_on_batch.side_effect = predict_mock
         yield mock_model
 
 def test_health():

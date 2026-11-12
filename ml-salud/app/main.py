@@ -69,6 +69,9 @@ def load_ml_model():
 
     if model_path.exists():
         model = joblib.load(model_path)
+        # Se guardó con n_jobs=-1: con una ventana por llamada, repartir 600 árboles
+        # en hilos cuesta más que recorrerlos (~77 ms contra ~19). Misma salida.
+        model.n_jobs = 1
         log.info("Modelo (RandomForest) cargado correctamente.")
     else:
         log.warning("No se encontró el modelo en %s.", model_path)
