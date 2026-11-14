@@ -191,7 +191,7 @@ class MatrizPermisosIT extends SeguridadItBase {
         m.add(ep("DELETE", "/api/v1/animales/{id}/historial-pesos/{pesoId}",
                 "/api/v1/animales/{animalA}/historial-pesos/999999999", pvc));
         m.add(ep("GET", "/api/v1/animales/{id}/indicadores-salud", "/api/v1/animales/{animalA}/indicadores-salud",
-                Set.of(A, P, V)));
+                apvc));
         m.add(ep("GET", "/api/v1/animales/{id}/linea-tiempo-alertas", "/api/v1/animales/{animalA}/linea-tiempo-alertas",
                 pvc));
         m.add(ep("POST", "/api/v1/animales/{id}/vincular-caravana", "/api/v1/animales/{animalA}/vincular-caravana",
