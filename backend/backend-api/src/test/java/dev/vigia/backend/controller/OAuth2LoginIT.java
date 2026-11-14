@@ -13,7 +13,9 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.util.UriUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -96,7 +98,9 @@ class OAuth2LoginIT extends SeguridadItBase {
         UriComponents redirect = loginConProveedor(email("camperoA"));
 
         assertThat(redirect.getQueryParams().getFirst("token")).isNull();
-        assertThat(redirect.getQueryParams().getFirst("error")).contains("no está activa");
+        // El mensaje viaja codificado en la URL (los acentos no van crudos en el header Location): se lee como el navegador.
+        assertThat(UriUtils.decode(redirect.getQueryParams().getFirst("error"), StandardCharsets.UTF_8))
+                .contains("no está activa");
     }
 
     @Test
