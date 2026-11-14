@@ -54,9 +54,10 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
                 getRedirectStrategy().sendRedirect(request, response, targetUrl);
             } catch (IllegalArgumentException e) {
+                // encode(): el mensaje tiene acentos ("invitación"); crudos en el header Location llegan rotos.
                 String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
                         .queryParam("error", e.getMessage())
-                        .build().toUriString();
+                        .build().encode().toUriString();
                 getRedirectStrategy().sendRedirect(request, response, targetUrl);
             }
         } else {
