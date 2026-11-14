@@ -21,9 +21,11 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
             AuthenticationException exception) throws IOException, ServletException {
+        // encode(): sin codificar, los acentos del mensaje viajan crudos en el header Location y el navegador los
+        // muestra rotos ("invitaci�n").
         String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
                 .queryParam("error", exception.getLocalizedMessage())
-                .build().toUriString();
+                .build().encode().toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
