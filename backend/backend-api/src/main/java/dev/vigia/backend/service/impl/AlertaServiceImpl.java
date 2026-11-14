@@ -113,13 +113,11 @@ public class AlertaServiceImpl implements AlertaService {
 
                 SeveridadAlerta severidadEnum = null;
                 if (severidad != null && !severidad.isBlank()) {
-                        String s = severidad.trim().toUpperCase();
-                        if (s.equals("ALTA"))
-                                severidadEnum = SeveridadAlerta.ALTA;
-                        else if (s.equals("MEDIA"))
-                                severidadEnum = SeveridadAlerta.MEDIA;
-                        else if (s.equals("BAJA"))
-                                severidadEnum = SeveridadAlerta.BAJA;
+                        try {
+                                severidadEnum = SeveridadAlerta.valueOf(severidad.trim().toUpperCase());
+                        } catch (IllegalArgumentException e) {
+                                throw new IllegalArgumentException("Severidad de alerta desconocida: " + severidad);
+                        }
                 }
 
                 List<Alerta> alertas = alertaRepository.findByFiltros(establecimientoId, estado, disparadores,

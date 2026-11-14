@@ -126,9 +126,8 @@ export function useVentanaInseminacion(
         setSegundosRestantes(data.tiempoRestanteSegundos);
         startTicker(data.tiempoRestanteSegundos, data.porcentajeTranscurrido, 'ACTIVA');
       } else if (data.estado === 'FUTURA') {
-        // En el backend, tiempoRestanteSegundos es el tiempo hasta el FIN.
-        // Asumiendo que la ventana es de 18 horas (64800s), calculamos el tiempo hasta el INICIO:
-        const tiempoRestanteInicio = Math.max(0, data.tiempoRestanteSegundos - 64800);
+        // En una ventana FUTURA el backend manda en tiempoRestanteSegundos el tiempo hasta que abre.
+        const tiempoRestanteInicio = Math.max(0, data.tiempoRestanteSegundos);
         setSegundosRestantes(tiempoRestanteInicio);
         startTicker(tiempoRestanteInicio, 0, 'FUTURA');
       } else {
