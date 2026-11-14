@@ -18,6 +18,7 @@ frontend/.env.local
 .idea/
 *.iml
 .vscode/
+.claude
 
 # Docker / OS / Env
 infra/postgres-init/*.bak
@@ -28,6 +29,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+CLAUDE.md
 
 # Modelos entrenados (historial)
 ml-training/celo/models
@@ -38,3 +40,15 @@ ml-training/celo/figuras
 
 # Logs
 *.log
+
+# Cobertura (pytest-cov)
+.coverage
+coverage.xml
+htmlcov/
+
+# Cobertura (vitest/v8)
+frontend/coverage/
+
+# Manual de Usuario: las capturas y el .docx generado no se versionan
+docs/manual-usuario/img/
+docs/manual-usuario/*.docx

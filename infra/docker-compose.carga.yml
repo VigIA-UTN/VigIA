@@ -12,11 +12,11 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics
-      # Los horarios de Railway (celo y salud los define allá; geo y anestro no, así que valen los del código). Van
-      # los cuatro porque el compose base pone valores locales.
-      - VIGIA_BATCH_CELO_RATE=21600000
-      - VIGIA_BATCH_SALUD_RATE=21600000
-      - VIGIA_BATCH_GEO_RATE=900000
+      # Los horarios de Railway: celo, salud y geo cada 30 min (RNF01, ver tasks/plan-volumen.md), anestro a las 2 AM.
+      # Van los cuatro porque el compose base pone valores locales. Se pueden pisar desde el entorno.
+      - VIGIA_BATCH_CELO_RATE=${VIGIA_BATCH_CELO_RATE:-1800000}
+      - VIGIA_BATCH_SALUD_RATE=${VIGIA_BATCH_SALUD_RATE:-1800000}
+      - VIGIA_BATCH_GEO_RATE=${VIGIA_BATCH_GEO_RATE:-1800000}
       - "VIGIA_BATCH_ANESTRO_CRON=0 0 2 * * *"
 
   k6:

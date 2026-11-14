@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
           
@@ -30,26 +30,15 @@ jobs:
       - name: Lint
         run: npm run lint
         
+      - name: Test
+        run: npm test -- --coverage
+        
       - name: Build
         run: npm run build
 
   backend-build:
     name: Build Backend
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: vigia_user
-          POSTGRES_PASSWORD: vigia_dev_password
-          POSTGRES_DB: vigia
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -68,8 +57,19 @@ jobs:
         if: ${{ github.actor == 'nektos/act' }}
         run: sudo apt-get update && sudo apt-get install -y maven
 
-      - name: Build with Maven
-        run: mvn -B clean package --file pom.xml
+      - name: Build and test with Maven
+        run: mvn -B clean verify --file pom.xml
+
+      # upload-artifact no usa el working-directory: los paths van desde la raíz del repo
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-backend
+          path: |
+            backend/*/target/site/jacoco/
+            backend/backend-coverage/target/site/jacoco-aggregate/
+          if-no-files-found: ignore
 
   ml-checks:
     name: ML Checks
@@ -103,15 +103,24 @@ jobs:
       - name: Run Tests
         run: |
           if [ -d "tests" ]; then
-            python -m pytest tests/ -v
+            python -m pytest tests/ -v --cov --cov-report=term --cov-report=xml --cov-report=html
           else
             echo "No tests found."
           fi
 
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-${{ matrix.service }}
+          path: |
+            ${{ matrix.service }}/coverage.xml
+            ${{ matrix.service }}/htmlcov/
+          if-no-files-found: ignore
+
   docker-build:
     name: Docker Compose Build
     runs-on: ubuntu-latest
-    # Wait for the other jobs to succeed before testing the full docker build
     needs: [frontend-build, backend-build, ml-checks]
     steps:
       - name: Checkout code
@@ -119,3 +128,92 @@ jobs:
         
       - name: Build all Docker Compose services
         run: docker compose -f infra/docker-compose.yml build
+
+  e2e-tests:
+    name: E2E Tests (Playwright - ${{ matrix.project }})
+    runs-on: ubuntu-latest
+    needs: [frontend-build, backend-build, ml-checks]
+    # Un job por navegador, en paralelo y cada uno con su propio stack y base: los specs modifican el escenario,
+    # así que no comparten datos. Si falla un navegador, los demás terminan igual.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: chromium
+            browser: chromium
+          - project: firefox
+            browser: firefox
+          - project: webkit
+            browser: webkit
+          - project: edge
+            browser: msedge
+    env:
+      # Sin esto el proyecto edge corre en Chromium con el user agent de Edge, no en Edge.
+      PLAYWRIGHT_CHANNEL_EDGE: ${{ matrix.project == 'edge' && '1' || '' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browser and dependencies
+        working-directory: frontend
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Start Docker Compose stack
+        run: >
+          docker compose
+          --env-file infra/.env.example
+          -f infra/docker-compose.yml
+          up -d --build --wait --wait-timeout 300
+
+      - name: Wait for Backend API readiness
+        run: |
+          echo "Waiting for vigia-backend-api to be UP..."
+          for i in {1..30}; do
+            STATUS=$(curl -s http://localhost:8080/actuator/health | grep '"status":"UP"' || true)
+            if [ -n "$STATUS" ]; then
+              echo "Backend is UP!"
+              break
+            fi
+            echo "Attempt $i: Backend not ready yet, sleeping 2s..."
+            sleep 2
+          done
+
+      - name: Load scenario fixtures
+        run: |
+          cat fixtures/escenario/limpiar.sql fixtures/escenario/escenario.sql | docker exec -i vigia-db psql -U vigia_user -d vigia -v ON_ERROR_STOP=1
+
+      - name: Run E2E tests
+        working-directory: frontend
+        env:
+          # frontend/.env no está en git. Sin esta variable, los streams SSE piden /undefined/... y dan 404.
+          VITE_API_URL: http://localhost:8080/api/v1
+        run: npm run test:e2e -- --project=${{ matrix.project }}
+
+      - name: Dump Docker logs on failure
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml logs --tail 100
+
+      - name: Upload Playwright HTML report and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: ignore
+
+      - name: Teardown Docker Compose stack
+        if: always()
+        run: docker compose -f infra/docker-compose.yml down -v

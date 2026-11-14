@@ -1,0 +1,13 @@
+[run]
+branch = True
+source = app
+omit = tests/*
+
+[report]
+show_missing = True
+
+[xml]
+output = coverage.xml
+
+[html]
+directory = htmlcov

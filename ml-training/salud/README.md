@@ -42,6 +42,15 @@ qué se usa un `RandomForestClassifier` en vez de una LSTM (reproducibilidad).
 
 ## Uso
 
+> **Para reentrenar no hace falta regenerar el dataset.** `dataset/` ya está
+> versionado y el bloque de abajo, que empieza con `generate_dataset.py`, lo
+> **sobrescribe** (queda modificado en `git status`). Para solo reentrenar,
+> correr desde esta carpeta únicamente la última línea:
+> `python train_model.py --dataset-dir dataset --models-dir models`. Sus
+> defaults son los hiperparámetros de los resultados finales (split-seed 42,
+> semillas 42 a 46, 600 árboles, sin límite de profundidad). Ver también
+> [`../README.md`](../README.md#reentrenar-y-reemplazar-un-modelo-rnf05).
+
 ```bash
 python3 generate_dataset.py --n-animales 300 --dias-evaluacion 90 --seed 42 --out-dir dataset \
     --gps-noise-std-m 15.5 --heartbeat-interval-ticks 6
@@ -70,6 +79,13 @@ El comando de `calibracion_dataset.py` valida (rápido, sin red) que el
 ruido del dataset regenerado sigue siendo realista.
 
 ## Resultados de referencia (dataset sintético, 300 animales, 90 días de evaluación, seed 42)
+
+> Los resultados finales para el informe están en
+> [`../resultados_finales/`](../resultados_finales/README.md) y se generan
+> con `python evaluar_final.py`. Se miden como decide `ml-salud`
+> (argmax, desvío = severidad > 0): F1 de desvío **0.525 ± 0.008**. Las
+> filas "umbral óptimo" de la tabla de abajo usan un umbral elegido sobre
+> prueba que el servicio no aplica, así que quedan como históricas.
 
 Media ± desvío estándar sobre 5 corridas con distinta semilla del
 estimador, misma partición de datos (80/20 por animal). Corrida

@@ -497,7 +497,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
-        @Transactional
+        @org.springframework.transaction.annotation.Transactional(readOnly = true)
         @SuppressWarnings("null")
         public List<AnimalResponse> listarAnimales(String emailUsuario, Long establecimientoId) {
 
@@ -537,7 +537,7 @@ public class AnimalServiceImpl implements AnimalService {
         }
 
         @Override
-        @Transactional
+        @org.springframework.transaction.annotation.Transactional(readOnly = true)
         @SuppressWarnings("null")
         public List<AnimalMapaResponse> getPosicionesMapa(String emailUsuario, Long establecimientoId) {
                 Usuario usuario = usuarioRepository.findByEmail(emailUsuario)

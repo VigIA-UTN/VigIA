@@ -1,0 +1,26 @@
+# Perfil de los tests de integración (ver IntegracionBase): pisa lo de H2 del application.yaml de test con lo
+# mismo que main. La URL y las credenciales de la base y de RabbitMQ las pone IntegracionBase desde los contenedores.
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      # Como en producción: si una entidad no coincide con lo que dejan las migraciones, el contexto no levanta.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  # En producción las migraciones las aplica backend-api; acá el worker las toma de ese módulo (failsafe corre con el
+  # directorio del módulo como directorio de trabajo).
+  flyway:
+    enabled: true
+    locations: filesystem:../backend-api/src/main/resources/db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  batch:
+    jdbc:
+      initialize-schema: always
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: true
