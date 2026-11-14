@@ -48,3 +48,7 @@ htmlcov/
 
 # Cobertura (vitest/v8)
 frontend/coverage/
+
+# Manual de Usuario: las capturas y el .docx generado no se versionan
+docs/manual-usuario/img/
+docs/manual-usuario/*.docx
