@@ -25,7 +25,6 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const login = useAuthStore((s) => s.login);
 
-  const ssoPendiente = searchParams.get('sso_pendiente') === '1';
   const ssoError = searchParams.get('sso_error');
 
   const [showPassword, setShowPassword] = useState(false);
@@ -88,17 +87,6 @@ export default function LoginPage() {
         <img src={logoImg} alt="VigIA" className="login-logo" />
 
         <h1 className="login-title">Iniciá sesión en VigIA</h1>
-
-        {/* Alerta de cuenta pendiente de aprobación (SSO) */}
-        {ssoPendiente && (
-          <div className="login-alert alert-locked" role="alert">
-            <span>⏳</span>
-            <span>
-              Tu cuenta de Google fue registrada correctamente pero está <strong>pendiente de aprobación</strong>.
-              Un administrador debe asignarte un rol antes de que puedas acceder.
-            </span>
-          </div>
-        )}
 
         {/* Alerta de error SSO */}
         {ssoError && (
