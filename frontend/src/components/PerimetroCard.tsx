@@ -11,6 +11,8 @@ interface PerimetroCardProps {
   onHoverStart: (perimetroId: number) => void;
   onHoverEnd: () => void;
   isEditing?: boolean;
+  /** Sin acciones: la tarjeta solo muestra el perímetro. */
+  soloLectura?: boolean;
 }
 
 export default function PerimetroCard({
@@ -22,6 +24,7 @@ export default function PerimetroCard({
   onHoverStart,
   onHoverEnd,
   isEditing = false,
+  soloLectura = false,
 }: PerimetroCardProps) {
   // Obtener nombres de los rodeos asignados
   const nombresRodeos = perimetro.loteIds && perimetro.loteIds.length > 0
@@ -47,10 +50,10 @@ export default function PerimetroCard({
       acento={perimetro.activo}
       apagada={!perimetro.activo}
       seleccionada={isEditing}
-      onClick={() => onEdit(perimetro)}
+      onClick={soloLectura ? undefined : () => onEdit(perimetro)}
       onMouseEnter={() => onHoverStart(perimetro.id)}
       onMouseLeave={onHoverEnd}
-      acciones={
+      acciones={soloLectura ? undefined : (
         <div className="d-flex align-items-center gap-2">
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(perimetro); }}
@@ -81,7 +84,7 @@ export default function PerimetroCard({
             <i className="bi bi-trash fs-5"></i>
           </button>
         </div>
-      }
+      )}
     />
   );
 }

@@ -21,6 +21,8 @@ interface PerimetroSidebarProps {
   onHoverStart: (id: number) => void;
   onHoverEnd: () => void;
   isSaving?: boolean;
+  /** Oculta crear, editar, activar/desactivar y eliminar (roles que solo consultan). */
+  soloLectura?: boolean;
 }
 
 export default function PerimetroSidebar({
@@ -40,6 +42,7 @@ export default function PerimetroSidebar({
   onHoverStart,
   onHoverEnd,
   isSaving = false,
+  soloLectura = false,
 }: PerimetroSidebarProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
@@ -85,6 +88,7 @@ export default function PerimetroSidebar({
         <div className="d-flex align-items-center gap-2">
           <h4 className="m-0 fw-bold" style={{ color: '#1E3A5F' }}>Perímetros</h4>
           {/* Switch para activar/desactivar todos los perímetros */}
+          {!soloLectura && (
           <div className="form-check form-switch m-0 p-0 d-flex align-items-center">
             <input
               className="form-check-input m-0"
@@ -95,7 +99,8 @@ export default function PerimetroSidebar({
               onChange={onToggleAll}
             />
           </div>
-          {!editingPerimetro && (
+          )}
+          {!editingPerimetro && !soloLectura && (
             <button
               onClick={onCreateNew}
               className="btn btn-sm py-1 px-2 fw-semibold d-flex align-items-center gap-1"
@@ -164,6 +169,7 @@ export default function PerimetroSidebar({
                 onHoverStart={onHoverStart}
                 onHoverEnd={onHoverEnd}
                 isEditing={false}
+                soloLectura={soloLectura}
               />
             ))}
           </>

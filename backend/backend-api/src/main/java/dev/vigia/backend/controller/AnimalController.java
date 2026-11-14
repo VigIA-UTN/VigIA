@@ -656,7 +656,7 @@ public class AnimalController {
      *         denegado
      */
     @GetMapping("/{id}/indicadores-salud")
-    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO')")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('PRODUCTOR') or hasRole('VETERINARIO') or hasRole('CAMPERO')")
     public ResponseEntity<?> getIndicadoresSalud(
             @PathVariable("id") Long animalId,
             Authentication authentication) {
