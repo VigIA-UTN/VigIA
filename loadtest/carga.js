@@ -6,6 +6,7 @@
 //   clientes_streams     cada productor con 3 streams SSE abiertos, como la página del mapa: 2 de alertas
 //                        (el sidebar y el mapa) y 1 de telemetría del mapa.
 //   clientes_navegacion  cada productor recarga animales, mapa y alertas cada PENSAR_S (60 s), con jitter.
+// Con CELO, SALUD y AISLAMIENTO (RNF01), esos animales siguen su patrón anómalo desde su turno (ver anomalia()).
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { check, sleep } from 'k6';
@@ -22,6 +23,12 @@ const RAMPA = __ENV.RAMPA || '10m';
 const PENSAR_S = Number(__ENV.PENSAR_S || 60);
 const ESCENARIOS = (__ENV.ESCENARIOS || 'sensores').split(',');
 const CON_CLIENTES = ESCENARIOS.some((e) => e.startsWith('clientes_'));
+// RNF01 (ver README, "Alertas"): los mismos animales que seed.sql con -v celo/salud/aislamiento, en cada
+// establecimiento. Cada uno queda callado hasta su turno, repartido en ESCALONAR, y desde ahí sigue su patrón.
+const CELO = Number(__ENV.CELO || 0);
+const SALUD = Number(__ENV.SALUD || 0);
+const AISLAMIENTO = Number(__ENV.AISLAMIENTO || 0);
+const ESCALONAR_S = segundos(__ENV.ESCALONAR || '30m');
 
 if (ESCENARIOS.includes('sensores') && ESCENARIOS.includes('rafaga')) {
     throw new Error('sensores y rafaga son alternativos: numeran igual sus uplinks y se pisarían los f_cnt');
@@ -121,7 +128,8 @@ export function setup() {
 
 // La misma fórmula que trayectoria.sql (y la grilla de establecimientos de seed.sql), así el tráfico continúa el
 // historial sembrado. g: índice global del sensor (LT-00001 es 0); t: tick de 5 minutos desde epoch.
-function posicion(g, t) {
+// amplitud: escala de las vueltas, como en trayectoria.sql (salud: 0,4).
+function posicion(g, t, amplitud = 1) {
     const n = Math.floor(g / SENSORES_POR_CLIENTE); // establecimiento, desde 0
     const d = g % SENSORES_POR_CLIENTE;
     const lat0 = -35 - Math.floor(n / 25) * 0.05;
@@ -129,13 +137,26 @@ function posicion(g, t) {
     const a1 = (2 * Math.PI * t) / 87.6 + d * 0.37;
     const a2 = (2 * Math.PI * t) / 34.8 + d * 1.13;
     return {
-        lat: lat0 + (Math.floor(d / 10) - 2) * 0.0003 + 0.000195 * Math.sin(a1) + 0.0000443 * Math.sin(a2),
-        lon: lon0 + ((d % 10) - 4.5) * 0.0004 + 0.000195 * Math.cos(a1) + 0.0000443 * Math.cos(a2),
+        lat: lat0 + (Math.floor(d / 10) - (Math.ceil(SENSORES_POR_CLIENTE / 10) - 1) / 2) * 0.0003
+            + amplitud * (0.000195 * Math.sin(a1) + 0.0000443 * Math.sin(a2)),
+        lon: lon0 + ((d % 10) - 4.5) * 0.0004 + amplitud * (0.000195 * Math.cos(a1) + 0.0000443 * Math.cos(a2)),
     };
 }
 
+// El sensor d de su establecimiento: su tipo y su turno, en segundos desde el arranque (el i-ésimo de los n de su
+// tipo, en (i + 0,5) · ESCALONAR / n). Los mismos d que seed.sql.
+function anomalia(d) {
+    if (d < CELO) return { tipo: 'celo', turno: ((d + 0.5) * ESCALONAR_S) / CELO };
+    if (d < CELO + SALUD) return { tipo: 'salud', turno: ((d - CELO + 0.5) * ESCALONAR_S) / SALUD };
+    if (AISLAMIENTO && d === SENSORES_POR_CLIENTE - 1) return { tipo: 'aislamiento', turno: ESCALONAR_S / 2 };
+    return { tipo: 'normal', turno: 0 };
+}
+
 // Como el pastoreo normal del simulador: 35 % reposo (0-1), 60 % normal (2-6), 5 % alta actividad (7-9).
-function moveState() {
+// En celo, alta actividad (7-9); con desvío sanitario, poca (1-3). Igual que carga_move_state de trayectoria.sql.
+function moveState(tipo = 'normal') {
+    if (tipo === 'celo') return 7 + Math.floor(Math.random() * 3);
+    if (tipo === 'salud') return 1 + Math.floor(Math.random() * 3);
     const r = Math.random();
     if (r < 0.35) return Math.floor(Math.random() * 2);
     if (r < 0.95) return 2 + Math.floor(Math.random() * 5);
@@ -165,17 +186,29 @@ export function sensor(data) {
     const g = i % SENSORES;
     const ronda = Math.floor(i / SENSORES);
     const devEui = `LT-${String(g + 1).padStart(5, '0')}`;
-    const p = posicion(g, Date.now() / 1000 / 300);
+    const { tipo, turno } = anomalia(g % SENSORES_POR_CLIENTE);
+    const desdeTurnoS = (Date.now() - data.inicioMs) / 1000 - turno;
+    if (desdeTurnoS < 0) return; // callado hasta su turno: su primer dato es el que dispara la alerta
+    const p = posicion(g, Date.now() / 1000 / 300, tipo === 'salud' ? 0.4 : 1);
+    if (tipo === 'celo' && ronda % 2 === 1) {
+        // El salto de carga_salto (trayectoria.sql): 2,5-4 veces la velocidad base de simulador_celo.py.
+        const s = 0.000018 * (2.5 + 1.5 * Math.random());
+        const a = 2 * Math.PI * Math.random();
+        p.lat += s * Math.cos(a);
+        p.lon += s * Math.sin(a);
+    }
+    // Aislamiento: en dos pasos se corre 0,002° al este (~180 m), a más de 100 m de cualquier otra y dentro del perímetro.
+    if (tipo === 'aislamiento') p.lon += Math.min(Math.floor(desdeTurnoS / INTERVALO_S) + 1, 2) * 0.001;
     enviar(devEui, data.base + ronda * 2, {
         type: 'GNSSPosition',
         latitude: p.lat,
         longitude: p.lon,
-        moveState: moveState(),
+        moveState: moveState(tipo),
         battery: '89.5%',
     });
     // Un heartbeat por hora por sensor, repartidos entre rondas para que sean ~6,9/s parejos y no todos juntos.
     if ((ronda + g) % 12 === 0) {
-        enviar(devEui, data.base + ronda * 2 + 1, { type: 'Heartbeat', moveState: moveState(), battery: '89.4%' });
+        enviar(devEui, data.base + ronda * 2 + 1, { type: 'Heartbeat', moveState: moveState(tipo), battery: '89.4%' });
     }
 }
 

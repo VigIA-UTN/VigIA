@@ -18,7 +18,8 @@ docker compose -f infra/docker-compose.yml -f infra/docker-compose.carga.yml up 
   curl localhost:8080/actuator/metrics/hikaricp.connections.active   # API
   curl localhost:8081/actuator/metrics/hikaricp.connections.active   # worker
   ```
-- **Los horarios de los jobs de Railway:** celo y salud cada 6 h, geo cada 15 min y anestro a las 2 AM. El stack normal los corre cada minuto.
+- **Los horarios de los jobs de Railway:** celo, salud y geo cada 30 min y anestro a las 2 AM. Se pueden pisar desde el entorno (`VIGIA_BATCH_CELO_RATE=21600000 docker compose ... up -d`). El stack normal los corre cada minuto.
+- **El perfil `prod` exige `JWT_SECRET`.** Si `infra/.env` no lo define, la API no arranca: pasarlo en el entorno de `docker compose`.
 - **Un servicio `k6`** (perfil `carga`, no arranca con `up`). Monta esta carpeta en `/scripts` y recibe `API_URL`, `WORKER_URL` y `TTN_API_KEY`:
   ```bash
   docker compose -f infra/docker-compose.yml -f infra/docker-compose.carga.yml run --rm k6 version
@@ -138,7 +139,7 @@ Escribe `loadtest/resultados/<corrida>/muestras.csv`:
 ## Orden de una corrida
 
 1. **Semilla** (arriba), justo antes: el historial termina cuando se siembra, y un hueco largo entre el último punto y el primero de k6 se ve como un salto de posición.
-2. **Reiniciar el worker:** `docker restart vigia-backend-worker`. Celo y salud corren cada 6 h y, como son `fixedRate`, la primera vez al arrancar. Así el ciclo que procesa las 6 h pendientes cae dentro de la corrida; si no, no correría nunca durante una prueba.
+2. **Reiniciar el worker:** `docker restart vigia-backend-worker`. Celo, salud y geo corren cada 30 min y, como son `fixedRate`, la primera vez al arrancar. Así el ciclo que procesa las 6 h pendientes cae dentro de la corrida; si no, no correría nunca durante una prueba.
 3. **Observador y k6**, con el mismo nombre de corrida:
    ```bash
    python loadtest/observar.py <corrida> &
@@ -147,6 +148,34 @@ Escribe `loadtest/resultados/<corrida>/muestras.csv`:
    ```
 
 Celo, salud y geo corren de a uno (ver `BatchScheduler`), así que geo espera mientras dura el ciclo de celo y salud.
+
+`loadtest/estres.sh rafaga` y `loadtest/estres.sh estable [90m]` hacen todo esto (limpiar, semilla, reiniciar el worker, observador y k6) y guardan la corrida en `resultados/stress-<modo>/`, o en `resultados/<corrida>/` con un tercer argumento (`estres.sh estable 90m stress-estable-2`). La estable agrega en cada establecimiento un animal en celo, uno con desvío y uno que se aísla, que arrancan a los 5 min, y mide su latencia con `latencia.sql` al terminar k6 (`latencia.txt`). A 25.000 caravanas una pasada de celo más una de salud dura más que la corrida, así que los que todavía no alertaron aparecen en "Problemas".
+
+## Volumen: 10, 50 y 200 animales (RNF01 y RNF02)
+
+Un establecimiento por corrida, con 24 h de historial y tráfico real encima. Mide la respuesta de la API al crecer el rodeo (RNF02: hasta 25 % más lenta entre 10 y 200) y cuánto tardan en salir las alertas (RNF01: p95 dentro de los 60 min del dato que las dispara).
+
+```bash
+loadtest/volumen.sh 200 10 70m    # sensores, animales con anomalía de cada tipo, duración
+```
+
+En orden: `limpiar.sql`, la semilla, reinicio del worker (celo, salud y geo corren al arrancar y después cada 30 min), 2 min de calentamiento sin medir y la corrida con el observador. Una corrida de menos de 30 min (`volumen.sh 200 10 20m`) reparte los turnos en su duración y, al terminar k6, espera la segunda pasada de los jobs para que `latencia.txt` mida RNF01. Deja en `resultados/vol-<sensores>/` lo de siempre más `semilla.txt` y `latencia.txt`.
+
+**Alertas.** Con `-v celo=N -v salud=N -v aislamiento=1` (semilla) y `CELO`, `SALUD`, `AISLAMIENTO` (k6), en cada establecimiento:
+
+| Sensores (`d`) | Últimas 24 h de la semilla | Desde su turno, en k6 |
+|---|---|---|
+| `0` … `N-1`: celo | moveState 7-9 y un salto cada dos ticks a 2,5-4 veces la velocidad base de `simulador_celo.py` | Lo mismo |
+| `N` … `2N-1`: salud | moveState 1-3 y vueltas al 40 % | Lo mismo |
+| el último: aislamiento | Normal | En dos pasos se corre ~180 m al este, a más de 100 m de cualquier otra y dentro del perímetro |
+
+- **Validado contra los modelos** (ventanas armadas con `trayectoria.sql`, mandadas directo a ml-celo y ml-salud):
+  - Celo: P entre 0,947 y 0,953 en 40 de 40, con el umbral local de `infra/.env` (0,892). La misma vaca da también desvío sanitario severidad 3, así que alerta de los dos tipos.
+  - Salud: severidad 2 en 5 de 5.
+  - Normal y aislamiento: ni celo (P < 0,3) ni desvío.
+- **Turnos.** La semilla deja esas 24 h ya procesadas y cada animal con anomalía queda callado hasta su turno: el i-ésimo de los N de su tipo manda su primer dato a (i + 0,5) · `ESCALONAR` / N (30 min por defecto) del arranque de k6. Ese primer dato es el que dispara la alerta. Repartidos así, los disparos caen en cualquier momento del ciclo de 30 min de los jobs, como en producción.
+  - Celo y salud aceptan el hueco: rellenan hasta 60 min y piden el 90 % de la ventana.
+- **`latencia.sql`** da cada alerta con su latencia (`ts_generacion` menos ese primer dato; en aislamiento, más los 15 min fuera del grupo que exige el worker), el p50/p95/máximo por tipo y en total, y los problemas: animales con anomalía sin su alerta y alertas sobre animales normales.
 
 ## Volver al stack normal
 

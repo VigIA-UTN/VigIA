@@ -6,6 +6,9 @@ import dev.vigia.backend.model.Telemetria;
 import dev.vigia.backend.repository.CaravanaRepository;
 import dev.vigia.backend.repository.TelemetriaRepository;
 import dev.vigia.backend.service.ml.DetectorStrategy;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.FlushModeType;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
@@ -35,6 +38,9 @@ public class SaludBatchConfig {
     private final TelemetriaRepository telemetriaRepository;
     private final DetectorStrategy saludDetectorStrategy;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     public SaludBatchConfig(JobRepository jobRepository, PlatformTransactionManager transactionManager,
             CaravanaRepository caravanaRepository, TelemetriaRepository telemetriaRepository,
             @Qualifier("saludDetectorStrategyImpl") DetectorStrategy saludDetectorStrategy) {
@@ -59,6 +65,10 @@ public class SaludBatchConfig {
     @Bean
     public ItemProcessor<Caravana, Caravana> saludProcessor() {
         return caravana -> {
+            // Un flush por chunk, al commitear: con el automático, cada consulta revisaba la telemetría de 24 h de
+            // las caravanas anteriores del chunk (~2.900 entidades) y mandaba sus UPDATE. Ninguna consulta de una
+            // caravana lee lo que escribieron las otras (RNF01; ver FlushPorChunkIT).
+            entityManager.setFlushMode(FlushModeType.COMMIT);
             LocalDateTime hace24h = LocalDateTime.now().minusHours(24);
             // Usa el flag de "pendiente" propio de salud (estado_inferencia_salud),
             // no el de celo: comparten Telemetria pero cada pipeline necesita
