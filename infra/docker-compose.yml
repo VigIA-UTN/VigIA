@@ -10,7 +10,9 @@ services:
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
-      - vigia_pgdata:/var/lib/pgdata/data
+      # La imagen timescaledb-ha guarda los datos en PGDATA=/home/postgres/pgdata/data: el volumen va montado ahí
+      # para que la base sobreviva a recrear el contenedor.
+      - vigia_db_data:/home/postgres/pgdata/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER:-vigia_user} -d ${POSTGRES_DB:-vigia}" ]
@@ -185,4 +187,4 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
 
 volumes:
-  vigia_pgdata:
+  vigia_db_data:
