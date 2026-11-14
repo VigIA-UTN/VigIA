@@ -325,14 +325,9 @@ export default function LandingPage() {
               Ir a mi panel
             </button>
           ) : (
-            <>
-              <Link to="/login" className="landing-btn-secondary w-100" style={{ textAlign: 'center' }}>
-                Iniciar sesión
-              </Link>
-              <Link to="/register" className="landing-btn-primary w-100" style={{ textAlign: 'center' }}>
-                Registrarse
-              </Link>
-            </>
+            <Link to="/login" className="landing-btn-primary w-100" style={{ textAlign: 'center' }}>
+              Iniciar sesión
+            </Link>
           )}
         </div>
       </div>
@@ -968,7 +963,6 @@ export default function LandingPage() {
               <h4 className="landing-footer-title">Plataforma</h4>
               <ul className="landing-footer-links">
                 <li><Link to="/login" className="landing-footer-link">Iniciar sesión</Link></li>
-                <li><Link to="/register" className="landing-footer-link">Registrarse</Link></li>
                 <li><a href="/privacy.html" target="_blank" rel="noreferrer" className="landing-footer-link">Política de Privacidad</a></li>
               </ul>
             </div>

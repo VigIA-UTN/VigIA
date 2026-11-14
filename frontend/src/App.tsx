@@ -6,7 +6,6 @@ import EstablecimientosPage from './pages/EstablecimientosPage';
 import InvitacionesPage from './pages/InvitacionesPage';
 import InvitacionesEmpleadosPage from './pages/InvitacionesEmpleadosPage';
 import InvitacionesPendientesPage from './pages/InvitacionesPendientesPage';
-import RegisterPage from './pages/RegisterPage';
 import AcceptInvitationPage from './pages/AcceptInvitationPage';
 import OAuth2CallbackPage from './pages/OAuth2CallbackPage';
 import UsuariosAdminPage from './pages/UsuariosAdminPage';
@@ -50,7 +49,6 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
-        <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
         <Route path="/aceptar-invitacion" element={<AcceptInvitationPage />} />
         <Route path="/oauth2/callback" element={<OAuth2CallbackPage />} />
         <Route

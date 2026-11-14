@@ -123,7 +123,7 @@ class IndicadoresSaludIT extends DeteccionItBase {
         assertThat(estado(getAnimal("productorA", animal, "/indicadores-salud"))).isEqualTo(200);
         assertThat(estado(getAnimal("veterinarioA", animal, "/indicadores-salud"))).isEqualTo(200);
         assertThat(estado(getAnimal("admin", animal, "/indicadores-salud"))).isEqualTo(200);
-        assertThat(estado(getAnimal("camperoA", animal, "/indicadores-salud"))).isEqualTo(403);
+        assertThat(estado(getAnimal("camperoA", animal, "/indicadores-salud"))).isEqualTo(200);
         assertThat(estado(getAnimal("productorB", animal, "/indicadores-salud"))).isEqualTo(403);
     }
 

@@ -384,6 +384,8 @@ export default function EstablecimientosPage() {
 
             {errorLote && <Alert variant="danger">{errorLote}</Alert>}
 
+            {/* Solo el productor crea lotes: el servidor rechaza el alta al administrador. */}
+            {rol === 'PRODUCTOR' && (
             <Form onSubmit={async (e) => {
               e.preventDefault();
               if (!nuevoLoteNombre.trim()) return;
@@ -411,6 +413,7 @@ export default function EstablecimientosPage() {
                 {creandoLote ? <Spinner size="sm" animation="border" /> : '+ Nuevo Lote'}
               </Button>
             </Form>
+            )}
 
             {loadingLotes ? (
               <div className="text-center py-3"><Spinner animation="border" variant="primary" /></div>
