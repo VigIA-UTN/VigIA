@@ -103,6 +103,9 @@ function MapUpdater({ center, trigger }: { center: [number, number], trigger: { 
 export default function MapPage() {
   const mapRef = useRef<L.Map | null>(null);
   const { establecimientos, selectedId } = useEstablecimientoStore();
+  // Igual que el servidor: solo el productor y el administrador crean, editan, activan o eliminan perímetros.
+  const rol = useAuthStore((s) => s.rol);
+  const puedeEditarPerimetros = rol === 'PRODUCTOR' || rol === 'ADMINISTRADOR';
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [selectedAlertaMap, setSelectedAlertaMap] = useState<AlertaResponse | null>(null);
   const [animales, setAnimales] = useState<AnimalMapa[]>([]);
@@ -790,6 +793,7 @@ export default function MapPage() {
           onHoverStart={(id) => setHoveredPerimetroId(id)}
           onHoverEnd={() => setHoveredPerimetroId(null)}
           isSaving={isSavingPerimetro}
+          soloLectura={!puedeEditarPerimetros}
         />
       ) : null}
 

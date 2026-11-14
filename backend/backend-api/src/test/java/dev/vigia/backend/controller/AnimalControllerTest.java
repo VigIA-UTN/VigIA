@@ -2523,14 +2523,14 @@ class AnimalControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - RBAC: CAMPERO no tiene acceso (403)")
+        @DisplayName("GET /api/v1/animales/{id}/indicadores-salud - RBAC: el CAMPERO del establecimiento tiene acceso")
         @SuppressWarnings("null")
-        void getIndicadoresSalud_rbacCampero_forbidden() throws Exception {
+        void getIndicadoresSalud_rbacCampero_ok() throws Exception {
                 Long animalId = crearAnimal("Vaca RBAC Campero", establecimientoId, rodeoLoteId);
 
                 mockMvc.perform(get("/api/v1/animales/" + animalId + "/indicadores-salud")
                                 .header("Authorization", "Bearer " + camperoToken))
-                                .andExpect(status().isForbidden());
+                                .andExpect(status().isOk());
         }
 
         @Test
