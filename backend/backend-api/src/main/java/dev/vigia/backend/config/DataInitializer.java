@@ -53,13 +53,21 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.Polygon;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -69,13 +77,18 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Datos de prueba para desarrollo y para la demo E2E (Sprint 10): limpia la base
- * y la vuelve a sembrar en cada arranque. Solo corre con el perfil "dev"; nunca
- * con "prod" (el default de la app).
+ * Datos de prueba para desarrollo y para la demo E2E (Sprint 10): limpia y vuelve a sembrar en cada arranque.
+ * <ul>
+ * <li>"dev": borra toda la base y siembra la demo con un admin propio.</li>
+ * <li>"demo" (para prod: {@code SPRING_PROFILES_ACTIVE=prod,demo}): borra solo la demo con
+ * {@code db/demo/limpiar_demo.sql}, que aborta si la demo está mezclada con datos reales, y siembra sin admin
+ * (prod ya tiene el suyo). Si la limpieza aborta, no siembra y la API arranca igual.</li>
+ * </ul>
+ * Sin ninguno de los dos (el default es "prod") no corre.
  */
 @Slf4j
 @Component
-@Profile("dev")
+@Profile({ "dev", "demo" })
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
@@ -99,6 +112,12 @@ public class DataInitializer implements CommandLineRunner {
         private final PasswordEncoder passwordEncoder;
         private final ObjectMapper objectMapper;
         private final JdbcTemplate jdbcTemplate;
+        private final Environment environment;
+
+        // Mails que la limpieza del perfil "demo" borra además de los del seed, separados por coma: el de Pedro,
+        // que se invita en vivo (Acto 1). Variable de entorno VIGIA_DEMO_EMAILS_EXTRA.
+        @Value("${vigia.demo.emails-extra:}")
+        private String demoEmailsExtra;
 
         private static final double LAT_CENTRO = -34.943317;
         private static final double LON_CENTRO = -59.225728;
@@ -144,7 +163,57 @@ public class DataInitializer implements CommandLineRunner {
         @Override
         @SuppressWarnings("null")
         public void run(String... args) {
-                log.info("[DataInitializer] Iniciando seed de DEMO (Sprint 10 E2E)...");
+                boolean demo = environment.acceptsProfiles(Profiles.of("demo"));
+                log.info("[DataInitializer] Iniciando seed de DEMO (Sprint 10 E2E), modo {}...",
+                                demo ? "demo (limpieza acotada)" : "dev (base completa)");
+                if (demo) {
+                        if (!limpiarDemo()) {
+                                return;
+                        }
+                } else {
+                        borrarTodo();
+                }
+                sembrar(demo);
+        }
+
+        /**
+         * Corre limpiar_demo.sql en una sola transaccion. Si una guarda aborta (la demo esta mezclada con datos
+         * reales), deshace todo, lo deja en el log y devuelve false: no se siembra, pero la API arranca.
+         */
+        private boolean limpiarDemo() {
+                try (Connection conexion = jdbcTemplate.getDataSource().getConnection()) {
+                        String script = new ClassPathResource("db/demo/limpiar_demo.sql")
+                                        .getContentAsString(StandardCharsets.UTF_8);
+                        boolean autoCommit = conexion.getAutoCommit();
+                        // Antes de abrir la transaccion: la primera sentencia del script es el SET TRANSACTION.
+                        try (PreparedStatement ps = conexion
+                                        .prepareStatement("SELECT set_config('vigia.demo_emails_extra', ?, false)")) {
+                                ps.setString(1, demoEmailsExtra == null ? "" : demoEmailsExtra);
+                                ps.execute();
+                        }
+                        conexion.setAutoCommit(false);
+                        try (Statement st = conexion.createStatement()) {
+                                st.execute(script);
+                                conexion.commit();
+                        } catch (Exception e) {
+                                conexion.rollback();
+                                throw e;
+                        } finally {
+                                conexion.setAutoCommit(autoCommit);
+                                try (Statement st = conexion.createStatement()) {
+                                        st.execute("RESET vigia.demo_emails_extra");
+                                }
+                        }
+                        log.info("[DataInitializer] Demo anterior borrada (limpiar_demo.sql).");
+                        return true;
+                } catch (Exception e) {
+                        log.error("[DataInitializer] limpiar_demo.sql aborto y no se borro nada; NO se siembra la demo. "
+                                        + "Motivo: {}", e.getMessage());
+                        return false;
+                }
+        }
+
+        private void borrarTodo() {
                 try {
                         jdbcTemplate.execute("SET vigia.bypass_immutable_triggers = 'true'");
                 } catch (Exception ignored) {
@@ -166,14 +235,20 @@ public class DataInitializer implements CommandLineRunner {
                 rodeoLoteRepository.deleteAll();
                 establecimientoRepository.deleteAll();
                 usuarioRepository.deleteAll();
+        }
 
-                // Usuarios
-                Usuario admin = buildUsuario("Admin", "VigIA", "admin@vigia.dev", "admin123", Rol.ADMINISTRADOR);
+        private void sembrar(boolean demo) {
+                // Usuarios. Con "demo" no hay admin propio: prod ya tiene el suyo, y un segundo ADMINISTRADOR (rol
+                // global) veria tambien los establecimientos reales.
                 Usuario productor = buildUsuario("Juan", "Martínez", "juan@laesperanza.com", "productor123",
                                 Rol.PRODUCTOR);
                 Usuario campero = buildUsuario("Carlos", "Gómez", "carlos@laesperanza.com", "campero123", Rol.CAMPERO);
                 Usuario vet = buildUsuario("Laura", "Benítez", "laura@vet.com", "vet123", Rol.VETERINARIO);
-                usuarioRepository.saveAll(List.of(admin, productor, campero, vet));
+                usuarioRepository.saveAll(List.of(productor, campero, vet));
+                if (!demo) {
+                        usuarioRepository.save(
+                                        buildUsuario("Admin", "VigIA", "admin@vigia.dev", "admin123", Rol.ADMINISTRADOR));
+                }
 
                 // Establecimiento principal (coords = simulador.py)
                 Establecimiento estP = new Establecimiento();
@@ -188,18 +263,7 @@ public class DataInitializer implements CommandLineRunner {
                 estP.getEmpleados().add(new Empleado(estP, vet));
                 establecimientoRepository.save(estP);
 
-                // Segundo establecimiento (selector RNF03 -- productor en AMBOS)
-                Establecimiento estAurora = new Establecimiento();
-                estAurora.setNombre("Estancia La Aurora");
-                estAurora.setLatitud(-34.920000);
-                estAurora.setLongitud(-59.210000);
-                estAurora.setActivo(true);
-                estAurora.setFechaAlta(LocalDate.now());
-                establecimientoRepository.save(estAurora);
-                estAurora.getEmpleados().add(new Empleado(estAurora, productor));
-                establecimientoRepository.save(estAurora);
-
-                log.info("[DataInitializer] 2 establecimientos + 4 usuarios. Productor vinculado a ambos (RNF03).");
+                log.info("[DataInitializer] Establecimiento demo + usuarios creados.");
 
                 // Rodeos
                 RodeoLote lotePrincipal = new RodeoLote(estP);
@@ -475,8 +539,10 @@ public class DataInitializer implements CommandLineRunner {
 
                 log.info("[DataInitializer] Alertas historicas 8 semanas sembradas (H0044/H0045).");
                 log.info("[DataInitializer] SEED DEMO completado.");
-                log.info("  admin@vigia.dev        / admin123      -> ADMINISTRADOR");
-                log.info("  juan@laesperanza.com   / productor123  -> PRODUCTOR (ambos establecimientos)");
+                if (!demo) {
+                        log.info("  admin@vigia.dev        / admin123      -> ADMINISTRADOR");
+                }
+                log.info("  juan@laesperanza.com   / productor123  -> PRODUCTOR");
                 log.info("  carlos@laesperanza.com / campero123    -> CAMPERO");
                 log.info("  laura@vet.com          / vet123        -> VETERINARIO");
         }
