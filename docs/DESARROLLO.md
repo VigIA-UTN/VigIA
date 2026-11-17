@@ -208,7 +208,7 @@ Si utiliza el plugin de PostgreSQL de Railway, este proveerá sus propias creden
 - `SPRING_RABBITMQ_PASSWORD`: Contraseña de RabbitMQ.
 
 #### 3. Backend (API y Worker)
-- `SPRING_PROFILES_ACTIVE`: **producción → dejar sin setear o `prod`.** El default de la app ya es `prod`, así que un redeploy nunca ejecuta el `DataInitializer` (que limpia y re-siembra la base). **Solo el entorno de `develop` debe setear `SPRING_PROFILES_ACTIVE=dev`** para volver a tener datos de prueba en cada deploy.
+- `SPRING_PROFILES_ACTIVE`: **producción → dejar sin setear o `prod`.** El default de la app ya es `prod`, así que un redeploy nunca ejecuta el `DataInitializer` (que limpia y re-siembra la base). **Solo el entorno de `develop` debe setear `SPRING_PROFILES_ACTIVE=dev`** para volver a tener datos de prueba en cada deploy. Única excepción en producción: `prod,demo` en `backend-api` mientras se ensaya o presenta la demo E2E. Borra y vuelve a sembrar solo el establecimiento de la demo y aborta si está mezclado con datos reales; ver [demo/README.md](../demo/README.md). Sacarlo al terminar.
 - `CORS_ORIGINS` (solo `backend-api`): URLs de su frontend en producción (ej. `https://vigia-frontend.up.railway.app`).
 - `TZ`: `America/Argentina/Buenos_Aires`
 - `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (solo `backend-api`): credenciales del cliente OAuth de Google para el login con SSO, de Google Cloud Console > APIs y servicios > Credenciales. **Son obligatorias**: el `application.yaml` no trae valores por defecto y la API no levanta sin ellas.
