@@ -2,8 +2,7 @@
 -- Cuarentena, vaquillonas, perímetros, alertas, intervenciones, diagnósticos, invitaciones y usuarios que solo
 -- pertenecen a la demo (Pedro incluido). Los demás establecimientos y sus datos no se tocan.
 --
--- Lo corre DataInitializer con el perfil "demo" antes de sembrar. A mano (el SET va antes del BEGIN porque la
--- primera sentencia de la transacción tiene que ser el SET TRANSACTION de abajo):
+-- Lo corre DataInitializer con el perfil "demo" antes de sembrar (reintenta si choca con el worker). A mano:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SET vigia.demo_emails_extra = 'pedro@gmail.com'" \
 --        -c "BEGIN" -f limpiar_demo.sql -c "COMMIT"
 -- Prueba en seco: lo mismo con ROLLBACK en vez de COMMIT (muestra qué borraría y deshace todo).
@@ -13,14 +12,15 @@
 --   - Un usuario fijo de la demo (juan, carlos, laura o el de vigia.demo_emails_extra) es empleado de un
 --     establecimiento real.
 --   - Una caravana VIGIA-* o un animal de la demo pertenece a un establecimiento real.
---   - Al final cambió la cantidad de filas de algún dato real.
+--   - Al final falta alguna fila real que estaba al principio.
 -- Usuarios: se borran los fijos y los que solo son empleados de la demo (los invitados en vivo). Un usuario real
 -- que además esté en la demo solo pierde ese vínculo. Un ADMINISTRADOR nunca se borra.
 --
+-- Corre en READ COMMITTED, la del worker: con REPEATABLE READ, cualquier fila de la demo que el worker actualizara
+-- durante la limpieza (telemetría procesada, perfiles) la hacía fallar con "could not serialize access".
+--
 -- SQL plano sin metacomandos de psql y sin BEGIN/COMMIT: la transacción la abre quien lo corre.
 
--- Foto fija de la base: los conteos de antes y de después no ven lo que la ingesta real escribe mientras tanto.
-SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 -- estados_salud, diagnosticos, intervenciones y alertas resueltas bloquean el DELETE salvo con este bypass (V12, V15, V16).
 SET LOCAL vigia.bypass_immutable_triggers = 'true';
 
@@ -104,24 +104,36 @@ BEGIN
     END IF;
 END $$;
 
+-- Bloquea el establecimiento, las caravanas y los animales de la demo hasta el COMMIT: desde acá, la telemetría,
+-- alertas o registros de cohesión que el worker quiera colgar de ellos esperan y después fallan por la FK, en vez de
+-- aparecer a mitad de la limpieza y frenar el DELETE de animales o caravanas.
+DO $$
+BEGIN
+    PERFORM 1 FROM establecimientos WHERE id IN (SELECT id FROM demo_est) FOR UPDATE;
+    PERFORM 1 FROM caravanas WHERE id IN (SELECT id FROM demo_caravana) FOR UPDATE;
+    PERFORM 1 FROM animales WHERE id IN (SELECT id FROM demo_animal) FOR UPDATE;
+END $$;
+
+-- Después del bloqueo: ya no se pueden sumar alertas a los animales de la demo.
 CREATE TEMP TABLE demo_alerta ON COMMIT DROP AS
 SELECT id FROM alertas WHERE animal_id IN (SELECT id FROM demo_animal);
 
--- Conteo de los datos reales, para comparar al final.
-CREATE TEMP TABLE conteo_antes ON COMMIT DROP AS
-SELECT 'establecimientos' AS tabla, count(*) AS n FROM establecimientos WHERE id NOT IN (SELECT id FROM demo_est)
-UNION ALL SELECT 'usuarios', count(*) FROM usuarios WHERE id NOT IN (SELECT id FROM demo_usuario)
-UNION ALL SELECT 'empleado', count(*) FROM empleado
+-- Las filas reales que hay ahora, para verificar al final que siguen todas. Por id y no por conteo: la ingesta real
+-- sigue escribiendo mientras corre la limpieza.
+CREATE TEMP TABLE real_ids ON COMMIT DROP AS
+SELECT 'establecimientos' AS tabla, id FROM establecimientos WHERE id NOT IN (SELECT id FROM demo_est)
+UNION ALL SELECT 'usuarios', id FROM usuarios WHERE id NOT IN (SELECT id FROM demo_usuario)
+UNION ALL SELECT 'empleado', id FROM empleado
           WHERE establecimiento_id IS NULL OR establecimiento_id NOT IN (SELECT id FROM demo_est)
-UNION ALL SELECT 'rodeo_lote', count(*) FROM rodeo_lote WHERE establecimiento_id NOT IN (SELECT id FROM demo_est)
-UNION ALL SELECT 'perimetro', count(*) FROM perimetro WHERE establecimiento_id NOT IN (SELECT id FROM demo_est)
-UNION ALL SELECT 'caravanas', count(*) FROM caravanas WHERE id NOT IN (SELECT id FROM demo_caravana)
-UNION ALL SELECT 'animales', count(*) FROM animales WHERE id NOT IN (SELECT id FROM demo_animal)
-UNION ALL SELECT 'alertas', count(*) FROM alertas WHERE id NOT IN (SELECT id FROM demo_alerta)
-UNION ALL SELECT 'estados_reproductivos', count(*) FROM estados_reproductivos WHERE animal_id NOT IN (SELECT id FROM demo_animal)
-UNION ALL SELECT 'intervenciones', count(*) FROM intervenciones WHERE animal_id NOT IN (SELECT id FROM demo_animal)
-UNION ALL SELECT 'diagnosticos', count(*) FROM diagnosticos WHERE animal_id NOT IN (SELECT id FROM demo_animal)
-UNION ALL SELECT 'registros_peso', count(*) FROM registros_peso WHERE animal_id NOT IN (SELECT id FROM demo_animal);
+UNION ALL SELECT 'rodeo_lote', id FROM rodeo_lote WHERE establecimiento_id NOT IN (SELECT id FROM demo_est)
+UNION ALL SELECT 'perimetro', id FROM perimetro WHERE establecimiento_id NOT IN (SELECT id FROM demo_est)
+UNION ALL SELECT 'caravanas', id FROM caravanas WHERE id NOT IN (SELECT id FROM demo_caravana)
+UNION ALL SELECT 'animales', id FROM animales WHERE id NOT IN (SELECT id FROM demo_animal)
+UNION ALL SELECT 'alertas', id FROM alertas WHERE id NOT IN (SELECT id FROM demo_alerta)
+UNION ALL SELECT 'estados_reproductivos', id FROM estados_reproductivos WHERE animal_id NOT IN (SELECT id FROM demo_animal)
+UNION ALL SELECT 'intervenciones', id FROM intervenciones WHERE animal_id NOT IN (SELECT id FROM demo_animal)
+UNION ALL SELECT 'diagnosticos', id FROM diagnosticos WHERE animal_id NOT IN (SELECT id FROM demo_animal)
+UNION ALL SELECT 'registros_peso', id FROM registros_peso WHERE animal_id NOT IN (SELECT id FROM demo_animal);
 
 DO $$
 BEGIN
@@ -161,32 +173,30 @@ DELETE FROM empleado WHERE establecimiento_id IN (SELECT id FROM demo_est) OR us
 DELETE FROM establecimientos WHERE id IN (SELECT id FROM demo_est);
 DELETE FROM usuarios WHERE id IN (SELECT id FROM demo_usuario);
 
--- 5. Los datos reales tienen que estar igual que al principio.
+-- 5. Todas las filas reales del principio tienen que seguir estando.
 DO $$
 DECLARE
     r RECORD;
 BEGIN
     FOR r IN
-        SELECT a.tabla, a.n AS antes, d.n AS despues
-        FROM conteo_antes a
-        JOIN (
-            SELECT 'establecimientos' AS tabla, count(*) AS n FROM establecimientos WHERE id NOT IN (SELECT id FROM demo_est)
-            UNION ALL SELECT 'usuarios', count(*) FROM usuarios WHERE id NOT IN (SELECT id FROM demo_usuario)
-            UNION ALL SELECT 'empleado', count(*) FROM empleado
-                      WHERE establecimiento_id IS NULL OR establecimiento_id NOT IN (SELECT id FROM demo_est)
-            UNION ALL SELECT 'rodeo_lote', count(*) FROM rodeo_lote WHERE establecimiento_id NOT IN (SELECT id FROM demo_est)
-            UNION ALL SELECT 'perimetro', count(*) FROM perimetro WHERE establecimiento_id NOT IN (SELECT id FROM demo_est)
-            UNION ALL SELECT 'caravanas', count(*) FROM caravanas WHERE id NOT IN (SELECT id FROM demo_caravana)
-            UNION ALL SELECT 'animales', count(*) FROM animales WHERE id NOT IN (SELECT id FROM demo_animal)
-            UNION ALL SELECT 'alertas', count(*) FROM alertas WHERE id NOT IN (SELECT id FROM demo_alerta)
-            UNION ALL SELECT 'estados_reproductivos', count(*) FROM estados_reproductivos WHERE animal_id NOT IN (SELECT id FROM demo_animal)
-            UNION ALL SELECT 'intervenciones', count(*) FROM intervenciones WHERE animal_id NOT IN (SELECT id FROM demo_animal)
-            UNION ALL SELECT 'diagnosticos', count(*) FROM diagnosticos WHERE animal_id NOT IN (SELECT id FROM demo_animal)
-            UNION ALL SELECT 'registros_peso', count(*) FROM registros_peso WHERE animal_id NOT IN (SELECT id FROM demo_animal)
-        ) d USING (tabla)
-        WHERE a.n <> d.n
+        SELECT tabla, count(*) AS faltan
+        FROM real_ids x
+        WHERE CASE tabla
+            WHEN 'establecimientos' THEN NOT EXISTS (SELECT 1 FROM establecimientos t WHERE t.id = x.id)
+            WHEN 'usuarios' THEN NOT EXISTS (SELECT 1 FROM usuarios t WHERE t.id = x.id)
+            WHEN 'empleado' THEN NOT EXISTS (SELECT 1 FROM empleado t WHERE t.id = x.id)
+            WHEN 'rodeo_lote' THEN NOT EXISTS (SELECT 1 FROM rodeo_lote t WHERE t.id = x.id)
+            WHEN 'perimetro' THEN NOT EXISTS (SELECT 1 FROM perimetro t WHERE t.id = x.id)
+            WHEN 'caravanas' THEN NOT EXISTS (SELECT 1 FROM caravanas t WHERE t.id = x.id)
+            WHEN 'animales' THEN NOT EXISTS (SELECT 1 FROM animales t WHERE t.id = x.id)
+            WHEN 'alertas' THEN NOT EXISTS (SELECT 1 FROM alertas t WHERE t.id = x.id)
+            WHEN 'estados_reproductivos' THEN NOT EXISTS (SELECT 1 FROM estados_reproductivos t WHERE t.id = x.id)
+            WHEN 'intervenciones' THEN NOT EXISTS (SELECT 1 FROM intervenciones t WHERE t.id = x.id)
+            WHEN 'diagnosticos' THEN NOT EXISTS (SELECT 1 FROM diagnosticos t WHERE t.id = x.id)
+            WHEN 'registros_peso' THEN NOT EXISTS (SELECT 1 FROM registros_peso t WHERE t.id = x.id)
+        END
+        GROUP BY tabla
     LOOP
-        RAISE EXCEPTION 'limpiar_demo: cambiaron los datos reales de % (% -> % filas); se deshace todo',
-            r.tabla, r.antes, r.despues;
+        RAISE EXCEPTION 'limpiar_demo: faltan % fila(s) reales de %; se deshace todo', r.faltan, r.tabla;
     END LOOP;
 END $$;
