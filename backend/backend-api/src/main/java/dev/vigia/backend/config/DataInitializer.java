@@ -178,39 +178,74 @@ public class DataInitializer implements CommandLineRunner {
 
         /**
          * Corre limpiar_demo.sql en una sola transaccion. Si una guarda aborta (la demo esta mezclada con datos
-         * reales), deshace todo, lo deja en el log y devuelve false: no se siembra, pero la API arranca.
+         * reales), deshace todo, lo deja en el log y devuelve false: no se siembra, pero la API arranca. Si choca con
+         * el worker, que sigue procesando la telemetria de la demo mientras se borra (deadlock, serializacion o una
+         * FK), reintenta.
          */
         private boolean limpiarDemo() {
-                try (Connection conexion = jdbcTemplate.getDataSource().getConnection()) {
-                        String script = new ClassPathResource("db/demo/limpiar_demo.sql")
-                                        .getContentAsString(StandardCharsets.UTF_8);
-                        boolean autoCommit = conexion.getAutoCommit();
-                        // Antes de abrir la transaccion: la primera sentencia del script es el SET TRANSACTION.
-                        try (PreparedStatement ps = conexion
-                                        .prepareStatement("SELECT set_config('vigia.demo_emails_extra', ?, false)")) {
-                                ps.setString(1, demoEmailsExtra == null ? "" : demoEmailsExtra);
-                                ps.execute();
+                for (int intento = 1; ; intento++) {
+                        try {
+                                limpiarDemoUnaVez();
+                                log.info("[DataInitializer] Demo anterior borrada (limpiar_demo.sql).");
+                                return true;
+                        } catch (Exception e) {
+                                if (intento < INTENTOS_LIMPIEZA_DEMO && esChoqueConcurrente(e)) {
+                                        log.warn("[DataInitializer] limpiar_demo.sql choco con otra transaccion (intento {}"
+                                                        + " de {}), reintento: {}", intento, INTENTOS_LIMPIEZA_DEMO,
+                                                        e.getMessage());
+                                        try {
+                                                Thread.sleep(5_000);
+                                        } catch (InterruptedException ie) {
+                                                Thread.currentThread().interrupt();
+                                                return false;
+                                        }
+                                        continue;
+                                }
+                                log.error("[DataInitializer] limpiar_demo.sql aborto y no se borro nada; NO se siembra la"
+                                                + " demo. Motivo: {}", e.getMessage());
+                                return false;
                         }
+                }
+        }
+
+        private static final int INTENTOS_LIMPIEZA_DEMO = 3;
+
+        private void limpiarDemoUnaVez() throws Exception {
+                String script = new ClassPathResource("db/demo/limpiar_demo.sql")
+                                .getContentAsString(StandardCharsets.UTF_8);
+                try (Connection conexion = jdbcTemplate.getDataSource().getConnection()) {
+                        boolean autoCommit = conexion.getAutoCommit();
                         conexion.setAutoCommit(false);
-                        try (Statement st = conexion.createStatement()) {
-                                st.execute(script);
+                        try {
+                                // is_local = true: vale solo para esta transaccion, no queda en la conexion del pool.
+                                try (PreparedStatement ps = conexion.prepareStatement(
+                                                "SELECT set_config('vigia.demo_emails_extra', ?, true)")) {
+                                        ps.setString(1, demoEmailsExtra == null ? "" : demoEmailsExtra);
+                                        ps.execute();
+                                }
+                                try (Statement st = conexion.createStatement()) {
+                                        st.execute(script);
+                                }
                                 conexion.commit();
                         } catch (Exception e) {
                                 conexion.rollback();
                                 throw e;
                         } finally {
                                 conexion.setAutoCommit(autoCommit);
-                                try (Statement st = conexion.createStatement()) {
-                                        st.execute("RESET vigia.demo_emails_extra");
-                                }
                         }
-                        log.info("[DataInitializer] Demo anterior borrada (limpiar_demo.sql).");
-                        return true;
-                } catch (Exception e) {
-                        log.error("[DataInitializer] limpiar_demo.sql aborto y no se borro nada; NO se siembra la demo. "
-                                        + "Motivo: {}", e.getMessage());
-                        return false;
                 }
+        }
+
+        // 40001 serializacion, 40P01 deadlock, 55P03 lock no disponible, 23503 FK (el worker colgo una fila de la
+        // demo justo antes del bloqueo). Las guardas del script (RAISE EXCEPTION, P0001) no se reintentan.
+        private static boolean esChoqueConcurrente(Throwable e) {
+                for (Throwable t = e; t != null; t = t.getCause()) {
+                        if (t instanceof java.sql.SQLException sql && sql.getSQLState() != null
+                                        && List.of("40001", "40P01", "55P03", "23503").contains(sql.getSQLState())) {
+                                return true;
+                        }
+                }
+                return false;
         }
 
         private void borrarTodo() {
