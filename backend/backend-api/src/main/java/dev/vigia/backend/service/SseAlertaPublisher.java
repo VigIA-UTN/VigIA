@@ -108,7 +108,11 @@ public class SseAlertaPublisher {
             list.remove(emitter);
         });
         emitter.onError((e) -> {
-            log.error("Error en cliente SSE para establecimiento {}", establecimientoId, e);
+            if (esDesconexion(e)) {
+                log.debug("Cliente SSE desconectado para establecimiento {} ({})", establecimientoId, e.getMessage());
+            } else {
+                log.error("Error en cliente SSE para establecimiento {}", establecimientoId, e);
+            }
             emitter.complete();
             list.remove(emitter);
         });
@@ -199,10 +203,27 @@ public class SseAlertaPublisher {
                         animal,
                         aislados);
             } catch (Exception e) {
-                log.error("Error enviando alerta por SSE a un cliente, removiendo emitter.", e);
+                if (esDesconexion(e)) {
+                    log.debug("Cliente SSE desconectado ({}), removiendo emitter.", e.getMessage());
+                } else {
+                    log.error("Error enviando alerta por SSE a un cliente, removiendo emitter.", e);
+                }
                 list.remove(emitter);
             }
         }
+    }
+
+    /**
+     * Cerrar la pestaña corta el stream sin aviso: el próximo envío (alerta o heartbeat) falla con
+     * "Broken pipe". Es el fin normal de un cliente SSE, no un error del servidor.
+     */
+    static boolean esDesconexion(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof IOException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void enviarMails(Long alertaId, Long establecimientoId) {

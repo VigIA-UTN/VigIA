@@ -108,6 +108,17 @@ class SseAlertaPublisherTest {
     }
 
     @Test
+    void brokenPipe_esDesconexionDelCliente_noError() {
+        // Así llega en prod cuando se cierra la pestaña: el IOException viene envuelto.
+        Exception brokenPipe = new org.springframework.web.context.request.async.AsyncRequestNotUsableException(
+                "ServletOutputStream failed to flush", new java.io.IOException("Broken pipe"));
+        assertThat(SseAlertaPublisher.esDesconexion(brokenPipe)).isTrue();
+        assertThat(SseAlertaPublisher.esDesconexion(new RuntimeException(new java.io.IOException("Broken pipe"))))
+                .isTrue();
+        assertThat(SseAlertaPublisher.esDesconexion(new IllegalStateException("otra cosa"))).isFalse();
+    }
+
+    @Test
     void alertaNueva_sinClientesConectados_igualMandaMail() {
         Establecimiento establecimiento = animalDelEstablecimiento(1L);
         Alerta alerta = new Alerta();
