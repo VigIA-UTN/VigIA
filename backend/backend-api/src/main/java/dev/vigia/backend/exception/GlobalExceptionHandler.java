@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -41,6 +42,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleAlertaYaProcesada(AlertaYaProcesadaException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(errorBody(HttpStatus.CONFLICT, ex.getMessage()));
+    }
+
+    /**
+     * El cliente de un stream SSE se desconectó: la respuesta ya no se puede escribir, así que no hay
+     * nada que devolver. Sin este handler Spring loguea un WARN por cada pestaña cerrada.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClienteDesconectado(AsyncRequestNotUsableException ex) {
+        // Nada que responder.
     }
 
     private Map<String, Object> errorBody(HttpStatus status, String message) {
