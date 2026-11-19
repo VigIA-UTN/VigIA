@@ -315,7 +315,7 @@ export default function ConfiguracionEstablecimientoPage() {
           <span className="cfg-breadcrumb-current">Establecimientos</span>
         )}
         <span className="cfg-breadcrumb-sep"><i className="bi bi-chevron-right" /></span>
-        <span className="cfg-breadcrumb-current">{nombreGuardado}</span>
+        <span className="cfg-breadcrumb-current cfg-breadcrumb-name" title={nombreGuardado}>{nombreGuardado}</span>
         <span className="cfg-breadcrumb-sep"><i className="bi bi-chevron-right" /></span>
         <span className="cfg-breadcrumb-current">Configuración</span>
       </div>

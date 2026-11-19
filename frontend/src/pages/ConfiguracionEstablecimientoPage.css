@@ -41,6 +41,19 @@
   color: #6b7280;
 }
 
+/* El breadcrumb siempre en 1 línea: solo el nombre del establecimiento se achica con "…" */
+.cfg-breadcrumb > * {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.cfg-breadcrumb > .cfg-breadcrumb-name {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Header ─────────────────────────────────────────────────────────────── */
 .cfg-title {
   font-size: 1.75rem;
@@ -642,6 +655,17 @@
     padding: 1rem;
   }
 
+  /* Estado en su propia fila arriba; Volver y Guardar lado a lado, mitad del ancho cada uno */
+  .cfg-savebar-status {
+    flex-basis: 100%;
+  }
+
+  .cfg-savebar .cfg-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 0.65rem 1rem;
+  }
+
   .cfg-card-body {
     flex-direction: column;
   }
@@ -651,25 +675,9 @@
     height: 1px;
   }
 
+  /* Los botones de secciones ocupaban media pantalla en mobile: se navega scrolleando */
   .cfg-nav {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
-    padding: 8px;
-    overflow-x: visible;
-  }
-
-  .cfg-nav-item {
-    width: 100%;
-    padding: 8px 10px;
-    font-size: 0.85rem;
-    gap: 8px;
-  }
-
-  .cfg-nav-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: none;
   }
 }
 

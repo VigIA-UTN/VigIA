@@ -127,7 +127,7 @@ export default function EstablecimientosPage() {
   return (
     <div className="vigia-page-container">
       <Container>
-        <div className="vigia-page-header">
+        <div className="vigia-page-header establecimientos-header">
           <h2 className="vigia-page-title">Establecimientos</h2>
           <div className="d-flex gap-3">
             <Form.Control
@@ -135,7 +135,6 @@ export default function EstablecimientosPage() {
               placeholder="Buscar por nombre o #id..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ maxWidth: '300px' }}
             />
             {rol === 'ADMINISTRADOR' && (
               <Button className="btn-vigia-success text-nowrap" onClick={handleShowModal}>
