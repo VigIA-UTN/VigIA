@@ -161,6 +161,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           left: 0,
           bottom: 0,
           width: '350px',
+          maxWidth: '100%',
           backgroundColor: 'white',
           zIndex: 1000,
           boxShadow: '2px 0 10px rgba(0,0,0,0.2)',

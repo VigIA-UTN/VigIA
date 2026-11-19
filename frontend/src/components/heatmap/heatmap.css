@@ -483,3 +483,17 @@
 .hm-peri-poly {
     fill: url(#hm-peri-hatch);
 }
+/* Pestaña "Todo el rodeo": en mobile muestra "Todo" para no partir en 2 líneas */
+.hm-tab-short {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    .hm-tab-long {
+        display: none;
+    }
+
+    .hm-tab-short {
+        display: inline;
+    }
+}
