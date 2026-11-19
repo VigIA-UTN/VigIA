@@ -133,19 +133,20 @@ export default function AlertasPage() {
         <>
             <div className="vigia-page-container">
                 <Container>
-                    <div className="vigia-page-header">
+                    <div className="vigia-page-header alertas-header gap-3">
                         <div className="d-flex align-items-center gap-2">
                             <h2 className="vigia-page-title">Histórico de Alertas</h2>
                         </div>
-                        <div className="d-flex align-items-center gap-2">
-                            <Button className="btn-vigia-success" onClick={fetchAlertas} title="Actualizar">
+                        <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                            {/* text-nowrap: en mobile el título apretaba el botón y "Refrescar" partía en 2 líneas */}
+                            <Button className="btn-vigia-success text-nowrap" onClick={fetchAlertas} title="Actualizar">
                                 <i className="bi bi-arrow-clockwise" /> Refrescar
                             </Button>
                         </div>
                     </div>
 
-                    <div className="mb-4 mt-3 d-flex flex-wrap gap-3 p-3 bg-white rounded-3 shadow-sm" style={{ border: '1px solid #E2E8F0' }}>
-                        <div style={{ flex: '1 1 200px' }}>
+                    <div className="alertas-filtros">
+                        <div>
                             <Form.Label className="text-muted fw-semibold small mb-1">Estado</Form.Label>
                             <Form.Select 
                                 value={filtroEstado} 
@@ -158,7 +159,7 @@ export default function AlertasPage() {
                                 <option value="DESCARTADA">Descartadas</option>
                             </Form.Select>
                         </div>
-                        <div style={{ flex: '1 1 200px' }}>
+                        <div>
                             <Form.Label className="text-muted fw-semibold small mb-1">Tipo</Form.Label>
                             <Form.Select 
                                 value={filtroTipo} 
@@ -171,7 +172,7 @@ export default function AlertasPage() {
                                 <option value="GEOESPACIAL">Geoespacial</option>
                             </Form.Select>
                         </div>
-                        <div style={{ flex: '1 1 200px' }}>
+                        <div>
                             <Form.Label className="text-muted fw-semibold small mb-1">Severidad</Form.Label>
                             <Form.Select 
                                 value={filtroSeveridad} 

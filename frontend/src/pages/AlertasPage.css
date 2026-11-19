@@ -92,3 +92,135 @@
     background-color: #E6FFFA;
     color: #2C7A7B;
 }
+
+/* ── Filtros (Estado / Tipo / Severidad) ─────────────────────── */
+.alertas-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1rem;
+    margin: 1rem 0 1.5rem;
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.alertas-filtros > div {
+    flex: 1 1 200px;
+}
+
+/* ── Mobile ──────────────────────────────────────────────────── */
+@media (max-width: 767.98px) {
+    /* Refrescar debajo del título (no le roba ancho) y del mismo tamaño que el del Dashboard */
+    .alertas-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem !important;
+    }
+
+    .alertas-header .btn {
+        font-size: 0.82rem;
+        padding: 8px 16px;
+        border-radius: 20px;
+    }
+
+    /* Filtros en una sola línea con scroll lateral; el degradé a la derecha avisa que hay más.
+       El padding-right deja el último filtro fuera del degradé al llegar al final del scroll. */
+    .alertas-filtros {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 0.5rem;
+        padding: 0 24px 4px 0;
+        margin: 0.5rem 0 1rem;
+        background: none;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+        mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    }
+
+    .alertas-filtros > div {
+        flex: 0 0 160px;
+    }
+
+    /* Tabla → tarjetas: fila 1 ID + "Ver Detalle", fila 2 badges (tipo, severidad, estado), fila 3 fecha.
+       Columnas: 1 ID · 2 Tipo · 3 Severidad · 4 Fecha · 5 Estado · 6 Acciones. */
+    .vigia-table.alerta-row thead {
+        display: none;
+    }
+
+    .vigia-table.alerta-row,
+    .vigia-table.alerta-row tbody {
+        display: block;
+    }
+
+    .vigia-table.alerta-row tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        column-gap: 8px;
+        padding: 12px 16px;
+    }
+
+    /* Corte de línea forzado entre la fila ID/botón y la de badges */
+    .vigia-table.alerta-row tbody tr::after {
+        content: '';
+        order: 2;
+        flex-basis: 100%;
+    }
+
+    .vigia-table.alerta-row tbody td {
+        padding: 0;
+        font-size: 0.9rem;
+    }
+
+    .vigia-table.alerta-row tbody td:nth-child(1) {
+        order: 0;
+        flex: 1 1 0;
+        min-width: 0;
+        font-weight: 600;
+    }
+
+    .vigia-table.alerta-row tbody td:nth-child(6) {
+        order: 1;
+    }
+
+    .vigia-table.alerta-row tbody td:nth-child(2),
+    .vigia-table.alerta-row tbody td:nth-child(3),
+    .vigia-table.alerta-row tbody td:nth-child(5) {
+        order: 3;
+        margin-top: 8px;
+        /* Se reparten el ancho en partes iguales; min-width: max-content hace que uno largo
+           (p. ej. "AISLAMIENTO SOCIAL") no se corte sino que baje de línea y la fila siga llena. */
+        flex: 1 1 0;
+        min-width: max-content;
+    }
+
+    .alerta-row .severidad-badge,
+    .alerta-row .estado-alerta-badge {
+        display: block;
+        text-align: center;
+    }
+
+    .alerta-row td:nth-child(2) .tipo-badge {
+        flex: 1;
+        text-align: center;
+    }
+
+    .vigia-table.alerta-row tbody td:nth-child(4) {
+        order: 4;
+        flex-basis: 100%;
+        margin-top: 6px;
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+
+    .alerta-row .tipo-badge,
+    .alerta-row .severidad-badge,
+    .alerta-row .estado-alerta-badge {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+    }
+}
