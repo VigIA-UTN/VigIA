@@ -270,27 +270,52 @@
         display: none !important;
     }
 
-    /* Header: 3 filas → título / filtros / botones */
-    .animales-header-mobile {
-        flex-direction: column;
-        align-items: flex-start !important;
+    /* Header: 2 filas → título / [pestañas solo ícono ··· + Animal ⋮]. Los contenedores intermedios pasan a
+       display: contents para que título, pestañas y acciones sean ítems del mismo flex. */
+    .animales-top {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
         gap: 8px;
     }
 
-    /* Título toma fila completa → filtros quedan juntos en la siguiente línea */
-    .animales-header-mobile>div:first-child {
-        flex-wrap: wrap;
-        align-items: center;
+    .animales-header-mobile,
+    .animales-header-mobile > div:first-child {
+        display: contents !important;
     }
 
-    .animales-header-mobile>div:first-child .vigia-page-title {
+    .animales-top .vigia-page-title {
         flex-basis: 100%;
+    }
+
+    .animales-acciones {
+        margin-left: auto;
+    }
+
+    /* Todos los botones de la fila a 36px de alto */
+    .animales-top .btn-filter {
+        height: 36px;
+        padding: 0 12px;
+        justify-content: center;
+    }
+
+    .animales-acciones .btn {
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0 12px;
     }
 
     /* Barra de búsqueda full width */
     .mb-3.mt-3 .form-control {
         max-width: 100% !important;
         width: 100%;
+    }
+
+    /* IDs/nombres largos sin espacios pueden partirse: si no, ensanchan la tabla y aparece scroll lateral */
+    .animales-table-wrapper td {
+        overflow-wrap: anywhere;
     }
 
     /* Celdas más compactas */
@@ -305,8 +330,16 @@
     }
 
     /* Estado badge más compacto */
-    .estado-badge {
+    .estado-badge,
+    .estado-badge-celo {
         font-size: 0.75rem;
         min-width: 60px;
+        text-align: center;
+    }
+
+    /* Cada encabezado reserva 16px a la derecha para la flecha de orden: descentraba el título respecto de la
+       columna y sumaba ancho. En mobile el hueco solo existe en la columna ordenada (el span vacío se oculta). */
+    .animales-table-wrapper thead th span:empty {
+        display: none !important;
     }
 }
