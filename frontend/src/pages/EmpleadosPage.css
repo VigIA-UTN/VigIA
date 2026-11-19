@@ -57,7 +57,7 @@
         overflow-wrap: anywhere;
     }
 
-    .vigia-table.empleados-table tbody td[colspan] {
+    .vigia-table.empleados-table tbody tr td[colspan] {
         grid-column: 1 / -1;
     }
 

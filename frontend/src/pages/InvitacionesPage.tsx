@@ -134,7 +134,7 @@ export default function InvitacionesPage() {
   return (
     <div className="vigia-page-container">
       <Container>
-        <div className="vigia-page-header">
+        <div className="vigia-page-header invitaciones-header">
           <h2 className="vigia-page-title">Productores Invitados</h2>
           <Button
             className="btn-vigia-success"
@@ -156,18 +156,18 @@ export default function InvitacionesPage() {
         )}
 
         {/* Filtros */}
-        <div className="d-flex flex-column flex-md-row mb-4 gap-3">
+        <div className="invitaciones-filtros d-flex flex-column flex-md-row mb-4 gap-3">
           <Form.Control
             type="text"
             placeholder="Buscar por email..."
             value={emailFilter}
             onChange={(e) => setEmailFilter(e.target.value)}
-            style={{ flex: 1, maxWidth: '300px' }}
+            style={{ flex: 1 }}
           />
           <Form.Select 
             value={estadoFilter} 
             onChange={(e) => setEstadoFilter(e.target.value)}
-            style={{ flex: 1, maxWidth: '200px' }}
+            style={{ flex: 1 }}
           >
             <option value="">Todos los estados</option>
             <option value="PENDIENTE">PENDIENTE</option>
@@ -177,7 +177,7 @@ export default function InvitacionesPage() {
           <Form.Select 
             value={establecimientoFilter} 
             onChange={(e) => setEstablecimientoFilter(e.target.value)}
-            style={{ flex: 1, maxWidth: '250px' }}
+            style={{ flex: 1 }}
           >
             <option value="">Todos los establecimientos</option>
             {establecimientos.map(e => (
@@ -193,7 +193,7 @@ export default function InvitacionesPage() {
           </div>
         ) : (
           <div className="vigia-table-wrapper">
-            <table className="vigia-table">
+            <table className="vigia-table invitaciones-table">
               <thead>
                 <tr>
                   <th onClick={() => handleSort('nombreCompleto')} style={{cursor: 'pointer'}}>Nombre Completo {sortField === 'nombreCompleto' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
@@ -305,22 +305,13 @@ export default function InvitacionesPage() {
 
             <Form.Group controlId="invitacion-email" className="mb-3">
               <Form.Label>Email del Productor</Form.Label>
-              <div className="email-input-wrapper">
+              <div>
                 <Form.Control
                   type="email"
                   placeholder="correo@electronico.com"
                   {...register('email')}
                   isInvalid={!!errors.email}
-                  style={{ paddingRight: '2.5rem' }}
                 />
-                <button
-                  type="button"
-                  className="email-clear-btn"
-                  onClick={() => reset({ email: '', establecimientoId: 0 })}
-                  tabIndex={-1}
-                >
-                  ×
-                </button>
                 <Form.Control.Feedback type="invalid">
                   {errors.email?.message}
                 </Form.Control.Feedback>
