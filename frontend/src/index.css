@@ -184,9 +184,10 @@ body {
         min-height: 64px;
     }
 
-    /* Logo más grande en mobile */
+    /* Logo más grande en mobile. 44px + 2×10px de padding del trapecio = 64px, el alto de la navbar:
+       con más, el trapecio sobresale por debajo. */
     .navbar .navbar-logo {
-        max-height: 48px !important;
+        max-height: 44px !important;
     }
 }
 
@@ -223,6 +224,9 @@ body {
     top: 0;
     left: 0;
     height: 100vh;
+    /* 100vh en Android incluye el área detrás de la barra del navegador/sistema y tapaba "Cerrar sesión";
+       dvh es el alto realmente visible (el 100vh de arriba queda de fallback). */
+    height: 100dvh;
     width: 78vw;
     max-width: 300px;
     background: #1A3558;
@@ -296,10 +300,18 @@ body {
 /* Footer del drawer */
 .mobile-drawer-footer {
     padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+/* En el drawer el selector ocupa todo el ancho, igual que Mi Perfil / Cerrar sesión (pisa el maxWidth inline
+   que usa el navbar de escritorio). */
+.mobile-drawer-footer #navbar-establecimiento-selector {
+    max-width: none !important;
+    width: 100%;
 }
 
 /* Botón Salir en la Navbar */

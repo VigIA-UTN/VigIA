@@ -150,6 +150,9 @@ function NavScroll() {
                         </>
                     ) : (
                         <>
+                            <button className="mobile-drawer-link" onClick={() => handleNavLink('/dashboard')}>
+                                <i className="bi bi-house-door me-2" />Dashboard
+                            </button>
                             <button className="mobile-drawer-link" onClick={() => handleNavLink('/mapa')}>
                                 <i className="bi bi-map me-2" />Mapa
                             </button>
@@ -198,7 +201,7 @@ function NavScroll() {
                     </div>
                     <div className="mt-3">
                         <button
-                            className="btn btn-vigia-outline btn-sm w-100 mb-2"
+                            className="btn btn-outline-light btn-sm w-100 mb-2"
                             onClick={() => { setDrawerOpen(false); navigate('/perfil'); }}
                         >
                             Mi Perfil
