@@ -100,7 +100,7 @@ function NavScroll() {
 
             {/* ── Drawer lateral (solo mobile) ── */}
             <div
-                className="d-lg-none mobile-drawer"
+                className={`d-lg-none mobile-drawer${drawerOpen ? ' open' : ''}`}
                 style={{
                     transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
                 }}

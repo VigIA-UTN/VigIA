@@ -5,6 +5,36 @@
     min-width: 0;
 }
 
+/* Mobile: un poco más de aire a los costados (16px en vez de los 12px del container de Bootstrap) */
+@media (max-width: 767.98px) {
+    .animal-detail-container > .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
+
+/* Flecha de volver (solo mobile, a la izquierda del nombre) */
+.animal-back-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    margin-left: -6px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #1E3A5F;
+    font-size: 1.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.animal-back-btn:hover,
+.animal-back-btn:active {
+    background: rgba(30, 58, 95, 0.08);
+}
+
 .bateria-dot {
     display: inline-block;
     width: 7px;
@@ -163,4 +193,71 @@
 
 .vigia-table tbody tr.hist-row-manual td:first-child {
     box-shadow: inset 3px 0 0 #1E3A5F;
+}
+/* ── Historial reproductivo en mobile: tabla → tarjetas ──────────────────────
+   Columnas: 1 Estado · 2 Últ. parto · 3 Últ. inseminación · 4 Origen · 5 Registrado por · 6 Fecha · 7 Acciones.
+   [ESTADO]                [Editar]
+   ÚLT. PARTO   ÚLT. INSEMINACIÓN
+   ORIGEN       REGISTRADO POR
+   FECHA REGISTRO */
+@media (max-width: 767.98px) {
+    .vigia-table.repro-hist-table thead {
+        display: none;
+    }
+
+    .vigia-table.repro-hist-table,
+    .vigia-table.repro-hist-table tbody {
+        display: block;
+    }
+
+    .vigia-table.repro-hist-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 16px;
+        padding: 12px 12px 12px 15px;
+    }
+
+    .vigia-table.repro-hist-table tbody td {
+        padding: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* Estado ocupa la fila 1 entera; Acciones se superpone a la derecha (así sin Acciones no queda hueco) */
+    .vigia-table.repro-hist-table tbody td:nth-child(1) {
+        grid-column: 1 / -1;
+        grid-row: 1;
+    }
+
+    .vigia-table.repro-hist-table tbody td:nth-child(7) {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+        align-self: center;
+    }
+
+    .vigia-table.repro-hist-table td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #94A3B8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 2px;
+    }
+
+    /* El acento auto/manual pasa del primer td a la tarjeta entera */
+    .vigia-table.repro-hist-table tbody tr.hist-row-auto td:first-child,
+    .vigia-table.repro-hist-table tbody tr.hist-row-manual td:first-child {
+        box-shadow: none;
+    }
+
+    .vigia-table.repro-hist-table tbody tr.hist-row-auto {
+        box-shadow: inset 3px 0 0 #66C6EB;
+    }
+
+    .vigia-table.repro-hist-table tbody tr.hist-row-manual {
+        box-shadow: inset 3px 0 0 #1E3A5F;
+    }
 }

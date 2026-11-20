@@ -208,7 +208,12 @@ export default function AnimalDetailPage() {
         <div className="vigia-page-container animal-detail-container">
             <Container>
                 <div className="vigia-page-header mb-4 flex-wrap gap-3">
-                    <h2 className="vigia-page-title text-break pe-3 mb-0">
+                    <div className="d-flex align-items-center gap-2" style={{ minWidth: 0 }}>
+                    {/* Mobile: flecha de volver a la izquierda del nombre (en desktop queda el botón "Volver") */}
+                    <button type="button" className="animal-back-btn d-md-none" onClick={() => navigate('/animales')} aria-label="Volver" title="Volver">
+                        <i className="bi bi-arrow-left" />
+                    </button>
+                    <h2 className="vigia-page-title text-break pe-3 mb-0" style={{ minWidth: 0 }}>
                         {animal.alias || animal.idCaravanaOficial || `#${animal.id}`}
                         {animal.enCalibracion && (
                             <Badge bg="info" className="ms-3 align-middle" style={{ fontSize: '0.9rem' }}>
@@ -216,6 +221,7 @@ export default function AnimalDetailPage() {
                             </Badge>
                         )}
                     </h2>
+                    </div>
                     <div className="d-flex align-items-center gap-2 flex-shrink-0">
                         {rol === 'PRODUCTOR' && !isEditing && activeTab === 'ficha' && (
                             <Button
@@ -247,7 +253,7 @@ export default function AnimalDetailPage() {
                                 </Button>
                             </>
                         )}
-                        <Button variant="outline-secondary" className="px-4" onClick={() => navigate('/animales')}>
+                        <Button variant="outline-secondary" className="px-4 d-none d-md-inline-block" onClick={() => navigate('/animales')}>
                             <i className="bi bi-arrow-left me-2" /> Volver
                         </Button>
                     </div>

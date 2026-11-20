@@ -233,7 +233,12 @@ body {
     z-index: 1050;
     display: flex;
     flex-direction: column;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* La sombra solo con el drawer abierto: cerrado (translateX(-100%)) su difuminado asomaba en el borde izquierdo */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+}
+
+.mobile-drawer.open {
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
 }
 
