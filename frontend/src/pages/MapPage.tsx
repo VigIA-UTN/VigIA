@@ -491,7 +491,7 @@ export default function MapPage() {
   };
 
   return (
-    <div style={{ height: '100%', width: '100%', margin: 0, padding: 0, position: 'relative', overflow: 'hidden' }}>
+    <div className="mapa-page" style={{ height: '100%', width: '100%', margin: 0, padding: 0, position: 'relative', overflow: 'hidden' }}>
       <MapContainer
         ref={mapRef}
         center={center}

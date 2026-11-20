@@ -161,6 +161,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
           left: 0,
           bottom: 0,
           width: '350px',
+          maxWidth: '100%',
           backgroundColor: 'white',
           zIndex: 1000,
           boxShadow: '2px 0 10px rgba(0,0,0,0.2)',
@@ -195,7 +196,7 @@ export default function AlertSidebar({ onClose, externalAlert }: AlertSidebarPro
             }}
             onClick={() => setFiltroTipo(prev => prev === 'CELO' ? null : 'CELO')}
           >
-            <i className="bi bi-search"></i> Celo
+            <i className="bi bi-calendar-heart"></i> Celo
           </button>
           <button
             className="btn rounded-pill px-2 py-1 fw-semibold d-flex align-items-center gap-1"

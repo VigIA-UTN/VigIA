@@ -93,6 +93,8 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
         right: 0,
         bottom: 0,
         width: '400px',
+        // En mobile (< 400px) se salía por la izquierda y la X de cerrar quedaba fuera de pantalla
+        maxWidth: '100%',
         backgroundColor: '#F7FAFC',
         zIndex: 1000,
         boxShadow: '-2px 0 10px rgba(0,0,0,0.2)',
@@ -108,7 +110,7 @@ export default function AnimalDetailSidebar({ animalMapa, onClose, onAlertClick,
     >
       <div className="p-4 bg-white border-bottom" style={{ zIndex: 10, borderRadius: '12px 0 0 0' }}>
         <div className="d-flex justify-content-between align-items-start mb-2">
-          <button className="btn btn-link text-secondary p-0 border-0" onClick={handleClose}>
+          <button className="btn btn-link text-secondary p-0 border-0" onClick={handleClose} aria-label="Cerrar">
             <i className="bi bi-x-lg fs-5"></i>
           </button>
         </div>

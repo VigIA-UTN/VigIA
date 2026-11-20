@@ -83,7 +83,8 @@
   position: absolute;
   top: 20px;
   right: 20px;
-  z-index: 1000;
+  /* Debajo de los paneles (mapa de calor, sidebars: 1000) para no taparlos ni bloquear sus clicks */
+  z-index: 999;
   display: flex;
   gap: 10px
 }
@@ -100,8 +101,61 @@
   pointer-events: none;
 }
 
-@media (max-width: 600px) {
+/* Mobile: las 3 tarjetas de alertas pasan a una píldora compacta abajo a la izquierda (arriba del crédito de
+   Esri), así no compiten con los botones flotantes de arriba. Los !important pisan estilos inline / utilidades. */
+@media (max-width: 767.98px) {
   .resumen-alertas {
-    flex-direction: column;
+    top: auto;
+    right: auto;
+    bottom: 26px;
+    left: 10px;
+    gap: 0;
+    padding: 4px 2px;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+
+  .resumen-alertas .card {
+    min-width: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none;
+    border-radius: 0;
+  }
+
+  .resumen-alertas .card + .card {
+    border-left: 1px solid #E2E8F0;
+  }
+
+  .resumen-alertas .card-body {
+    padding: 2px 10px !important;
+  }
+
+  .resumen-alertas .card-title {
+    font-size: 0.62rem !important;
+    margin-bottom: 0 !important;
+  }
+
+  .resumen-alertas .card-text {
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+}
+/* Mobile: el crédito de Esri (obligatorio por sus términos) ocupaba varias líneas al pie del mapa.
+   Queda en 1 línea truncada con "…" y se expande al tocarla, como hace esri-leaflet. */
+@media (max-width: 767.98px) {
+  .mapa-page .leaflet-control-attribution {
+    max-width: calc(100vw - 20px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  .mapa-page .leaflet-control-attribution:hover,
+  .mapa-page .leaflet-control-attribution:active {
+    white-space: normal;
   }
 }

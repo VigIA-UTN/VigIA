@@ -57,18 +57,16 @@ export default function DiagnosticosPage() {
                     </span>
                 </div>
 
-                <div className="mb-3 mt-3 d-flex gap-3 flex-wrap align-items-center">
+                <div className="diag-filtros mb-3 mt-3 d-flex gap-3 flex-wrap align-items-center">
                     <Form.Control
                         type="text"
                         placeholder="Buscá por nombre o caravana"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        style={{ maxWidth: '400px' }}
                     />
                     <Form.Select
                         value={establecimiento}
                         onChange={e => setEstablecimiento(e.target.value)}
-                        style={{ maxWidth: '320px' }}
                     >
                         <option>Todos los establecimientos</option>
                         {establecimientos.map(e => (
@@ -78,7 +76,7 @@ export default function DiagnosticosPage() {
                 </div>
 
                 <div className="vigia-table-wrapper animales-table-wrapper">
-                    <table className="vigia-table">
+                    <table className="vigia-table diag-table">
                         <thead>
                             <tr>
                                 <th>Fecha</th>
@@ -120,8 +118,9 @@ export default function DiagnosticosPage() {
                                             </div>
                                         </td>
                                         <td className="col-mobile-hide">{r.establecimientoNombre || '—'}</td>
-                                        <td className="text-truncate" style={{ maxWidth: '260px' }}>{r.diagnostico}</td>
-                                        <td className="col-mobile-hide text-truncate" style={{ maxWidth: '300px' }}>{r.tratamiento || '—'}</td>
+                                        {/* data-label: encabezado visible en la tarjeta de mobile */}
+                                        <td className="text-truncate" style={{ maxWidth: '260px' }} data-label="Diagnóstico">{r.diagnostico}</td>
+                                        <td className="col-mobile-hide text-truncate" style={{ maxWidth: '300px' }} data-label="Indicación o tratamiento">{r.tratamiento || '—'}</td>
                                         <td className="col-mobile-hide">{r.veterinarioNombre}</td>
                                         <td className="text-center">
                                             <a

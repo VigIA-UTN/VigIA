@@ -17,8 +17,9 @@ const PRESETS = [
     { label: 'Este mes', range: () => thisMonthRange() },
 ];
 
-const TABS: { id: HeatScope; label: string }[] = [
-    { id: 'todo', label: 'Todo el rodeo' },
+// short: texto visible en mobile (el aria-label conserva `label`)
+const TABS: { id: HeatScope; label: string; short?: string }[] = [
+    { id: 'todo', label: 'Todo el rodeo', short: 'Todo' },
     { id: 'rodeo', label: 'Rodeo' },
     { id: 'animal', label: 'Animal' },
 ];
@@ -114,9 +115,11 @@ export default function HeatmapPanel({
                     </div>
                     <div className="hm-tabs" role="tablist">
                         {TABS.map(t => (
-                            <button key={t.id} type="button" role="tab" aria-selected={filter.scope === t.id}
+                            <button key={t.id} type="button" role="tab" aria-selected={filter.scope === t.id} aria-label={t.label}
                                 className={filter.scope === t.id ? 'active' : ''} onClick={() => setScope(t.id)}>
-                                {t.label}
+                                {t.short
+                                    ? <><span className="hm-tab-long">{t.label}</span><span className="hm-tab-short">{t.short}</span></>
+                                    : t.label}
                             </button>
                         ))}
                     </div>

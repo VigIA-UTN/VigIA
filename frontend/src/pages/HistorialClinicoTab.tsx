@@ -19,8 +19,9 @@ import './AnimalDetailPage.css';
 import './AnimalesPage.css';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-const TIPOS: [HistorialTipo, string][] = [
-    ['alerta', 'Alertas'], ['diagnostico', 'Diagnósticos'], ['estado_salud', 'Estados de salud'], ['intervencion', 'Intervenciones'],
+// 3er elemento: label corto para mobile (los chips van en grilla 2×2)
+const TIPOS: [HistorialTipo, string, string?][] = [
+    ['alerta', 'Alertas'], ['diagnostico', 'Diagnósticos'], ['estado_salud', 'Estados de salud', 'Salud'], ['intervencion', 'Intervenciones'],
 ];
 const TODOS_LOS_TIPOS: Record<HistorialTipo, boolean> = { alerta: true, diagnostico: true, estado_salud: true, intervencion: true };
 const TIPO_ICON: Record<HistorialTipo, string> = {
@@ -46,6 +47,26 @@ const errMsg = (err: unknown, fallback: string) => {
 const pad = (n: number) => String(n).padStart(2, '0');
 const fmtDia = (t: number) => { const d = new Date(t); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; };
 const fmtFecha = (iso: string) => { const [d, t] = iso.split('T'); const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y} ${t} h`; };
+
+/**
+ * Detalle que se abre/cierra animado (CSS: .hc-detail-wrap). Al cerrar queda montado solo mientras dura la
+ * transición y después se desmonta, así los cerrados no quedan en el DOM. La apertura anima con @starting-style.
+ */
+function DetalleColapsable({ open, children }: { open: boolean; children: React.ReactNode }) {
+    const [cerrando, setCerrando] = useState(false);
+    const [prevOpen, setPrevOpen] = useState(open);
+    if (open !== prevOpen) {
+        setPrevOpen(open);
+        setCerrando(!open);
+    }
+    if (!open && !cerrando) return null;
+    return (
+        <div className={`hc-detail-wrap${open ? ' open' : ''}`} inert={!open}
+            onTransitionEnd={e => { if (e.target === e.currentTarget && e.propertyName === 'grid-template-rows') setCerrando(false); }}>
+            <div className="hc-detail-inner">{children}</div>
+        </div>
+    );
+}
 
 function TipoIcon({ ev, size = 40 }: { ev: HistorialEvento; size?: number }) {
     const cls = ev.tipo === 'alerta' ? `hc-node hc-node-${ev.sev === 'ALTA' ? 'critico' : 'borde'}`
@@ -230,13 +251,15 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
                     <div className="hc-field">
                         <div className="hc-label">Tipo de evento</div>
                         <div className="hc-chips">
-                            {TIPOS.map(([k, l]) => (
+                            {TIPOS.map(([k, l, corto]) => (
                                 <button key={k} type="button" aria-pressed={tipos[k]} className={`hc-chip${tipos[k] ? ' on' : ''}`}
                                     onClick={() => setTipos(t => ({ ...t, [k]: !t[k] }))}>
                                     <span className={`hc-chip-icon hc-chip-${k}`}>
                                         <i className={`bi ${TIPO_ICON[k]}`} />
                                     </span>
-                                    <span>{l}</span>
+                                    <span className="hc-chip-label">
+                                        {corto ? <><span className="hc-label-long">{l}</span><span className="hc-label-short">{corto}</span></> : l}
+                                    </span>
                                     <span className="hc-chip-count">{porFecha.filter(e => e.tipo === k).length}</span>
                                 </button>
                             ))}
@@ -323,9 +346,9 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
                                                     <span className="hc-origen"><i className={`bi ${orgIcon}`} />{orgLabel}</span>
                                                 </div>
                                             </div>
-                                            <i className={`bi ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'} hc-chevron`} />
+                                            <i className={`bi bi-chevron-down hc-chevron${isOpen ? ' open' : ''}`} />
                                         </button>
-                                        {isOpen && (
+                                        <DetalleColapsable open={isOpen}>
                                             <div className="hc-detail">
                                                 <p>{ev.resumen}</p>
                                                 {!!ev.detalles?.length && (
@@ -351,7 +374,7 @@ export default function HistorialClinicoTab({ animalId, rol, onAnimalUpdated }: 
                                                     {alertaError?.evId === ev.id && <span role="alert" style={{ color: '#D50000', fontSize: '0.85rem' }}>{alertaError.msg}</span>}
                                                 </div>
                                             </div>
-                                        )}
+                                        </DetalleColapsable>
                                     </div>
                                 </div>
                             </div>

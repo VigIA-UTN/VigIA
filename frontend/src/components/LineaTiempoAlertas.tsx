@@ -101,6 +101,29 @@ const estadoToEvento = (e: EstadoReproductivoResponse): TimelineEvento => ({
 /** Clave de las alertas para los mapas de label/ícono: el anestro llega con tipo CELO. */
 const claveAlerta = (e: TimelineEvento) => (esAnestro(e) ? 'ANESTRO' : (e.tipo ?? '').toUpperCase());
 
+/** Label, ícono y clase de color de un evento (compartido por el rail de desktop y el feed de mobile). */
+function eventoMeta(evento: TimelineEvento) {
+  if (evento.tipoEvento === 'ALERTA') {
+    return {
+      label: TIPO_ALERTA_LABEL[claveAlerta(evento)] ?? evento.tipo ?? 'Alerta',
+      icon: TIPO_ALERTA_ICON[claveAlerta(evento)] ?? 'bi-bell-fill',
+      colorClass: `lt-nodo--alerta ${severidadClass(evento.severidad)}`,
+    };
+  }
+  if (evento.tipoEvento === 'ESTADO') {
+    return {
+      label: ESTADO_REPRODUCTIVO_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? 'Estado',
+      icon: 'bi-flag-fill',
+      colorClass: 'lt-nodo--estado',
+    };
+  }
+  return {
+    label: TIPO_INTERVENCION_LABEL[evento.tipoIntervencion ?? ''] ?? 'Intervención',
+    icon: TIPO_INTERVENCION_ICON[evento.tipoIntervencion?.toUpperCase() ?? ''] ?? 'bi-clipboard2-pulse-fill',
+    colorClass: 'lt-nodo--intervencion',
+  };
+}
+
 // ── Popup card ────────────────────────────────────────────────────────────────
 
 /** Apertura del detalle de una alerta desde su popup. */
@@ -287,30 +310,13 @@ interface NodoProps extends VerAlertaProps {
 
 function EventoNodo({ evento, position, index, ...verAlerta }: NodoProps) {
   const [open, setOpen] = useState(false);
-  const isAlerta = evento.tipoEvento === 'ALERTA';
-  const isEstado = evento.tipoEvento === 'ESTADO';
-
-  const nodeClass = [
-    'lt-nodo',
-    isAlerta ? `lt-nodo--alerta ${severidadClass(evento.severidad)}` : isEstado ? 'lt-nodo--estado' : 'lt-nodo--intervencion',
-  ].join(' ');
+  const { label, icon, colorClass } = eventoMeta(evento);
+  const nodeClass = `lt-nodo ${colorClass}`;
 
   const labelClass = [
     'lt-nodo-label',
     position === 'above' ? 'lt-nodo-label--above' : 'lt-nodo-label--below',
   ].join(' ');
-
-  const label = isAlerta
-    ? TIPO_ALERTA_LABEL[claveAlerta(evento)] ?? evento.tipo ?? 'Alerta'
-    : isEstado
-      ? ESTADO_REPRODUCTIVO_LABEL[evento.tipo ?? ''] ?? evento.tipo ?? 'Estado'
-      : TIPO_INTERVENCION_LABEL[evento.tipoIntervencion ?? ''] ?? 'Intervención';
-
-  const icon = isAlerta
-    ? TIPO_ALERTA_ICON[claveAlerta(evento)] ?? 'bi-bell-fill'
-    : isEstado
-      ? 'bi-flag-fill'
-      : TIPO_INTERVENCION_ICON[evento.tipoIntervencion?.toUpperCase() ?? ''] ?? 'bi-clipboard2-pulse-fill';
 
   return (
     <div className="lt-nodo-wrapper" style={{ '--nodo-index': index } as React.CSSProperties}>
@@ -339,6 +345,113 @@ function EventoNodo({ evento, position, index, ...verAlerta }: NodoProps) {
           {...verAlerta}
         />
       )}
+    </div>
+  );
+}
+
+// ── Feed vertical (mobile) ────────────────────────────────────────────────────
+
+/** Fecha corta para el feed: el mes ya está en el encabezado del grupo. */
+const fmtFeed = (iso: string) => new Date(iso).toLocaleString('es-AR', {
+  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+});
+
+const capitalizar = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+
+interface FeedItemProps extends VerAlertaProps {
+  evento: TimelineEvento;
+}
+
+function EventoFeedItem({ evento, onVerAlerta, abriendoAlertaId, alertaError }: FeedItemProps) {
+  const [expandido, setExpandido] = useState(false);
+  const { label, icon, colorClass } = eventoMeta(evento);
+  const isAlerta = evento.tipoEvento === 'ALERTA';
+  const repro = evento.estadoRepro;
+  const titulo = isAlerta ? `Alerta de ${label.toLowerCase()}` : repro ? `Estado: ${label}` : label;
+
+  return (
+    <li className="lt-feed-item">
+      <span className={`lt-feed-dot ${colorClass}`} aria-hidden="true"><i className={`bi ${icon}`} /></span>
+      <div className="lt-feed-card">
+        <div className="lt-feed-head">
+          <span className="lt-feed-title">{titulo}</span>
+          <time className="lt-feed-fecha" dateTime={evento.fecha}>{fmtFeed(evento.fecha)}</time>
+        </div>
+
+        {repro && (
+          <div className="lt-feed-meta">
+            Últ. parto: <strong>{formatDateOnly(repro.fechaUltimoParto)}</strong> · Últ. inseminación: <strong>{formatDateOnly(repro.fechaUltimaInseminacion)}</strong>
+          </div>
+        )}
+
+        {isAlerta && claveAlerta(evento) === 'ANESTRO' && evento.valorDetectado != null && (
+          <div className="lt-feed-meta"><strong>{Math.round(evento.valorDetectado)} días sin ciclo</strong></div>
+        )}
+
+        {/* Descripción a 2 líneas; tocarla la expande en el lugar */}
+        {!isAlerta && evento.descripcion && (
+          <button type="button" className={`lt-feed-desc${expandido ? ' open' : ''}`}
+            aria-expanded={expandido} onClick={() => setExpandido(e => !e)}>
+            "{evento.descripcion}"
+          </button>
+        )}
+
+        {evento.interventor && (
+          <div className="lt-feed-meta"><i className="bi bi-person-circle me-1" />{evento.interventor}</div>
+        )}
+
+        {evento.alertaAsociadaId && (
+          <div className="lt-feed-meta"><i className="bi bi-link-45deg me-1" />Asociada a alerta <strong>#{evento.alertaAsociadaId}</strong></div>
+        )}
+
+        {isAlerta && (
+          <div className="lt-feed-foot">
+            {evento.severidad && (
+              <span className={`lt-chip lt-chip--sev ${severidadClass(evento.severidad)}`}>{capitalizar(evento.severidad)}</span>
+            )}
+            {evento.estadoResolucion && (
+              <span className={`lt-chip lt-chip--estado estado-${evento.estadoResolucion.toLowerCase().replace(/_/g, '-')}`}>
+                {ESTADO_ALERTA_LABEL[evento.estadoResolucion] ?? evento.estadoResolucion}
+              </span>
+            )}
+            <button type="button" className="lt-popup-link lt-feed-ver" aria-label={`Ver alerta #${evento.id}`}
+              onClick={() => onVerAlerta(evento)} disabled={abriendoAlertaId === evento.id}>
+              {abriendoAlertaId === evento.id ? 'Abriendo...' : <>Ver <i className="bi bi-chevron-right" /></>}
+            </button>
+          </div>
+        )}
+        {isAlerta && alertaError?.id === evento.id && (
+          <div role="alert" style={{ color: '#D50000', fontSize: '0.8rem' }}>{alertaError.msg}</div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** Feed vertical para mobile: más reciente primero, agrupado por mes, contenido visible sin popups. */
+function EventoFeed({ eventos, ...verAlerta }: VerAlertaProps & { eventos: TimelineEvento[] }) {
+  const grupos: { key: string; titulo: string; eventos: TimelineEvento[] }[] = [];
+  for (const ev of [...eventos].reverse()) {
+    const d = new Date(ev.fecha);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    let grupo = grupos[grupos.length - 1];
+    if (grupo?.key !== key) {
+      grupo = { key, titulo: d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }), eventos: [] };
+      grupos.push(grupo);
+    }
+    grupo.eventos.push(ev);
+  }
+
+  return (
+    <div className="lt-feed">
+      {grupos.map(g => (
+        <section key={g.key} className="lt-feed-mes">
+          <h4 className="lt-feed-mes-titulo">{g.titulo}</h4>
+          <ol className="lt-feed-lista">
+            {g.eventos.map(ev => <EventoFeedItem key={`${ev.tipoEvento}-${ev.id}`} evento={ev} {...verAlerta} />)}
+          </ol>
+        </section>
+      ))}
     </div>
   );
 }
@@ -501,8 +614,15 @@ export default function LineaTiempoAlertas({ animalId, estados, onAlertaResuelta
       )}
 
       {/* ── Rail de la línea de tiempo ── */}
+      {/* Mobile: feed vertical en lugar del rail (CSS muestra uno u otro según el ancho) */}
       {cargado && !error && eventos.length > 0 && (
-        <div className={`lt-scroll-wrapper${loading ? ' lt-refrescando' : ''}`}>
+        <div className={`lt-feed-wrapper${loading ? ' lt-refrescando' : ''}`}>
+          <EventoFeed eventos={eventos} onVerAlerta={abrirAlerta} abriendoAlertaId={abriendoAlertaId} alertaError={alertaError} />
+        </div>
+      )}
+
+      {cargado && !error && eventos.length > 0 && (
+        <div className={`lt-scroll-wrapper lt-rail-desktop${loading ? ' lt-refrescando' : ''}`}>
           <div className="lt-rail-container" style={{ '--event-count': eventos.length } as React.CSSProperties}>
 
             {/* Eje horizontal */}

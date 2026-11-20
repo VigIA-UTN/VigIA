@@ -116,18 +116,16 @@ export default function EmpleadosPage() {
                 <div className="vigia-page-header">
                     <h2 className="vigia-page-title">Empleados</h2>
                 </div>
-                <div className="d-flex flex-column flex-md-row justify-content-between mb-4 gap-3">
+                <div className="empleados-filtros d-flex flex-column flex-md-row justify-content-between mb-4 gap-3">
                     <Form.Control
                         type="text"
                         placeholder="Buscar por nombre, email o establecimiento..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ maxWidth: '400px' }}
                     />
                     <Form.Select
                         value={roleFilter}
                         onChange={(e) => setRoleFilter(e.target.value)}
-                        style={{ maxWidth: '250px' }}
                     >
                         <option value="">Todos los roles</option>
                         <option value="PRODUCTOR">Productor</option>
@@ -144,7 +142,7 @@ export default function EmpleadosPage() {
                     </div>
                 ) : (
                     <div className="vigia-table-wrapper">
-                        <table className="vigia-table">
+                        <table className="vigia-table empleados-table">
                             <thead>
                                 <tr>
                                     <th onClick={() => handleSort('nombre')} style={{cursor: 'pointer'}}>Nombre Completo {sortField === 'nombre' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
