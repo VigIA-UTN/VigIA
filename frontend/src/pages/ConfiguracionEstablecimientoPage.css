@@ -686,3 +686,11 @@
   background-color: #f9fafb;
   color: #6b7280;
 }
+/* Mobile: sin la píldora "Solo el productor puede editar estos datos" (el input gris de solo lectura ya lo indica)
+   ni los subtítulos de Datos generales / Ubicación, para ahorrar alto. */
+@media (max-width: 767.98px) {
+  .cfg-badge-info,
+  .cfg-hide-mobile {
+    display: none;
+  }
+}

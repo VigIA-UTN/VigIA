@@ -279,8 +279,9 @@
         gap: 8px;
     }
 
-    .animales-header-mobile,
-    .animales-header-mobile > div:first-child {
+    /* Acotado a .animales-top: DiagnosticosPage también usa .animales-header-mobile */
+    .animales-top .animales-header-mobile,
+    .animales-top .animales-header-mobile > div:first-child {
         display: contents !important;
     }
 
@@ -341,5 +342,111 @@
        columna y sumaba ancho. En mobile el hueco solo existe en la columna ordenada (el span vacío se oculta). */
     .animales-table-wrapper thead th span:empty {
         display: none !important;
+    }
+}
+/* ── Diagnósticos (DiagnosticosPage importa este CSS): tabla → tarjetas en mobile ──
+   Columnas: 1 Fecha · 2 Animal · 3 Establecimiento · 4 Diagnóstico · 5 Tratamiento · 6 Veterinario · 7 Alerta.
+   [Animal / caravana]                 [#alerta]
+   DIAGNÓSTICO …
+   INDICACIÓN O TRATAMIENTO …
+   fecha · establecimiento · veterinario
+   Las columnas col-mobile-hide vuelven a mostrarse: en la tarjeta hay lugar. */
+@media (max-width: 767.98px) {
+    .vigia-table.diag-table thead {
+        display: none;
+    }
+
+    .vigia-table.diag-table,
+    .vigia-table.diag-table tbody {
+        display: block;
+    }
+
+    .vigia-table.diag-table tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        column-gap: 8px;
+        padding: 12px 16px;
+    }
+
+    /* Corte de línea entre la fila Animal/#alerta y el resto */
+    .vigia-table.diag-table tbody tr::after {
+        content: '';
+        order: 2;
+        flex-basis: 100%;
+    }
+
+    .vigia-table.diag-table tbody td {
+        display: block !important;
+        padding: 0;
+        min-width: 0;
+        /* pisa el width/max-width 220px de la 3ª columna de Animales (.animales-table-wrapper) */
+        width: auto;
+        max-width: none !important;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        font-size: 0.9rem;
+    }
+
+    .vigia-table.diag-table tbody td:nth-child(2) {
+        order: 0;
+        flex: 1 1 0;
+        font-weight: 600;
+    }
+
+    .vigia-table.diag-table tbody td:nth-child(7) {
+        order: 1;
+    }
+
+    .vigia-table.diag-table tbody td:nth-child(4),
+    .vigia-table.diag-table tbody td:nth-child(5) {
+        order: 3;
+        flex-basis: 100%;
+        margin-top: 8px;
+    }
+
+    .vigia-table.diag-table td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #94A3B8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 2px;
+    }
+
+    /* Pie: fecha · establecimiento · veterinario */
+    .vigia-table.diag-table tbody td:nth-child(1),
+    .vigia-table.diag-table tbody td:nth-child(3),
+    .vigia-table.diag-table tbody td:nth-child(6) {
+        order: 4;
+        margin-top: 8px;
+        font-size: 0.78rem;
+        color: #6b7280;
+    }
+
+    .vigia-table.diag-table tbody td:nth-child(3)::before,
+    .vigia-table.diag-table tbody td:nth-child(6)::before {
+        content: '· ';
+    }
+
+    /* Filas de estado (cargando / error / vacío): mensaje a todo el ancho con su estilo normal */
+    .vigia-table.diag-table tbody tr td[colspan] {
+        order: 0;
+        flex-basis: 100%;
+        margin-top: 0;
+        font-size: 0.9rem;
+    }
+}
+
+/* Diagnósticos: buscador y filtro de establecimiento con ancho acotado desde md; en mobile, ambos a todo el ancho */
+@media (min-width: 768px) {
+    .diag-filtros .form-control {
+        max-width: 400px;
+    }
+
+    .diag-filtros .form-select {
+        max-width: 320px;
     }
 }
