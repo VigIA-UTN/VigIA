@@ -115,6 +115,22 @@
   padding: 0 2rem 1.5rem;
 }
 
+/* Bootstrap le pone margin a los hijos del footer: el botón quedaba más angosto que los inputs */
+.modal-productor .modal-footer > * {
+  margin: 0;
+}
+
+/* Mobile: menos padding lateral para que inputs y botón aprovechen el ancho de la card */
+@media (max-width: 575.98px) {
+  .modal-productor .modal-body {
+    padding: 1.25rem 1rem;
+  }
+
+  .modal-productor .modal-footer {
+    padding: 0 1rem 1.25rem;
+  }
+}
+
 .modal-productor .form-label {
   color: #cbd5e1;
   font-size: 0.9rem;
@@ -138,34 +154,6 @@
   outline: none;
 }
 
-.email-input-wrapper {
-  position: relative;
-}
-
-.email-clear-btn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: #1B344D;
-  border: none;
-  border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: white;
-  font-size: 0.75rem;
-  line-height: 1;
-  padding: 0;
-}
-
-.email-clear-btn:hover {
-  background: #152b47;
-}
-
 .btn-generar {
   background-color: #8CC63F;
   border: none;
@@ -186,4 +174,98 @@
 .btn-generar:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* Mobile: "Nuevo" debajo del título (no le roba ancho) y del mismo tamaño que "+ Animal" en Animales */
+@media (max-width: 767.98px) {
+  .invitaciones-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .invitaciones-header .btn {
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+  }
+}
+
+/* Filtros: ancho acotado desde md; en mobile buscador y estado ocupan todo el ancho (mismo ancho los dos) */
+@media (min-width: 768px) {
+  .invitaciones-filtros .form-control {
+    max-width: 300px;
+  }
+
+  .invitaciones-filtros .form-select {
+    max-width: 200px;
+  }
+}
+
+/* Admin: 3er filtro (establecimiento) */
+@media (min-width: 768px) {
+  .invitaciones-filtros .form-select + .form-select {
+    max-width: 250px;
+  }
+}
+
+/* ── Mobile: tabla → tarjetas ──────────────────────────────────────────────
+   Columnas: 1 Nombre (avatar) · 2 Email · 3 Establecimiento · 4 Estado + eliminar.
+   [A] Nombre              [PENDIENTE] [🗑]
+       email
+       establecimiento
+   Email y establecimiento se indentan al ancho del avatar (36px + 0.75rem de gap). */
+@media (max-width: 767.98px) {
+  .vigia-table.invitaciones-table thead {
+    display: none;
+  }
+
+  .vigia-table.invitaciones-table,
+  .vigia-table.invitaciones-table tbody {
+    display: block;
+  }
+
+  .vigia-table.invitaciones-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .vigia-table.invitaciones-table tbody td {
+    padding: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .vigia-table.invitaciones-table tbody tr td[colspan] {
+    grid-column: 1 / -1;
+  }
+
+  .vigia-table.invitaciones-table tbody td:nth-child(1),
+  .vigia-table.invitaciones-table tbody td:nth-child(2),
+  .vigia-table.invitaciones-table tbody td:nth-child(3) {
+    grid-column: 1;
+  }
+
+  .vigia-table.invitaciones-table tbody td:nth-child(2),
+  .vigia-table.invitaciones-table tbody td:nth-child(3) {
+    padding-left: calc(36px + 0.75rem);
+    font-size: 0.85rem;
+  }
+
+  .vigia-table.invitaciones-table tbody td:nth-child(2) {
+    margin-top: -8px;
+  }
+
+  .vigia-table.invitaciones-table tbody td:nth-child(3) .establecimiento-tag {
+    font-size: 0.78rem;
+  }
+
+  .vigia-table.invitaciones-table tbody td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+  }
 }

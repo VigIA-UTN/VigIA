@@ -74,7 +74,23 @@
 .hc-meta small { font-size: 11px; font-weight: 500; color: #949494; }
 .hc-origen { padding: 4px 8px; border-radius: 6px; background: #EEF3F8; color: var(--hc-navy); font-size: 12px; font-weight: 500; }
 .hc-chevron { font-size: 16px; color: var(--hc-navy); padding-top: 4px; }
-.hc-detail { border-top: 1px solid #EBF1F5; padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 16px; animation: hc-fade .2s ease; }
+.hc-detail { border-top: 1px solid #EBF1F5; padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 16px; }
+
+/* Apertura/cierre del detalle (también "Expandir/Contraer todo"): alto con grid 0fr→1fr + fundido.
+   Abrir 250ms ease-out (desacelera al llegar); cerrar 200ms ease-in (20% más rápido, se va sin demorar).
+   La transición de cada sentido es la del estado de destino. */
+.hc-detail-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 200ms ease-in, opacity 200ms ease-in; }
+.hc-detail-wrap.open { grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows 250ms ease-out, opacity 250ms ease-out; }
+/* Al montarse ya abierto, arranca desde cerrado para animar la apertura (sin soporte: aparece sin animar) */
+@starting-style { .hc-detail-wrap.open { grid-template-rows: 0fr; opacity: 0; } }
+.hc-detail-inner { min-height: 0; overflow: hidden; }
+.hc-chevron { transition: transform 200ms ease-in; }
+.hc-chevron.open { transform: rotate(180deg); transition: transform 250ms ease-out; }
+
+/* Movimiento reducido: sin animación visible. 1ms y no "none" para que transitionend llegue y el detalle se desmonte. */
+@media (prefers-reduced-motion: reduce) {
+    .hc-detail-wrap, .hc-detail-wrap.open, .hc-chevron, .hc-chevron.open { transition-duration: 1ms; }
+}
 .hc-detail p { margin: 0; font-size: 16px; line-height: 1.45; color: #263238; }
 .hc-detalles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 24px; font-size: 15px; line-height: 1.35; }
 .hc-fuente { background: var(--hc-bg); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -82,9 +98,35 @@
 .hc-fuente-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; }
 .hc-fuente-line i, .hc-fuente-line strong { color: var(--hc-navy); }
 .hc-fuente-reg { font-size: 13px; color: var(--hc-muted); }
-@keyframes hc-fade { from { opacity: 0; } to { opacity: 1; } }
 
-@media (max-width: 575px) {
-    .hc-row { grid-template-columns: 44px 40px minmax(0, 1fr); gap: 0 8px; }
-    .hc-hora { font-size: 13px; }
+/* Mobile: sin la columna de hora (la tarjeta ya muestra fecha y hora en su meta); la tarjeta gana ese ancho.
+   En los encabezados de mes se oculta la celda vacía que alineaba con esa columna. */
+@media (max-width: 767.98px) {
+    .hc-row { grid-template-columns: 40px minmax(0, 1fr); gap: 0 10px; }
+    .hc-hora,
+    .hc-month > div:first-child { display: none; }
+}
+
+/* Mobile: período igual que en la línea de tiempo reproductiva — segmentos a todo el ancho y del mismo tamaño,
+   botón de fechas debajo con el mismo ancho, alto (40px) y radio. */
+.hc-label-short { display: none; }
+
+@media (max-width: 767.98px) {
+    /* Botones "Registrar…": a todo el ancho, mismo alto/radio que los controles de período */
+    .hc-actions { flex-direction: column; gap: 8px; }
+    .hc-actions .btn { width: 100%; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+
+    /* Tipos de evento: grilla 2×2 de chips iguales, contador alineado a la derecha */
+    .hc-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .hc-chip { min-width: 0; padding: 0 10px 0 6px; gap: 6px; font-size: 13px; }
+    .hc-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hc-chip-count { margin-left: auto; }
+    .hc-label-long { display: none; }
+    .hc-label-short { display: inline; }
+
+    .hc-filters { padding: 12px; }
+    .hc-field { width: 100%; }
+    .hc-period { flex-direction: column; align-items: stretch; }
+    .hc-presets button { flex: 1 1 0; padding: 0 4px; font-size: 13px; }
+    .hc-date-btn { width: 100%; border-radius: 10px; }
 }

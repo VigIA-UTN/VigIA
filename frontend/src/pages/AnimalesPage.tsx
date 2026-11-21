@@ -542,22 +542,24 @@ export default function AnimalesPage() {
         <>
             <div className="vigia-page-container">
                 <Container>
+                    {/* animales-top: en desktop no cambia nada; en mobile junta pestañas y acciones en una fila (ver CSS) */}
+                    <div className="animales-top">
                     <div className="vigia-page-header animales-header-mobile">
                         <div className="d-flex align-items-center gap-2 flex-wrap">
                             <h2 className="vigia-page-title">Animales</h2>
-                            <button className={`btn-filter${activeTab === 'general' ? ' active' : ''}`} onClick={() => setActiveTab('general')}>
-                                <i className="bi bi-list" /> General
+                            <button className={`btn-filter${activeTab === 'general' ? ' active' : ''}`} onClick={() => setActiveTab('general')} title="General" aria-label="General">
+                                <i className="bi bi-list" /><span className="col-mobile-hide"> General</span>
                             </button>
-                            <button className={`btn-filter${activeTab === 'celo' ? ' active' : ''}`} onClick={() => setActiveTab('celo')}>
-                                <i className="bi bi-search" /> Celo
+                            <button className={`btn-filter${activeTab === 'celo' ? ' active' : ''}`} onClick={() => setActiveTab('celo')} title="Celo" aria-label="Celo">
+                                <i className="bi bi-calendar-heart" /><span className="col-mobile-hide"> Celo</span>
                             </button>
-                            <button className={`btn-filter${activeTab === 'salud' ? ' active' : ''}`} onClick={() => setActiveTab('salud')}>
-                                <i className="bi bi-heart" /> Salud
+                            <button className={`btn-filter${activeTab === 'salud' ? ' active' : ''}`} onClick={() => setActiveTab('salud')} title="Salud" aria-label="Salud">
+                                <i className="bi bi-heart" /><span className="col-mobile-hide"> Salud</span>
                             </button>
                         </div>
 
                     </div>
-                    <div>
+                    <div className="animales-acciones">
                         {(esProductor || (puedeGestionarCaravanas && selectedId)) && (
                             <div className="d-flex justify-content-end align-items-center gap-2">
                                 {esProductor && (
@@ -615,6 +617,7 @@ export default function AnimalesPage() {
                                 </Dropdown>
                             </div>
                         )}
+                    </div>
                     </div>
 
                     <div className="mb-3 mt-3 d-flex align-items-center gap-2 flex-wrap">
@@ -677,7 +680,8 @@ export default function AnimalesPage() {
                                                     <th onClick={() => handleSort('estadoReproductivo')} style={{ cursor: 'pointer' }}>
                                                         <div className="d-flex align-items-center justify-content-center">
                                                             <span className="d-none d-sm-inline">Estado Reproductivo</span>
-                                                            <span className="d-sm-none">Reproductivo</span>
+                                                            {/* En xs "Reproductivo" era lo más ancho de la columna y forzaba scroll lateral */}
+                                                            <span className="d-sm-none">Estado</span>
                                                             <span style={{ width: '16px', display: 'inline-block', marginLeft: '4px' }}>{sortField === 'estadoReproductivo' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
                                                         </div>
                                                     </th>
@@ -816,9 +820,11 @@ export default function AnimalesPage() {
                                                         </>
                                                     )}
                                                     <td className="text-center">
-                                                        <div className="d-flex justify-content-center gap-2">
-                                                            <Button variant="vigia-outline" size="sm" onClick={() => navigate(`/animales/${a.id}`)}>
-                                                                <i className="bi bi-eye"></i> Ver
+                                                        {/* En mobile los botones quedan solo con ícono (col-mobile-hide) para que la tabla entre
+                                                            en el ancho de la pantalla sin scroll lateral */}
+                                                        <div className="d-flex justify-content-center gap-1 gap-sm-2">
+                                                            <Button variant="vigia-outline" size="sm" onClick={() => navigate(`/animales/${a.id}`)} title="Ver" aria-label="Ver">
+                                                                <i className="bi bi-eye"></i><span className="col-mobile-hide"> Ver</span>
                                                             </Button>
                                                             {a.estadoActual === 'CON_ALERTA' && (
                                                                 <Button
@@ -830,11 +836,11 @@ export default function AnimalesPage() {
                                                                 >
                                                                     {loadingAlerta === a.id
                                                                         ? <Spinner as="span" animation="border" size="sm" />
-                                                                        : <><i className="bi bi-bell-fill"></i> Alerta</>}
+                                                                        : <><i className="bi bi-bell-fill"></i><span className="col-mobile-hide"> Alerta</span></>}
                                                                 </Button>
                                                             )}
                                                             {esProductor && (
-                                                                <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)}>
+                                                                <Button variant="outline-danger" size="sm" onClick={() => handleDarDeBaja(a.id)} title="Dar de baja" aria-label="Dar de baja">
                                                                     <i className="bi bi-trash"></i>
                                                                 </Button>
                                                             )}

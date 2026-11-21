@@ -42,3 +42,53 @@
   border-radius: 12px;
   color: #666;
 }
+
+/* ── Mobile: tarjeta compacta ──
+   Datos arriba (más chicos y juntos), acciones abajo en una fila: [Rechazar] [Aceptar Invitación ───],
+   el principal a la derecha y más ancho. Antes las acciones (min-width 220px) apretaban los datos al costado. */
+@media (max-width: 767.98px) {
+  .invitacion-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  .invitacion-info {
+    padding-right: 0;
+  }
+
+  .invitacion-info h4 {
+    margin-bottom: 8px;
+    font-size: 1.15rem;
+  }
+
+  .invitacion-info p {
+    margin-bottom: 2px;
+    font-size: 0.875rem;
+  }
+
+  .invitacion-actions {
+    flex-direction: row;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .invitacion-actions .btn {
+    width: auto !important;
+    margin: 0 !important;
+    height: 40px;
+    padding: 0 14px;
+    font-size: 0.9rem;
+    border-radius: 10px;
+  }
+
+  .invitacion-actions .btn:last-child {
+    flex: 1;
+  }
+
+  .empty-state {
+    padding: 24px 16px;
+  }
+}

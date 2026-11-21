@@ -449,12 +449,13 @@ export default function DashboardPage() {
                                                 <td>
                                                     <span className="dash-exec-rodeo-name">{row.nombre}</span>
                                                 </td>
-                                                <td className="dash-exec-cell-normal">{row.animales}</td>
-                                                <td>{cobCell(row.coberturaPorcentaje)}</td>
-                                                <td className="dash-exec-cell-normal">{row.alertasPendientes}</td>
-                                                <td>{alertas100Cell(row.alertasCada100, row.alertasPendientes)}</td>
-                                                <td className="dash-exec-cell-normal">{row.ventanasPerdidas}</td>
-                                                <td>{vacias90Cell(row.vaciasLargasPorcentaje)}</td>
+                                                {/* data-label: en mobile la tabla se apila como tarjetas y muestra el encabezado junto al valor */}
+                                                <td className="dash-exec-cell-normal" data-label="Animales">{row.animales}</td>
+                                                <td data-label="Cobertura">{cobCell(row.coberturaPorcentaje)}</td>
+                                                <td className="dash-exec-cell-normal" data-label="Alertas pend.">{row.alertasPendientes}</td>
+                                                <td data-label="Alertas /100">{alertas100Cell(row.alertasCada100, row.alertasPendientes)}</td>
+                                                <td className="dash-exec-cell-normal" data-label="Vent. perdidas">{row.ventanasPerdidas}</td>
+                                                <td data-label={`% vacías > ${re.umbrales.diasVaciaLarga} d`}>{vacias90Cell(row.vaciasLargasPorcentaje)}</td>
                                                 <td>
                                                     <button
                                                         className="dash-exec-ver-btn"
@@ -1276,7 +1277,8 @@ export default function DashboardPage() {
                         <h2>Resumen del establecimiento</h2>
                     )}
                 </div>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {/* flex-wrap: en mobile, si los filtros + Refrescar no entran, Refrescar baja de fila en vez de desbordar */}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
                     {/* Filtro por lote — visible en Centro de mando y Salud */}
                     {(activeTab === 'mando' || activeTab === 'salud') && rodeos.length > 0 && (
                         <div className="dash-lote-filter">

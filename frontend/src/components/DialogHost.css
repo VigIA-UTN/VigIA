@@ -36,6 +36,19 @@
     padding: 8px 28px 24px;
     justify-content: center;
     flex-wrap: nowrap;
+    /* Si un texto parte en 2 líneas (p. ej. "Sí, dar de baja" en mobile) ambos botones quedan del mismo alto */
+    align-items: stretch;
+}
+
+@media (max-width: 575.98px) {
+    .modal-dialog-vigia .modal-footer {
+        padding: 8px 20px 20px;
+    }
+
+    /* Un poco más chico para que los textos habituales entren en una línea */
+    .btn-dialog-vigia {
+        font-size: 0.95rem !important;
+    }
 }
 
 .dialog-vigia-icon {

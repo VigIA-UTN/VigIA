@@ -70,6 +70,7 @@ export default function PerimetroSidebar({
         left: 0,
         bottom: 0,
         width: '350px',
+        maxWidth: '100%',
         backgroundColor: 'white',
         zIndex: 1000,
         boxShadow: '2px 0 10px rgba(0,0,0,0.2)',
@@ -103,13 +104,15 @@ export default function PerimetroSidebar({
           {!editingPerimetro && !soloLectura && (
             <button
               onClick={onCreateNew}
-              className="btn btn-sm py-1 px-2 fw-semibold d-flex align-items-center gap-1"
+              className="btn px-3 fw-semibold d-flex align-items-center gap-1"
               style={{
                 backgroundColor: '#13D4FB',
                 color: '#1E3A5F',
                 border: 'none',
                 borderRadius: '8px',
-                fontSize: '0.8rem',
+                fontSize: '0.9rem',
+                // Mismo alto que "+ Animal" en mobile: área táctil más cómoda
+                height: '36px',
               }}
               title="Crear un nuevo perímetro"
             >

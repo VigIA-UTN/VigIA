@@ -315,7 +315,7 @@ export default function ConfiguracionEstablecimientoPage() {
           <span className="cfg-breadcrumb-current">Establecimientos</span>
         )}
         <span className="cfg-breadcrumb-sep"><i className="bi bi-chevron-right" /></span>
-        <span className="cfg-breadcrumb-current">{nombreGuardado}</span>
+        <span className="cfg-breadcrumb-current cfg-breadcrumb-name" title={nombreGuardado ?? undefined}>{nombreGuardado}</span>
         <span className="cfg-breadcrumb-sep"><i className="bi bi-chevron-right" /></span>
         <span className="cfg-breadcrumb-current">Configuración</span>
       </div>
@@ -369,7 +369,7 @@ export default function ConfiguracionEstablecimientoPage() {
                   </div>
                   <div>
                     <h2 className="cfg-card-title">Datos generales</h2>
-                    <p className="cfg-card-subtitle">Cómo se identifica el establecimiento en VigIA</p>
+                    <p className="cfg-card-subtitle cfg-hide-mobile">Cómo se identifica el establecimiento en VigIA</p>
                   </div>
                   {!editaDatos && <span className="cfg-badge-info">Solo el productor puede editar estos datos</span>}
                 </div>
@@ -399,7 +399,7 @@ export default function ConfiguracionEstablecimientoPage() {
                   </div>
                   <div>
                     <h2 className="cfg-card-title">Ubicación</h2>
-                    <p className="cfg-card-subtitle">Coordenadas del casco del establecimiento</p>
+                    <p className="cfg-card-subtitle cfg-hide-mobile">Coordenadas del casco del establecimiento</p>
                   </div>
                   {!editaDatos && <span className="cfg-badge-info">Solo el productor puede editar estos datos</span>}
                 </div>
