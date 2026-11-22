@@ -182,8 +182,8 @@ test.describe('H0013 - Alertas activas en el mapa (UI)', () => {
 
     await pines(page, 'critico').click();
 
-    await expect(page.getByText(`#${animal.id} en estado CRITICO`)).toBeVisible();
-    await expect(page.getByText(`#${animal.id} en estado BORDE`)).toBeVisible();
+    await expect(page.getByText(`#${animal.idCaravanaOficial} en estado CRITICO`)).toBeVisible();
+    await expect(page.getByText(`#${animal.idCaravanaOficial} en estado BORDE`)).toBeVisible();
     await expect(page.getByText('Reproductivo', { exact: true }).last()).toBeVisible();
     await expect(page.getByText('Sanitario', { exact: true }).last()).toBeVisible();
   });
@@ -194,7 +194,7 @@ test.describe('H0013 - Alertas activas en el mapa (UI)', () => {
     await abrirMapaCon(page, animal);
 
     await pines(page, 'critico').click();
-    await page.getByText(`#${animal.id} en estado CRITICO`).click();
+    await page.getByText(`#${animal.idCaravanaOficial} en estado CRITICO`).click();
 
     await expect(page.getByText('Ventana de inseminación')).toBeVisible();
     await expect(page.getByRole('button', { name: /Confirmar celo e inseminación/i })).toBeVisible();

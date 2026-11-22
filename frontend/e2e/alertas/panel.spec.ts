@@ -16,21 +16,21 @@ import {
  * crea sus alertas y mira solo la posición de las suyas: el escenario y los otros specs dejan otras pendientes.
  */
 
-/** Ids de animal de las filas del histórico, en el orden en que se muestran. */
-async function idsDelHistorico(page: Page): Promise<number[]> {
+/** Caravanas de las filas del histórico, en el orden en que se muestran. */
+async function caravanasDelHistorico(page: Page): Promise<string[]> {
   const celdas = await page.locator('tbody tr td:first-child').allInnerTexts();
-  return celdas.map((t) => Number(t.replace('#', ''))).filter((n) => !Number.isNaN(n));
+  return celdas.map((t) => t.trim()).filter((t) => t.startsWith('#')).map((t) => t.slice(1));
 }
 
-/** Ids de animal de las tarjetas del panel del mapa, en el orden en que se muestran. */
-async function idsDelPanel(page: Page): Promise<number[]> {
-  const titulos = await page.getByText(/^#\d+ en estado/).allInnerTexts();
-  return titulos.map((t) => Number(/^#(\d+)/.exec(t)![1]));
+/** Caravanas de las tarjetas del panel del mapa, en el orden en que se muestran. */
+async function caravanasDelPanel(page: Page): Promise<string[]> {
+  const titulos = await page.getByText(/^#\S+ en estado/).allInnerTexts();
+  return titulos.map((t) => /^#(\S+)/.exec(t)![1]);
 }
 
 /** Las posiciones de estos animales dentro de la lista, para comparar el orden relativo. */
-function posiciones(lista: number[], ...animales: number[]): number[] {
-  return animales.map((id) => lista.indexOf(id));
+function posiciones(lista: string[], ...animales: { idCaravanaOficial: string }[]): number[] {
+  return animales.map((a) => lista.indexOf(a.idCaravanaOficial));
 }
 
 test.describe('H0028 - Panel de alertas ordenado por severidad (UI)', () => {
@@ -57,9 +57,9 @@ test.describe('H0028 - Panel de alertas ordenado por severidad (UI)', () => {
 
     await page.goto('/alertas');
     await expect(filaAlerta(page, baja.id)).toBeVisible();
-    const orden = await idsDelHistorico(page);
+    const orden = await caravanasDelHistorico(page);
 
-    const [pNueva, pVieja, pMedia, pBaja] = posiciones(orden, altaNueva.id, altaVieja.id, mediaA.id, baja.id);
+    const [pNueva, pVieja, pMedia, pBaja] = posiciones(orden, altaNueva, altaVieja, mediaA, baja);
     expect([pNueva, pVieja, pMedia, pBaja].every((p) => p >= 0)).toBe(true);
     expect(pNueva).toBeLessThan(pVieja);
     expect(pVieja).toBeLessThan(pMedia);
@@ -79,15 +79,15 @@ test.describe('H0028 - Panel de alertas ordenado por severidad (UI)', () => {
 
     await abrirPanelAlertas(page);
     await expect(tarjetaPanel(page, baja.id)).toHaveCount(1);
-    const orden = await idsDelPanel(page);
+    const orden = await caravanasDelPanel(page);
 
-    const [pAlta, pMedia, pBaja] = posiciones(orden, alta.id, media.id, baja.id);
+    const [pAlta, pMedia, pBaja] = posiciones(orden, alta, media, baja);
     expect(pAlta).toBeGreaterThanOrEqual(0);
     expect(pAlta).toBeLessThan(pMedia);
     expect(pMedia).toBeLessThan(pBaja);
-    await expect(page.getByText(`#${alta.id} en estado CRITICO`)).toBeVisible();
-    await expect(page.getByText(`#${media.id} en estado BORDE`)).toBeVisible();
-    await expect(page.getByText(`#${baja.id} en estado NORMAL`)).toBeVisible();
+    await expect(page.getByText(`#${alta.idCaravanaOficial} en estado CRITICO`)).toBeVisible();
+    await expect(page.getByText(`#${media.idCaravanaOficial} en estado BORDE`)).toBeVisible();
+    await expect(page.getByText(`#${baja.idCaravanaOficial} en estado NORMAL`)).toBeVisible();
   });
 
   test('H0028-07 - Un grupo de animales aislados es una sola tarjeta y se decide con una sola acción', async ({
@@ -135,8 +135,8 @@ test.describe('H0028 - Panel de alertas ordenado por severidad (UI)', () => {
     await page.locator('.vigia-page-container select').nth(1).selectOption('CELO');
     await expect(filaAlerta(page, celoBaja.id)).toBeVisible();
 
-    const orden = await idsDelHistorico(page);
-    const [pAlta, pMedia, pBaja] = posiciones(orden, celoAlta.id, celoMedia.id, celoBaja.id);
+    const orden = await caravanasDelHistorico(page);
+    const [pAlta, pMedia, pBaja] = posiciones(orden, celoAlta, celoMedia, celoBaja);
     expect(pAlta).toBeGreaterThanOrEqual(0);
     expect(pAlta).toBeLessThan(pMedia);
     expect(pMedia).toBeLessThan(pBaja);

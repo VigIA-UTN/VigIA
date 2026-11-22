@@ -1,7 +1,7 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import { obtenerUsuarioPorClave } from '../fixtures/credenciales';
 import { tokenPorClave } from './api.helper';
-import { AHORA, sql } from './salud.helper';
+import { AHORA, caravanaDe, sql } from './salud.helper';
 
 /**
  * Datos y accesos para los flujos del ciclo de vida de las alertas (E4).
@@ -81,9 +81,10 @@ export async function abrirPanelAlertas(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Alertas', exact: true })).toBeVisible();
 }
 
-/** Tarjeta de un animal en el panel de alertas del mapa ("#123 en estado CRITICO"). */
+/** Tarjeta de un animal en el panel de alertas del mapa ("#A-102 en estado CRITICO", con su caravana oficial). */
 export function tarjetaPanel(page: Page, animalId: number) {
-  return page.getByText(new RegExp(`^#${animalId} en estado`));
+  const caravana = caravanaDe(animalId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return page.getByText(new RegExp(`^#${caravana} en estado`));
 }
 
 /** Abre el detalle de la alerta de ese animal desde el panel del mapa. */
