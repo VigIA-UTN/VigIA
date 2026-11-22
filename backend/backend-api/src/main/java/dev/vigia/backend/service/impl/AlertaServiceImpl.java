@@ -504,6 +504,7 @@ public class AlertaServiceImpl implements AlertaService {
                                 .subtipo(alerta.getTipo())
                                 .severidad(alerta.getSeveridad() != null ? alerta.getSeveridad().name() : null)
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
+                                .animalIdentificador(alerta.getAnimal() != null ? alerta.getAnimal().getIdCaravanaOficial() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
                                 .tsConfirmacion(alerta.getTsConfirmacion())
                                 .latitud(alerta.getLatitud())

@@ -5,7 +5,10 @@ export interface AlertaResponse {
   tipo: string;
   /** Tipo crudo de la alerta ('Anestro Detectado', 'Celo Detectado', ...); `tipo` lleva el disparador. */
   subtipo?: string | null;
+  /** Clave interna del animal: para rutas y búsquedas, no para mostrar. */
   animalId: number;
+  /** Caravana oficial del animal: lo que se muestra como "#…". */
+  animalIdentificador?: string | null;
   tsGeneracion: string;
   /** Momento en que se confirmó, descartó o archivó la alerta. */
   tsConfirmacion?: string | null;
@@ -46,6 +49,10 @@ export interface DetalleAislamiento {
   /** Horas de telemetría que analiza el worker (el acumulado fuera del grupo es dentro de esta ventana). */
   ventanaHoras?: number | null;
 }
+
+/** Número que ve el usuario para el animal de la alerta: la caravana oficial, no la clave interna. */
+export const identificadorAnimal = (a: Pick<AlertaResponse, 'animalId' | 'animalIdentificador'>) =>
+  a.animalIdentificador || String(a.animalId);
 
 /** Alerta geoespacial de aislamiento social: uno o más animales lejos del rodeo. */
 export const esAislamiento = (a: { tipo?: string | null }) => /AISLAMIENTO/i.test(a.tipo ?? '');

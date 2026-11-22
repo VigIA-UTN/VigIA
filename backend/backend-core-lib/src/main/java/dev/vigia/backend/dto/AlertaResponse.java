@@ -16,6 +16,8 @@ public class AlertaResponse {
     private String severidad;
     private EstadoAlerta estado;
     private Long animalId;
+    /** Caravana oficial del animal: lo que se muestra como "#…". animalId es la clave interna (rutas). */
+    private String animalIdentificador;
     private LocalDateTime tsGeneracion;
     private LocalDateTime tsConfirmacion;
     private Double latitud;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { intervenirAlerta } from '../api/alertaApi';
+import { intervenirAlerta, identificadorAnimal } from '../api/alertaApi';
 import type { AlertaResponse, TipoIntervencion, TipoEstadoSaludResultante } from '../api/alertaApi';
 
 const TIPO_LABELS: Record<TipoIntervencion, string> = {
@@ -43,7 +43,7 @@ export default function IntervencionFormPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const displayName = animalName ?? `Vaca #${alerta.animalId}`;
+  const displayName = animalName ?? `Vaca #${identificadorAnimal(alerta)}`;
 
   const handleClose = () => {
     setIsClosing(true);
