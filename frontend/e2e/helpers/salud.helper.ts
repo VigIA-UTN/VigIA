@@ -95,9 +95,16 @@ export async function diagnosticarPorApi(
   return (await creado.json()).id as number;
 }
 
-/** Fila del Histórico de Alertas de un animal: la columna muestra su id interno (#123). */
+/** Caravana oficial del animal: lo que la app muestra como "#…" (el id interno es solo para rutas). */
+export function caravanaDe(animalId: number): string {
+  const caravana = sql(`SELECT id_caravana_oficial FROM animales WHERE id = ${animalId};`);
+  if (!caravana) throw new Error(`No existe el animal ${animalId}`);
+  return caravana;
+}
+
+/** Fila del Histórico de Alertas de un animal: la columna muestra su caravana oficial (#A-102). */
 export function filaAlerta(page: Page, animalId: number) {
-  return page.getByRole('row').filter({ has: page.getByRole('cell', { name: `#${animalId}`, exact: true }) });
+  return page.getByRole('row').filter({ has: page.getByRole('cell', { name: `#${caravanaDe(animalId)}`, exact: true }) });
 }
 
 /** Abre el Histórico de Alertas y el detalle de la alerta de ese animal. */

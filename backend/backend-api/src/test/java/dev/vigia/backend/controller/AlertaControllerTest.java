@@ -718,6 +718,7 @@ class AlertaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].tipo").value("AISLAMIENTO_SOCIAL"))
+                .andExpect(jsonPath("$[0].animalIdentificador").value("CAR-001"))
                 .andExpect(jsonPath("$[0].animalesAislados.length()").value(1))
                 .andExpect(jsonPath("$[0].animalesAislados[0].length()").value(9))
                 .andExpect(jsonPath("$[0].animalesAislados[0].tsRegreso").isEmpty())

@@ -1053,6 +1053,7 @@ public class AnimalServiceImpl implements AnimalService {
                                 .tipo(alerta.getTipo())
                                 .subtipo(alerta.getTipo())
                                 .animalId(alerta.getAnimal() != null ? alerta.getAnimal().getId() : null)
+                                .animalIdentificador(alerta.getAnimal() != null ? alerta.getAnimal().getIdCaravanaOficial() : null)
                                 .tsGeneracion(alerta.getTsGeneracion())
                                 .latitud(alerta.getLatitud())
                                 .longitud(alerta.getLongitud())

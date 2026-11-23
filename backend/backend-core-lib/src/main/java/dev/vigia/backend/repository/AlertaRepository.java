@@ -134,8 +134,9 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
                      @Param("desde") LocalDateTime desde,
                      @Param("hasta") LocalDateTime hasta);
 
-       @Query("SELECT a FROM Alerta a " +
-                     "WHERE a.animal.establecimiento.id = :establecimientoId " +
+       // JOIN FETCH: la respuesta muestra la caravana oficial del animal; sin esto es una consulta por animal.
+       @Query("SELECT a FROM Alerta a JOIN FETCH a.animal an " +
+                     "WHERE an.establecimiento.id = :establecimientoId " +
                      "AND (:estado IS NULL OR a.estado = :estado) " +
                      "AND a.disparador IN :disparadores " +
                      "AND (:severidad IS NULL OR a.severidad = :severidad) " +

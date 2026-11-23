@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { AlertaResponse, AlertaDetalleResponse, AnimalAislado, SeveridadNivel, DetalleGeoespacial } from '../api/alertaApi';
-import { updateAlertaEstado, getAlertaDetalle, esAnestro, esAislamiento, estadoAislado } from '../api/alertaApi';
+import { updateAlertaEstado, getAlertaDetalle, esAnestro, esAislamiento, estadoAislado, identificadorAnimal } from '../api/alertaApi';
 import { formatMinutos } from '../utils/fechas';
 import { SEVERIDAD } from '../utils/severidadColores';
 import SanitarioAlertDetail, { SeveridadBadge } from './SanitarioAlertDetail';
@@ -82,7 +82,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   const ventanaHoras = detAisl?.ventanaHoras ?? 24;
   const tituloAislamiento = aislados.length > 1
     ? `${aislados.length} animales aislados del rodeo`
-    : `#${aislados[0]?.identificador ?? alerta.animalId} aislado del rodeo`;
+    : `#${aislados[0]?.identificador ?? identificadorAnimal(alerta)} aislado del rodeo`;
 
   // Contador en vivo del tiempo fuera del perímetro (tick cada segundo)
   const [segundosVivoFuera, setSegundosVivoFuera] = useState<number>(0);
@@ -189,7 +189,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
   let windowStart = new Date();
   let windowEnd = new Date();
   
-  const caravanaText = detalle?.animalCaravanaOficial ? detalle.animalCaravanaOficial : alerta.animalId;
+  const caravanaText = detalle?.animalCaravanaOficial || identificadorAnimal(alerta);
   const animalName = detalle?.animalAlias || 'Vaca';
   // Link a la ficha, salvo que el panel ya esté abierto dentro de la ficha de este animal
   const fichaAnimal = `/animales/${alerta.animalId}`;
@@ -386,7 +386,7 @@ export default function AlertDetailSidebar({ alerta, onClose, onActionComplete, 
                 <p className="m-0" style={{ color: '#3F3F3F', fontSize: '0.95rem' }}>
                   {aislados.length > 1
                     ? 'Se estima que estos animales se alejaron del rodeo. Andá a revisarlos.'
-                    : `Se estima que #${aislados[0]?.identificador ?? alerta.animalId} se alejó del rodeo. Andá a revisarlo.`}
+                    : `Se estima que #${aislados[0]?.identificador ?? identificadorAnimal(alerta)} se alejó del rodeo. Andá a revisarlo.`}
                 </p>
 
                 <div>
