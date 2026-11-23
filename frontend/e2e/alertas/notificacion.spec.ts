@@ -77,7 +77,7 @@ test.describe('H0028 - Alertas nuevas en pantalla sin recargar (UI)', () => {
 
     // Es la más reciente de las de severidad ALTA: queda primera de la lista.
     await expect(filaAlerta(page, animal.id)).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('tbody tr').first()).toContainText(`#${animal.id}`);
+    await expect(page.locator('tbody tr').first()).toContainText(`#${animal.idCaravanaOficial}`);
     await expect(filaAlerta(page, animal.id)).toContainText('PENDIENTE');
   });
 });

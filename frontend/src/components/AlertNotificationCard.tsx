@@ -1,4 +1,4 @@
-import { esAislamiento, esAnestro, textoAccionRecomendada, volvioAlGrupo, type AlertaResponse } from '../api/alertaApi';
+import { esAislamiento, esAnestro, identificadorAnimal, textoAccionRecomendada, volvioAlGrupo, type AlertaResponse } from '../api/alertaApi';
 import { formatMinutos } from '../utils/fechas';
 import SidebarCard, { type Categoria, type Severidad } from './SidebarCard';
 import DatoDesactualizadoBadge from './DatoDesactualizadoBadge';
@@ -69,9 +69,10 @@ export default function AlertNotificationCard({
   const aislamiento = esAislamiento(alerta);
   const aislados = alerta.animalesAislados ?? [];
 
-  let titulo = anestro ? `#${alerta.animalId} en anestro` : `#${alerta.animalId} en estado ${ESTADO_ANIMAL[severidad]}`;
+  const idAnimal = identificadorAnimal(alerta);
+  let titulo = anestro ? `#${idAnimal} en anestro` : `#${idAnimal} en estado ${ESTADO_ANIMAL[severidad]}`;
   if (aislamiento) {
-    titulo = aislados.length > 1 ? `${aislados.length} animales aislados del rodeo` : `#${aislados[0]?.identificador ?? alerta.animalId} aislado del rodeo`;
+    titulo = aislados.length > 1 ? `${aislados.length} animales aislados del rodeo` : `#${aislados[0]?.identificador ?? idAnimal} aislado del rodeo`;
   }
   // Los que volvieron siguen listados ("estuvo afuera"), pero el tiempo de la card es el de los que siguen afuera.
   const fuera = aislados.filter(a => !a.tsRegreso);

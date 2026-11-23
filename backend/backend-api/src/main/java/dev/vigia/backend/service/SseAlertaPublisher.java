@@ -271,6 +271,7 @@ public class SseAlertaPublisher {
         AlertaResponse response = AlertaResponse.builder()
                 .id(id)
                 .animalId(animalId)
+                .animalIdentificador(animal != null ? animal.getIdCaravanaOficial() : null)
                 .tipo(disparador != null ? disparador.name() : subtipo)
                 .subtipo(subtipo)
                 .severidad(severidad)

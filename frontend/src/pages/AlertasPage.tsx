@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Container, Spinner, Alert, Form, Button } from 'react-bootstrap';
-import { getAlertas, esAnestro, aplicarAlertaEnLista, combinarAlerta, type AlertaResponse } from '../api/alertaApi';
+import { getAlertas, esAnestro, aplicarAlertaEnLista, combinarAlerta, identificadorAnimal, type AlertaResponse } from '../api/alertaApi';
 import { useEstablecimientoStore } from '../store/establecimientoStore';
 import { useAlertasStream } from '../hooks/useAlertasStream';
 import AlertDetailSidebar from '../components/AlertDetailSidebar';
@@ -242,7 +242,7 @@ export default function AlertasPage() {
                                             const aislados = a.animalesAislados ?? [];
                                             const idAnimal = aislados.length > 1
                                                 ? `${aislados.length} animales`
-                                                : `#${aislados[0]?.identificador ?? a.animalId}`;
+                                                : `#${aislados[0]?.identificador ?? identificadorAnimal(a)}`;
                                             
                                             return (
                                                 <tr key={a.id}>
